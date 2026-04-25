@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Variables: modo claro ─────────────────────────────────── */
 :root {
   --bg:          #f0f4f8;
   --surface:     #ffffff;
@@ -21,6 +22,68 @@
   --sidebar-w:   260px;
 }
 
+/* ── Variables: modo oscuro ────────────────────────────────── */
+html.dark {
+  --bg:          #0f1623;
+  --surface:     #1a2535;
+  --surface2:    #1e2d40;
+  --border:      #2a3a50;
+  --text:        #e2eaf3;      /* ✅ CORREGIDO: claro y legible sobre fondos oscuros */
+  --text-muted:  #8da0b5;
+  --primary:     #2b8fd1;
+  --primary-dk:  #1d6fa4;
+  --primary-lt:  #1a2f42;
+  --accent:      #10c992;
+  --accent-lt:   #0d2a22;
+  --danger:      #e05260;
+  --danger-lt:   #2d1419;
+  --warn:        #f09230;
+  --warn-lt:     #2b1f0e;
+}
+
+/* En dark, el main content usa colores de superficie oscura */
+html.dark body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+html.dark .card {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+html.dark .input-field {
+  background: var(--surface2);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+html.dark .input-field::placeholder { color: #4d6070; }
+
+html.dark .form-section { background: var(--surface); border-color: var(--border); }
+
+html.dark .tabla th { background: var(--surface2); color: var(--text-muted); }
+html.dark .tabla td { border-color: var(--border); color: var(--text); }
+html.dark .tabla tr:hover td { background: var(--primary-lt); }
+
+html.dark .btn-secondary {
+  background: var(--surface2);
+  border-color: var(--border);
+  color: var(--text);
+}
+html.dark .btn-secondary:hover { background: var(--border); }
+
+html.dark .badge-blue   { background: var(--primary-lt); color: var(--primary); }
+html.dark .badge-green  { background: var(--accent-lt);  color: var(--accent); }
+html.dark .badge-red    { background: var(--danger-lt);  color: var(--danger); }
+html.dark .badge-orange { background: var(--warn-lt);    color: var(--warn); }
+
+html.dark h1, html.dark h2, html.dark h3, html.dark h4 { color: var(--text); }
+html.dark p, html.dark span, html.dark label { color: inherit; }
+html.dark .input-label { color: var(--text-muted); }
+
+/* ── Base ──────────────────────────────────────────────────── */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -28,21 +91,22 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  transition: background 0.25s, color 0.25s;
 }
 
-h1,h2,h3,h4 { font-family: "Syne", sans-serif; }
+h1, h2, h3, h4 { font-family: "Syne", sans-serif; }
 
-/* Scrollbar sutil */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-/* Utilidades globales */
+/* ── Componentes ───────────────────────────────────────────── */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 1.5rem;
+  transition: background 0.25s, border-color 0.25s;
 }
 
 .btn-primary {
@@ -60,8 +124,8 @@ h1,h2,h3,h4 { font-family: "Syne", sans-serif; }
   align-items: center;
   gap: 0.5rem;
 }
-.btn-primary:hover  { background: var(--primary-dk); }
-.btn-primary:active { transform: scale(0.98); }
+.btn-primary:hover    { background: var(--primary-dk); }
+.btn-primary:active   { transform: scale(0.98); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .btn-secondary {
@@ -94,7 +158,7 @@ h1,h2,h3,h4 { font-family: "Syne", sans-serif; }
 }
 .btn-danger:hover { background: #b02a37; }
 
-/* Inputs */
+/* ── Inputs ────────────────────────────────────────────────── */
 .input-field {
   width: 100%;
   padding: 0.55rem 0.85rem;
@@ -104,7 +168,7 @@ h1,h2,h3,h4 { font-family: "Syne", sans-serif; }
   font-size: 0.9rem;
   color: var(--text);
   background: var(--surface);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.25s;
   outline: none;
 }
 .input-field:focus {
@@ -124,13 +188,14 @@ h1,h2,h3,h4 { font-family: "Syne", sans-serif; }
 
 .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
 
-/* SecciÃ³n de formulario */
+/* ── Secciones de formulario ───────────────────────────────── */
 .form-section {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
   margin-bottom: 1.25rem;
+  transition: background 0.25s;
 }
 .form-section-header {
   background: var(--primary);
@@ -150,11 +215,20 @@ h1,h2,h3,h4 { font-family: "Syne", sans-serif; }
   display: grid;
   gap: 1rem;
 }
+
+/* Grid helpers — se aplican como clases en desktop, colapsan en móvil */
 .col-2 { grid-template-columns: 1fr 1fr; }
 .col-3 { grid-template-columns: 1fr 1fr 1fr; }
 .col-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
 
-/* Badge */
+@media (max-width: 900px) {
+  .col-3, .col-4 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .col-2, .col-3, .col-4 { grid-template-columns: 1fr; }
+}
+
+/* ── Badges ────────────────────────────────────────────────── */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -168,7 +242,7 @@ h1,h2,h3,h4 { font-family: "Syne", sans-serif; }
 .badge-red    { background: var(--danger-lt);  color: var(--danger); }
 .badge-orange { background: var(--warn-lt);    color: var(--warn); }
 
-/* Toast */
+/* ── Toast ─────────────────────────────────────────────────── */
 .toast-container {
   position: fixed;
   bottom: 1.5rem;
@@ -184,6 +258,7 @@ h1,h2,h3,h4 { font-family: "Syne", sans-serif; }
   font-size: 0.88rem;
   font-weight: 500;
   min-width: 260px;
+  max-width: 90vw;
   box-shadow: 0 4px 20px rgba(0,0,0,0.12);
   animation: slideIn 0.25s ease;
   display: flex;
@@ -199,7 +274,7 @@ h1,h2,h3,h4 { font-family: "Syne", sans-serif; }
   to   { transform: translateX(0);    opacity: 1; }
 }
 
-/* Tabla */
+/* ── Tabla ─────────────────────────────────────────────────── */
 .tabla { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 .tabla th {
   background: var(--surface2);
@@ -218,43 +293,86 @@ h1,h2,h3,h4 { font-family: "Syne", sans-serif; }
   color: var(--text);
 }
 .tabla tr:last-child td { border-bottom: none; }
-.tabla tr:hover td { background: var(--primary-lt); }
-.tabla tr { transition: background 0.15s; cursor: pointer; }
+.tabla tr:hover td      { background: var(--primary-lt); }
+.tabla tr               { transition: background 0.15s; cursor: pointer; }
 
-/* TOOLTIP */
+/* Tabla responsive — scroll horizontal en móvil */
+.tabla-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── Sidebar tooltip (collapsed) ───────────────────────────── */
+.sidebar-item { position: relative; }
 .tooltip {
+  display: none;
   position: absolute;
-  left: 70px;
+  left: calc(100% + 10px);
   top: 50%;
-  transform: translateY(-50%) scale(0.95);
-  background: #111;
+  transform: translateY(-50%);
+  background: #1a2535;
   color: #fff;
-  padding: 4px 8px;
+  padding: 0.35rem 0.75rem;
   border-radius: 6px;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   white-space: nowrap;
-  opacity: 0;
   pointer-events: none;
-  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  z-index: 999;
+}
+.sidebar-item:hover .tooltip { display: block; }
+
+/* ── Login responsive ──────────────────────────────────────── */
+.login-panel-left {
+  flex: 1;
+  background: #1a2535;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 3rem;
+  position: relative;
+  overflow: hidden;
 }
 
-/* Mostrar tooltip */
-.sidebar-item:hover + .tooltip {
-  opacity: 1;
-  transform: translateY(-50%) scale(1);
+.login-panel-right {
+  width: 440px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 3rem;
+  background: var(--surface);
+  box-shadow: -8px 0 40px rgba(0,0,0,0.08);
 }
 
-/* Hover animado suave */
-.sidebar-item:hover {
-  transform: scale(1.05);
-  background: rgba(255,255,255,0.08);
+.login-mobile-logo { display: none; }
+
+@media (max-width: 768px) {
+  .login-panel-left  { display: none; }
+  .login-panel-right {
+    width: 100%;
+    padding: 2.5rem 1.5rem;
+    min-height: 100vh;
+    justify-content: flex-start;
+    padding-top: 3rem;
+  }
+  .login-mobile-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+  }
 }
 
-/* Dark mode base */
-.dark {
-  --bg: #0f172a;
-  --text: #020617;
-  --card: #1e293b;
-  --card-border: #334155;
-  --primary: #6366f1;
+/* ── Responsive helpers generales ─────────────────────────── */
+@media (max-width: 768px) {
+  .hide-mobile { display: none !important; }
+  .card        { padding: 1rem; }
+
+  /* Stat cards del dashboard en 1 columna en móvil */
+  .stat-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .toast-container { left: 1rem; right: 1rem; bottom: 1rem; }
+  .toast           { min-width: unset; width: 100%; }
 }

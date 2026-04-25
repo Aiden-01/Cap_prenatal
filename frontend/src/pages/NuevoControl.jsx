@@ -65,7 +65,7 @@ export default function NuevoControl() {
             {inp("Peso (kg)", "peso_kg", "number")}
             {inp("Talla (cm)", "talla_cm", "number")}
             {inp("Circ. brazo (cm)", "circunferencia_brazo_cm", "number")}
-            {inp("Semanas gestaciÃ³n", "edad_embarazo_semanas", "number")}
+            {inp("Semanas gestación", "edad_embarazo_semanas", "number")}
             {inp("IMC", "imc", "number")}
           </div>
         </div>
@@ -80,7 +80,7 @@ export default function NuevoControl() {
               </div>
             ))}
             {inp("Cita siguiente", "cita_siguiente", "date")}
-            {inp("Personal de salud que atendiÃ³", "personal_atendio")}
+            {inp("Personal de salud que atendio", "personal_atendio")}
           </div>
         </div>
 

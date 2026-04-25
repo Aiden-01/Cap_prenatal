@@ -1,43 +1,34 @@
 ﻿import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard,
-  Users,
-  UserPlus,
-  BarChart3,
-  Settings,
-  X,
-  LogOut,
-  Menu,
-  Moon,
-  Sun
+  LayoutDashboard, Users, UserPlus, BarChart3,
+  Settings, X, LogOut, Menu, Moon, Sun
 } from "lucide-react";
 
 const NAV = [
   { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard, delay: 0 },
-  { label: "Pacientes", path: "/pacientes", icon: Users, delay: 50 },
-  { label: "Nueva", path: "/nuevo", icon: UserPlus, delay: 100 },
-  { label: "Reportes", path: "/reportes", icon: BarChart3, delay: 150 },
+  { label: "Pacientes",  path: "/pacientes", icon: Users,           delay: 50 },
+  { label: "Nueva",      path: "/nuevo",     icon: UserPlus,        delay: 100 },
+  { label: "Reportes",   path: "/reportes",  icon: BarChart3,       delay: 150 },
 ];
 
 const NAV_ADMIN = [
   { label: "Usuarios", path: "/usuarios", icon: Settings, delay: 200 },
 ];
 
+// Color fijo del sidebar — no depende del tema, siempre oscuro
+const SIDEBAR_BG = "#0f172a";          // slate-900
+const SIDEBAR_BG_ITEM_HOVER = "rgba(255,255,255,0.06)";
+
 export default function Sidebar({
-  usuario,
-  menuOpen,
-  setMenuOpen,
-  isMobile,
-  onLogout,
-  collapsed,
-  setCollapsed
+  usuario, menuOpen, setMenuOpen, isMobile,
+  onLogout, collapsed, setCollapsed
 }) {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate  = useNavigate();
+  const location  = useLocation();
 
   const [visible, setVisible] = useState(false);
-  const [dark, setDark] = useState(localStorage.getItem("theme") === "dark");
+  const [dark, setDark]       = useState(localStorage.getItem("theme") === "dark");
 
   // 🌙 DARK MODE
   useEffect(() => {
@@ -51,18 +42,11 @@ export default function Sidebar({
     }
   }, [dark]);
 
-  // 🎬 Animación
+  // 🎬 Animación entrada
   useEffect(() => {
-    if (!isMobile) {
-      setVisible(true);
-      return;
-    }
-
-    if (menuOpen) {
-      setTimeout(() => setVisible(true), 60);
-    } else {
-      setVisible(false);
-    }
+    if (!isMobile) { setVisible(true); return; }
+    if (menuOpen)  { setTimeout(() => setVisible(true), 60); }
+    else           { setVisible(false); }
   }, [menuOpen, isMobile]);
 
   const handleNav = (path) => {
@@ -81,11 +65,10 @@ export default function Sidebar({
         <div
           onClick={() => setMenuOpen(false)}
           style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.35)",
+            position: "fixed", inset: 0,
+            background: "rgba(0,0,0,0.45)",
             backdropFilter: "blur(2px)",
-            zIndex: 90
+            zIndex: 90,
           }}
         />
       )}
@@ -94,11 +77,11 @@ export default function Sidebar({
       <aside
         style={{
           position: "fixed",
-          top: 0,
-          left: 0,
+          top: 0, left: 0,
           height: "100%",
           width: collapsed ? 80 : 260,
-          background: "var(--text)",
+          // ✅ Color fijo — nunca depende de --text ni de variables del tema
+          background: SIDEBAR_BG,
           color: "#fff",
           zIndex: 100,
           transform: isMobile
@@ -107,35 +90,45 @@ export default function Sidebar({
           transition: "all 0.35s cubic-bezier(0.34,1.56,0.64,1)",
           display: "flex",
           flexDirection: "column",
+          borderRight: "1px solid rgba(255,255,255,0.06)",
         }}
       >
         {/* HEADER */}
-        <div style={{ padding: "1rem" }}>
+        <div style={{ padding: "1rem 1rem 0.5rem" }}>
           <button
             onClick={() => {
               if (isMobile) setMenuOpen(!menuOpen);
               else setCollapsed(!collapsed);
             }}
-            style={{ background: "transparent", border: "none", color: "#fff", cursor: "pointer" }}
+            style={{
+              background: "transparent", border: "none",
+              color: "#fff", cursor: "pointer",
+              padding: "0.4rem", borderRadius: 6,
+              display: "flex",
+            }}
           >
-            {isMobile ? <X /> : <Menu />}
+            {isMobile ? <X size={20} /> : <Menu size={20} />}
           </button>
 
           {!collapsed && (
-            <>
-              <h2>CAP El Chal</h2>
-              <p style={{ fontSize: "0.8rem", opacity: 0.6 }}>
+            <div style={{ marginTop: "0.75rem" }}>
+              <h2 style={{
+                fontSize: "1rem", fontWeight: 700,
+                color: "#fff", margin: 0,
+              }}>
+                CAP El Chal
+              </h2>
+              <p style={{ fontSize: "0.75rem", opacity: 0.5, margin: "2px 0 0" }}>
                 Expedientes Prenatales
               </p>
-            </>
+            </div>
           )}
         </div>
 
         {/* NAV */}
-        <nav style={{ flex: 1, padding: "0.5rem" }}>
+        <nav style={{ flex: 1, padding: "0.75rem 0.5rem", overflowY: "auto" }}>
           {items.map(({ label, path, icon: Icon, delay }) => {
             const isActive = location.pathname.startsWith(path);
-
             return (
               <div key={path} style={{ position: "relative" }}>
                 <button
@@ -146,31 +139,34 @@ export default function Sidebar({
                     justifyContent: collapsed ? "center" : "flex-start",
                     gap: "0.75rem",
                     width: "100%",
-                    padding: "0.7rem",
+                    padding: "0.65rem 0.75rem",
                     borderRadius: 10,
-                    marginBottom: 6,
+                    marginBottom: 4,
                     border: "none",
                     cursor: "pointer",
-
-                    background: isActive ? "var(--primary)" : "transparent",
-                    color: isActive ? "#fff" : "rgba(255,255,255,0.7)",
-
-                    // 🎬 animación entrada
+                    background: isActive
+                      ? "var(--primary)"
+                      : SIDEBAR_BG_ITEM_HOVER,
+                    color: isActive ? "#fff" : "rgba(255,255,255,0.72)",
+                    fontWeight: isActive ? 600 : 400,
+                    fontSize: "0.9rem",
+                    // 🎬 animación
                     opacity: visible ? 1 : 0,
                     transform: visible ? "translateX(0)" : "translateX(-10px)",
-                    transition: `all 0.3s ease ${delay}ms`,
+                    transition: `opacity 0.3s ease ${delay}ms,
+                                 transform 0.3s ease ${delay}ms,
+                                 background 0.15s ease,
+                                 color 0.15s ease`,
                   }}
                   className="sidebar-item"
                 >
                   <Icon size={20} />
-                  {!collapsed && label}
+                  {!collapsed && <span>{label}</span>}
                 </button>
 
-                {/* TOOLTIP */}
+                {/* TOOLTIP cuando collapsed */}
                 {collapsed && (
-                  <span className="tooltip">
-                    {label}
-                  </span>
+                  <span className="tooltip">{label}</span>
                 )}
               </div>
             );
@@ -178,9 +174,11 @@ export default function Sidebar({
         </nav>
 
         {/* FOOTER */}
-        <div style={{ padding: "1rem", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-          
-          {/* DARK MODE */}
+        <div style={{
+          padding: "0.75rem 0.5rem 1rem",
+          borderTop: "1px solid rgba(255,255,255,0.08)",
+        }}>
+          {/* DARK MODE toggle */}
           <button
             onClick={() => setDark(!dark)}
             style={{
@@ -189,14 +187,17 @@ export default function Sidebar({
               justifyContent: collapsed ? "center" : "flex-start",
               gap: "0.6rem",
               width: "100%",
-              marginBottom: "0.8rem",
+              padding: "0.6rem 0.75rem",
+              marginBottom: "0.4rem",
               background: "transparent",
               border: "none",
-              color: "#fff",
+              color: "rgba(255,255,255,0.72)",
               cursor: "pointer",
+              borderRadius: 8,
+              fontSize: "0.9rem",
             }}
           >
-            {dark ? <Sun size={20} /> : <Moon size={20} />}
+            {dark ? <Sun size={18} /> : <Moon size={18} />}
             {!collapsed && (dark ? "Modo claro" : "Modo oscuro")}
           </button>
 
@@ -208,14 +209,17 @@ export default function Sidebar({
               alignItems: "center",
               justifyContent: collapsed ? "center" : "flex-start",
               gap: "0.6rem",
+              width: "100%",
+              padding: "0.6rem 0.75rem",
               color: "#f87171",
               border: "none",
               background: "transparent",
               cursor: "pointer",
-              width: "100%",
+              borderRadius: 8,
+              fontSize: "0.9rem",
             }}
           >
-            <LogOut size={20} />
+            <LogOut size={18} />
             {!collapsed && "Cerrar sesión"}
           </button>
         </div>

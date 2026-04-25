@@ -1,5 +1,5 @@
 ﻿export default function Toast({ toasts }) {
-  const icons = { success: "âœ“", error: "âœ•", info: "i" };
+  const icons = { success: "✓", error: "✕", info: "i" };
   return (
     <div className="toast-container">
       {toasts.map((t) => (
