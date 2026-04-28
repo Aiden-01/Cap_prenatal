@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  body {
+    margin: 0;
+    position: relative;
+    font-family: Arial, sans-serif;
+  }
+
+  .page {
+    position: relative;
+    width: 210mm;
+    height: 297mm;
+  }
+
+  .bg {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+  }
+
+  .field {
+    position: absolute;
+    font-size: 11px;
+    z-index: 1;
+  }
+
+  .check {
+    position: absolute;
+    font-size: 14px;
+    font-weight: bold;
+  }
+
+</style>
+</head>
+
+<body>
+<div class="page">
+
+  <img src="control_bg.jpg" class="bg"/>
+
+  <!-- DATOS -->
+  <div class="field" style="top: 35mm; left: 40mm;">
+    {{nombre}}
+  </div>
+
+  <div class="field" style="top: 35mm; left: 150mm;">
+    {{expediente}}
+  </div>
+
+  <div class="field" style="top: 45mm; left: 40mm;">
+    {{fecha}}
+  </div>
+
+  <div class="field" style="top: 45mm; left: 80mm;">
+    {{hora}}
+  </div>
+
+  <div class="field" style="top: 55mm; left: 40mm;">
+    {{eg}}
+  </div>
+
+  <div class="field" style="top: 65mm; left: 40mm;">
+    {{motivo}}
+  </div>
+
+  <!-- SIGNOS VITALES -->
+  <div class="field" style="top: 90mm; left: 30mm;">{{temp}}</div>
+  <div class="field" style="top: 90mm; left: 60mm;">{{pulso}}</div>
+  <div class="field" style="top: 90mm; left: 90mm;">{{resp}}</div>
+
+  <div class="field" style="top: 100mm; left: 30mm;">{{pa}}</div>
+  <div class="field" style="top: 100mm; left: 70mm;">{{peso}}</div>
+  <div class="field" style="top: 100mm; left: 100mm;">{{talla}}</div>
+
+  <div class="field" style="top: 110mm; left: 30mm;">{{au}}</div>
+  <div class="field" style="top: 110mm; left: 70mm;">{{fcf}}</div>
+  <div class="field" style="top: 110mm; left: 100mm;">{{imc}}</div>
+
+  <!-- CHECKBOXES -->
+  <div class="check" style="top: 140mm; left: 60mm;">
+    {{proteinuria}}
+  </div>
+
+  <div class="check" style="top: 150mm; left: 60mm;">
+    {{bacteriuria}}
+  </div>
+
+  <!-- TEXTO GRANDE -->
+  <div class="field" style="top: 180mm; left: 30mm; width: 150mm;">
+    {{tratamiento}}
+  </div>
+
+  <div class="field" style="top: 220mm; left: 30mm; width: 150mm;">
+    {{consejeria}}
+  </div>
+
+</div>
+</body>
+</html>

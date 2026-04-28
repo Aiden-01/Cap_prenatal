@@ -1,9 +1,12 @@
 -- ============================================================
 -- SISTEMA DE EXPEDIENTES CLÍNICOS PRENATALES - CAP EL CHAL
--- Schema completo v1.0
+-- Schema completo v2.0
+-- Basado en: Ficha Clínica Prenatal y Puerperio MSPAS
+--            (Programa Nacional de Salud Reproductiva)
+-- Autor tesis: Hugo Yondani Corado Hernández (690-21-10427)
+-- UMG — Facultad de Ingeniería en Sistemas
 -- ============================================================
 
--- Extensión para UUID
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================
@@ -28,182 +31,422 @@ CREATE TABLE IF NOT EXISTS usuarios (
 );
 
 -- ============================================================
--- MÓDULO 1 — REGISTRO DE PACIENTES (Ficha Primera Consulta)
--- Basado en: FICHA CLINICA PRIMERA CONSULTA (Forma-actu-14052020)
+-- MÓDULO 1 — DATOS GENERALES DE LA PACIENTE
+-- Página 1-4 de la Ficha Clínica Prenatal y Puerperio MSPAS
+-- Separación clara: no_expediente (del servicio) vs cui (DPI persona)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS pacientes (
-  id                      SERIAL PRIMARY KEY,
+  id                        SERIAL PRIMARY KEY,
 
-  -- Identificación del servicio
-  nombre_servicio_salud   VARCHAR(150),
-  area_salud              VARCHAR(150),
+  -- ── Identificación del expediente y la persona ──────────────
+  no_expediente             VARCHAR(30) UNIQUE NOT NULL, -- Número asignado por el servicio
+  cui                       VARCHAR(13),                 -- DPI guatemalteco (13 dígitos)
 
-  -- Datos generales
-  no_historia_clinica     VARCHAR(30) UNIQUE NOT NULL, -- DPI sugerido como registro
-  nombre                  VARCHAR(200) NOT NULL,
-  edad                    INTEGER,
-  lugar_residencia        VARCHAR(255),
-  grupo_etnico            VARCHAR(80),
-  poblacion_migrante      BOOLEAN DEFAULT FALSE,
+  -- ── Datos del establecimiento ───────────────────────────────
+  nombre_establecimiento    VARCHAR(150),
+  distrito                  VARCHAR(100),
+  area_salud                VARCHAR(150),
+  -- Categoría del servicio: CCS | PS | CS_B | CS_A
+  categoria_servicio        VARCHAR(10) CHECK (categoria_servicio IN ('CCS','PS','CS_B','CS_A')),
 
-  -- Motivo de consulta e historia
-  motivo_consulta         TEXT,
-  historia_problema_actual TEXT,
+  -- ── Datos de la embarazada ───────────────────────────────────
+  nombres                   VARCHAR(150) NOT NULL,
+  apellidos                 VARCHAR(150) NOT NULL,
+  fecha_nacimiento          DATE,
+  -- Clasificación edad al momento del registro (calculada en backend, guardada para histórico)
+  rango_edad                VARCHAR(10) CHECK (rango_edad IN ('menor_14','14_19','20_35','mayor_35')),
+  -- Alfa/Beta (sistema clasificación interna MSPAS)
+  clasificacion_alfa_beta   VARCHAR(5)  CHECK (clasificacion_alfa_beta IN ('ALFA','BETA')),
 
-  -- Antecedentes gineco-obstétricos
-  fur                     DATE,
-  no_embarazos            INTEGER DEFAULT 0,
-  fecha_ultimo_embarazo   DATE,
-  no_partos_eutocicos     INTEGER DEFAULT 0,
-  no_partos_distocicos    INTEGER DEFAULT 0,
-  no_abortos              INTEGER DEFAULT 0,
-  no_cesarea              INTEGER DEFAULT 0,
-  muerte_fetal_neonatal   INTEGER DEFAULT 0,
-  ninos_nacidos_antes_8m  BOOLEAN DEFAULT FALSE,
-  ultimo_rn_menor_5lbs    BOOLEAN DEFAULT FALSE,
-  ultimo_rn_mayor_9lbs    BOOLEAN DEFAULT FALSE,
-  embarazos_multiples     BOOLEAN DEFAULT FALSE,
-  incompatibilidad_sanguinea BOOLEAN DEFAULT FALSE,
+  domicilio                 VARCHAR(255),
+  municipio                 VARCHAR(100),
+  territorio                VARCHAR(100),
+  sector                    VARCHAR(80),
+  comunidad                 VARCHAR(100),
+  telefono                  VARCHAR(20),
 
-  -- Antecedentes patológicos
-  tuberculosis            BOOLEAN DEFAULT FALSE,
-  cancer                  BOOLEAN DEFAULT FALSE,
-  asma_bronquial          BOOLEAN DEFAULT FALSE,
-  diabetes                BOOLEAN DEFAULT FALSE,
-  hipertension_arterial   BOOLEAN DEFAULT FALSE,
-  cardiopatia             BOOLEAN DEFAULT FALSE,
-  its_vih_sida            BOOLEAN DEFAULT FALSE,
-  nefropatia              BOOLEAN DEFAULT FALSE,
-  infecciones_urinarias   BOOLEAN DEFAULT FALSE,
-  enfermedad_mental       BOOLEAN DEFAULT FALSE,
-  chagas                  BOOLEAN DEFAULT FALSE,
-  sifilis_positivo        BOOLEAN DEFAULT FALSE,
+  -- Cobertura
+  cobertura_igss            BOOLEAN DEFAULT FALSE,
+  cobertura_privada         BOOLEAN DEFAULT FALSE,
+  cobertura_privada_detalle VARCHAR(100),
 
-  -- Quirúrgicos
-  no_legrados_uterinos    INTEGER DEFAULT 0,
-  no_cesareas_previas     INTEGER DEFAULT 0,
-  otra_cirugia            VARCHAR(255),
+  -- Referencia
+  viene_referida            BOOLEAN DEFAULT FALSE,
+  referida_de               VARCHAR(150),
 
-  -- Hábitos
-  fuma                    BOOLEAN DEFAULT FALSE,
-  cigarros_dia            INTEGER DEFAULT 0,
-  ingiere_alcohol         BOOLEAN DEFAULT FALSE,
-  consume_drogas          BOOLEAN DEFAULT FALSE,
-  vacuna_td               BOOLEAN DEFAULT FALSE,
+  -- Estudios y situación personal
+  -- Nivel: ninguno | primaria | secundaria | universitaria
+  nivel_estudios            VARCHAR(20) CHECK (nivel_estudios IN ('ninguno','primaria','secundaria','universitaria')),
+  ultimo_anio_aprobado      INTEGER,
+  profesion_oficio          VARCHAR(100),
 
-  -- Papanicolaou
-  papanicolaou_fecha      DATE,
-  papanicolaou_resultado  VARCHAR(255),
+  -- Estado civil: casada | unida | soltera | separada | vive_sola
+  estado_civil              VARCHAR(15) CHECK (estado_civil IN ('casada','unida','soltera','separada','vive_sola')),
 
-  -- Medicamentos
-  toma_medicamentos       TEXT,
-  otros_antecedentes      TEXT,
+  nombre_esposo_conviviente VARCHAR(200),
 
-  -- Signos vitales (primera consulta)
-  pa_sistolica            INTEGER,
-  pa_diastolica           INTEGER,
-  temperatura             DECIMAL(4,1),
-  peso_lbs                DECIMAL(6,2),
-  talla_cm                DECIMAL(5,2),
-  frecuencia_cardiaca     INTEGER,
-  respiraciones           INTEGER,
+  -- Migración
+  es_migrante               BOOLEAN DEFAULT FALSE,
+  migrante_municipio_depto_pais VARCHAR(150),
 
-  -- Examen general
-  palidez                 VARCHAR(50),
-  palma_manos             VARCHAR(50),
-  conjuntivas             VARCHAR(50),
-  unas                    VARCHAR(50),
-  icteria                 VARCHAR(50),
-  estado_animo            VARCHAR(80),
-  estado_nutricional      VARCHAR(80),
-  circunferencia_brazo_cm DECIMAL(4,1),
-  imc                     DECIMAL(4,2),
+  -- Identidad étnica: maya | garifuna | xinca | mestizo | otro
+  pueblo                    VARCHAR(15) CHECK (pueblo IN ('maya','garifuna','xinca','mestizo','otro')),
+  comunidad_linguistica     VARCHAR(80),
 
-  -- Examen ginecológico externo
-  hemorragia_vaginal      BOOLEAN DEFAULT FALSE,
-  papilomas               BOOLEAN DEFAULT FALSE,
-  flujo_vaginal           BOOLEAN DEFAULT FALSE,
-  herpes                  BOOLEAN DEFAULT FALSE,
-  ulcera                  BOOLEAN DEFAULT FALSE,
+  -- ── Hábitos / factores de riesgo social ─────────────────────
+  fuma_activamente          BOOLEAN DEFAULT FALSE,
+  fuma_pasivamente          BOOLEAN DEFAULT FALSE,
+  consume_drogas            BOOLEAN DEFAULT FALSE,
+  consume_alcohol           BOOLEAN DEFAULT FALSE,
 
-  -- IC, Tx, Consejería, Plan
-  impresion_clinica       TEXT,
-  tratamiento             TEXT,
-  consejeria              TEXT,
-  plan_parto              TEXT,
-  plan_emergencia         TEXT,
-  cita_siguiente          DATE,
-  personal_atendio        VARCHAR(150),
+  -- Violencia (desglosada por trimestre según nueva ficha)
+  violencia_1er_trimestre   BOOLEAN DEFAULT FALSE,
+  violencia_2do_trimestre   BOOLEAN DEFAULT FALSE,
+  violencia_3er_trimestre   BOOLEAN DEFAULT FALSE,
 
-  -- Auditoría
-  registrado_por          INTEGER REFERENCES usuarios(id),
-  created_at              TIMESTAMPTZ DEFAULT NOW(),
-  updated_at              TIMESTAMPTZ DEFAULT NOW()
+  -- Embarazo producto de abuso sexual
+  embarazo_abuso_sexual     BOOLEAN DEFAULT FALSE,
+
+  -- ── Gestación actual ────────────────────────────────────────
+  fur                       DATE,                        -- Fecha Última Regla
+  fpp                       DATE,                        -- Fecha Probable de Parto
+  eg_confiable_fur          BOOLEAN DEFAULT FALSE,       -- EG confiable por FUR
+  eg_confiable_usg          BOOLEAN DEFAULT FALSE,       -- EG confiable por USG
+
+  -- ── Antecedentes obstétricos ─────────────────────────────────
+  gestas_previas            INTEGER DEFAULT 0,
+  abortos                   INTEGER DEFAULT 0,
+  partos_vaginales          INTEGER DEFAULT 0,
+  cesareas                  INTEGER DEFAULT 0,
+  nacidos_vivos             INTEGER DEFAULT 0,
+  hijos_viven               INTEGER DEFAULT 0,
+  muertos_antes_1sem        INTEGER DEFAULT 0,           -- muertos < 1 semana
+  muertos_despues_1sem      INTEGER DEFAULT 0,           -- muertos > 1 semana
+  cirugia_genito_urinaria   BOOLEAN DEFAULT FALSE,
+  infertilidad              BOOLEAN DEFAULT FALSE,
+
+  -- Último embarazo previo
+  fin_embarazo_anterior     DATE,
+  fin_embarazo_menos_1anio  BOOLEAN DEFAULT FALSE,
+
+  -- Embarazo planeado / método anticonceptivo
+  embarazo_planeado         BOOLEAN DEFAULT FALSE,
+  -- Fracaso de método: no | barrera | hormonal | DIU | natural | emergencia
+  fracaso_metodo            VARCHAR(15) CHECK (fracaso_metodo IN ('no','barrera','hormonal','DIU','natural','emergencia')),
+
+  -- ── Antecedentes personales ──────────────────────────────────
+  antec_diabetes            BOOLEAN DEFAULT FALSE,
+  antec_tbc                 BOOLEAN DEFAULT FALSE,
+  antec_hipertension        BOOLEAN DEFAULT FALSE,
+  antec_preeclampsia        BOOLEAN DEFAULT FALSE,
+  antec_eclampsia           BOOLEAN DEFAULT FALSE,
+  antec_cardiopatia         BOOLEAN DEFAULT FALSE,
+  antec_nefropatia          BOOLEAN DEFAULT FALSE,
+  antec_otra_condicion      BOOLEAN DEFAULT FALSE,
+  antec_otra_condicion_desc VARCHAR(200),
+  cirugia_genito_urinaria_pers BOOLEAN DEFAULT FALSE,
+
+  -- ── Antecedentes familiares ──────────────────────────────────
+  fam_diabetes              BOOLEAN DEFAULT FALSE,
+  fam_tbc                   BOOLEAN DEFAULT FALSE,
+  fam_hipertension          BOOLEAN DEFAULT FALSE,
+  fam_preeclampsia          BOOLEAN DEFAULT FALSE,
+  fam_eclampsia             BOOLEAN DEFAULT FALSE,
+  fam_cardiopatia           BOOLEAN DEFAULT FALSE,
+  fam_gemelos               BOOLEAN DEFAULT FALSE,       -- Antecedente de gemelares
+
+  -- Notas de antecedentes obstétricos adicionales
+  -- N/C | 3 espontáneos consecutivos | normal | último previo
+  clasificacion_antec_obstetrico VARCHAR(30),
+
+  -- Peso neonatal previo
+  rn_menor_2500g            BOOLEAN DEFAULT FALSE,
+  rn_mayor_4000g            BOOLEAN DEFAULT FALSE,
+  antec_vih_positivo        BOOLEAN DEFAULT FALSE,
+  antec_emb_ectopico        BOOLEAN DEFAULT FALSE,
+  antec_violencia           BOOLEAN DEFAULT FALSE,
+
+  -- ── Ficha de riesgo obstétrico ───────────────────────────────
+  -- Referencia a si ya se llenó (el detalle está en tabla aparte)
+  tiene_ficha_riesgo        BOOLEAN DEFAULT FALSE,
+
+  -- ── Auditoría ────────────────────────────────────────────────
+  registrado_por            INTEGER REFERENCES usuarios(id),
+  created_at                TIMESTAMPTZ DEFAULT NOW(),
+  updated_at                TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
--- MÓDULO 2 — SEGUIMIENTO PRENATAL
--- Basado en: ATENCION PRENATAL pág 2 + SEGUIMIENTO pág 3
+-- MÓDULO 2 — VACUNAS
+-- Página 1-4, sección Vacunas
+-- Previo embarazo | Durante embarazo | Postparto/aborto
+-- Vacunas: Td y Tdap | Influenza | SPR/SR
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS vacunas_paciente (
+  id              SERIAL PRIMARY KEY,
+  paciente_id     INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+
+  -- Tipo: td_tdap | influenza | spr_sr
+  tipo_vacuna     VARCHAR(20) NOT NULL CHECK (tipo_vacuna IN ('td_tdap','influenza','spr_sr')),
+
+  -- Momento: previo_embarazo | durante_embarazo | postparto_aborto
+  momento         VARCHAR(25) NOT NULL CHECK (momento IN ('previo_embarazo','durante_embarazo','postparto_aborto')),
+
+  -- Dosis dentro del momento (primera, segunda, tercera para Td/Tdap)
+  numero_dosis    INTEGER DEFAULT 1,
+  fecha_dosis     DATE,
+
+  registrado_por  INTEGER REFERENCES usuarios(id),
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================
+-- MÓDULO 3 — CONTROLES PRENATALES (Atenciones 1 a 4 + Otras)
+-- Páginas 1-4, 2-4 y 3-4 de la ficha
+-- Cada fila = una atención/control prenatal
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS controles_prenatales (
-  id                      SERIAL PRIMARY KEY,
-  paciente_id             INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
-  numero_control          INTEGER NOT NULL CHECK (numero_control BETWEEN 1 AND 10),
-  -- 1-4 son los controles estándar, 5-10 son "Otros"
+  id                        SERIAL PRIMARY KEY,
+  paciente_id               INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+  -- 1-4 controles estándar MSPAS; 5+ son "otras atenciones"
+  numero_control            INTEGER NOT NULL CHECK (numero_control >= 1),
 
-  fecha                   DATE NOT NULL,
+  fecha                     DATE NOT NULL,
+  hora                      TIME,
 
-  -- Signos vitales
-  temperatura             DECIMAL(4,1),
-  respiraciones           INTEGER,
-  pa_sistolica            INTEGER,
-  pa_diastolica           INTEGER,
-  pulso                   INTEGER,
-  au_cm                   DECIMAL(4,1),   -- Altura uterina
-  fcf                     INTEGER,         -- Frecuencia cardíaca fetal
-  peso_kg                 DECIMAL(5,2),
-  talla_cm                DECIMAL(5,2),
-  circunferencia_brazo_cm DECIMAL(4,1),
-  edad_embarazo_semanas   INTEGER,
-  imc                     DECIMAL(4,2),
+  motivo_consulta           TEXT,
 
-  -- IC, Tx, consejería
-  impresion_clinica       TEXT,
-  tratamiento             TEXT,
-  consejeria              TEXT,            -- temas de la lista sugerida
-  plan_parto              TEXT,
-  plan_emergencia         TEXT,
-  cita_siguiente          DATE,
-  personal_atendio        VARCHAR(150),
+  -- ── Signos de peligro (checklist triage) ────────────────────
+  peligro_hemorragia_vaginal    BOOLEAN DEFAULT FALSE,
+  peligro_palidez               BOOLEAN DEFAULT FALSE,
+  peligro_dolor_cabeza          BOOLEAN DEFAULT FALSE,
+  peligro_hipertension          BOOLEAN DEFAULT FALSE,
+  peligro_dolor_epigastrico     BOOLEAN DEFAULT FALSE,
+  peligro_trastornos_visuales   BOOLEAN DEFAULT FALSE,
+  peligro_fiebre                BOOLEAN DEFAULT FALSE,
+  peligro_otro                  VARCHAR(200),
 
-  -- Auditoría
-  registrado_por          INTEGER REFERENCES usuarios(id),
-  created_at              TIMESTAMPTZ DEFAULT NOW(),
-  updated_at              TIMESTAMPTZ DEFAULT NOW(),
+  -- Edad gestacional al momento del control (semanas)
+  edad_gestacional_semanas  INTEGER,
+  nombre_acompanante        VARCHAR(150),
+  nombre_cargo_atiende      VARCHAR(150),
+
+  -- ── Examen físico (Página 2-4) ───────────────────────────────
+  pa_sistolica              INTEGER,
+  pa_diastolica             INTEGER,
+  frecuencia_cardiaca       INTEGER,
+  frecuencia_respiratoria   INTEGER,
+  temperatura               DECIMAL(4,1),
+  perimetro_braquial_cm     DECIMAL(4,1),     -- NUEVO en nueva ficha
+  peso_kg                   DECIMAL(5,2),
+  talla_cm                  DECIMAL(5,2),
+  imc                       DECIMAL(4,2),
+  examen_bucodental         BOOLEAN,          -- Si/No
+  examen_mamas              BOOLEAN,          -- Si/No
+
+  -- ── Examen obstétrico ────────────────────────────────────────
+  altura_uterina_cm         DECIMAL(4,1),
+  fcf                       INTEGER,           -- Frecuencia cardíaca fetal
+  movimientos_fetales       BOOLEAN,
+  situacion_fetal           VARCHAR(50),
+  presentacion_fetal        VARCHAR(50),
+
+  -- ── Examen ginecológico ──────────────────────────────────────
+  sangre_manchado           BOOLEAN DEFAULT FALSE,
+  verrugas_herpes_papilomas BOOLEAN DEFAULT FALSE,  -- NUEVO
+  flujo_vaginal             BOOLEAN DEFAULT FALSE,
+  otros_ginecologico        TEXT,
+
+  -- ── Laboratorios (Página 2-4) ────────────────────────────────
+  -- Hematología
+  hematologia_realizada     BOOLEAN DEFAULT FALSE,
+  hematologia_resultado     VARCHAR(100),
+
+  -- Glicemia en ayunas
+  glicemia_realizada        BOOLEAN DEFAULT FALSE,
+  glicemia_resultado        VARCHAR(100),
+
+  -- Grupo y RH
+  grupo_rh_realizado        BOOLEAN DEFAULT FALSE,
+  grupo_rh_resultado        VARCHAR(20),      -- ej: "O+" / "A-"
+
+  -- Orina
+  orina_realizada           BOOLEAN DEFAULT FALSE,
+  orina_bacteriuria         BOOLEAN,
+  orina_proteinuria         BOOLEAN,
+
+  -- Heces
+  heces_realizada           BOOLEAN DEFAULT FALSE,
+  heces_resultado           VARCHAR(100),
+
+  -- VIH
+  vih_realizado             BOOLEAN DEFAULT FALSE,
+  vih_resultado             VARCHAR(20),      -- positivo | negativo | no_aplica
+  vih_resultado_valor       VARCHAR(50),
+
+  -- VDRL/RPR
+  vdrl_realizado            BOOLEAN DEFAULT FALSE,
+  vdrl_resultado            VARCHAR(20),      -- positivo | negativo
+  vdrl_tratamiento_indicado BOOLEAN DEFAULT FALSE,  -- MSPAS indica anotar si positivo
+
+  -- TORCH
+  torch_realizado           BOOLEAN DEFAULT FALSE,
+  torch_resultado_positivo  BOOLEAN,
+  torch_resultado_valor     VARCHAR(100),
+
+  -- Papanicolau / IVAA
+  papanicolau_ivaa_realizado  BOOLEAN DEFAULT FALSE,
+  papanicolau_ivaa_fecha_toma DATE,                   -- Fecha toma de muestra (Carné pág.6)
+  papanicolau_ivaa_resultado  VARCHAR(100),
+
+  -- Hepatitis B
+  hepatitis_b_realizado     BOOLEAN DEFAULT FALSE,
+  hepatitis_b_resultado     VARCHAR(50),
+
+  -- Otros laboratorios
+  otros_lab                 TEXT,
+
+  -- ── Estudios complementarios (USG) ──────────────────────────
+  usg_realizado             BOOLEAN DEFAULT FALSE,
+  usg_hallazgos             TEXT,
+
+  -- ── Suplementación (Página 3-4) ──────────────────────────────
+  sulfato_ferroso           BOOLEAN DEFAULT FALSE,
+  sulfato_ferroso_tabletas  INTEGER,
+  acido_folico              BOOLEAN DEFAULT FALSE,
+  acido_folico_tabletas     INTEGER,
+  suplementacion_hallazgos  TEXT,
+  suplementacion_tratamiento TEXT,
+
+  -- ── Orientaciones brindadas (Página 2-4, sección Orientaciones)
+  orient_plan_emergencia_parto  BOOLEAN DEFAULT FALSE,
+  orient_alimentacion_embarazo  BOOLEAN DEFAULT FALSE,
+  orient_senales_peligro        BOOLEAN DEFAULT FALSE,
+  orient_lactancia_materna      BOOLEAN DEFAULT FALSE,
+  orient_planificacion_familiar BOOLEAN DEFAULT FALSE,
+  orient_importancia_postparto  BOOLEAN DEFAULT FALSE,
+  orient_vacunacion_nino        BOOLEAN DEFAULT FALSE,
+  orient_pre_post_prueba_vih    BOOLEAN DEFAULT FALSE,
+  orient_importancia_atenciones BOOLEAN DEFAULT FALSE,
+  orient_tratamiento_its_pareja BOOLEAN DEFAULT FALSE,
+  orient_otros                  TEXT,
+
+  -- ── IC, Tx ───────────────────────────────────────────────────
+  impresion_clinica         TEXT,
+  tratamiento               TEXT,
+  cita_siguiente            DATE,
+
+  -- ── Auditoría ────────────────────────────────────────────────
+  registrado_por            INTEGER REFERENCES usuarios(id),
+  created_at                TIMESTAMPTZ DEFAULT NOW(),
+  updated_at                TIMESTAMPTZ DEFAULT NOW(),
 
   UNIQUE (paciente_id, numero_control)
 );
 
--- Plan de Parto (integrado en el Módulo 2, formulario independiente MSPAS)
+-- ============================================================
+-- MÓDULO 4 — MORBILIDAD DURANTE EL EMBARAZO
+-- Página 3-4: consultas intercurrentes (2 registros en la ficha física)
+-- En BD se guardan N registros por paciente
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS morbilidad_embarazo (
+  id                        SERIAL PRIMARY KEY,
+  paciente_id               INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+
+  fecha                     DATE NOT NULL,
+  hora                      TIME,
+  motivo_consulta           TEXT,
+  historia_enfermedad_actual TEXT,
+  revision_por_sistemas     TEXT,
+  examen_fisico             TEXT,
+  impresion_clinica         TEXT,
+  tratamiento_referencia    TEXT,
+  nombre_cargo_atiende      VARCHAR(150),
+
+  registrado_por            INTEGER REFERENCES usuarios(id),
+  created_at                TIMESTAMPTZ DEFAULT NOW(),
+  updated_at                TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================
+-- MÓDULO 5 — PUERPERIO
+-- Página 4-4: Primera y Segunda atención del puerperio
+-- En BD se guardan como registros independientes (numero_atencion 1|2)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS controles_puerperio (
+  id                          SERIAL PRIMARY KEY,
+  paciente_id                 INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+  -- 1 = Primera atención, 2 = Segunda atención
+  numero_atencion             INTEGER NOT NULL CHECK (numero_atencion IN (1, 2)),
+
+  fecha                       DATE NOT NULL,
+  hora                        TIME,
+
+  -- ── Signos de peligro ────────────────────────────────────────
+  signos_peligro              TEXT,  -- descripción libre si hay signos
+
+  -- ── Datos del parto ──────────────────────────────────────────
+  dias_despues_parto          INTEGER,
+  lugar_atencion_parto        VARCHAR(150),
+  quien_atendio_parto         VARCHAR(150),
+  recien_nacido_vivo          BOOLEAN,
+  -- Tipo: vaginal | cesarea | fórceps | otro
+  tipo_parto                  VARCHAR(20) CHECK (tipo_parto IN ('vaginal','cesarea','forceps','otro')),
+  tuvo_apego_inmediato        BOOLEAN,
+  lactancia_materna_exclusiva BOOLEAN,
+  herida_operatoria           VARCHAR(200),  -- descripción si aplica
+
+  -- ── Signos vitales ───────────────────────────────────────────
+  pa_sistolica                INTEGER,
+  pa_diastolica               INTEGER,
+  frecuencia_cardiaca         INTEGER,
+  frecuencia_respiratoria     INTEGER,
+  temperatura                 DECIMAL(4,1),
+
+  -- ── Examen ───────────────────────────────────────────────────
+  examen_mamas                TEXT,
+  -- loquios, episiorrafía, hallazgos patológicos
+  examen_ginecologico         TEXT,
+
+  -- ── IC, Consejería, Tx ───────────────────────────────────────
+  orientacion_consejeria      TEXT,
+  impresion_clinica           TEXT,
+  tratamiento                 TEXT,
+  nombre_cargo_atiende        VARCHAR(150),
+
+  -- ── Auditoría ────────────────────────────────────────────────
+  registrado_por              INTEGER REFERENCES usuarios(id),
+  created_at                  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at                  TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE (paciente_id, numero_atencion)
+);
+
+-- ============================================================
+-- MÓDULO 6 — PLAN DE PARTO
+-- Formulario independiente MSPAS (sin cambios estructurales)
+-- ============================================================
+
 CREATE TABLE IF NOT EXISTS planes_parto (
   id                              SERIAL PRIMARY KEY,
   paciente_id                     INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
   fecha                           DATE NOT NULL,
 
-  -- Datos generales
   nombre_conyuge                  VARCHAR(200),
   telefono                        VARCHAR(20),
   fecha_nacimiento                DATE,
   estado_civil                    VARCHAR(30),
-  pueblo                          VARCHAR(30),   -- Maya/Xinca/Garífuna/Mestiza/Otro
+  pueblo                          VARCHAR(30),
   escolaridad                     VARCHAR(30),
   con_quien_vive                  VARCHAR(50),
   idioma                          VARCHAR(80),
   ha_tenido_atencion_prenatal     BOOLEAN DEFAULT FALSE,
 
-  -- Obstétricos
   no_embarazos                    INTEGER,
   no_partos                       INTEGER,
   no_abortos                      INTEGER,
@@ -215,14 +458,12 @@ CREATE TABLE IF NOT EXISTS planes_parto (
   fecha_ultima_cesarea            DATE,
   edad_gestacional_semanas        INTEGER,
 
-  -- Parto anterior atendido por
   parto_anterior_hospital         BOOLEAN DEFAULT FALSE,
   parto_anterior_caimi            BOOLEAN DEFAULT FALSE,
   parto_anterior_comadrona        BOOLEAN DEFAULT FALSE,
   parto_anterior_clinica_privada  BOOLEAN DEFAULT FALSE,
   parto_anterior_otro             VARCHAR(80),
 
-  -- Signos de peligro (checkboxes)
   peligro_dolor_cabeza            BOOLEAN DEFAULT FALSE,
   peligro_vision_borrosa          BOOLEAN DEFAULT FALSE,
   peligro_embarazo_multiple       BOOLEAN DEFAULT FALSE,
@@ -236,15 +477,13 @@ CREATE TABLE IF NOT EXISTS planes_parto (
   peligro_ausencia_mov_fetales    BOOLEAN DEFAULT FALSE,
   peligro_placenta_no_salia       BOOLEAN DEFAULT FALSE,
 
-  -- Lugar elegido para la atención del parto
   posicion_parto                  VARCHAR(50),
-  lugar_atencion_parto            VARCHAR(50),   -- CAP/CAIMI/Hospital/Clínica privada/Otro
+  lugar_atencion_parto            VARCHAR(50),
   horas_distancia                 INTEGER,
   kms_servicio                    DECIMAL(6,2),
   casa_materna_cercana            BOOLEAN DEFAULT FALSE,
   usara_casa_materna              BOOLEAN DEFAULT FALSE,
 
-  -- Traslado
   como_trasladara                 VARCHAR(80),
   quien_acompanara                VARCHAR(150),
   bebida_durante_parto            VARCHAR(150),
@@ -256,68 +495,26 @@ CREATE TABLE IF NOT EXISTS planes_parto (
   lleva_dpi_conyuge               BOOLEAN DEFAULT FALSE,
   lleva_partida_nacimiento        BOOLEAN DEFAULT FALSE,
 
-  -- Ahorro / comunicación
   cuenta_ahorro                   BOOLEAN DEFAULT FALSE,
   comunicado_comite               BOOLEAN DEFAULT FALSE,
 
-  -- Cuidado de casa e hijos
   con_quien_hijos                 VARCHAR(80),
   quien_cuida_casa                VARCHAR(80),
   telefono_vehiculo               VARCHAR(20),
 
-  -- Responsable activar plan
   responsable_activar             VARCHAR(80),
   nombre_activara_plan            VARCHAR(150),
-
-  -- Firma/huella
   nombre_proveedor_salud          VARCHAR(150),
 
-  -- Auditoría
   registrado_por                  INTEGER REFERENCES usuarios(id),
   created_at                      TIMESTAMPTZ DEFAULT NOW(),
   updated_at                      TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Control post parto (parte final del formulario de seguimiento)
-CREATE TABLE IF NOT EXISTS controles_post_parto (
-  id                        SERIAL PRIMARY KEY,
-  paciente_id               INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
-  numero_control            INTEGER NOT NULL CHECK (numero_control BETWEEN 1 AND 4),
-  fecha                     DATE NOT NULL,
-
-  temperatura               DECIMAL(4,1),
-  pulso                     INTEGER,
-  respiraciones             INTEGER,
-  pa_sistolica              INTEGER,
-  pa_diastolica             INTEGER,
-  peso_kg                   DECIMAL(5,2),
-  involucion_utero          VARCHAR(100),
-  presencia_loquios         VARCHAR(100),
-  senales_peligro_madre     TEXT,
-  senales_peligro_rn        TEXT,
-  diagnostico               TEXT,
-  tratamiento               TEXT,
-  consejeria                TEXT,
-  sulfato_ferroso           BOOLEAN DEFAULT FALSE,
-  acido_folico              BOOLEAN DEFAULT FALSE,
-  cita_siguiente            DATE,
-  personal_atendio          VARCHAR(150),
-
-  -- Método planificación familiar
-  metodo_planificacion      VARCHAR(150),
-  metodo_usado_anteriormente VARCHAR(150),
-  orientacion               TEXT,
-
-  -- Auditoría
-  registrado_por            INTEGER REFERENCES usuarios(id),
-  created_at                TIMESTAMPTZ DEFAULT NOW(),
-  updated_at                TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- ============================================================
--- MÓDULO 3 — FICHA DE RIESGO OBSTÉTRICO
--- Basado en: FICHA DE RIESGO OBSTETRICO (Forma-actu-12/05/2020)
--- 25 criterios con clasificación automática
+-- MÓDULO 7 — FICHA DE RIESGO OBSTÉTRICO
+-- 25 criterios con clasificación automática STORED
+-- Sin cambios estructurales respecto a v1.0
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS fichas_riesgo_obstetrico (
@@ -325,7 +522,6 @@ CREATE TABLE IF NOT EXISTS fichas_riesgo_obstetrico (
   paciente_id                       INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
   fecha                             DATE NOT NULL,
 
-  -- Datos complementarios del formulario
   telefono                          VARCHAR(20),
   pueblo                            VARCHAR(30),
   migrante                          BOOLEAN DEFAULT FALSE,
@@ -349,39 +545,39 @@ CREATE TABLE IF NOT EXISTS fichas_riesgo_obstetrico (
   no_hijos_muertos                  INTEGER,
   edad_embarazo_semanas             INTEGER,
 
-  -- ANTECEDENTES OBSTÉTRICOS (criterios 1-7)
-  muerte_fetal_neonatal_previa      BOOLEAN DEFAULT FALSE,  -- 1
-  abortos_espontaneos_3mas          BOOLEAN DEFAULT FALSE,  -- 2
-  gestas_3mas                       BOOLEAN DEFAULT FALSE,  -- 3
-  peso_ultimo_bebe_menor_2500g      BOOLEAN DEFAULT FALSE,  -- 4
-  peso_ultimo_bebe_mayor_4500g      BOOLEAN DEFAULT FALSE,  -- 5
-  antec_hipertension_preeclampsia   BOOLEAN DEFAULT FALSE,  -- 6
-  cirugias_tracto_reproductivo      BOOLEAN DEFAULT FALSE,  -- 7
+  -- Criterios 1-7: Antecedentes obstétricos
+  muerte_fetal_neonatal_previa      BOOLEAN DEFAULT FALSE,
+  abortos_espontaneos_3mas          BOOLEAN DEFAULT FALSE,
+  gestas_3mas                       BOOLEAN DEFAULT FALSE,
+  peso_ultimo_bebe_menor_2500g      BOOLEAN DEFAULT FALSE,
+  peso_ultimo_bebe_mayor_4500g      BOOLEAN DEFAULT FALSE,
+  antec_hipertension_preeclampsia   BOOLEAN DEFAULT FALSE,
+  cirugias_tracto_reproductivo      BOOLEAN DEFAULT FALSE,
 
-  -- EMBARAZO ACTUAL (criterios 8-19)
-  embarazo_multiple                 BOOLEAN DEFAULT FALSE,  -- 8
-  menor_20_anos                     BOOLEAN DEFAULT FALSE,  -- 9
-  mayor_35_anos                     BOOLEAN DEFAULT FALSE,  -- 10
-  paciente_rh_negativo              BOOLEAN DEFAULT FALSE,  -- 11
-  hemorragia_vaginal                BOOLEAN DEFAULT FALSE,  -- 12
-  vih_positivo_sifilis              BOOLEAN DEFAULT FALSE,  -- 13
-  presion_diastolica_90mas          BOOLEAN DEFAULT FALSE,  -- 14
-  anemia                            BOOLEAN DEFAULT FALSE,  -- 15
-  desnutricion_obesidad             BOOLEAN DEFAULT FALSE,  -- 16
-  dolor_abdominal                   BOOLEAN DEFAULT FALSE,  -- 17
-  sintomatologia_urinaria           BOOLEAN DEFAULT FALSE,  -- 18
-  ictericia                         BOOLEAN DEFAULT FALSE,  -- 19
+  -- Criterios 8-19: Embarazo actual
+  embarazo_multiple                 BOOLEAN DEFAULT FALSE,
+  menor_20_anos                     BOOLEAN DEFAULT FALSE,
+  mayor_35_anos                     BOOLEAN DEFAULT FALSE,
+  paciente_rh_negativo              BOOLEAN DEFAULT FALSE,
+  hemorragia_vaginal                BOOLEAN DEFAULT FALSE,
+  vih_positivo_sifilis              BOOLEAN DEFAULT FALSE,
+  presion_diastolica_90mas          BOOLEAN DEFAULT FALSE,
+  anemia                            BOOLEAN DEFAULT FALSE,
+  desnutricion_obesidad             BOOLEAN DEFAULT FALSE,
+  dolor_abdominal                   BOOLEAN DEFAULT FALSE,
+  sintomatologia_urinaria           BOOLEAN DEFAULT FALSE,
+  ictericia                         BOOLEAN DEFAULT FALSE,
 
-  -- HISTORIA CLÍNICA GENERAL (criterios 20-25)
-  diabetes                          BOOLEAN DEFAULT FALSE,  -- 20
-  enfermedad_renal                  BOOLEAN DEFAULT FALSE,  -- 21
-  enfermedad_corazon                BOOLEAN DEFAULT FALSE,  -- 22
-  hipertension_arterial             BOOLEAN DEFAULT FALSE,  -- 23
-  consumo_drogas_alcohol_tabaco     BOOLEAN DEFAULT FALSE,  -- 24
-  otra_enfermedad_severa            BOOLEAN DEFAULT FALSE,  -- 25
+  -- Criterios 20-25: Historia clínica general
+  diabetes                          BOOLEAN DEFAULT FALSE,
+  enfermedad_renal                  BOOLEAN DEFAULT FALSE,
+  enfermedad_corazon                BOOLEAN DEFAULT FALSE,
+  hipertension_arterial             BOOLEAN DEFAULT FALSE,
+  consumo_drogas_alcohol_tabaco     BOOLEAN DEFAULT FALSE,
+  otra_enfermedad_severa            BOOLEAN DEFAULT FALSE,
   otra_enfermedad_descripcion       TEXT,
 
-  -- Clasificación automática (calculada en backend)
+  -- Clasificación automática
   tiene_riesgo                      BOOLEAN GENERATED ALWAYS AS (
     muerte_fetal_neonatal_previa OR abortos_espontaneos_3mas OR gestas_3mas OR
     peso_ultimo_bebe_menor_2500g OR peso_ultimo_bebe_mayor_4500g OR
@@ -398,93 +594,23 @@ CREATE TABLE IF NOT EXISTS fichas_riesgo_obstetrico (
   referida_a                        VARCHAR(255),
   nombre_personal_atendio           VARCHAR(150),
 
-  -- Auditoría
   registrado_por                    INTEGER REFERENCES usuarios(id),
   created_at                        TIMESTAMPTZ DEFAULT NOW(),
   updated_at                        TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
--- MÓDULO 4 — RESULTADOS DE LABORATORIO
--- Basado en: HOJA DE RESULTADO DE LABORATORIOS DE LA ATENCION PRENATAL
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS resultados_laboratorio (
-  id              SERIAL PRIMARY KEY,
-  paciente_id     INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
-  control_id      INTEGER REFERENCES controles_prenatales(id) ON DELETE SET NULL,
-  numero_control  INTEGER NOT NULL CHECK (numero_control BETWEEN 1 AND 4),
-
-  -- PRIMER CONTROL
-  orina_1         VARCHAR(255),
-  heces_1         VARCHAR(255),
-  hematologia_1   VARCHAR(255),
-  glicemia_ayunas_1 VARCHAR(255),
-  grupo_rh_1      VARCHAR(50),
-  vdrl_rpr_1      VARCHAR(255),
-  resultado_vih_1 VARCHAR(255),
-  hepatitis_b_1   VARCHAR(255),
-  papanicolaou_ivaa_1 VARCHAR(255),
-  torch_1         VARCHAR(255),
-
-  -- SEGUNDO CONTROL
-  orina_2         VARCHAR(255),
-  glicemia_ayunas_2 VARCHAR(255),
-  oferta_vih_2    VARCHAR(255),
-  vdrl_rpr_2      VARCHAR(255),
-  hepatitis_b_2   VARCHAR(255),
-
-  -- TERCER CONTROL
-  hematologia_3   VARCHAR(255),
-  orina_3         VARCHAR(255),
-  glicemia_ayunas_3 VARCHAR(255),
-
-  -- CUARTO CONTROL
-  orina_4         VARCHAR(255),
-  glicemia_ayunas_4 VARCHAR(255),
-  oferta_vih_4    VARCHAR(255),
-  vdrl_rpr_4      VARCHAR(255),
-  hepatitis_b_4   VARCHAR(255),
-
-  -- Auditoría
-  registrado_por  INTEGER REFERENCES usuarios(id),
-  created_at      TIMESTAMPTZ DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ DEFAULT NOW(),
-
-  UNIQUE (paciente_id, numero_control)
-);
-
--- ============================================================
--- MÓDULO 5 — MICRONUTRIENTES E INMUNIZACIONES
--- Basado en: Carné prenatal págs. 4, 5 y 6 (datos clínicos relevantes)
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS micronutrientes (
-  id              SERIAL PRIMARY KEY,
-  paciente_id     INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
-  acido_folico_cantidad  INTEGER,
-  sulfato_ferroso_cantidad INTEGER,
-  fecha           DATE,
-  registrado_por  INTEGER REFERENCES usuarios(id),
-  created_at      TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS inmunizaciones (
-  id              SERIAL PRIMARY KEY,
-  paciente_id     INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
-  vacuna          VARCHAR(80) NOT NULL,  -- TD / TdaP / INFLUENZA
-  fecha_aplicacion DATE NOT NULL,
-  registrado_por  INTEGER REFERENCES usuarios(id),
-  created_at      TIMESTAMPTZ DEFAULT NOW()
-);
-
--- ============================================================
 -- ÍNDICES PARA PERFORMANCE
 -- ============================================================
 
-CREATE INDEX IF NOT EXISTS idx_pacientes_historia ON pacientes(no_historia_clinica);
-CREATE INDEX IF NOT EXISTS idx_pacientes_nombre ON pacientes(nombre);
-CREATE INDEX IF NOT EXISTS idx_controles_paciente ON controles_prenatales(paciente_id);
-CREATE INDEX IF NOT EXISTS idx_riesgo_paciente ON fichas_riesgo_obstetrico(paciente_id);
-CREATE INDEX IF NOT EXISTS idx_labs_paciente ON resultados_laboratorio(paciente_id);
-CREATE INDEX IF NOT EXISTS idx_usuarios_username ON usuarios(username);
+CREATE INDEX IF NOT EXISTS idx_pacientes_expediente   ON pacientes(no_expediente);
+CREATE INDEX IF NOT EXISTS idx_pacientes_cui          ON pacientes(cui);
+CREATE INDEX IF NOT EXISTS idx_pacientes_apellidos    ON pacientes(apellidos);
+CREATE INDEX IF NOT EXISTS idx_pacientes_nombres      ON pacientes(nombres);
+CREATE INDEX IF NOT EXISTS idx_controles_paciente     ON controles_prenatales(paciente_id);
+CREATE INDEX IF NOT EXISTS idx_controles_fecha        ON controles_prenatales(fecha);
+CREATE INDEX IF NOT EXISTS idx_morbilidad_paciente    ON morbilidad_embarazo(paciente_id);
+CREATE INDEX IF NOT EXISTS idx_puerperio_paciente     ON controles_puerperio(paciente_id);
+CREATE INDEX IF NOT EXISTS idx_riesgo_paciente        ON fichas_riesgo_obstetrico(paciente_id);
+CREATE INDEX IF NOT EXISTS idx_vacunas_paciente       ON vacunas_paciente(paciente_id);
+CREATE INDEX IF NOT EXISTS idx_usuarios_username      ON usuarios(username);

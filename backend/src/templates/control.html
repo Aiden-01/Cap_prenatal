@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Control Prenatal</title>
+
+<style>
+@page {
+  size: letter portrait;
+  margin: 5mm;
+}
+
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 11px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  td, th {
+    border: 1px solid black;
+    padding: 4px;
+    vertical-align: top;
+  }
+
+  .no-border {
+    border: none;
+  }
+
+  .center {
+    text-align: center;
+  }
+
+  .bold {
+    font-weight: bold;
+  }
+
+  .small {
+    font-size: 9px;
+  }
+
+  .h-40 { height: 40px; }
+  .h-60 { height: 60px; }
+  .h-80 { height: 80px; }
+
+</style>
+</head>
+
+<body>
+
+<!-- ================= HEADER ================= -->
+<table>
+  <tr>
+    <td class="center bold" colspan="6">
+      CONTROL PRENATAL
+    </td>
+  </tr>
+
+  <tr>
+    <td colspan="3">Nombre: {{nombre}}</td>
+    <td>No. Expediente: {{expediente}}</td>
+    <td>Fecha: {{fecha}}</td>
+    <td>Hora: {{hora}}</td>
+  </tr>
+
+  <tr>
+    <td>Edad Gestacional: {{eg}}</td>
+    <td>FUR:</td>
+    <td>FPP:</td>
+    <td colspan="3">Establecimiento:</td>
+  </tr>
+</table>
+
+<br>
+
+<!-- ================= MOTIVO ================= -->
+<table>
+  <tr>
+    <td class="bold">Motivo de Consulta</td>
+  </tr>
+  <tr>
+    <td class="h-40">{{motivo}}</td>
+  </tr>
+</table>
+
+<br>
+
+<!-- ================= SIGNOS VITALES ================= -->
+<table>
+  <tr>
+    <td colspan="6" class="bold center">SIGNOS VITALES</td>
+  </tr>
+  <tr>
+    <td>Temp</td>
+    <td>Pulso</td>
+    <td>Resp</td>
+    <td>PA</td>
+    <td>Peso</td>
+    <td>Talla</td>
+  </tr>
+  <tr>
+    <td>{{temp}}</td>
+    <td>{{pulso}}</td>
+    <td>{{resp}}</td>
+    <td>{{pa}}</td>
+    <td>{{peso}}</td>
+    <td>{{talla}}</td>
+  </tr>
+</table>
+
+<br>
+
+<!-- ================= OBSTETRICO ================= -->
+<table>
+  <tr>
+    <td colspan="6" class="bold center">EVALUACIÓN OBSTÉTRICA</td>
+  </tr>
+  <tr>
+    <td>AU</td>
+    <td>FCF</td>
+    <td>IMC</td>
+    <td>Circ. Brazo</td>
+    <td colspan="2">Signos de Peligro</td>
+  </tr>
+  <tr>
+    <td>{{au}}</td>
+    <td>{{fcf}}</td>
+    <td>{{imc}}</td>
+    <td>{{cbr}}</td>
+    <td colspan="2">{{peligro}}</td>
+  </tr>
+</table>
+
+<br>
+
+<!-- ================= EXAMEN ================= -->
+<table>
+  <tr>
+    <td colspan="6" class="bold center">EXAMEN FÍSICO</td>
+  </tr>
+  <tr>
+    <td>Bucodental</td>
+    <td>Flujo Vaginal</td>
+    <td>Verrugas</td>
+    <td>Herpes</td>
+    <td>Papilomas</td>
+    <td>Úlcera</td>
+  </tr>
+  <tr>
+    <td>{{bucal}}</td>
+    <td>{{flujo}}</td>
+    <td>{{verrugas}}</td>
+    <td>{{herpes}}</td>
+    <td>{{papilomas}}</td>
+    <td>{{ulcera}}</td>
+  </tr>
+</table>
+
+<br>
+
+<!-- ================= LAB ================= -->
+<table>
+  <tr>
+    <td colspan="6" class="bold center">LABORATORIO</td>
+  </tr>
+  <tr>
+    <td>Glicemia</td>
+    <td>Proteinuria</td>
+    <td>Bacteriuria</td>
+    <td>Hepatitis B</td>
+    <td>TORCH</td>
+    <td>Papanicolau</td>
+  </tr>
+  <tr>
+    <td>{{glicemia}}</td>
+    <td>{{proteinuria}}</td>
+    <td>{{bacteriuria}}</td>
+    <td>{{hepb}}</td>
+    <td>{{torch}}</td>
+    <td>{{papa}}</td>
+  </tr>
+</table>
+
+<br>
+
+<!-- ================= MEDICAMENTOS ================= -->
+<table>
+  <tr>
+    <td colspan="6" class="bold center">SUPLEMENTACIÓN</td>
+  </tr>
+  <tr>
+    <td>Sulfato Ferroso</td>
+    <td>Tabletas</td>
+    <td>Ácido Fólico</td>
+    <td>Tabletas</td>
+    <td colspan="2">USG</td>
+  </tr>
+  <tr>
+    <td>{{sf}}</td>
+    <td>{{sf_tab}}</td>
+    <td>{{af}}</td>
+    <td>{{af_tab}}</td>
+    <td colspan="2">{{usg}}</td>
+  </tr>
+</table>
+
+<br>
+
+<!-- ================= DIAGNOSTICO ================= -->
+<table>
+  <tr>
+    <td class="bold">Impresión Clínica</td>
+  </tr>
+  <tr>
+    <td class="h-60">{{impresion}}</td>
+  </tr>
+</table>
+
+<br>
+
+<table>
+  <tr>
+    <td class="bold">Tratamiento</td>
+  </tr>
+  <tr>
+    <td class="h-60">{{tratamiento}}</td>
+  </tr>
+</table>
+
+<br>
+
+<table>
+  <tr>
+    <td class="bold">Consejería</td>
+  </tr>
+  <tr>
+    <td class="h-60">{{consejeria}}</td>
+  </tr>
+</table>
+
+<br>
+
+<!-- ================= FINAL ================= -->
+<table>
+  <tr>
+    <td>Cita siguiente: {{cita}}</td>
+    <td>Personal: {{personal}}</td>
+  </tr>
+  <tr>
+    <td colspan="2" class="center h-40">
+      Firma y sello
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

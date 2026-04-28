@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
+const cors    = require('cors');
 
 const authRoutes      = require('./routes/auth');
 const usuariosRoutes  = require('./routes/usuarios');
@@ -19,14 +19,14 @@ app.use(express.json());
 // ── Rutas ─────────────────────────────────────────────────────
 app.use('/api/auth',      authRoutes);
 app.use('/api/usuarios',  usuariosRoutes);
-app.use('/api/pacientes', pacientesRoutes);
+app.use('/api/pacientes', pacientesRoutes);   // incluye sub-rutas controles/riesgo/morbilidad/vacunas/referencias/pdf
 app.use('/api/reportes',  reportesRoutes);
 
 // ── Health check ──────────────────────────────────────────────
 app.get('/api/health', (_, res) => res.json({
-  status: 'ok',
-  sistema: 'CAP El Chal - Expedientes Prenatales',
-  version: '1.0.0',
+  status:    'ok',
+  sistema:   'CAP El Chal - Expedientes Prenatales',
+  version:   '2.1.0',
   timestamp: new Date().toISOString()
 }));
 

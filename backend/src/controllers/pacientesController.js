@@ -1,6 +1,8 @@
 const pool = require('../db/pool');
 
+// ============================================================
 // GET /api/pacientes?buscar=xxx&pagina=1&limite=20
+// ============================================================
 async function listar(req, res) {
   const { buscar = '', pagina = 1, limite = 20 } = req.query;
   const offset = (parseInt(pagina) - 1) * parseInt(limite);
@@ -8,17 +10,25 @@ async function listar(req, res) {
 
   try {
     const { rows } = await pool.query(
-      `SELECT id, no_historia_clinica, nombre, edad, fur, created_at,
-              pa_sistolica, pa_diastolica, peso_lbs, talla_cm
+      `SELECT id, no_expediente, cui,
+              nombres, apellidos,
+              fecha_nacimiento, fur, fpp,
+              municipio, comunidad, telefono,
+              created_at
        FROM pacientes
-       WHERE nombre ILIKE $1 OR no_historia_clinica ILIKE $1
-       ORDER BY nombre ASC
+       WHERE nombres ILIKE $1
+          OR apellidos ILIKE $1
+          OR no_expediente ILIKE $1
+          OR cui ILIKE $1
+       ORDER BY apellidos ASC, nombres ASC
        LIMIT $2 OFFSET $3`,
       [q, parseInt(limite), offset]
     );
 
     const { rows: total } = await pool.query(
-      `SELECT COUNT(*) FROM pacientes WHERE nombre ILIKE $1 OR no_historia_clinica ILIKE $1`,
+      `SELECT COUNT(*) FROM pacientes
+       WHERE nombres ILIKE $1 OR apellidos ILIKE $1
+          OR no_expediente ILIKE $1 OR cui ILIKE $1`,
       [q]
     );
 
@@ -29,11 +39,16 @@ async function listar(req, res) {
   }
 }
 
+// ============================================================
 // GET /api/pacientes/:id
+// ============================================================
 async function obtener(req, res) {
   const { id } = req.params;
   try {
-    const { rows } = await pool.query('SELECT * FROM pacientes WHERE id = $1', [id]);
+    const { rows } = await pool.query(
+      'SELECT * FROM pacientes WHERE id = $1',
+      [id]
+    );
     if (!rows[0]) return res.status(404).json({ error: 'Paciente no encontrado' });
     return res.json(rows[0]);
   } catch (err) {
@@ -41,39 +56,62 @@ async function obtener(req, res) {
   }
 }
 
+// ============================================================
 // POST /api/pacientes
+// ============================================================
 async function crear(req, res) {
-  const data = req.body;
+  const d = req.body;
 
-  // Campos requeridos
-  if (!data.no_historia_clinica || !data.nombre) {
-    return res.status(400).json({ error: 'No. historia clínica y nombre son requeridos' });
+  if (!d.no_expediente || !d.nombres || !d.apellidos) {
+    return res.status(400).json({
+      error: 'no_expediente, nombres y apellidos son requeridos'
+    });
   }
 
   try {
     const { rows } = await pool.query(
       `INSERT INTO pacientes (
-        no_historia_clinica, nombre_servicio_salud, area_salud,
-        nombre, edad, lugar_residencia, grupo_etnico, poblacion_migrante,
-        motivo_consulta, historia_problema_actual,
-        fur, no_embarazos, fecha_ultimo_embarazo,
-        no_partos_eutocicos, no_partos_distocicos, no_abortos, no_cesarea,
-        muerte_fetal_neonatal, ninos_nacidos_antes_8m, ultimo_rn_menor_5lbs,
-        ultimo_rn_mayor_9lbs, embarazos_multiples, incompatibilidad_sanguinea,
-        tuberculosis, cancer, asma_bronquial, diabetes, hipertension_arterial,
-        cardiopatia, its_vih_sida, nefropatia, infecciones_urinarias,
-        enfermedad_mental, chagas, sifilis_positivo,
-        no_legrados_uterinos, no_cesareas_previas, otra_cirugia,
-        fuma, cigarros_dia, ingiere_alcohol, consume_drogas, vacuna_td,
-        papanicolaou_fecha, papanicolaou_resultado,
-        toma_medicamentos, otros_antecedentes,
-        pa_sistolica, pa_diastolica, temperatura, peso_lbs, talla_cm,
-        frecuencia_cardiaca, respiraciones,
-        palidez, palma_manos, conjuntivas, unas, icteria,
-        estado_animo, estado_nutricional, circunferencia_brazo_cm, imc,
-        hemorragia_vaginal, papilomas, flujo_vaginal, herpes, ulcera,
-        impresion_clinica, tratamiento, consejeria, plan_parto, plan_emergencia,
-        cita_siguiente, personal_atendio, registrado_por
+        -- Identificación
+        no_expediente, cui,
+        -- Establecimiento
+        nombre_establecimiento, distrito, area_salud, categoria_servicio,
+        -- Datos personales
+        nombres, apellidos, fecha_nacimiento, rango_edad, clasificacion_alfa_beta,
+        domicilio, municipio, territorio, sector, comunidad, telefono,
+        -- Cobertura
+        cobertura_igss, cobertura_privada, cobertura_privada_detalle,
+        viene_referida, referida_de,
+        -- Estudios / situación
+        nivel_estudios, ultimo_anio_aprobado, profesion_oficio,
+        estado_civil, nombre_esposo_conviviente,
+        -- Migración / etnia
+        es_migrante, migrante_municipio_depto_pais, pueblo, comunidad_linguistica,
+        -- Hábitos / riesgo social
+        fuma_activamente, fuma_pasivamente, consume_drogas, consume_alcohol,
+        violencia_1er_trimestre, violencia_2do_trimestre, violencia_3er_trimestre,
+        embarazo_abuso_sexual,
+        -- Gestación actual
+        fur, fpp, eg_confiable_fur, eg_confiable_usg,
+        -- Antecedentes obstétricos
+        gestas_previas, abortos, partos_vaginales, cesareas,
+        nacidos_vivos, hijos_viven, muertos_antes_1sem, muertos_despues_1sem,
+        cirugia_genito_urinaria, infertilidad,
+        fin_embarazo_anterior, fin_embarazo_menos_1anio,
+        embarazo_planeado, fracaso_metodo,
+        clasificacion_antec_obstetrico, rn_menor_2500g, rn_mayor_4000g,
+        antec_vih_positivo, antec_emb_ectopico, antec_violencia,
+        -- Antecedentes personales
+        antec_diabetes, antec_tbc, antec_hipertension, antec_preeclampsia,
+        antec_eclampsia, antec_cardiopatia, antec_nefropatia,
+        antec_otra_condicion, antec_otra_condicion_desc,
+        cirugia_genito_urinaria_pers,
+        -- Antecedentes familiares
+        fam_diabetes, fam_tbc, fam_hipertension, fam_preeclampsia,
+        fam_eclampsia, fam_cardiopatia, fam_gemelos,
+        -- Ficha riesgo
+        tiene_ficha_riesgo,
+        -- Auditoría
+        registrado_por
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
         $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
@@ -82,36 +120,54 @@ async function crear(req, res) {
         $41,$42,$43,$44,$45,$46,$47,$48,$49,$50,
         $51,$52,$53,$54,$55,$56,$57,$58,$59,$60,
         $61,$62,$63,$64,$65,$66,$67,$68,$69,$70,
-        $71,$72,$73
+        $71,$72,$73,$74,$75,$76,$77,$78,$79
       )
-      RETURNING id, no_historia_clinica, nombre`,
+      RETURNING id, no_expediente, cui, nombres, apellidos`,
       [
-        data.no_historia_clinica, data.nombre_servicio_salud, data.area_salud,
-        data.nombre, data.edad, data.lugar_residencia, data.grupo_etnico, data.poblacion_migrante ?? false,
-        data.motivo_consulta, data.historia_problema_actual,
-        data.fur, data.no_embarazos ?? 0, data.fecha_ultimo_embarazo,
-        data.no_partos_eutocicos ?? 0, data.no_partos_distocicos ?? 0, data.no_abortos ?? 0, data.no_cesarea ?? 0,
-        data.muerte_fetal_neonatal ?? 0, data.ninos_nacidos_antes_8m ?? false, data.ultimo_rn_menor_5lbs ?? false,
-        data.ultimo_rn_mayor_9lbs ?? false, data.embarazos_multiples ?? false, data.incompatibilidad_sanguinea ?? false,
-        data.tuberculosis ?? false, data.cancer ?? false, data.asma_bronquial ?? false,
-        data.diabetes ?? false, data.hipertension_arterial ?? false,
-        data.cardiopatia ?? false, data.its_vih_sida ?? false, data.nefropatia ?? false,
-        data.infecciones_urinarias ?? false, data.enfermedad_mental ?? false,
-        data.chagas ?? false, data.sifilis_positivo ?? false,
-        data.no_legrados_uterinos ?? 0, data.no_cesareas_previas ?? 0, data.otra_cirugia,
-        data.fuma ?? false, data.cigarros_dia ?? 0,
-        data.ingiere_alcohol ?? false, data.consume_drogas ?? false, data.vacuna_td ?? false,
-        data.papanicolaou_fecha, data.papanicolaou_resultado,
-        data.toma_medicamentos, data.otros_antecedentes,
-        data.pa_sistolica, data.pa_diastolica, data.temperatura, data.peso_lbs, data.talla_cm,
-        data.frecuencia_cardiaca, data.respiraciones,
-        data.palidez, data.palma_manos, data.conjuntivas, data.unas, data.icteria,
-        data.estado_animo, data.estado_nutricional, data.circunferencia_brazo_cm, data.imc,
-        data.hemorragia_vaginal ?? false, data.papilomas ?? false, data.flujo_vaginal ?? false,
-        data.herpes ?? false, data.ulcera ?? false,
-        data.impresion_clinica, data.tratamiento, data.consejeria,
-        data.plan_parto, data.plan_emergencia,
-        data.cita_siguiente, data.personal_atendio, req.usuario.id
+        // Identificación
+        d.no_expediente, d.cui,
+        // Establecimiento
+        d.nombre_establecimiento, d.distrito, d.area_salud, d.categoria_servicio,
+        // Datos personales
+        d.nombres, d.apellidos, d.fecha_nacimiento, d.rango_edad, d.clasificacion_alfa_beta,
+        d.domicilio, d.municipio, d.territorio, d.sector, d.comunidad, d.telefono,
+        // Cobertura
+        d.cobertura_igss ?? false, d.cobertura_privada ?? false, d.cobertura_privada_detalle,
+        d.viene_referida ?? false, d.referida_de,
+        // Estudios / situación
+        d.nivel_estudios, d.ultimo_anio_aprobado, d.profesion_oficio,
+        d.estado_civil, d.nombre_esposo_conviviente,
+        // Migración / etnia
+        d.es_migrante ?? false, d.migrante_municipio_depto_pais, d.pueblo, d.comunidad_linguistica,
+        // Hábitos / riesgo social
+        d.fuma_activamente ?? false, d.fuma_pasivamente ?? false,
+        d.consume_drogas ?? false, d.consume_alcohol ?? false,
+        d.violencia_1er_trimestre ?? false, d.violencia_2do_trimestre ?? false,
+        d.violencia_3er_trimestre ?? false, d.embarazo_abuso_sexual ?? false,
+        // Gestación actual
+        d.fur, d.fpp, d.eg_confiable_fur ?? false, d.eg_confiable_usg ?? false,
+        // Antecedentes obstétricos
+        d.gestas_previas ?? 0, d.abortos ?? 0, d.partos_vaginales ?? 0, d.cesareas ?? 0,
+        d.nacidos_vivos ?? 0, d.hijos_viven ?? 0,
+        d.muertos_antes_1sem ?? 0, d.muertos_despues_1sem ?? 0,
+        d.cirugia_genito_urinaria ?? false, d.infertilidad ?? false,
+        d.fin_embarazo_anterior, d.fin_embarazo_menos_1anio ?? false,
+        d.embarazo_planeado ?? false, d.fracaso_metodo,
+        d.clasificacion_antec_obstetrico, d.rn_menor_2500g ?? false, d.rn_mayor_4000g ?? false,
+        d.antec_vih_positivo ?? false, d.antec_emb_ectopico ?? false, d.antec_violencia ?? false,
+        // Antecedentes personales
+        d.antec_diabetes ?? false, d.antec_tbc ?? false, d.antec_hipertension ?? false,
+        d.antec_preeclampsia ?? false, d.antec_eclampsia ?? false, d.antec_cardiopatia ?? false,
+        d.antec_nefropatia ?? false, d.antec_otra_condicion ?? false, d.antec_otra_condicion_desc,
+        d.cirugia_genito_urinaria_pers ?? false,
+        // Antecedentes familiares
+        d.fam_diabetes ?? false, d.fam_tbc ?? false, d.fam_hipertension ?? false,
+        d.fam_preeclampsia ?? false, d.fam_eclampsia ?? false,
+        d.fam_cardiopatia ?? false, d.fam_gemelos ?? false,
+        // Ficha riesgo
+        d.tiene_ficha_riesgo ?? false,
+        // Auditoría
+        req.usuario.id
       ]
     );
 
@@ -119,19 +175,22 @@ async function crear(req, res) {
   } catch (err) {
     console.error(err);
     if (err.code === '23505') {
-      return res.status(409).json({ error: 'Ya existe un paciente con ese No. de historia clínica' });
+      return res.status(409).json({ error: 'Ya existe un expediente con ese número' });
     }
     return res.status(500).json({ error: 'Error al crear paciente' });
   }
 }
 
-// PUT /api/pacientes/:id
+// ============================================================
+// PUT /api/pacientes/:id  (SET dinámico)
+// ============================================================
 async function actualizar(req, res) {
   const { id } = req.params;
   const data = req.body;
 
-  // Construir SET dinámico con los campos enviados
-  const campos = Object.keys(data).filter(k => k !== 'id' && k !== 'registrado_por');
+  const CAMPOS_BLOQUEADOS = ['id', 'registrado_por', 'created_at'];
+  const campos = Object.keys(data).filter(k => !CAMPOS_BLOQUEADOS.includes(k));
+
   if (campos.length === 0) {
     return res.status(400).json({ error: 'Sin campos para actualizar' });
   }
@@ -141,10 +200,11 @@ async function actualizar(req, res) {
   valores.push(id);
 
   try {
-    await pool.query(
+    const { rowCount } = await pool.query(
       `UPDATE pacientes SET ${sets}, updated_at = NOW() WHERE id = $${valores.length}`,
       valores
     );
+    if (rowCount === 0) return res.status(404).json({ error: 'Paciente no encontrado' });
     return res.json({ message: 'Paciente actualizado' });
   } catch (err) {
     console.error(err);
@@ -152,33 +212,66 @@ async function actualizar(req, res) {
   }
 }
 
-// GET /api/pacientes/:id/expediente — retorna todo el expediente completo
+// ============================================================
+// GET /api/pacientes/:id/expediente  — expediente completo
+// ============================================================
 async function expedienteCompleto(req, res) {
   const { id } = req.params;
   try {
-    const [paciente, controles, postParto, riesgo, laboratorio, planParto, inmunizaciones, micronutrientes] =
-      await Promise.all([
-        pool.query('SELECT * FROM pacientes WHERE id = $1', [id]),
-        pool.query('SELECT * FROM controles_prenatales WHERE paciente_id = $1 ORDER BY numero_control', [id]),
-        pool.query('SELECT * FROM controles_post_parto WHERE paciente_id = $1 ORDER BY numero_control', [id]),
-        pool.query('SELECT * FROM fichas_riesgo_obstetrico WHERE paciente_id = $1 ORDER BY fecha DESC LIMIT 1', [id]),
-        pool.query('SELECT * FROM resultados_laboratorio WHERE paciente_id = $1 ORDER BY numero_control', [id]),
-        pool.query('SELECT * FROM planes_parto WHERE paciente_id = $1 ORDER BY fecha DESC LIMIT 1', [id]),
-        pool.query('SELECT * FROM inmunizaciones WHERE paciente_id = $1 ORDER BY fecha_aplicacion', [id]),
-        pool.query('SELECT * FROM micronutrientes WHERE paciente_id = $1 ORDER BY fecha', [id]),
-      ]);
+    const [
+      paciente,
+      controles,
+      puerperio,
+      morbilidad,
+      riesgo,
+      planParto,
+      vacunas,
+      referencias
+    ] = await Promise.all([
+      pool.query('SELECT * FROM pacientes WHERE id = $1', [id]),
+      pool.query(
+        'SELECT * FROM controles_prenatales WHERE paciente_id = $1 ORDER BY numero_control',
+        [id]
+      ),
+      pool.query(
+        'SELECT * FROM controles_puerperio WHERE paciente_id = $1 ORDER BY numero_atencion',
+        [id]
+      ),
+      pool.query(
+        'SELECT * FROM morbilidad_embarazo WHERE paciente_id = $1 ORDER BY fecha DESC',
+        [id]
+      ),
+      pool.query(
+        'SELECT * FROM fichas_riesgo_obstetrico WHERE paciente_id = $1 ORDER BY fecha DESC LIMIT 1',
+        [id]
+      ),
+      pool.query(
+        'SELECT * FROM planes_parto WHERE paciente_id = $1 ORDER BY fecha DESC LIMIT 1',
+        [id]
+      ),
+      pool.query(
+        'SELECT * FROM vacunas_paciente WHERE paciente_id = $1 ORDER BY tipo_vacuna, numero_dosis',
+        [id]
+      ),
+      pool.query(
+        'SELECT * FROM referencias_efectuadas WHERE paciente_id = $1 ORDER BY fecha DESC',
+        [id]
+      ),
+    ]);
 
-    if (!paciente.rows[0]) return res.status(404).json({ error: 'Paciente no encontrado' });
+    if (!paciente.rows[0]) {
+      return res.status(404).json({ error: 'Paciente no encontrado' });
+    }
 
     return res.json({
-      paciente: paciente.rows[0],
+      paciente:             paciente.rows[0],
       controles_prenatales: controles.rows,
-      controles_post_parto: postParto.rows,
-      ficha_riesgo: riesgo.rows[0] || null,
-      laboratorio: laboratorio.rows,
-      plan_parto: planParto.rows[0] || null,
-      inmunizaciones: inmunizaciones.rows,
-      micronutrientes: micronutrientes.rows,
+      controles_puerperio:  puerperio.rows,
+      morbilidad:           morbilidad.rows,
+      ficha_riesgo:         riesgo.rows[0] || null,
+      plan_parto:           planParto.rows[0] || null,
+      vacunas:              vacunas.rows,
+      referencias:          referencias.rows,
     });
   } catch (err) {
     console.error(err);

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+
+<style>
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+  }
+
+  .page {
+    position: relative;
+    width: 210mm;
+    height: 297mm;
+  }
+
+  .bg {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+  }
+
+  .field {
+    position: absolute;
+    font-size: 11px;
+  }
+
+  .check {
+    position: absolute;
+    font-size: 14px;
+    font-weight: bold;
+  }
+
+</style>
+</head>
+
+<body>
+<div class="page">
+
+  <img src="puerperio_bg.jpg" class="bg">
+
+  <!-- IDENTIFICACIÓN -->
+  <div class="field" style="top: 30mm; left: 40mm;">
+    {{nombre}}
+  </div>
+
+  <div class="field" style="top: 30mm; left: 150mm;">
+    {{expediente}}
+  </div>
+
+  <div class="field" style="top: 40mm; left: 40mm;">
+    {{fecha}}
+  </div>
+
+  <div class="field" style="top: 40mm; left: 100mm;">
+    {{numero}}
+  </div>
+
+  <!-- DATOS DEL PARTO -->
+  <div class="field" style="top: 55mm; left: 40mm;">
+    {{lugar_parto}}
+  </div>
+
+  <div class="field" style="top: 65mm; left: 40mm;">
+    {{quien_atendio}}
+  </div>
+
+  <div class="check" style="top: 75mm; left: 40mm;">
+    {{apego}}
+  </div>
+
+  <div class="field" style="top: 75mm; left: 80mm;">
+    {{dias}}
+  </div>
+
+  <!-- SIGNOS VITALES -->
+  <div class="field" style="top: 95mm; left: 30mm;">{{temp}}</div>
+  <div class="field" style="top: 95mm; left: 60mm;">{{pulso}}</div>
+  <div class="field" style="top: 95mm; left: 90mm;">{{resp}}</div>
+
+  <div class="field" style="top: 105mm; left: 30mm;">{{pa}}</div>
+  <div class="field" style="top: 105mm; left: 70mm;">{{peso}}</div>
+
+  <!-- EXAMEN -->
+  <div class="field" style="top: 125mm; left: 30mm;">
+    {{herida}}
+  </div>
+
+  <div class="field" style="top: 135mm; left: 30mm;">
+    {{mamas}}
+  </div>
+
+  <div class="field" style="top: 145mm; left: 30mm;">
+    {{loquios}}
+  </div>
+
+  <div class="field" style="top: 155mm; left: 30mm;">
+    {{episio}}
+  </div>
+
+  <!-- PELIGRO -->
+  <div class="field" style="top: 175mm; left: 30mm; width: 150mm;">
+    {{peligro_madre}}
+  </div>
+
+  <div class="field" style="top: 190mm; left: 30mm; width: 150mm;">
+    {{peligro_rn}}
+  </div>
+
+  <!-- DX -->
+  <div class="field" style="top: 210mm; left: 30mm; width: 150mm;">
+    {{dx}}
+  </div>
+
+  <div class="field" style="top: 225mm; left: 30mm; width: 150mm;">
+    {{tratamiento}}
+  </div>
+
+  <div class="field" style="top: 240mm; left: 30mm; width: 150mm;">
+    {{consejeria}}
+  </div>
+
+  <!-- FINAL -->
+  <div class="field" style="top: 260mm; left: 30mm;">
+    {{cita}}
+  </div>
+
+  <div class="field" style="top: 260mm; left: 120mm;">
+    {{personal}}
+  </div>
+
+</div>
+</body>
+</html>
