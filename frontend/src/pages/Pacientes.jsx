@@ -1,13 +1,14 @@
 ﻿import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Search, UserPlus } from "lucide-react";
 import api from "../api/axios";
 
 export default function Pacientes() {
   const [pacientes, setPacientes] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [buscar, setBuscar] = useState("");
-  const [pagina, setPagina] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [total, setTotal]         = useState(0);
+  const [buscar, setBuscar]       = useState("");
+  const [pagina, setPagina]       = useState(1);
+  const [loading, setLoading]     = useState(true);
   const navigate = useNavigate();
   const LIMITE = 20;
 
@@ -25,68 +26,97 @@ export default function Pacientes() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.75rem" }}>
+      {/* HEADER */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.75rem", flexWrap: "wrap", gap: "0.75rem" }}>
         <div>
-          <h1 style={{ fontSize: "1.6rem", fontWeight: 800 }}>Pacientes</h1>
-          <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginTop: 3 }}>{total} paciente(s) registradas</p>
+          <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--text)" }}>Pacientes</h1>
+          <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 3 }}>
+            {total} paciente{total !== 1 ? "s" : ""} registrada{total !== 1 ? "s" : ""}
+          </p>
         </div>
-        <button className="btn-primary" onClick={() => navigate("/nuevo")}>+ Nueva paciente</button>
+        <button className="btn-primary" onClick={() => navigate("/nuevo")}
+          style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <UserPlus size={15} /> Nueva paciente
+        </button>
       </div>
 
-      <div className="card" style={{ marginBottom: "1.25rem" }}>
+      {/* BÚSQUEDA */}
+      <div className="card" style={{ marginBottom: "1.25rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+        <Search size={16} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
         <input
           className="input-field"
-          placeholder="Buscar por nombre o No. de historia clinica..."
+          placeholder="Buscar por nombre, apellido, No. expediente o CUI..."
           value={buscar}
           onChange={(e) => { setBuscar(e.target.value); setPagina(1); }}
-          style={{ maxWidth: 400 }}
+          style={{ maxWidth: 420, margin: 0 }}
         />
       </div>
 
+      {/* TABLA */}
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {loading ? (
-          <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-muted)" }}>Cargando...</div>
+          <div style={{ padding: "2.5rem", textAlign: "center", color: "var(--text-muted)" }}>Cargando...</div>
         ) : pacientes.length === 0 ? (
           <div style={{ padding: "2.5rem", textAlign: "center", color: "var(--text-muted)" }}>
-            No se encontraron pacientes
+            No se encontraron pacientes.
           </div>
         ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>No. Historia</th>
-                <th>Nombre</th>
-                <th>Edad</th>
-                <th>FUR</th>
-                <th>FPP (est.)</th>
-                <th>Registrada</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pacientes.map((p) => {
-                const fpp = p.fur ? new Date(new Date(p.fur).getTime() + 280 * 86400000) : null;
-                return (
-                  <tr key={p.id} onClick={() => navigate(`/pacientes/${p.id}`)}>
-                    <td><span className="badge badge-blue">{p.no_historia_clinica}</span></td>
-                    <td style={{ fontWeight: 500 }}>{p.nombre}</td>
-                    <td>{p.edad ?? "—"}</td>
-                    <td>{p.fur ? new Date(p.fur).toLocaleDateString("es-GT") : "—"}</td>
-                    <td>{fpp ? fpp.toLocaleDateString("es-GT") : "—"}</td>
-                    <td style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
-                      {new Date(p.created_at).toLocaleDateString("es-GT")}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div style={{ overflowX: "auto" }}>
+            <table className="tabla">
+              <thead>
+                <tr>
+                  <th>No. Expediente</th>
+                  <th>Apellidos</th>
+                  <th>Nombres</th>
+                  <th>Municipio</th>
+                  <th>FUR</th>
+                  <th>FPP (est.)</th>
+                  <th>Registrada</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pacientes.map((p) => {
+                  const fpp = p.fur
+                    ? new Date(new Date(p.fur).getTime() + 280 * 86400000)
+                    : null;
+                  return (
+                    <tr key={p.id} style={{ cursor: "pointer" }}
+                      onClick={() => navigate(`/pacientes/${p.id}`)}>
+                      <td>
+                        <span className="badge badge-blue">{p.no_expediente}</span>
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{p.apellidos}</td>
+                      <td>{p.nombres}</td>
+                      <td style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>{p.municipio || "—"}</td>
+                      <td style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                        {p.fur ? new Date(p.fur).toLocaleDateString("es-GT") : "—"}
+                      </td>
+                      <td style={{ color: "var(--accent)", fontWeight: 500, fontSize: "0.85rem" }}>
+                        {fpp ? fpp.toLocaleDateString("es-GT") : "—"}
+                      </td>
+                      <td style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>
+                        {new Date(p.created_at).toLocaleDateString("es-GT")}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
 
+        {/* PAGINACIÓN */}
         {totalPaginas > 1 && (
-          <div style={{ padding: "1rem", display: "flex", gap: "0.5rem", justifyContent: "flex-end", borderTop: "1px solid var(--border)" }}>
-            <button className="btn-secondary" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina === 1}>← Anterior</button>
-            <span style={{ padding: "0.6rem 1rem", fontSize: "0.85rem", color: "var(--text-muted)" }}>{pagina} / {totalPaginas}</span>
-            <button className="btn-secondary" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas}>Siguiente →</button>
+          <div style={{ padding: "1rem", display: "flex", gap: "0.5rem", justifyContent: "flex-end", borderTop: "1px solid var(--border)", alignItems: "center" }}>
+            <button className="btn-secondary" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina === 1}>
+              ← Anterior
+            </button>
+            <span style={{ padding: "0.5rem 0.75rem", fontSize: "0.83rem", color: "var(--text-muted)" }}>
+              {pagina} / {totalPaginas}
+            </span>
+            <button className="btn-secondary" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas}>
+              Siguiente →
+            </button>
           </div>
         )}
       </div>

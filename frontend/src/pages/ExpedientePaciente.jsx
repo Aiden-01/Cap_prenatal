@@ -1,13 +1,21 @@
 ﻿import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/axios";
+import { useGlobalToast } from "../components/Layout";
+import {
+  ChevronLeft, Plus, AlertTriangle, CheckCircle,
+  Syringe, Activity, FlaskConical, Baby, FileText
+} from "lucide-react";
 
+// ─── HELPERS ────────────────────────────────────────────────
 function Row({ label, value }) {
-  if (!value && value !== 0) return null;
+  if (value === null || value === undefined || value === "") return null;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>{label}</span>
-      <span style={{ fontSize: "0.9rem", color: "var(--text)", fontWeight: 400 }}>{String(value)}</span>
+      <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>
+        {label}
+      </span>
+      <span style={{ fontSize: "0.88rem", color: "var(--text)" }}>{String(value)}</span>
     </div>
   );
 }
@@ -15,221 +23,490 @@ function Row({ label, value }) {
 function SiNo({ label, value }) {
   if (value === undefined || value === null) return null;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-      <span style={{ width: 16, height: 16, borderRadius: 4, background: value ? "var(--accent)" : "var(--border)", display: "grid", placeItems: "center", flexShrink: 0 }}>
-        {value && <span style={{ color: "#fff", fontSize: "0.6rem", fontWeight: 700 }}>✓</span>}
-      </span>
-      <span style={{ fontSize: "0.85rem", color: value ? "var(--text)" : "var(--text-muted)" }}>{label}</span>
+    <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+      <div style={{
+        width: 15, height: 15, borderRadius: 4,
+        background: value ? "var(--accent)" : "var(--border)",
+        display: "grid", placeItems: "center", flexShrink: 0,
+      }}>
+        {value && <span style={{ color: "#fff", fontSize: "0.58rem", fontWeight: 800 }}>✓</span>}
+      </div>
+      <span style={{ fontSize: "0.82rem", color: value ? "var(--text)" : "var(--text-muted)" }}>{label}</span>
     </div>
   );
 }
 
+function SecTitle({ children }) {
+  return (
+    <div style={{
+      fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.09em",
+      textTransform: "uppercase", color: "var(--primary)",
+      borderBottom: "1.5px solid var(--primary-lt)",
+      paddingBottom: "0.35rem", marginBottom: "0.85rem",
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function Grid({ cols = 3, children }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: "0.9rem" }}>
+      {children}
+    </div>
+  );
+}
+
+function GridAuto({ children }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: "0.55rem" }}>
+      {children}
+    </div>
+  );
+}
+
+function fecha(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("es-GT");
+}
+
+// ─── COMPONENTE PRINCIPAL ────────────────────────────────────
 export default function ExpedientePaciente() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [exp, setExp] = useState(null);
+  const { id }     = useParams();
+  const navigate   = useNavigate();
+  const toast      = useGlobalToast();
+  const [exp, setExp]       = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("general");
+  const [tab, setTab]         = useState("general");
 
   useEffect(() => {
     api.get(`/pacientes/${id}/expediente`)
       .then(({ data }) => setExp(data))
-      .catch(console.error)
+      .catch(() => toast("Error al cargar expediente", "error"))
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <div style={{ padding: "2rem", color: "var(--text-muted)" }}>Cargando expediente...</div>;
-  if (!exp) return <div style={{ padding: "2rem", color: "var(--danger)" }}>Paciente no encontrada.</div>;
+  if (loading) return (
+    <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
+      Cargando expediente...
+    </div>
+  );
+  if (!exp) return (
+    <div style={{ padding: "3rem", textAlign: "center", color: "var(--danger)" }}>
+      Paciente no encontrada.
+    </div>
+  );
 
   const p = exp.paciente;
-  const fpp = p.fur ? new Date(new Date(p.fur).getTime() + 280 * 86400000) : null;
 
   const TABS = [
-    { id: "general", label: "Primera consulta" },
-    { id: "controles", label: `Controles (${exp.controles_prenatales.length})` },
-    { id: "riesgo", label: "Riesgo obstétrico" },
-    { id: "laboratorio", label: "Laboratorio" },
+    { id: "general",    label: "Datos generales",                          icon: FileText     },
+    { id: "controles",  label: `Controles (${exp.controles_prenatales?.length ?? 0})`, icon: Activity     },
+    { id: "puerperio",  label: `Puerperio (${exp.controles_puerperio?.length ?? 0})`,  icon: Baby         },
+    { id: "morbilidad", label: `Morbilidad (${exp.morbilidad?.length ?? 0})`,          icon: Plus         },
+    { id: "riesgo",     label: "Riesgo obstétrico",                        icon: AlertTriangle },
+    { id: "vacunas",    label: "Vacunas",                                  icon: Syringe      },
+    { id: "laboratorio",label: "Laboratorios",                             icon: FlaskConical },
   ];
 
   return (
     <div>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", marginBottom: "1.5rem" }}>
-        <button className="btn-secondary" onClick={() => navigate("/pacientes")}>← Volver</button>
+      {/* ── HEADER ── */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+        <button className="btn-secondary" onClick={() => navigate("/pacientes")}
+          style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+          <ChevronLeft size={15} /> Volver
+        </button>
+
         <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>{p.nombre}</h1>
-            {exp.ficha_riesgo?.tiene_riesgo && <span className="badge badge-red">⚠ Riesgo obstétrico</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+            <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--text)" }}>
+              {p.nombres} {p.apellidos}
+            </h1>
+            {exp.ficha_riesgo?.tiene_riesgo && (
+              <span className="badge badge-red">⚠ Riesgo obstétrico</span>
+            )}
           </div>
-          <div style={{ display: "flex", gap: "1rem", marginTop: 6, flexWrap: "wrap" }}>
-            <span className="badge badge-blue">HC: {p.no_historia_clinica}</span>
-            {p.edad && <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>{p.edad} años</span>}
-            {p.fur && <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>FUR: {new Date(p.fur).toLocaleDateString("es-GT")}</span>}
-            {fpp && <span style={{ color: "var(--accent)", fontSize: "0.85rem", fontWeight: 600 }}>FPP: {fpp.toLocaleDateString("es-GT")}</span>}
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <span className="badge badge-blue">Exp: {p.no_expediente}</span>
+            {p.cui && <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>CUI: {p.cui}</span>}
+            {p.fur  && <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>FUR: {fecha(p.fur)}</span>}
+            {p.fpp  && <span style={{ color: "var(--accent)", fontSize: "0.82rem", fontWeight: 600 }}>FPP: {fecha(p.fpp)}</span>}
           </div>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem" }}>
-          <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}>+ Control</button>
-        </div>
-      </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: "0.25rem", borderBottom: "2px solid var(--border)", marginBottom: "1.5rem" }}>
-        {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: "0.6rem 1.2rem", border: "none", background: "transparent",
-            borderBottom: tab === t.id ? "2px solid var(--primary)" : "2px solid transparent",
-            marginBottom: -2, color: tab === t.id ? "var(--primary)" : "var(--text-muted)",
-            fontFamily: "DM Sans", fontSize: "0.88rem", fontWeight: tab === t.id ? 600 : 400,
-            cursor: "pointer", transition: "all 0.15s",
-          }}>
-            {t.label}
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}
+            style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <Plus size={14} /> Control
           </button>
-        ))}
+        </div>
       </div>
 
-      {/* Tab: Primera consulta */}
+      {/* ── TABS ── */}
+      <div style={{ display: "flex", gap: "0.15rem", borderBottom: "2px solid var(--border)", marginBottom: "1.5rem", overflowX: "auto" }}>
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              padding: "0.55rem 1rem", border: "none", background: "transparent", whiteSpace: "nowrap",
+              borderBottom: tab === t.id ? "2px solid var(--primary)" : "2px solid transparent",
+              marginBottom: -2, color: tab === t.id ? "var(--primary)" : "var(--text-muted)",
+              fontFamily: "DM Sans", fontSize: "0.82rem", fontWeight: tab === t.id ? 600 : 400,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem",
+            }}>
+              <Icon size={13} />{t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ══════════════════════════════════════════
+          TAB: DATOS GENERALES
+      ══════════════════════════════════════════ */}
       {tab === "general" && (
         <div style={{ display: "grid", gap: "1.25rem" }}>
+
           <div className="card">
-            <h3 style={{ fontFamily: "Syne", marginBottom: "1rem", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--primary)" }}>Datos Generales</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1rem" }}>
-              <Row label="Servicio de salud" value={p.nombre_servicio_salud} />
-              <Row label="Ãrea de salud" value={p.area_salud} />
-              <Row label="Lugar de residencia" value={p.lugar_residencia} />
-              <Row label="Grupo Ã©tnico" value={p.grupo_etnico} />
-              <Row label="Motivo de consulta" value={p.motivo_consulta} />
+            <SecTitle>Establecimiento</SecTitle>
+            <Grid cols={3}>
+              <Row label="Nombre establecimiento" value={p.nombre_establecimiento} />
+              <Row label="Distrito" value={p.distrito} />
+              <Row label="Área de salud" value={p.area_salud} />
+              <Row label="Categoría" value={p.categoria_servicio} />
+            </Grid>
+          </div>
+
+          <div className="card">
+            <SecTitle>Datos Personales</SecTitle>
+            <Grid cols={3}>
+              <Row label="Nombres" value={p.nombres} />
+              <Row label="Apellidos" value={p.apellidos} />
+              <Row label="Fecha de nacimiento" value={fecha(p.fecha_nacimiento)} />
+              <Row label="CUI" value={p.cui} />
+              <Row label="Domicilio" value={p.domicilio} />
+              <Row label="Municipio" value={p.municipio} />
+              <Row label="Comunidad" value={p.comunidad} />
+              <Row label="Teléfono" value={p.telefono} />
+              <Row label="Estado civil" value={p.estado_civil} />
+              <Row label="Pueblo" value={p.pueblo} />
+              <Row label="Comunidad lingüística" value={p.comunidad_linguistica} />
+              <Row label="Profesión/oficio" value={p.profesion_oficio} />
+              <Row label="Esposo/conviviente" value={p.nombre_esposo_conviviente} />
+            </Grid>
+            <div style={{ marginTop: "0.85rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              <SiNo label="IGSS"         value={p.cobertura_igss} />
+              <SiNo label="Cob. privada" value={p.cobertura_privada} />
+              <SiNo label="Migrante"     value={p.es_migrante} />
+              <SiNo label="Referida"     value={p.viene_referida} />
             </div>
           </div>
 
           <div className="card">
-            <h3 style={{ fontFamily: "Syne", marginBottom: "1rem", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--primary)" }}>Antecedentes Obstétricos</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "1rem" }}>
-              <Row label="# Embarazos" value={p.no_embarazos} />
-              <Row label="# Partos eutócicos" value={p.no_partos_eutocicos} />
-              <Row label="# Partos distócicos" value={p.no_partos_distocicos} />
-              <Row label="# Cesáreas" value={p.no_cesarea} />
-              <Row label="# Abortos" value={p.no_abortos} />
-              <Row label="Muerte fetal/neonatal" value={p.muerte_fetal_neonatal} />
+            <SecTitle>Gestación Actual</SecTitle>
+            <Grid cols={4}>
+              <Row label="FUR" value={fecha(p.fur)} />
+              <Row label="FPP" value={fecha(p.fpp)} />
+              <Row label="EG confiable FUR" value={p.eg_confiable_fur ? "Sí" : "No"} />
+              <Row label="EG confiable USG" value={p.eg_confiable_usg ? "Sí" : "No"} />
+            </Grid>
+          </div>
+
+          <div className="card">
+            <SecTitle>Antecedentes Obstétricos</SecTitle>
+            <Grid cols={4}>
+              <Row label="Gestas previas"    value={p.gestas_previas} />
+              <Row label="Partos vaginales"  value={p.partos_vaginales} />
+              <Row label="Cesáreas"          value={p.cesareas} />
+              <Row label="Abortos"           value={p.abortos} />
+              <Row label="Nacidos vivos"     value={p.nacidos_vivos} />
+              <Row label="Hijos que viven"   value={p.hijos_viven} />
+              <Row label="Muertos < 1 sem"   value={p.muertos_antes_1sem} />
+              <Row label="Muertos > 1 sem"   value={p.muertos_despues_1sem} />
+            </Grid>
+            <div style={{ marginTop: "0.85rem" }}>
+              <GridAuto>
+                <SiNo label="Cirugía génito-urinaria" value={p.cirugia_genito_urinaria} />
+                <SiNo label="Infertilidad"            value={p.infertilidad} />
+                <SiNo label="RN anterior < 2500g"     value={p.rn_menor_2500g} />
+                <SiNo label="RN anterior ≥ 4000g"     value={p.rn_mayor_4000g} />
+                <SiNo label="Antec. VIH+"             value={p.antec_vih_positivo} />
+                <SiNo label="Antec. emb. ectópico"    value={p.antec_emb_ectopico} />
+              </GridAuto>
+            </div>
+            <div style={{ marginTop: "0.75rem" }}>
+              <Row label="Embarazo planeado" value={p.embarazo_planeado ? "Sí" : "No"} />
+              <Row label="Fracaso de método" value={p.fracaso_metodo} />
+              <Row label="Fin embarazo anterior" value={fecha(p.fin_embarazo_anterior)} />
             </div>
           </div>
 
           <div className="card">
-            <h3 style={{ fontFamily: "Syne", marginBottom: "1rem", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--primary)" }}>Signos Vitales</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "1rem" }}>
-              <Row label="P/A" value={p.pa_sistolica && p.pa_diastolica ? `${p.pa_sistolica}/${p.pa_diastolica} mmHg` : null} />
-              <Row label="Temperatura" value={p.temperatura ? `${p.temperatura}Â°C` : null} />
-              <Row label="Peso" value={p.peso_lbs ? `${p.peso_lbs} lbs` : null} />
-              <Row label="Talla" value={p.talla_cm ? `${p.talla_cm} cm` : null} />
-              <Row label="FC" value={p.frecuencia_cardiaca ? `${p.frecuencia_cardiaca} x min` : null} />
-              <Row label="Respiraciones" value={p.respiraciones ? `${p.respiraciones} x min` : null} />
-              <Row label="Circ. brazo" value={p.circunferencia_brazo_cm ? `${p.circunferencia_brazo_cm} cm` : null} />
-              <Row label="IMC" value={p.imc} />
-            </div>
+            <SecTitle>Antecedentes Personales</SecTitle>
+            <GridAuto>
+              <SiNo label="Diabetes"          value={p.antec_diabetes} />
+              <SiNo label="Tuberculosis"      value={p.antec_tbc} />
+              <SiNo label="Hipertensión"      value={p.antec_hipertension} />
+              <SiNo label="Preeclampsia"      value={p.antec_preeclampsia} />
+              <SiNo label="Eclampsia"         value={p.antec_eclampsia} />
+              <SiNo label="Cardiopatía"       value={p.antec_cardiopatia} />
+              <SiNo label="Nefropatía"        value={p.antec_nefropatia} />
+              <SiNo label="Violencia"         value={p.antec_violencia} />
+            </GridAuto>
           </div>
 
           <div className="card">
-            <h3 style={{ fontFamily: "Syne", marginBottom: "1rem", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--primary)" }}>Antecedentes Patológicos</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.75rem" }}>
-              <SiNo label="Tuberculosis" value={p.tuberculosis} />
-              <SiNo label="Cáncer" value={p.cancer} />
-              <SiNo label="Asma bronquial" value={p.asma_bronquial} />
-              <SiNo label="Diabetes" value={p.diabetes} />
-              <SiNo label="Hipertensión" value={p.hipertension_arterial} />
-              <SiNo label="Cardiopatía" value={p.cardiopatia} />
-              <SiNo label="ITS/VIH/Sida" value={p.its_vih_sida} />
-              <SiNo label="Sífilis positivo" value={p.sifilis_positivo} />
-              <SiNo label="Chagas" value={p.chagas} />
-              <SiNo label="Enfermedad mental" value={p.enfermedad_mental} />
-            </div>
+            <SecTitle>Antecedentes Familiares</SecTitle>
+            <GridAuto>
+              <SiNo label="Diabetes"   value={p.fam_diabetes} />
+              <SiNo label="TBC"        value={p.fam_tbc} />
+              <SiNo label="HTA"        value={p.fam_hipertension} />
+              <SiNo label="Preeclamp." value={p.fam_preeclampsia} />
+              <SiNo label="Eclampsia"  value={p.fam_eclampsia} />
+              <SiNo label="Cardiopatía"value={p.fam_cardiopatia} />
+              <SiNo label="Gemelares"  value={p.fam_gemelos} />
+            </GridAuto>
           </div>
 
-          {(p.impresion_clinica || p.tratamiento || p.consejeria) && (
-            <div className="card">
-              <h3 style={{ fontFamily: "Syne", marginBottom: "1rem", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--primary)" }}>IC / Tx / Plan</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                <Row label="Impresión Clínica" value={p.impresion_clinica} />
-                <Row label="Tratamiento" value={p.tratamiento} />
-                <Row label="Consejería" value={p.consejeria} />
-                <Row label="Plan de parto" value={p.plan_parto} />
-                <Row label="Plan de emergencia" value={p.plan_emergencia} />
-                <Row label="Cita siguiente" value={p.cita_siguiente ? new Date(p.cita_siguiente).toLocaleDateString("es-GT") : null} />
-                <Row label="Personal que atendió" value={p.personal_atendio} />
-              </div>
-            </div>
-          )}
+          <div className="card">
+            <SecTitle>Riesgo Social</SecTitle>
+            <GridAuto>
+              <SiNo label="Fuma act."          value={p.fuma_activamente} />
+              <SiNo label="Fuma pas."          value={p.fuma_pasivamente} />
+              <SiNo label="Alcohol"            value={p.consume_alcohol} />
+              <SiNo label="Drogas"             value={p.consume_drogas} />
+              <SiNo label="Violencia 1er trim" value={p.violencia_1er_trimestre} />
+              <SiNo label="Violencia 2do trim" value={p.violencia_2do_trimestre} />
+              <SiNo label="Violencia 3er trim" value={p.violencia_3er_trimestre} />
+              <SiNo label="Abuso sexual"       value={p.embarazo_abuso_sexual} />
+            </GridAuto>
+          </div>
+
         </div>
       )}
 
-      {/* Tab: Controles */}
+      {/* ══════════════════════════════════════════
+          TAB: CONTROLES PRENATALES
+      ══════════════════════════════════════════ */}
       {tab === "controles" && (
         <div style={{ display: "grid", gap: "1rem" }}>
-          {exp.controles_prenatales.length === 0 ? (
+          {exp.controles_prenatales?.length === 0 ? (
             <div className="card" style={{ textAlign: "center", padding: "2.5rem", color: "var(--text-muted)" }}>
               No hay controles registrados.
               <div style={{ marginTop: "1rem" }}>
-                <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}>+ Registrar 1er control</button>
+                <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}>
+                  + Registrar 1er control
+                </button>
               </div>
             </div>
           ) : (
             exp.controles_prenatales.map((ctrl) => (
               <div className="card" key={ctrl.id}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                  <span className="badge badge-blue" style={{ fontSize: "0.85rem", padding: "0.3rem 0.9rem" }}>Control {ctrl.numero_control}</span>
-                  <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>{new Date(ctrl.fecha).toLocaleDateString("es-GT")}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <span className="badge badge-blue">Control {ctrl.numero_control}</span>
+                  <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                    {fecha(ctrl.fecha)}{ctrl.hora ? ` — ${ctrl.hora}` : ""}
+                  </span>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.75rem" }}>
-                  <Row label="P/A" value={ctrl.pa_sistolica ? `${ctrl.pa_sistolica}/${ctrl.pa_diastolica}` : null} />
-                  <Row label="Temperatura" value={ctrl.temperatura ? `${ctrl.temperatura}Â°C` : null} />
+
+                {/* Signos de peligro */}
+                {(ctrl.peligro_hemorragia_vaginal || ctrl.peligro_palidez || ctrl.peligro_dolor_cabeza ||
+                  ctrl.peligro_hipertension || ctrl.peligro_dolor_epigastrico ||
+                  ctrl.peligro_trastornos_visuales || ctrl.peligro_fiebre || ctrl.peligro_otro) && (
+                  <div style={{ background: "var(--danger-lt)", border: "1px solid var(--danger)", borderRadius: 8, padding: "0.6rem 0.9rem", marginBottom: "0.85rem" }}>
+                    <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--danger)", marginBottom: "0.4rem" }}>⚠ SIGNOS DE PELIGRO</div>
+                    <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                      {ctrl.peligro_hemorragia_vaginal && <span className="badge badge-red">Hemorragia vaginal</span>}
+                      {ctrl.peligro_palidez           && <span className="badge badge-red">Palidez</span>}
+                      {ctrl.peligro_dolor_cabeza      && <span className="badge badge-red">Dolor de cabeza</span>}
+                      {ctrl.peligro_hipertension      && <span className="badge badge-red">Hipertensión</span>}
+                      {ctrl.peligro_dolor_epigastrico && <span className="badge badge-red">Dolor epigástrico</span>}
+                      {ctrl.peligro_trastornos_visuales && <span className="badge badge-red">Trast. visuales</span>}
+                      {ctrl.peligro_fiebre            && <span className="badge badge-red">Fiebre</span>}
+                      {ctrl.peligro_otro && <span className="badge badge-red">{ctrl.peligro_otro}</span>}
+                    </div>
+                  </div>
+                )}
+
+                <Grid cols={4}>
+                  <Row label="P/A" value={ctrl.pa_sistolica ? `${ctrl.pa_sistolica}/${ctrl.pa_diastolica} mmHg` : null} />
+                  <Row label="Temperatura" value={ctrl.temperatura ? `${ctrl.temperatura}°C` : null} />
                   <Row label="Peso" value={ctrl.peso_kg ? `${ctrl.peso_kg} kg` : null} />
-                  <Row label="AU" value={ctrl.au_cm ? `${ctrl.au_cm} cm` : null} />
+                  <Row label="Talla" value={ctrl.talla_cm ? `${ctrl.talla_cm} cm` : null} />
+                  <Row label="IMC" value={ctrl.imc} />
+                  <Row label="Perím. braquial" value={ctrl.perimetro_braquial_cm ? `${ctrl.perimetro_braquial_cm} cm` : null} />
+                  <Row label="AU" value={ctrl.altura_uterina_cm ? `${ctrl.altura_uterina_cm} cm` : null} />
                   <Row label="FCF" value={ctrl.fcf ? `${ctrl.fcf} lpm` : null} />
-                  <Row label="Semanas gest." value={ctrl.edad_embarazo_semanas ? `${ctrl.edad_embarazo_semanas} sem` : null} />
-                  <Row label="Cita siguiente" value={ctrl.cita_siguiente ? new Date(ctrl.cita_siguiente).toLocaleDateString("es-GT") : null} />
-                  <Row label="Personal" value={ctrl.personal_atendio} />
-                </div>
-                {ctrl.impresion_clinica && <div style={{ marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid var(--border)" }}><Row label="Impresión Clínica" value={ctrl.impresion_clinica} /></div>}
+                  <Row label="FC" value={ctrl.frecuencia_cardiaca ? `${ctrl.frecuencia_cardiaca} x min` : null} />
+                  <Row label="FR" value={ctrl.frecuencia_respiratoria ? `${ctrl.frecuencia_respiratoria} x min` : null} />
+                  <Row label="Semanas gest." value={ctrl.edad_gestacional_semanas ? `${ctrl.edad_gestacional_semanas} sem` : null} />
+                  <Row label="Cita siguiente" value={fecha(ctrl.cita_siguiente)} />
+                  <Row label="Situación fetal" value={ctrl.situacion_fetal} />
+                  <Row label="Presentación" value={ctrl.presentacion_fetal} />
+                </Grid>
+
+                {ctrl.impresion_clinica && (
+                  <div style={{ marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid var(--border)" }}>
+                    <Row label="Impresión Clínica" value={ctrl.impresion_clinica} />
+                  </div>
+                )}
+                {ctrl.tratamiento && <div style={{ marginTop: "0.5rem" }}><Row label="Tratamiento" value={ctrl.tratamiento} /></div>}
+
+                {/* Suplementación */}
+                {(ctrl.sulfato_ferroso || ctrl.acido_folico) && (
+                  <div style={{ marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid var(--border)", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+                    {ctrl.sulfato_ferroso && <span className="badge badge-green">Sulfato ferroso: {ctrl.sulfato_ferroso_tabletas ?? "—"} tab.</span>}
+                    {ctrl.acido_folico   && <span className="badge badge-green">Ácido fólico: {ctrl.acido_folico_tabletas ?? "—"} tab.</span>}
+                  </div>
+                )}
               </div>
             ))
           )}
         </div>
       )}
 
-      {/* Tab: Riesgo */}
+      {/* ══════════════════════════════════════════
+          TAB: PUERPERIO
+      ══════════════════════════════════════════ */}
+      {tab === "puerperio" && (
+        <div style={{ display: "grid", gap: "1rem" }}>
+          {exp.controles_puerperio?.length === 0 ? (
+            <div className="card" style={{ textAlign: "center", padding: "2.5rem", color: "var(--text-muted)" }}>
+              No hay atenciones de puerperio registradas.
+            </div>
+          ) : (
+            exp.controles_puerperio.map((pu) => (
+              <div className="card" key={pu.id}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <span className="badge badge-blue">{pu.numero_atencion === 1 ? "1ª Atención" : "2ª Atención"} — Puerperio</span>
+                  <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>{fecha(pu.fecha)}</span>
+                </div>
+
+                {pu.signos_peligro && (
+                  <div style={{ background: "var(--danger-lt)", border: "1px solid var(--danger)", borderRadius: 8, padding: "0.6rem 0.9rem", marginBottom: "0.85rem" }}>
+                    <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--danger)" }}>⚠ Signos de peligro: </span>
+                    <span style={{ fontSize: "0.82rem" }}>{pu.signos_peligro}</span>
+                  </div>
+                )}
+
+                <Grid cols={3}>
+                  <Row label="Días postparto"   value={pu.dias_despues_parto} />
+                  <Row label="Lugar del parto"  value={pu.lugar_atencion_parto} />
+                  <Row label="Quién atendió"    value={pu.quien_atendio_parto} />
+                  <Row label="Tipo de parto"    value={pu.tipo_parto} />
+                  <Row label="P/A" value={pu.pa_sistolica ? `${pu.pa_sistolica}/${pu.pa_diastolica}` : null} />
+                  <Row label="Temperatura"      value={pu.temperatura ? `${pu.temperatura}°C` : null} />
+                </Grid>
+                <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                  <SiNo label="RN vivo"               value={pu.recien_nacido_vivo} />
+                  <SiNo label="Apego inmediato"        value={pu.tuvo_apego_inmediato} />
+                  <SiNo label="Lactancia materna excl." value={pu.lactancia_materna_exclusiva} />
+                </div>
+                {pu.examen_mamas      && <div style={{ marginTop: "0.6rem" }}><Row label="Examen de mamas" value={pu.examen_mamas} /></div>}
+                {pu.examen_ginecologico && <div style={{ marginTop: "0.4rem" }}><Row label="Examen ginecológico" value={pu.examen_ginecologico} /></div>}
+                {pu.impresion_clinica  && <div style={{ marginTop: "0.4rem" }}><Row label="Impresión clínica" value={pu.impresion_clinica} /></div>}
+                {pu.tratamiento        && <div style={{ marginTop: "0.4rem" }}><Row label="Tratamiento" value={pu.tratamiento} /></div>}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          TAB: MORBILIDAD
+      ══════════════════════════════════════════ */}
+      {tab === "morbilidad" && (
+        <div style={{ display: "grid", gap: "1rem" }}>
+          {exp.morbilidad?.length === 0 ? (
+            <div className="card" style={{ textAlign: "center", padding: "2.5rem", color: "var(--text-muted)" }}>
+              No hay consultas intercurrentes registradas.
+            </div>
+          ) : (
+            exp.morbilidad.map((m) => (
+              <div className="card" key={m.id}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <span style={{ fontWeight: 600, color: "var(--text)", fontSize: "0.9rem" }}>{m.motivo_consulta}</span>
+                  <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                    {fecha(m.fecha)}{m.hora ? ` — ${m.hora}` : ""}
+                  </span>
+                </div>
+                <div style={{ display: "grid", gap: "0.5rem" }}>
+                  <Row label="Historia enfermedad actual" value={m.historia_enfermedad_actual} />
+                  <Row label="Revisión por sistemas"      value={m.revision_por_sistemas} />
+                  <Row label="Examen físico"              value={m.examen_fisico} />
+                  <Row label="Impresión clínica"          value={m.impresion_clinica} />
+                  <Row label="Tratamiento / Referencia"   value={m.tratamiento_referencia} />
+                  <Row label="Nombre / cargo atiende"     value={m.nombre_cargo_atiende} />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          TAB: RIESGO OBSTÉTRICO
+      ══════════════════════════════════════════ */}
       {tab === "riesgo" && (
         <div className="card">
           {!exp.ficha_riesgo ? (
             <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
               No hay ficha de riesgo registrada.
               <div style={{ marginTop: "1rem" }}>
-                <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/riesgo`)}>Registrar ficha de riesgo</button>
+                <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/riesgo`)}>
+                  Registrar ficha de riesgo
+                </button>
               </div>
             </div>
           ) : (
             <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
                 <h3 style={{ fontFamily: "Syne", fontSize: "1rem", fontWeight: 700 }}>Ficha de Riesgo Obstétrico</h3>
                 {exp.ficha_riesgo.tiene_riesgo
                   ? <span className="badge badge-red">⚠ PRESENTA RIESGO</span>
-                  : <span className="badge badge-green">✓ SIN RIESGO</span>}
+                  : <span className="badge badge-green"><CheckCircle size={11} /> SIN RIESGO</span>}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.6rem" }}>
-                <SiNo label="Muerte fetal/neonatal previa" value={exp.ficha_riesgo.muerte_fetal_neonatal_previa} />
-                <SiNo label="3+ abortos espontáneos" value={exp.ficha_riesgo.abortos_espontaneos_3mas} />
-                <SiNo label="Menor de 20 años" value={exp.ficha_riesgo.menor_20_anos} />
-                <SiNo label="Mayor de 35 años" value={exp.ficha_riesgo.mayor_35_anos} />
-                <SiNo label="Embarazo múltiple" value={exp.ficha_riesgo.embarazo_multiple} />
-                <SiNo label="Paciente Rh (-)" value={exp.ficha_riesgo.paciente_rh_negativo} />
-                <SiNo label="Hemorragia vaginal" value={exp.ficha_riesgo.hemorragia_vaginal} />
-                <SiNo label="VIH positivo / Sífilis" value={exp.ficha_riesgo.vih_positivo_sifilis} />
-                <SiNo label="Presión diastólica ≥ 90" value={exp.ficha_riesgo.presion_diastolica_90mas} />
-                <SiNo label="Anemia" value={exp.ficha_riesgo.anemia} />
-                <SiNo label="Diabetes" value={exp.ficha_riesgo.diabetes} />
-                <SiNo label="Hipertensión arterial" value={exp.ficha_riesgo.hipertension_arterial} />
-              </div>
+
+              <SecTitle>Antecedentes Obstétricos (criterios 1-7)</SecTitle>
+              <GridAuto>
+                <SiNo label="Muerte fetal/neonatal previa"       value={exp.ficha_riesgo.muerte_fetal_neonatal_previa} />
+                <SiNo label="3+ abortos espontáneos consecutivos" value={exp.ficha_riesgo.abortos_espontaneos_3mas} />
+                <SiNo label="3+ gestas"                           value={exp.ficha_riesgo.gestas_3mas} />
+                <SiNo label="RN anterior < 2500g"                 value={exp.ficha_riesgo.peso_ultimo_bebe_menor_2500g} />
+                <SiNo label="RN anterior > 4500g"                 value={exp.ficha_riesgo.peso_ultimo_bebe_mayor_4500g} />
+                <SiNo label="Antec. HTA / preeclampsia"           value={exp.ficha_riesgo.antec_hipertension_preeclampsia} />
+                <SiNo label="Cirugías tracto reproductivo"        value={exp.ficha_riesgo.cirugias_tracto_reproductivo} />
+              </GridAuto>
+
+              <SecTitle style={{ marginTop: "1rem" }}>Embarazo Actual (criterios 8-19)</SecTitle>
+              <GridAuto>
+                <SiNo label="Embarazo múltiple"        value={exp.ficha_riesgo.embarazo_multiple} />
+                <SiNo label="Menor de 20 años"         value={exp.ficha_riesgo.menor_20_anos} />
+                <SiNo label="Mayor de 35 años"         value={exp.ficha_riesgo.mayor_35_anos} />
+                <SiNo label="Paciente Rh (−)"          value={exp.ficha_riesgo.paciente_rh_negativo} />
+                <SiNo label="Hemorragia vaginal"        value={exp.ficha_riesgo.hemorragia_vaginal} />
+                <SiNo label="VIH+ / Sífilis"           value={exp.ficha_riesgo.vih_positivo_sifilis} />
+                <SiNo label="P/A diastólica ≥ 90"      value={exp.ficha_riesgo.presion_diastolica_90mas} />
+                <SiNo label="Anemia"                   value={exp.ficha_riesgo.anemia} />
+                <SiNo label="Desnutrición / Obesidad"  value={exp.ficha_riesgo.desnutricion_obesidad} />
+                <SiNo label="Dolor abdominal"          value={exp.ficha_riesgo.dolor_abdominal} />
+                <SiNo label="Sintomatología urinaria"  value={exp.ficha_riesgo.sintomatologia_urinaria} />
+                <SiNo label="Ictericia"                value={exp.ficha_riesgo.ictericia} />
+              </GridAuto>
+
+              <SecTitle style={{ marginTop: "1rem" }}>Historia Clínica General (criterios 20-25)</SecTitle>
+              <GridAuto>
+                <SiNo label="Diabetes"               value={exp.ficha_riesgo.diabetes} />
+                <SiNo label="Enfermedad renal"       value={exp.ficha_riesgo.enfermedad_renal} />
+                <SiNo label="Enfermedad del corazón" value={exp.ficha_riesgo.enfermedad_corazon} />
+                <SiNo label="Hipertensión arterial"  value={exp.ficha_riesgo.hipertension_arterial} />
+                <SiNo label="Drogas/alcohol/tabaco"  value={exp.ficha_riesgo.consumo_drogas_alcohol_tabaco} />
+                <SiNo label="Otra enf. severa"       value={exp.ficha_riesgo.otra_enfermedad_severa} />
+              </GridAuto>
+
               {exp.ficha_riesgo.referida_a && (
-                <div style={{ marginTop: "1rem", padding: "0.75rem", background: "var(--warn-lt)", borderRadius: 8 }}>
-                  <span style={{ color: "var(--warn)", fontWeight: 600, fontSize: "0.85rem" }}>Referida a: </span>
+                <div style={{ marginTop: "1rem", padding: "0.75rem", background: "var(--warn-lt)", borderRadius: 8, border: "1px solid var(--warn)" }}>
+                  <span style={{ color: "var(--warn)", fontWeight: 600, fontSize: "0.82rem" }}>Referida a: </span>
                   <span style={{ fontSize: "0.85rem" }}>{exp.ficha_riesgo.referida_a}</span>
                 </div>
               )}
@@ -238,57 +515,98 @@ export default function ExpedientePaciente() {
         </div>
       )}
 
-      {/* Tab: Laboratorio */}
-      {tab === "laboratorio" && (
+      {/* ══════════════════════════════════════════
+          TAB: VACUNAS
+      ══════════════════════════════════════════ */}
+      {tab === "vacunas" && (
         <div className="card">
-          {exp.laboratorio.length === 0 ? (
+          {!exp.vacunas?.length ? (
             <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
-              No hay resultados de laboratorio registrados.
+              No hay vacunas registradas.
             </div>
           ) : (
-            exp.laboratorio.map((lab) => (
-              <div key={lab.id} style={{ marginBottom: "1.5rem" }}>
-                <h4 style={{ fontFamily: "Syne", fontSize: "0.85rem", color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
-                  Control {lab.numero_control}
-                </h4>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.75rem" }}>
-                  {lab.numero_control === 1 && (<>
-                    <Row label="Orina" value={lab.orina_1} />
-                    <Row label="Heces" value={lab.heces_1} />
-                    <Row label="Hematología" value={lab.hematologia_1} />
-                    <Row label="Glicemia en ayunas" value={lab.glicemia_ayunas_1} />
-                    <Row label="Grupo y Rh" value={lab.grupo_rh_1} />
-                    <Row label="VDRL/RPR" value={lab.vdrl_rpr_1} />
-                    <Row label="Resultado VIH" value={lab.resultado_vih_1} />
-                    <Row label="Hepatitis B" value={lab.hepatitis_b_1} />
-                    <Row label="Papanicolaou/IVAA" value={lab.papanicolaou_ivaa_1} />
-                    <Row label="TORCH" value={lab.torch_1} />
-                  </>)}
-                  {lab.numero_control === 2 && (<>
-                    <Row label="Orina" value={lab.orina_2} />
-                    <Row label="Glicemia en ayunas" value={lab.glicemia_ayunas_2} />
-                    <Row label="Oferta VIH" value={lab.oferta_vih_2} />
-                    <Row label="VDRL/RPR" value={lab.vdrl_rpr_2} />
-                    <Row label="Hepatitis B" value={lab.hepatitis_b_2} />
-                  </>)}
-                  {lab.numero_control === 3 && (<>
-                    <Row label="Hematología" value={lab.hematologia_3} />
-                    <Row label="Orina" value={lab.orina_3} />
-                    <Row label="Glicemia en ayunas" value={lab.glicemia_ayunas_3} />
-                  </>)}
-                  {lab.numero_control === 4 && (<>
-                    <Row label="Orina" value={lab.orina_4} />
-                    <Row label="Glicemia en ayunas" value={lab.glicemia_ayunas_4} />
-                    <Row label="Oferta VIH" value={lab.oferta_vih_4} />
-                    <Row label="VDRL/RPR" value={lab.vdrl_rpr_4} />
-                    <Row label="Hepatitis B" value={lab.hepatitis_b_4} />
-                  </>)}
-                </div>
-              </div>
-            ))
+            <div style={{ overflowX: "auto" }}>
+              <table className="tabla">
+                <thead>
+                  <tr>
+                    <th>Vacuna</th>
+                    <th>Momento</th>
+                    <th>No. Dosis</th>
+                    <th>Fecha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {exp.vacunas.map((v) => (
+                    <tr key={v.id}>
+                      <td style={{ fontWeight: 500 }}>{v.tipo_vacuna?.replace("_", " ").toUpperCase()}</td>
+                      <td>
+                        <span className="badge badge-blue">
+                          {v.momento === "previo_embarazo" ? "Previo embarazo"
+                            : v.momento === "durante_embarazo" ? "Durante embarazo"
+                            : "Postparto/Aborto"}
+                        </span>
+                      </td>
+                      <td>{v.numero_dosis}</td>
+                      <td>{fecha(v.fecha_dosis)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
+
+      {/* ══════════════════════════════════════════
+          TAB: LABORATORIOS
+      ══════════════════════════════════════════ */}
+      {tab === "laboratorio" && (
+        <div style={{ display: "grid", gap: "1rem" }}>
+          {!exp.controles_prenatales?.some(c =>
+            c.hematologia_realizada || c.glicemia_realizada || c.orina_realizada ||
+            c.vih_realizado || c.vdrl_realizado || c.hepatitis_b_realizado
+          ) ? (
+            <div className="card" style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
+              No hay resultados de laboratorio registrados.
+            </div>
+          ) : (
+            exp.controles_prenatales
+              .filter(c =>
+                c.hematologia_realizada || c.glicemia_realizada || c.grupo_rh_realizado ||
+                c.orina_realizada || c.heces_realizada || c.vih_realizado ||
+                c.vdrl_realizado || c.torch_realizado || c.papanicolau_ivaa_realizado ||
+                c.hepatitis_b_realizado || c.usg_realizado
+              )
+              .map((ctrl) => (
+                <div className="card" key={ctrl.id}>
+                  <div style={{ marginBottom: "0.85rem" }}>
+                    <span className="badge badge-blue">Control {ctrl.numero_control}</span>
+                    <span style={{ color: "var(--text-muted)", fontSize: "0.8rem", marginLeft: "0.75rem" }}>{fecha(ctrl.fecha)}</span>
+                  </div>
+                  <Grid cols={3}>
+                    {ctrl.hematologia_realizada     && <Row label="Hematología"       value={ctrl.hematologia_resultado} />}
+                    {ctrl.glicemia_realizada         && <Row label="Glicemia en ayunas" value={ctrl.glicemia_resultado} />}
+                    {ctrl.grupo_rh_realizado         && <Row label="Grupo y RH"        value={ctrl.grupo_rh_resultado} />}
+                    {ctrl.orina_realizada            && <Row label="Orina" value={[ctrl.orina_bacteriuria && "Bacteriuria+", ctrl.orina_proteinuria && "Proteinuria+"].filter(Boolean).join(" / ") || "Realizada"} />}
+                    {ctrl.heces_realizada            && <Row label="Heces"             value={ctrl.heces_resultado} />}
+                    {ctrl.vih_realizado              && <Row label="VIH"               value={ctrl.vih_resultado} />}
+                    {ctrl.vdrl_realizado             && <Row label="VDRL/RPR"          value={ctrl.vdrl_resultado} />}
+                    {ctrl.torch_realizado            && <Row label="TORCH"             value={ctrl.torch_resultado_positivo ? "Positivo" : "Negativo"} />}
+                    {ctrl.papanicolau_ivaa_realizado && <Row label="Papanicolau/IVAA"  value={ctrl.papanicolau_ivaa_resultado} />}
+                    {ctrl.hepatitis_b_realizado      && <Row label="Hepatitis B"       value={ctrl.hepatitis_b_resultado} />}
+                    {ctrl.usg_realizado              && <Row label="USG" value={ctrl.usg_hallazgos || "Realizado"} />}
+                  </Grid>
+                  {ctrl.vdrl_resultado === "positivo" && ctrl.vdrl_tratamiento_indicado && (
+                    <div style={{ marginTop: "0.6rem", padding: "0.5rem 0.75rem", background: "var(--warn-lt)", borderRadius: 6, fontSize: "0.8rem", color: "var(--warn)", fontWeight: 600 }}>
+                      ⚠ VDRL positivo — Tratamiento indicado a pareja
+                    </div>
+                  )}
+                </div>
+              ))
+          )}
+        </div>
+      )}
+
     </div>
   );
 }
