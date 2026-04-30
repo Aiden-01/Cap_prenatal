@@ -26,19 +26,20 @@ async function censoMensual(req, res) {
         p.pueblo                          AS grupo_etnico,
         p.municipio,
         p.comunidad,
-        p.fur,
-        p.fpp,
+        COALESCE(e.fur, p.fur) AS fur,
+        COALESCE(e.fpp, p.fpp) AS fpp,
         p.gestas_previas                  AS no_embarazos,
         p.partos_vaginales + p.cesareas   AS no_partos,
         p.cesareas                        AS no_cesareas,
         p.abortos                         AS no_abortos,
         p.nacidos_vivos                   AS hijos_vivos,
         p.muertos_antes_1sem + p.muertos_despues_1sem AS hijos_muertos,
-        EXTRACT(WEEK FROM AGE(CURRENT_DATE, p.fur))::INTEGER AS semanas_gestacion,
+        EXTRACT(WEEK FROM AGE(CURRENT_DATE, COALESCE(e.fur, p.fur)))::INTEGER AS semanas_gestacion,
         COALESCE(r.tiene_riesgo, FALSE)   AS tiene_riesgo,
         p.created_at
       FROM pacientes p
-      LEFT JOIN fichas_riesgo_obstetrico r ON r.paciente_id = p.id
+      LEFT JOIN embarazos e ON e.paciente_id = p.id AND e.estado = 'activo'
+      LEFT JOIN fichas_riesgo_obstetrico r ON r.embarazo_id = e.id
       WHERE DATE(p.created_at) BETWEEN $1 AND $2
       ORDER BY p.apellidos ASC, p.nombres ASC`,
       [desde, hasta]
@@ -70,15 +71,16 @@ async function exportarCensoExcel(req, res) {
         DATE_PART('year', AGE(CURRENT_DATE, p.fecha_nacimiento))::INTEGER AS edad,
         p.pueblo                          AS etnia,
         p.municipio,
-        p.fur,
-        p.fpp,
-        EXTRACT(WEEK FROM AGE(CURRENT_DATE, p.fur))::INTEGER AS semanas,
+        COALESCE(e.fur, p.fur) AS fur,
+        COALESCE(e.fpp, p.fpp) AS fpp,
+        EXTRACT(WEEK FROM AGE(CURRENT_DATE, COALESCE(e.fur, p.fur)))::INTEGER AS semanas,
         p.gestas_previas,
         p.partos_vaginales + p.cesareas   AS partos,
         p.abortos,
         COALESCE(r.tiene_riesgo, FALSE)   AS riesgo
       FROM pacientes p
-      LEFT JOIN fichas_riesgo_obstetrico r ON r.paciente_id = p.id
+      LEFT JOIN embarazos e ON e.paciente_id = p.id AND e.estado = 'activo'
+      LEFT JOIN fichas_riesgo_obstetrico r ON r.embarazo_id = e.id
       WHERE DATE(p.created_at) BETWEEN $1 AND $2
       ORDER BY p.apellidos ASC, p.nombres ASC`,
       [desde, hasta]
@@ -351,7 +353,10 @@ async function estadisticas(req, res) {
     ] = await Promise.all([
       pool.query('SELECT COUNT(*) FROM pacientes'),
       pool.query(
-        'SELECT COUNT(*) FROM fichas_riesgo_obstetrico WHERE tiene_riesgo = TRUE'
+        `SELECT COUNT(*)
+         FROM fichas_riesgo_obstetrico r
+         JOIN embarazos e ON e.id = r.embarazo_id
+         WHERE r.tiene_riesgo = TRUE AND e.estado = 'activo'`
       ),
       pool.query(`
         SELECT COUNT(*) FROM controles_prenatales
@@ -366,6 +371,7 @@ async function estadisticas(req, res) {
           c.cita_siguiente,
           c.numero_control
         FROM controles_prenatales c
+        JOIN embarazos e ON e.id = c.embarazo_id AND e.estado = 'activo'
         JOIN pacientes p ON p.id = c.paciente_id
         WHERE c.cita_siguiente BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
         ORDER BY c.cita_siguiente ASC
@@ -397,10 +403,11 @@ async function pacientesConRiesgo(req, res) {
         p.no_expediente,
         p.cui,
         DATE_PART('year', AGE(CURRENT_DATE, p.fecha_nacimiento))::INTEGER AS edad,
-        p.fur,
+        COALESCE(e.fur, p.fur) AS fur,
         r.tiene_riesgo
       FROM pacientes p
-      JOIN fichas_riesgo_obstetrico r ON r.paciente_id = p.id
+      JOIN embarazos e ON e.paciente_id = p.id AND e.estado = 'activo'
+      JOIN fichas_riesgo_obstetrico r ON r.embarazo_id = e.id
       WHERE r.tiene_riesgo = TRUE
       ORDER BY p.apellidos ASC, p.nombres ASC
     `);

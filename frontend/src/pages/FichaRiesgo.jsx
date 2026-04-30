@@ -102,7 +102,7 @@ function calcularEdadAnios(fechaNacimiento) {
   return edad;
 }
 
-function defaultsDesdePaciente(paciente = {}) {
+function defaultsDesdePaciente(paciente = {}, embarazo = {}) {
   const edad = calcularEdadAnios(paciente.fecha_nacimiento);
   const hijosMuertos =
     Number(paciente.muertos_antes_1sem || 0) + Number(paciente.muertos_despues_1sem || 0);
@@ -115,8 +115,8 @@ function defaultsDesdePaciente(paciente = {}) {
     escolaridad: paciente.nivel_estudios || "",
     ocupacion: paciente.profesion_oficio || "",
     nombre_esposo_conviviente: paciente.nombre_esposo_conviviente || "",
-    fecha_ultima_regla: toDateInput(paciente.fur),
-    fecha_probable_parto: toDateInput(paciente.fpp),
+    fecha_ultima_regla: toDateInput(embarazo.fur || paciente.fur),
+    fecha_probable_parto: toDateInput(embarazo.fpp || paciente.fpp),
     no_embarazos: paciente.gestas_previas ?? "",
     no_partos: paciente.partos_vaginales ?? "",
     no_cesareas: paciente.cesareas ?? "",
@@ -160,6 +160,7 @@ export default function FichaRiesgo() {
     api.get(`/pacientes/${id}/expediente`)
       .then(({ data }) => {
         const pacienteData = data?.paciente;
+        const embarazoData = data?.embarazo_activo;
         const ficha = data?.ficha_riesgo;
         setPaciente(pacienteData || null);
         setExistingRisk(Boolean(ficha));
@@ -177,7 +178,7 @@ export default function FichaRiesgo() {
 
         setForm((f) => ({
           ...f,
-          ...defaultsDesdePaciente(pacienteData),
+          ...defaultsDesdePaciente(pacienteData, embarazoData),
         }));
       })
       .catch(() => toast("Error al cargar datos de la paciente", "error"))

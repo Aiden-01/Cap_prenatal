@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
 
 // ============================================================
@@ -7,11 +8,12 @@ const emptyToNull = (value) => (value === '' || value === undefined ? null : val
 async function listar(req, res) {
   const { pacienteId } = req.params;
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rows } = await pool.query(
       `SELECT * FROM vacunas_paciente
-       WHERE paciente_id = $1
+       WHERE embarazo_id = $1
        ORDER BY tipo_vacuna, momento, numero_dosis`,
-      [pacienteId]
+      [embarazoId]
     );
     return res.json(rows);
   } catch (err) {
@@ -26,9 +28,10 @@ async function listar(req, res) {
 async function obtener(req, res) {
   const { pacienteId, id } = req.params;
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rows } = await pool.query(
-      'SELECT * FROM vacunas_paciente WHERE id = $1 AND paciente_id = $2',
-      [id, pacienteId]
+      'SELECT * FROM vacunas_paciente WHERE id = $1 AND embarazo_id = $2',
+      [id, embarazoId]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Vacuna no encontrada' });
     return res.json(rows[0]);
@@ -64,22 +67,25 @@ async function guardar(req, res) {
   }
 
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rows } = await pool.query(
       `INSERT INTO vacunas_paciente (
         paciente_id,
+        embarazo_id,
         tipo_vacuna,
         momento,
         numero_dosis,
         fecha_dosis,
         registrado_por
-      ) VALUES ($1,$2,$3,$4,$5,$6)
-      ON CONFLICT (paciente_id, tipo_vacuna, momento, numero_dosis)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7)
+      ON CONFLICT (embarazo_id, tipo_vacuna, momento, numero_dosis)
       DO UPDATE SET
         fecha_dosis    = EXCLUDED.fecha_dosis,
         registrado_por = EXCLUDED.registrado_por
       RETURNING *`,
       [
         pacienteId,
+        embarazoId,
         d.tipo_vacuna,
         d.momento,
         d.numero_dosis ?? 1,
@@ -115,10 +121,11 @@ async function actualizar(req, res) {
   }
 
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rows } = await pool.query(
       `UPDATE vacunas_paciente SET
         tipo_vacuna=$1, momento=$2, numero_dosis=$3, fecha_dosis=$4, registrado_por=$5
-       WHERE id=$6 AND paciente_id=$7
+       WHERE id=$6 AND embarazo_id=$7
        RETURNING *`,
       [
         d.tipo_vacuna,
@@ -127,7 +134,7 @@ async function actualizar(req, res) {
         emptyToNull(d.fecha_dosis),
         req.usuario.id,
         id,
-        pacienteId,
+        embarazoId,
       ]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Vacuna no encontrada' });
@@ -146,10 +153,12 @@ async function actualizar(req, res) {
 // ============================================================
 async function eliminar(req, res) {
   const { id } = req.params;
+  const { pacienteId } = req.params;
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rowCount } = await pool.query(
-      'DELETE FROM vacunas_paciente WHERE id = $1',
-      [id]
+      'DELETE FROM vacunas_paciente WHERE id = $1 AND embarazo_id = $2',
+      [id, embarazoId]
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Vacuna no encontrada' });
     return res.json({ message: 'Vacuna eliminada' });

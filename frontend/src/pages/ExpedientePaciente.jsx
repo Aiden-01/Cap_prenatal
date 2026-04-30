@@ -116,6 +116,23 @@ export default function ExpedientePaciente() {
     }
   };
 
+  const crearNuevoEmbarazo = async () => {
+    if (!window.confirm("Esto cerrara el embarazo activo y creara un nuevo embarazo para esta paciente. ¿Continuar?")) return;
+    const fur = window.prompt("FUR del nuevo embarazo (AAAA-MM-DD). Puedes dejarlo vacio:");
+    if (fur === null) return;
+    const fpp = window.prompt("FPP del nuevo embarazo (AAAA-MM-DD). Puedes dejarlo vacio:");
+    if (fpp === null) return;
+
+    try {
+      await api.post(`/pacientes/${id}/embarazos`, { fur, fpp });
+      toast("Nuevo embarazo creado", "success");
+      cargarExpediente();
+      setTab("general");
+    } catch (err) {
+      toast(err.response?.data?.error || "Error al crear nuevo embarazo", "error");
+    }
+  };
+
   const TABS = [
     { id: "general",    label: "Datos generales",                          icon: FileText     },
     { id: "controles",  label: `Controles (${exp.controles_prenatales?.length ?? 0})`, icon: Activity     },
@@ -146,9 +163,10 @@ export default function ExpedientePaciente() {
           </div>
           <div style={{ display: "flex", gap: "0.75rem", marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
             <span className="badge badge-blue">Exp: {p.no_expediente}</span>
+            {exp.embarazo_activo && <span className="badge badge-green">Embarazo {exp.embarazo_activo.numero_embarazo} activo</span>}
             {p.cui && <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>CUI: {p.cui}</span>}
-            {p.fur  && <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>FUR: {fecha(p.fur)}</span>}
-            {p.fpp  && <span style={{ color: "var(--accent)", fontSize: "0.82rem", fontWeight: 600 }}>FPP: {fecha(p.fpp)}</span>}
+            {(exp.embarazo_activo?.fur || p.fur)  && <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>FUR: {fecha(exp.embarazo_activo?.fur || p.fur)}</span>}
+            {(exp.embarazo_activo?.fpp || p.fpp)  && <span style={{ color: "var(--accent)", fontSize: "0.82rem", fontWeight: 600 }}>FPP: {fecha(exp.embarazo_activo?.fpp || p.fpp)}</span>}
           </div>
         </div>
 
@@ -160,6 +178,10 @@ export default function ExpedientePaciente() {
           <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/editar`)}
             style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <Pencil size={14} /> Editar paciente
+          </button>
+          <button className="btn-secondary" onClick={crearNuevoEmbarazo}
+            style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <Plus size={14} /> Nuevo embarazo
           </button>
         </div>
       </div>
@@ -187,6 +209,26 @@ export default function ExpedientePaciente() {
       ══════════════════════════════════════════ */}
       {tab === "general" && (
         <div style={{ display: "grid", gap: "1.25rem" }}>
+
+          <div className="card">
+            <SecTitle>Historial de embarazos</SecTitle>
+            <Grid cols={4}>
+              {exp.embarazos?.map((emb) => (
+                <div key={emb.id} style={{ padding: "0.6rem", border: "1px solid var(--border)", borderRadius: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", alignItems: "center" }}>
+                    <strong>Embarazo {emb.numero_embarazo}</strong>
+                    <span className={emb.estado === "activo" ? "badge badge-green" : "badge badge-blue"}>{emb.estado}</span>
+                  </div>
+                  <div style={{ marginTop: "0.5rem", display: "grid", gap: 2 }}>
+                    <Row label="FUR" value={fecha(emb.fur)} />
+                    <Row label="FPP" value={fecha(emb.fpp)} />
+                    <Row label="Inicio" value={fecha(emb.fecha_inicio)} />
+                    {emb.fecha_cierre && <Row label="Cierre" value={fecha(emb.fecha_cierre)} />}
+                  </div>
+                </div>
+              ))}
+            </Grid>
+          </div>
 
           <div className="card">
             <SecTitle>Establecimiento</SecTitle>

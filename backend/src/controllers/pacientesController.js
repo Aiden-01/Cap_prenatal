@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
 
 // ============================================================
 // GET /api/pacientes?buscar=xxx&pagina=1&limite=20
@@ -202,6 +203,12 @@ async function crear(req, res) {
       valores
     );
 
+    await pool.query(
+      `INSERT INTO embarazos (paciente_id, numero_embarazo, estado, fur, fpp, fecha_inicio, registrado_por)
+       VALUES ($1, 1, 'activo', $2, $3, COALESCE($2, CURRENT_DATE), $4)`,
+      [rows[0].id, emptyToNull(d.fur), emptyToNull(d.fpp), req.usuario.id]
+    );
+
     return res.status(201).json(rows[0]);
   } catch (err) {
     console.error(err);
@@ -236,6 +243,17 @@ async function actualizar(req, res) {
       valores
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Paciente no encontrado' });
+
+    if (Object.prototype.hasOwnProperty.call(data, 'fur') || Object.prototype.hasOwnProperty.call(data, 'fpp')) {
+      const embarazoId = await obtenerEmbarazoActivoId(id);
+      await pool.query(
+        `UPDATE embarazos
+         SET fur = COALESCE($2, fur), fpp = COALESCE($3, fpp), updated_at = NOW()
+         WHERE id = $1`,
+        [embarazoId, emptyToNull(data.fur), emptyToNull(data.fpp)]
+      );
+    }
+
     return res.json({ message: 'Paciente actualizado' });
   } catch (err) {
     console.error(err);
@@ -249,8 +267,11 @@ async function actualizar(req, res) {
 async function expedienteCompleto(req, res) {
   const { id } = req.params;
   try {
+    const embarazoActivoId = await obtenerEmbarazoActivoId(id);
     const [
       paciente,
+      embarazos,
+      embarazoActivo,
       controles,
       puerperio,
       morbilidad,
@@ -260,29 +281,31 @@ async function expedienteCompleto(req, res) {
       referencias,
     ] = await Promise.all([
       pool.query('SELECT * FROM pacientes WHERE id = $1', [id]),
+      pool.query('SELECT * FROM embarazos WHERE paciente_id = $1 ORDER BY numero_embarazo DESC', [id]),
+      pool.query('SELECT * FROM embarazos WHERE id = $1', [embarazoActivoId]),
       pool.query(
-        'SELECT * FROM controles_prenatales WHERE paciente_id = $1 ORDER BY numero_control',
-        [id]
+        'SELECT * FROM controles_prenatales WHERE embarazo_id = $1 ORDER BY numero_control',
+        [embarazoActivoId]
       ),
       pool.query(
-        'SELECT * FROM controles_puerperio WHERE paciente_id = $1 ORDER BY numero_atencion',
-        [id]
+        'SELECT * FROM controles_puerperio WHERE embarazo_id = $1 ORDER BY numero_atencion',
+        [embarazoActivoId]
       ),
       pool.query(
-        'SELECT * FROM morbilidad_embarazo WHERE paciente_id = $1 ORDER BY fecha DESC',
-        [id]
+        'SELECT * FROM morbilidad_embarazo WHERE embarazo_id = $1 ORDER BY fecha DESC',
+        [embarazoActivoId]
       ),
       pool.query(
-        'SELECT * FROM fichas_riesgo_obstetrico WHERE paciente_id = $1 ORDER BY fecha DESC LIMIT 1',
-        [id]
+        'SELECT * FROM fichas_riesgo_obstetrico WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
+        [embarazoActivoId]
       ),
       pool.query(
-        'SELECT * FROM planes_parto WHERE paciente_id = $1 ORDER BY fecha DESC LIMIT 1',
-        [id]
+        'SELECT * FROM planes_parto WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
+        [embarazoActivoId]
       ),
       pool.query(
-        'SELECT * FROM vacunas_paciente WHERE paciente_id = $1 ORDER BY tipo_vacuna, numero_dosis',
-        [id]
+        'SELECT * FROM vacunas_paciente WHERE embarazo_id = $1 ORDER BY tipo_vacuna, numero_dosis',
+        [embarazoActivoId]
       ),
       pool.query(
         'SELECT * FROM referencias_efectuadas WHERE paciente_id = $1 ORDER BY fecha DESC',
@@ -296,6 +319,8 @@ async function expedienteCompleto(req, res) {
 
     return res.json({
       paciente:             paciente.rows[0],
+      embarazos:            embarazos.rows,
+      embarazo_activo:      embarazoActivo.rows[0] || null,
       controles_prenatales: controles.rows,
       controles_puerperio:  puerperio.rows,
       morbilidad:           morbilidad.rows,
@@ -310,4 +335,51 @@ async function expedienteCompleto(req, res) {
   }
 }
 
-module.exports = { listar, obtener, crear, actualizar, expedienteCompleto };
+async function nuevoEmbarazo(req, res) {
+  const { id } = req.params;
+  const d = req.body || {};
+
+  try {
+    const paciente = await pool.query('SELECT id FROM pacientes WHERE id = $1', [id]);
+    if (!paciente.rows[0]) return res.status(404).json({ error: 'Paciente no encontrado' });
+
+    await pool.query(
+      `UPDATE embarazos
+       SET estado = 'cerrado', fecha_cierre = COALESCE($2, CURRENT_DATE), updated_at = NOW()
+       WHERE paciente_id = $1 AND estado = 'activo'`,
+      [id, emptyToNull(d.fecha_cierre)]
+    );
+
+    const { rows: nextRows } = await pool.query(
+      'SELECT COALESCE(MAX(numero_embarazo), 0) + 1 AS siguiente FROM embarazos WHERE paciente_id = $1',
+      [id]
+    );
+
+    const { rows } = await pool.query(
+      `INSERT INTO embarazos (paciente_id, numero_embarazo, estado, fur, fpp, fecha_inicio, observaciones, registrado_por)
+       VALUES ($1, $2, 'activo', $3, $4, COALESCE($3, CURRENT_DATE), $5, $6)
+       RETURNING *`,
+      [
+        id,
+        nextRows[0].siguiente,
+        emptyToNull(d.fur),
+        emptyToNull(d.fpp),
+        emptyToNull(d.observaciones),
+        req.usuario.id,
+      ]
+    );
+
+    await pool.query(
+      `UPDATE pacientes SET fur = $2, fpp = $3, tiene_ficha_riesgo = FALSE, updated_at = NOW()
+       WHERE id = $1`,
+      [id, emptyToNull(d.fur), emptyToNull(d.fpp)]
+    );
+
+    return res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Error al crear nuevo embarazo' });
+  }
+}
+
+module.exports = { listar, obtener, crear, actualizar, expedienteCompleto, nuevoEmbarazo };

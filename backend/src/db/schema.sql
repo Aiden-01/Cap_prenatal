@@ -199,9 +199,30 @@ CREATE TABLE IF NOT EXISTS pacientes (
 -- Vacunas: Td y Tdap | Influenza | SPR/SR
 -- ============================================================
 
+CREATE TABLE IF NOT EXISTS embarazos (
+  id                SERIAL PRIMARY KEY,
+  paciente_id       INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+  numero_embarazo   INTEGER NOT NULL CHECK (numero_embarazo >= 1),
+  estado            VARCHAR(15) NOT NULL DEFAULT 'activo' CHECK (estado IN ('activo','cerrado')),
+  fur               DATE,
+  fpp               DATE,
+  fecha_inicio      DATE DEFAULT CURRENT_DATE,
+  fecha_cierre      DATE,
+  observaciones     TEXT,
+  registrado_por    INTEGER REFERENCES usuarios(id),
+  created_at        TIMESTAMPTZ DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (paciente_id, numero_embarazo)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_embarazo_activo_paciente
+  ON embarazos(paciente_id)
+  WHERE estado = 'activo';
+
 CREATE TABLE IF NOT EXISTS vacunas_paciente (
   id              SERIAL PRIMARY KEY,
   paciente_id     INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+  embarazo_id     INTEGER REFERENCES embarazos(id) ON DELETE CASCADE,
 
   -- Tipo: td_tdap | influenza | spr_sr
   tipo_vacuna     VARCHAR(20) NOT NULL CHECK (tipo_vacuna IN ('td_tdap','influenza','spr_sr')),
@@ -226,6 +247,7 @@ CREATE TABLE IF NOT EXISTS vacunas_paciente (
 CREATE TABLE IF NOT EXISTS controles_prenatales (
   id                        SERIAL PRIMARY KEY,
   paciente_id               INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+  embarazo_id               INTEGER REFERENCES embarazos(id) ON DELETE CASCADE,
   -- 1-4 controles estándar MSPAS; 5+ son "otras atenciones"
   numero_control            INTEGER NOT NULL CHECK (numero_control >= 1),
 
@@ -371,6 +393,7 @@ CREATE TABLE IF NOT EXISTS controles_prenatales (
 CREATE TABLE IF NOT EXISTS morbilidad_embarazo (
   id                        SERIAL PRIMARY KEY,
   paciente_id               INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+  embarazo_id               INTEGER REFERENCES embarazos(id) ON DELETE CASCADE,
 
   fecha                     DATE NOT NULL,
   hora                      TIME,
@@ -396,6 +419,7 @@ CREATE TABLE IF NOT EXISTS morbilidad_embarazo (
 CREATE TABLE IF NOT EXISTS controles_puerperio (
   id                          SERIAL PRIMARY KEY,
   paciente_id                 INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+  embarazo_id                 INTEGER REFERENCES embarazos(id) ON DELETE CASCADE,
   -- 1 = Primera atención, 2 = Segunda atención
   numero_atencion             INTEGER NOT NULL CHECK (numero_atencion IN (1, 2)),
 
@@ -448,8 +472,9 @@ CREATE TABLE IF NOT EXISTS controles_puerperio (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS planes_parto (
-  id                              SERIAL PRIMARY KEY,
-  paciente_id                     INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+    id                              SERIAL PRIMARY KEY,
+    paciente_id                     INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+    embarazo_id                     INTEGER REFERENCES embarazos(id) ON DELETE CASCADE,
   fecha                           DATE NOT NULL,
 
   nombre_conyuge                  VARCHAR(200),
@@ -546,6 +571,7 @@ CREATE TABLE IF NOT EXISTS referencias_efectuadas (
 CREATE TABLE IF NOT EXISTS fichas_riesgo_obstetrico (
   id                                SERIAL PRIMARY KEY,
   paciente_id                       INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+  embarazo_id                       INTEGER REFERENCES embarazos(id) ON DELETE CASCADE,
   fecha                             DATE NOT NULL,
 
   telefono                          VARCHAR(20),
@@ -629,6 +655,50 @@ CREATE TABLE IF NOT EXISTS fichas_riesgo_obstetrico (
 -- ÍNDICES PARA PERFORMANCE
 -- ============================================================
 
+ALTER TABLE vacunas_paciente ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
+ALTER TABLE controles_prenatales ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
+ALTER TABLE morbilidad_embarazo ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
+ALTER TABLE controles_puerperio ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
+ALTER TABLE planes_parto ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
+ALTER TABLE fichas_riesgo_obstetrico ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
+
+INSERT INTO embarazos (paciente_id, numero_embarazo, estado, fur, fpp, fecha_inicio, registrado_por)
+SELECT p.id, 1, 'activo', p.fur, p.fpp, COALESCE(p.fur, p.created_at::date, CURRENT_DATE), p.registrado_por
+FROM pacientes p
+WHERE NOT EXISTS (
+  SELECT 1 FROM embarazos e WHERE e.paciente_id = p.id
+);
+
+UPDATE vacunas_paciente v
+SET embarazo_id = e.id
+FROM embarazos e
+WHERE v.embarazo_id IS NULL AND v.paciente_id = e.paciente_id AND e.estado = 'activo';
+
+UPDATE controles_prenatales c
+SET embarazo_id = e.id
+FROM embarazos e
+WHERE c.embarazo_id IS NULL AND c.paciente_id = e.paciente_id AND e.estado = 'activo';
+
+UPDATE morbilidad_embarazo m
+SET embarazo_id = e.id
+FROM embarazos e
+WHERE m.embarazo_id IS NULL AND m.paciente_id = e.paciente_id AND e.estado = 'activo';
+
+UPDATE controles_puerperio cp
+SET embarazo_id = e.id
+FROM embarazos e
+WHERE cp.embarazo_id IS NULL AND cp.paciente_id = e.paciente_id AND e.estado = 'activo';
+
+UPDATE planes_parto pp
+SET embarazo_id = e.id
+FROM embarazos e
+WHERE pp.embarazo_id IS NULL AND pp.paciente_id = e.paciente_id AND e.estado = 'activo';
+
+UPDATE fichas_riesgo_obstetrico r
+SET embarazo_id = e.id
+FROM embarazos e
+WHERE r.embarazo_id IS NULL AND r.paciente_id = e.paciente_id AND e.estado = 'activo';
+
 CREATE INDEX IF NOT EXISTS idx_pacientes_expediente   ON pacientes(no_expediente);
 CREATE INDEX IF NOT EXISTS idx_pacientes_cui          ON pacientes(cui);
 CREATE INDEX IF NOT EXISTS idx_pacientes_apellidos    ON pacientes(apellidos);
@@ -637,9 +707,19 @@ CREATE INDEX IF NOT EXISTS idx_controles_paciente     ON controles_prenatales(pa
 CREATE INDEX IF NOT EXISTS idx_controles_fecha        ON controles_prenatales(fecha);
 CREATE INDEX IF NOT EXISTS idx_morbilidad_paciente    ON morbilidad_embarazo(paciente_id);
 CREATE INDEX IF NOT EXISTS idx_puerperio_paciente     ON controles_puerperio(paciente_id);
-CREATE UNIQUE INDEX IF NOT EXISTS ux_riesgo_paciente_unico ON fichas_riesgo_obstetrico(paciente_id);
+DROP INDEX IF EXISTS ux_riesgo_paciente_unico;
+DROP INDEX IF EXISTS ux_vacunas_paciente_dosis;
+ALTER TABLE controles_prenatales DROP CONSTRAINT IF EXISTS controles_prenatales_paciente_id_numero_control_key;
+ALTER TABLE controles_puerperio DROP CONSTRAINT IF EXISTS controles_puerperio_paciente_id_numero_atencion_key;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_riesgo_embarazo_unico ON fichas_riesgo_obstetrico(embarazo_id);
 CREATE INDEX IF NOT EXISTS idx_riesgo_paciente        ON fichas_riesgo_obstetrico(paciente_id);
-CREATE UNIQUE INDEX IF NOT EXISTS ux_vacunas_paciente_dosis ON vacunas_paciente(paciente_id, tipo_vacuna, momento, numero_dosis);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_vacunas_embarazo_dosis ON vacunas_paciente(embarazo_id, tipo_vacuna, momento, numero_dosis);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_controles_embarazo_numero ON controles_prenatales(embarazo_id, numero_control);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_puerperio_embarazo_numero ON controles_puerperio(embarazo_id, numero_atencion);
+CREATE INDEX IF NOT EXISTS idx_embarazos_paciente      ON embarazos(paciente_id);
+CREATE INDEX IF NOT EXISTS idx_controles_embarazo      ON controles_prenatales(embarazo_id);
+CREATE INDEX IF NOT EXISTS idx_riesgo_embarazo         ON fichas_riesgo_obstetrico(embarazo_id);
 CREATE INDEX IF NOT EXISTS idx_vacunas_paciente       ON vacunas_paciente(paciente_id);
 CREATE INDEX IF NOT EXISTS idx_referencias_paciente   ON referencias_efectuadas(paciente_id);
 CREATE INDEX IF NOT EXISTS idx_usuarios_username      ON usuarios(username);
@@ -651,6 +731,50 @@ CREATE INDEX IF NOT EXISTS idx_usuarios_username      ON usuarios(username);
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS vive_sola BOOLEAN DEFAULT FALSE;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_diabetes_tipo VARCHAR(1);
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fam_otra_condicion_medica_grave BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE vacunas_paciente ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
+ALTER TABLE controles_prenatales ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
+ALTER TABLE morbilidad_embarazo ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
+ALTER TABLE controles_puerperio ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
+ALTER TABLE planes_parto ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
+ALTER TABLE fichas_riesgo_obstetrico ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
+
+INSERT INTO embarazos (paciente_id, numero_embarazo, estado, fur, fpp, fecha_inicio, registrado_por)
+SELECT p.id, 1, 'activo', p.fur, p.fpp, COALESCE(p.fur, p.created_at::date, CURRENT_DATE), p.registrado_por
+FROM pacientes p
+WHERE NOT EXISTS (
+  SELECT 1 FROM embarazos e WHERE e.paciente_id = p.id
+);
+
+UPDATE vacunas_paciente v
+SET embarazo_id = e.id
+FROM embarazos e
+WHERE v.embarazo_id IS NULL AND v.paciente_id = e.paciente_id AND e.estado = 'activo';
+
+UPDATE controles_prenatales c
+SET embarazo_id = e.id
+FROM embarazos e
+WHERE c.embarazo_id IS NULL AND c.paciente_id = e.paciente_id AND e.estado = 'activo';
+
+UPDATE morbilidad_embarazo m
+SET embarazo_id = e.id
+FROM embarazos e
+WHERE m.embarazo_id IS NULL AND m.paciente_id = e.paciente_id AND e.estado = 'activo';
+
+UPDATE controles_puerperio cp
+SET embarazo_id = e.id
+FROM embarazos e
+WHERE cp.embarazo_id IS NULL AND cp.paciente_id = e.paciente_id AND e.estado = 'activo';
+
+UPDATE planes_parto pp
+SET embarazo_id = e.id
+FROM embarazos e
+WHERE pp.embarazo_id IS NULL AND pp.paciente_id = e.paciente_id AND e.estado = 'activo';
+
+UPDATE fichas_riesgo_obstetrico r
+SET embarazo_id = e.id
+FROM embarazos e
+WHERE r.embarazo_id IS NULL AND r.paciente_id = e.paciente_id AND e.estado = 'activo';
 
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fuma_activamente_1er_trimestre BOOLEAN DEFAULT FALSE;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fuma_activamente_2do_trimestre BOOLEAN DEFAULT FALSE;

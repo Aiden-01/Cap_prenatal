@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
 
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
 const boolOrFalse = (value) => value ?? false;
@@ -7,9 +8,10 @@ const boolOrFalse = (value) => value ?? false;
 async function obtener(req, res) {
   const { pacienteId } = req.params;
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rows } = await pool.query(
-      'SELECT * FROM fichas_riesgo_obstetrico WHERE paciente_id = $1 ORDER BY fecha DESC LIMIT 1',
-      [pacienteId]
+      'SELECT * FROM fichas_riesgo_obstetrico WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
+      [embarazoId]
     );
     return res.json(rows[0] || null);
   } catch (err) {
@@ -25,16 +27,17 @@ async function guardar(req, res) {
   if (!d.fecha) return res.status(400).json({ error: 'Fecha requerida' });
 
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const existe = await pool.query(
-      'SELECT id FROM fichas_riesgo_obstetrico WHERE paciente_id = $1 ORDER BY fecha DESC LIMIT 1',
-      [pacienteId]
+      'SELECT id FROM fichas_riesgo_obstetrico WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
+      [embarazoId]
     );
     if (existe.rows[0]) {
       return res.status(409).json({ error: 'Esta paciente ya tiene una ficha de riesgo registrada' });
     }
 
     const valores = [
-      pacienteId, d.fecha, emptyToNull(d.telefono), emptyToNull(d.pueblo), boolOrFalse(d.migrante), emptyToNull(d.estado_civil),
+      pacienteId, embarazoId, d.fecha, emptyToNull(d.telefono), emptyToNull(d.pueblo), boolOrFalse(d.migrante), emptyToNull(d.estado_civil),
       emptyToNull(d.escolaridad), emptyToNull(d.ocupacion), emptyToNull(d.nombre_esposo_conviviente), emptyToNull(d.edad_esposo),
       emptyToNull(d.pueblo_esposo), emptyToNull(d.escolaridad_esposo), emptyToNull(d.ocupacion_esposo),
       emptyToNull(d.distancia_servicio_km), emptyToNull(d.tiempo_horas), emptyToNull(d.fecha_ultima_regla), emptyToNull(d.fecha_probable_parto),
@@ -60,7 +63,7 @@ async function guardar(req, res) {
 
     const result = await pool.query(
       `INSERT INTO fichas_riesgo_obstetrico (
-        paciente_id, fecha, telefono, pueblo, migrante, estado_civil,
+        paciente_id, embarazo_id, fecha, telefono, pueblo, migrante, estado_civil,
         escolaridad, ocupacion, nombre_esposo_conviviente, edad_esposo,
         pueblo_esposo, escolaridad_esposo, ocupacion_esposo,
         distancia_servicio_km, tiempo_horas, fecha_ultima_regla, fecha_probable_parto,
@@ -80,7 +83,7 @@ async function guardar(req, res) {
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
         $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,
-        $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52,$53
+        $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52,$53,$54
       )
       RETURNING *, tiene_riesgo`,
       [...valores, req.usuario.id]
@@ -103,8 +106,9 @@ async function actualizar(req, res) {
   if (!d.fecha) return res.status(400).json({ error: 'Fecha requerida' });
 
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const valores = [
-      pacienteId, d.fecha, emptyToNull(d.telefono), emptyToNull(d.pueblo), boolOrFalse(d.migrante), emptyToNull(d.estado_civil),
+      embarazoId, d.fecha, emptyToNull(d.telefono), emptyToNull(d.pueblo), boolOrFalse(d.migrante), emptyToNull(d.estado_civil),
       emptyToNull(d.escolaridad), emptyToNull(d.ocupacion), emptyToNull(d.nombre_esposo_conviviente), emptyToNull(d.edad_esposo),
       emptyToNull(d.pueblo_esposo), emptyToNull(d.escolaridad_esposo), emptyToNull(d.ocupacion_esposo),
       emptyToNull(d.distancia_servicio_km), emptyToNull(d.tiempo_horas), emptyToNull(d.fecha_ultima_regla), emptyToNull(d.fecha_probable_parto),
@@ -147,7 +151,7 @@ async function actualizar(req, res) {
         hipertension_arterial=$47, consumo_drogas_alcohol_tabaco=$48,
         otra_enfermedad_severa=$49, otra_enfermedad_descripcion=$50,
         referida_a=$51, nombre_personal_atendio=$52, updated_at=NOW()
-      WHERE paciente_id=$1
+      WHERE embarazo_id=$1
       RETURNING *, tiene_riesgo`,
       valores
     );
@@ -163,9 +167,10 @@ async function actualizar(req, res) {
 async function eliminar(req, res) {
   const { pacienteId } = req.params;
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rowCount } = await pool.query(
-      'DELETE FROM fichas_riesgo_obstetrico WHERE paciente_id = $1',
-      [pacienteId]
+      'DELETE FROM fichas_riesgo_obstetrico WHERE embarazo_id = $1',
+      [embarazoId]
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Ficha de riesgo no encontrada' });
     return res.json({ message: 'Ficha de riesgo eliminada' });

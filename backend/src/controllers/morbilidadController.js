@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
 
 // ============================================================
 // GET /api/pacientes/:pacienteId/morbilidad
@@ -6,11 +7,12 @@ const pool = require('../db/pool');
 async function listar(req, res) {
   const { pacienteId } = req.params;
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rows } = await pool.query(
       `SELECT * FROM morbilidad_embarazo
-       WHERE paciente_id = $1
+       WHERE embarazo_id = $1
        ORDER BY fecha DESC`,
-      [pacienteId]
+      [embarazoId]
     );
     return res.json(rows);
   } catch (err) {
@@ -23,11 +25,12 @@ async function listar(req, res) {
 // GET /api/pacientes/:pacienteId/morbilidad/:id
 // ============================================================
 async function obtener(req, res) {
-  const { id } = req.params;
+  const { pacienteId, id } = req.params;
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rows } = await pool.query(
-      'SELECT * FROM morbilidad_embarazo WHERE id = $1',
-      [id]
+      'SELECT * FROM morbilidad_embarazo WHERE id = $1 AND embarazo_id = $2',
+      [id, embarazoId]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Registro no encontrado' });
     return res.json(rows[0]);
@@ -49,9 +52,11 @@ async function guardar(req, res) {
   }
 
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rows } = await pool.query(
       `INSERT INTO morbilidad_embarazo (
         paciente_id,
+        embarazo_id,
         fecha,
         hora,
         motivo_consulta,
@@ -62,10 +67,11 @@ async function guardar(req, res) {
         tratamiento_referencia,
         nombre_cargo_atiende,
         registrado_por
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
       RETURNING *`,
       [
         pacienteId,
+        embarazoId,
         d.fecha,
         d.hora || null,
         d.motivo_consulta,
@@ -89,21 +95,22 @@ async function guardar(req, res) {
 // PUT /api/pacientes/:pacienteId/morbilidad/:id
 // ============================================================
 async function actualizar(req, res) {
-  const { id } = req.params;
+  const { pacienteId, id } = req.params;
   const d = req.body;
 
-  const BLOQUEADOS = ['id', 'paciente_id', 'registrado_por', 'created_at'];
+  const BLOQUEADOS = ['id', 'paciente_id', 'embarazo_id', 'registrado_por', 'created_at'];
   const campos = Object.keys(d).filter(k => !BLOQUEADOS.includes(k));
 
   if (campos.length === 0) return res.status(400).json({ error: 'Sin campos para actualizar' });
 
   const sets = campos.map((c, i) => `${c} = $${i + 1}`).join(', ');
-  const valores = [...campos.map(c => d[c]), id];
+  const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+  const valores = [...campos.map(c => d[c]), id, embarazoId];
 
   try {
     const { rowCount } = await pool.query(
       `UPDATE morbilidad_embarazo SET ${sets}, updated_at = NOW()
-       WHERE id = $${valores.length}`,
+       WHERE id = $${valores.length - 1} AND embarazo_id = $${valores.length}`,
       valores
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Registro no encontrado' });
@@ -118,9 +125,10 @@ async function actualizar(req, res) {
 // DELETE /api/pacientes/:pacienteId/morbilidad/:id
 // ============================================================
 async function eliminar(req, res) {
-  const { id } = req.params;
+  const { pacienteId, id } = req.params;
   try {
-    await pool.query('DELETE FROM morbilidad_embarazo WHERE id = $1', [id]);
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    await pool.query('DELETE FROM morbilidad_embarazo WHERE id = $1 AND embarazo_id = $2', [id, embarazoId]);
     return res.json({ message: 'Registro eliminado' });
   } catch (err) {
     console.error(err);

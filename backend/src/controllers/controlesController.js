@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
 
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
 
@@ -61,11 +62,12 @@ const PUERPERIO_FIELDS = [
 async function listar(req, res) {
   const { pacienteId } = req.params;
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rows } = await pool.query(
       `SELECT * FROM controles_prenatales
-       WHERE paciente_id = $1
+       WHERE embarazo_id = $1
        ORDER BY numero_control`,
-      [pacienteId]
+      [embarazoId]
     );
     return res.json(rows);
   } catch (err) {
@@ -79,9 +81,10 @@ async function listar(req, res) {
 async function obtener(req, res) {
   const { pacienteId, id } = req.params;
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rows } = await pool.query(
-      'SELECT * FROM controles_prenatales WHERE id = $1 AND paciente_id = $2',
-      [id, pacienteId]
+      'SELECT * FROM controles_prenatales WHERE id = $1 AND embarazo_id = $2',
+      [id, embarazoId]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Control no encontrado' });
     return res.json(rows[0]);
@@ -95,15 +98,16 @@ async function obtener(req, res) {
 // ============================================================
 async function actualizar(req, res) {
   const { pacienteId, id } = req.params;
+  const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
   const { campos, sets, valores } = buildUpdate(req.body, CONTROL_FIELDS);
 
   if (campos.length === 0) return res.status(400).json({ error: 'Sin campos para actualizar' });
 
   try {
-    valores.push(id, pacienteId);
+    valores.push(id, embarazoId);
     const { rows } = await pool.query(
       `UPDATE controles_prenatales SET ${sets}, updated_at = NOW()
-       WHERE id = $${valores.length - 1} AND paciente_id = $${valores.length}
+       WHERE id = $${valores.length - 1} AND embarazo_id = $${valores.length}
        RETURNING *`,
       valores
     );
@@ -124,9 +128,10 @@ async function actualizar(req, res) {
 async function eliminar(req, res) {
   const { pacienteId, id } = req.params;
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rowCount } = await pool.query(
-      'DELETE FROM controles_prenatales WHERE id = $1 AND paciente_id = $2',
-      [id, pacienteId]
+      'DELETE FROM controles_prenatales WHERE id = $1 AND embarazo_id = $2',
+      [id, embarazoId]
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Control no encontrado' });
     return res.json({ message: 'Control eliminado' });
@@ -149,9 +154,10 @@ async function crear(req, res) {
   }
 
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rows } = await pool.query(
       `INSERT INTO controles_prenatales (
-        paciente_id, numero_control, fecha, hora,
+        paciente_id, embarazo_id, numero_control, fecha, hora,
         motivo_consulta,
         -- Signos de peligro
         peligro_hemorragia_vaginal, peligro_palidez, peligro_dolor_cabeza,
@@ -206,9 +212,9 @@ async function crear(req, res) {
         $51,$52,$53,$54,$55,$56,$57,$58,$59,$60,
         $61,$62,$63,$64,$65,$66,$67,$68,$69,$70,
         $71,$72,$73,$74,$75,$76,$77,$78,$79,$80,
-        $81,$82,$83,$84,$85
+        $81,$82,$83,$84,$85,$86
       )
-      ON CONFLICT (paciente_id, numero_control) DO UPDATE SET
+      ON CONFLICT (embarazo_id, numero_control) DO UPDATE SET
         fecha                      = EXCLUDED.fecha,
         hora                       = EXCLUDED.hora,
         motivo_consulta            = EXCLUDED.motivo_consulta,
@@ -294,7 +300,7 @@ async function crear(req, res) {
         updated_at                 = NOW()
       RETURNING *`,
       [
-        pacienteId, d.numero_control, d.fecha, d.hora || null,
+        pacienteId, embarazoId, d.numero_control, d.fecha, d.hora || null,
         d.motivo_consulta,
         // Signos de peligro
         d.peligro_hemorragia_vaginal ?? false,
@@ -376,9 +382,10 @@ async function crear(req, res) {
 async function obtenerPlanParto(req, res) {
   const { pacienteId } = req.params;
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rows } = await pool.query(
-      'SELECT * FROM planes_parto WHERE paciente_id = $1 ORDER BY fecha DESC LIMIT 1',
-      [pacienteId]
+      'SELECT * FROM planes_parto WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
+      [embarazoId]
     );
     return res.json(rows[0] || null);
   } catch (err) {
@@ -393,9 +400,10 @@ async function guardarPlanParto(req, res) {
   if (!data.fecha) return res.status(400).json({ error: 'Fecha requerida' });
 
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const existe = await pool.query(
-      'SELECT id FROM planes_parto WHERE paciente_id = $1',
-      [pacienteId]
+      'SELECT id FROM planes_parto WHERE embarazo_id = $1',
+      [embarazoId]
     );
 
     const BLOQUEADOS = ['id', 'registrado_por', 'created_at', 'updated_at'];
@@ -412,8 +420,8 @@ async function guardarPlanParto(req, res) {
         valores
       );
     } else {
-      campos.push('paciente_id', 'registrado_por');
-      valores.push(pacienteId, req.usuario.id);
+      campos.push('paciente_id', 'embarazo_id', 'registrado_por');
+      valores.push(pacienteId, embarazoId, req.usuario.id);
       const ph = valores.map((_, i) => `$${i + 1}`).join(', ');
       result = await pool.query(
         `INSERT INTO planes_parto (${campos.join(', ')}) VALUES (${ph}) RETURNING *`,
@@ -434,9 +442,10 @@ async function guardarPlanParto(req, res) {
 async function listarPuerperio(req, res) {
   const { pacienteId } = req.params;
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rows } = await pool.query(
-      'SELECT * FROM controles_puerperio WHERE paciente_id = $1 ORDER BY numero_atencion',
-      [pacienteId]
+      'SELECT * FROM controles_puerperio WHERE embarazo_id = $1 ORDER BY numero_atencion',
+      [embarazoId]
     );
     return res.json(rows);
   } catch (err) {
@@ -447,9 +456,10 @@ async function listarPuerperio(req, res) {
 async function obtenerPuerperio(req, res) {
   const { pacienteId, id } = req.params;
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rows } = await pool.query(
-      'SELECT * FROM controles_puerperio WHERE id = $1 AND paciente_id = $2',
-      [id, pacienteId]
+      'SELECT * FROM controles_puerperio WHERE id = $1 AND embarazo_id = $2',
+      [id, embarazoId]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Control de puerperio no encontrado' });
     return res.json(rows[0]);
@@ -467,9 +477,10 @@ async function guardarPuerperio(req, res) {
   }
 
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rows } = await pool.query(
       `INSERT INTO controles_puerperio (
-        paciente_id, numero_atencion, fecha, hora,
+        paciente_id, embarazo_id, numero_atencion, fecha, hora,
         signos_peligro,
         dias_despues_parto, lugar_atencion_parto, quien_atendio_parto,
         recien_nacido_vivo, tipo_parto, tuvo_apego_inmediato,
@@ -483,9 +494,9 @@ async function guardarPuerperio(req, res) {
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
         $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-        $21,$22,$23,$24,$25
+        $21,$22,$23,$24,$25,$26
       )
-      ON CONFLICT (paciente_id, numero_atencion) DO UPDATE SET
+      ON CONFLICT (embarazo_id, numero_atencion) DO UPDATE SET
         fecha                    = EXCLUDED.fecha,
         hora                     = EXCLUDED.hora,
         signos_peligro           = EXCLUDED.signos_peligro,
@@ -511,7 +522,7 @@ async function guardarPuerperio(req, res) {
         updated_at               = NOW()
       RETURNING *`,
       [
-        pacienteId, d.numero_atencion, d.fecha, d.hora || null,
+        pacienteId, embarazoId, d.numero_atencion, d.fecha, d.hora || null,
         d.signos_peligro || null,
         d.dias_despues_parto || null, d.lugar_atencion_parto || null,
         d.quien_atendio_parto || null,
@@ -536,15 +547,16 @@ async function guardarPuerperio(req, res) {
 
 async function actualizarPuerperio(req, res) {
   const { pacienteId, id } = req.params;
+  const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
   const { campos, sets, valores } = buildUpdate(req.body, PUERPERIO_FIELDS);
 
   if (campos.length === 0) return res.status(400).json({ error: 'Sin campos para actualizar' });
 
   try {
-    valores.push(id, pacienteId);
+    valores.push(id, embarazoId);
     const { rows } = await pool.query(
       `UPDATE controles_puerperio SET ${sets}, updated_at = NOW()
-       WHERE id = $${valores.length - 1} AND paciente_id = $${valores.length}
+       WHERE id = $${valores.length - 1} AND embarazo_id = $${valores.length}
        RETURNING *`,
       valores
     );
@@ -562,9 +574,10 @@ async function actualizarPuerperio(req, res) {
 async function eliminarPuerperio(req, res) {
   const { pacienteId, id } = req.params;
   try {
+    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
     const { rowCount } = await pool.query(
-      'DELETE FROM controles_puerperio WHERE id = $1 AND paciente_id = $2',
-      [id, pacienteId]
+      'DELETE FROM controles_puerperio WHERE id = $1 AND embarazo_id = $2',
+      [id, embarazoId]
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Control de puerperio no encontrado' });
     return res.json({ message: 'Control de puerperio eliminado' });
