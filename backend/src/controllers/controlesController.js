@@ -1,5 +1,60 @@
 const pool = require('../db/pool');
 
+const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
+
+function buildUpdate(data, allowedFields) {
+  const campos = allowedFields.filter((field) => Object.prototype.hasOwnProperty.call(data, field));
+  const sets = campos.map((field, index) => `${field} = $${index + 1}`).join(', ');
+  const valores = campos.map((field) => emptyToNull(data[field]));
+  return { campos, sets, valores };
+}
+
+const CONTROL_FIELDS = [
+  'numero_control', 'fecha', 'hora', 'motivo_consulta',
+  'peligro_hemorragia_vaginal', 'peligro_palidez', 'peligro_dolor_cabeza',
+  'peligro_hipertension', 'peligro_dolor_epigastrico',
+  'peligro_trastornos_visuales', 'peligro_fiebre', 'peligro_otro',
+  'edad_gestacional_semanas', 'nombre_acompanante', 'nombre_cargo_atiende',
+  'pa_sistolica', 'pa_diastolica', 'frecuencia_cardiaca', 'frecuencia_respiratoria',
+  'temperatura', 'perimetro_braquial_cm', 'peso_kg', 'talla_cm', 'imc',
+  'examen_bucodental', 'examen_mamas',
+  'altura_uterina_cm', 'fcf', 'movimientos_fetales',
+  'situacion_fetal', 'presentacion_fetal',
+  'sangre_manchado', 'verrugas_herpes_papilomas', 'flujo_vaginal', 'otros_ginecologico',
+  'hematologia_realizada', 'hematologia_resultado',
+  'glicemia_realizada', 'glicemia_resultado',
+  'grupo_rh_realizado', 'grupo_rh_resultado',
+  'orina_realizada', 'orina_bacteriuria', 'orina_proteinuria',
+  'heces_realizada', 'heces_resultado',
+  'vih_realizado', 'vih_resultado', 'vih_resultado_valor',
+  'vdrl_realizado', 'vdrl_resultado', 'vdrl_tratamiento_indicado',
+  'torch_realizado', 'torch_resultado_positivo', 'torch_resultado_valor',
+  'papanicolau_ivaa_realizado', 'papanicolau_ivaa_fecha_toma', 'papanicolau_ivaa_resultado',
+  'hepatitis_b_realizado', 'hepatitis_b_resultado',
+  'otros_lab', 'usg_realizado', 'usg_hallazgos',
+  'sulfato_ferroso', 'sulfato_ferroso_tabletas',
+  'acido_folico', 'acido_folico_tabletas',
+  'suplementacion_hallazgos', 'suplementacion_tratamiento',
+  'orient_plan_emergencia_parto', 'orient_alimentacion_embarazo',
+  'orient_senales_peligro', 'orient_lactancia_materna',
+  'orient_planificacion_familiar', 'orient_importancia_postparto',
+  'orient_vacunacion_nino', 'orient_pre_post_prueba_vih',
+  'orient_importancia_atenciones', 'orient_tratamiento_its_pareja',
+  'orient_otros', 'impresion_clinica', 'tratamiento', 'cita_siguiente',
+];
+
+const PUERPERIO_FIELDS = [
+  'numero_atencion', 'fecha', 'hora', 'signos_peligro',
+  'dias_despues_parto', 'lugar_atencion_parto', 'quien_atendio_parto',
+  'recien_nacido_vivo', 'tipo_parto', 'tuvo_apego_inmediato',
+  'lactancia_materna_exclusiva', 'herida_operatoria',
+  'pa_sistolica', 'pa_diastolica', 'frecuencia_cardiaca',
+  'frecuencia_respiratoria', 'temperatura',
+  'examen_mamas', 'examen_ginecologico',
+  'orientacion_consejeria', 'impresion_clinica', 'tratamiento',
+  'nombre_cargo_atiende',
+];
+
 // ============================================================
 // GET /api/pacientes/:pacienteId/controles
 // ============================================================
@@ -22,16 +77,62 @@ async function listar(req, res) {
 // GET /api/pacientes/:pacienteId/controles/:id
 // ============================================================
 async function obtener(req, res) {
-  const { id } = req.params;
+  const { pacienteId, id } = req.params;
   try {
     const { rows } = await pool.query(
-      'SELECT * FROM controles_prenatales WHERE id = $1',
-      [id]
+      'SELECT * FROM controles_prenatales WHERE id = $1 AND paciente_id = $2',
+      [id, pacienteId]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Control no encontrado' });
     return res.json(rows[0]);
   } catch (err) {
     return res.status(500).json({ error: 'Error al obtener control' });
+  }
+}
+
+// ============================================================
+// PUT /api/pacientes/:pacienteId/controles/:id
+// ============================================================
+async function actualizar(req, res) {
+  const { pacienteId, id } = req.params;
+  const { campos, sets, valores } = buildUpdate(req.body, CONTROL_FIELDS);
+
+  if (campos.length === 0) return res.status(400).json({ error: 'Sin campos para actualizar' });
+
+  try {
+    valores.push(id, pacienteId);
+    const { rows } = await pool.query(
+      `UPDATE controles_prenatales SET ${sets}, updated_at = NOW()
+       WHERE id = $${valores.length - 1} AND paciente_id = $${valores.length}
+       RETURNING *`,
+      valores
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Control no encontrado' });
+    return res.json(rows[0]);
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'Ya existe un control con ese numero para esta paciente' });
+    }
+    console.error(err);
+    return res.status(500).json({ error: 'Error al actualizar control prenatal' });
+  }
+}
+
+// ============================================================
+// DELETE /api/pacientes/:pacienteId/controles/:id
+// ============================================================
+async function eliminar(req, res) {
+  const { pacienteId, id } = req.params;
+  try {
+    const { rowCount } = await pool.query(
+      'DELETE FROM controles_prenatales WHERE id = $1 AND paciente_id = $2',
+      [id, pacienteId]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Control no encontrado' });
+    return res.json({ message: 'Control eliminado' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Error al eliminar control prenatal' });
   }
 }
 
@@ -343,6 +444,20 @@ async function listarPuerperio(req, res) {
   }
 }
 
+async function obtenerPuerperio(req, res) {
+  const { pacienteId, id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM controles_puerperio WHERE id = $1 AND paciente_id = $2',
+      [id, pacienteId]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Control de puerperio no encontrado' });
+    return res.json(rows[0]);
+  } catch (err) {
+    return res.status(500).json({ error: 'Error al obtener control de puerperio' });
+  }
+}
+
 async function guardarPuerperio(req, res) {
   const { pacienteId } = req.params;
   const d = req.body;
@@ -419,8 +534,48 @@ async function guardarPuerperio(req, res) {
   }
 }
 
+async function actualizarPuerperio(req, res) {
+  const { pacienteId, id } = req.params;
+  const { campos, sets, valores } = buildUpdate(req.body, PUERPERIO_FIELDS);
+
+  if (campos.length === 0) return res.status(400).json({ error: 'Sin campos para actualizar' });
+
+  try {
+    valores.push(id, pacienteId);
+    const { rows } = await pool.query(
+      `UPDATE controles_puerperio SET ${sets}, updated_at = NOW()
+       WHERE id = $${valores.length - 1} AND paciente_id = $${valores.length}
+       RETURNING *`,
+      valores
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Control de puerperio no encontrado' });
+    return res.json(rows[0]);
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'Ya existe esa atencion de puerperio para esta paciente' });
+    }
+    console.error(err);
+    return res.status(500).json({ error: 'Error al actualizar control de puerperio' });
+  }
+}
+
+async function eliminarPuerperio(req, res) {
+  const { pacienteId, id } = req.params;
+  try {
+    const { rowCount } = await pool.query(
+      'DELETE FROM controles_puerperio WHERE id = $1 AND paciente_id = $2',
+      [id, pacienteId]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Control de puerperio no encontrado' });
+    return res.json({ message: 'Control de puerperio eliminado' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Error al eliminar control de puerperio' });
+  }
+}
+
 module.exports = {
-  listar, obtener, crear,
+  listar, obtener, crear, actualizar, eliminar,
   obtenerPlanParto, guardarPlanParto,
-  listarPuerperio, guardarPuerperio,
+  listarPuerperio, obtenerPuerperio, guardarPuerperio, actualizarPuerperio, eliminarPuerperio,
 };

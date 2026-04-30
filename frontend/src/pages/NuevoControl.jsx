@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../components/Layout";
@@ -143,15 +143,45 @@ const TABS = [
 
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────
 export default function NuevoControl() {
-  const { id } = useParams();
+  const { id, controlId } = useParams();
   const navigate = useNavigate();
   const toast    = useGlobalToast();
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
   const [tab, setTab]         = useState("general");
   const [form, setForm]       = useState(INIT);
+  const editando = Boolean(controlId);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const p   = { form, set };
+
+  useEffect(() => {
+    const parseControl = (control) => ({
+      ...INIT,
+      ...control,
+      fecha: control.fecha ? control.fecha.split("T")[0] : INIT.fecha,
+      cita_siguiente: control.cita_siguiente ? control.cita_siguiente.split("T")[0] : "",
+      papanicolau_ivaa_fecha_toma: control.papanicolau_ivaa_fecha_toma
+        ? control.papanicolau_ivaa_fecha_toma.split("T")[0]
+        : "",
+    });
+
+    const request = editando
+      ? api.get(`/pacientes/${id}/controles/${controlId}`)
+      : api.get(`/pacientes/${id}/controles`);
+
+    request
+      .then(({ data }) => {
+        if (editando) {
+          setForm(parseControl(data));
+          return;
+        }
+        const ultimo = Math.max(0, ...(data || []).map((control) => Number(control.numero_control) || 0));
+        setForm((f) => ({ ...f, numero_control: ultimo + 1 }));
+      })
+      .catch(() => toast(editando ? "Error al cargar control" : "Error al calcular siguiente control", "error"))
+      .finally(() => setLoadingData(false));
+  }, [id, controlId, editando, toast]);
 
   // IMC automático
   const handlePeso = (v) => {
@@ -173,8 +203,12 @@ export default function NuevoControl() {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post(`/pacientes/${id}/controles`, form);
-      toast("Control registrado exitosamente", "success");
+      if (editando) {
+        await api.put(`/pacientes/${id}/controles/${controlId}`, form);
+      } else {
+        await api.post(`/pacientes/${id}/controles`, form);
+      }
+      toast(editando ? "Control actualizado exitosamente" : "Control registrado exitosamente", "success");
       setTimeout(() => navigate(`/pacientes/${id}`), 800);
     } catch (err) {
       toast(err.response?.data?.error || "Error al guardar", "error");
@@ -189,13 +223,18 @@ export default function NuevoControl() {
           <ChevronLeft size={15} /> Volver
         </button>
         <div>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>Registrar Control Prenatal</h1>
+          <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>{editando ? "Editar Control Prenatal" : "Registrar Control Prenatal"}</h1>
           <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 2 }}>
-            Atención Prenatal — Ficha Clínica MSPAS
+            {editando ? `Control ${form.numero_control}` : `Se registrara como control ${form.numero_control}`}
           </p>
         </div>
       </div>
 
+      {loadingData ? (
+        <div className="card" style={{ padding: "2rem", textAlign: "center", color: "var(--text-muted)" }}>
+          Cargando control...
+        </div>
+      ) : (
       <form onSubmit={handleSubmit}>
 
         {/* DATOS BÁSICOS DEL CONTROL — siempre visibles */}
@@ -524,11 +563,12 @@ export default function NuevoControl() {
           <button type="submit" className="btn-primary" disabled={loading}
             style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <Save size={15} />
-            {loading ? "Guardando..." : "Guardar control"}
+            {loading ? "Guardando..." : editando ? "Guardar cambios" : "Guardar control"}
           </button>
         </div>
 
       </form>
+      )}
     </div>
   );
 }

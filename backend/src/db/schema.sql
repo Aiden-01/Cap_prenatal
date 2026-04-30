@@ -637,7 +637,9 @@ CREATE INDEX IF NOT EXISTS idx_controles_paciente     ON controles_prenatales(pa
 CREATE INDEX IF NOT EXISTS idx_controles_fecha        ON controles_prenatales(fecha);
 CREATE INDEX IF NOT EXISTS idx_morbilidad_paciente    ON morbilidad_embarazo(paciente_id);
 CREATE INDEX IF NOT EXISTS idx_puerperio_paciente     ON controles_puerperio(paciente_id);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_riesgo_paciente_unico ON fichas_riesgo_obstetrico(paciente_id);
 CREATE INDEX IF NOT EXISTS idx_riesgo_paciente        ON fichas_riesgo_obstetrico(paciente_id);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_vacunas_paciente_dosis ON vacunas_paciente(paciente_id, tipo_vacuna, momento, numero_dosis);
 CREATE INDEX IF NOT EXISTS idx_vacunas_paciente       ON vacunas_paciente(paciente_id);
 CREATE INDEX IF NOT EXISTS idx_referencias_paciente   ON referencias_efectuadas(paciente_id);
 CREATE INDEX IF NOT EXISTS idx_usuarios_username      ON usuarios(username);

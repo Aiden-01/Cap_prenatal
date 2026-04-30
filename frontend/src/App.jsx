@@ -8,6 +8,9 @@ import NuevaPaciente from "./pages/NuevaPaciente";
 import ExpedientePaciente from "./pages/ExpedientePaciente";
 import NuevoControl from "./pages/NuevoControl";
 import FichaRiesgo from "./pages/FichaRiesgo";
+import PuerperioForm from "./pages/PuerperioForm";
+import MorbilidadForm from "./pages/MorbilidadForm";
+import VacunaForm from "./pages/VacunaForm";
 import Reportes from "./pages/Reportes";
 import Usuarios from "./pages/Usuarios";
 
@@ -31,7 +34,14 @@ export default function App() {
           <Route path="pacientes/:id" element={<ExpedientePaciente />} />
           <Route path="pacientes/:id/editar" element={<NuevaPaciente />} />
           <Route path="pacientes/:id/controles/nuevo" element={<NuevoControl />} />
+          <Route path="pacientes/:id/controles/:controlId/editar" element={<NuevoControl />} />
           <Route path="pacientes/:id/riesgo" element={<FichaRiesgo />} />
+          <Route path="pacientes/:id/puerperio/nuevo" element={<PuerperioForm />} />
+          <Route path="pacientes/:id/puerperio/:puerperioId/editar" element={<PuerperioForm />} />
+          <Route path="pacientes/:id/morbilidad/nuevo" element={<MorbilidadForm />} />
+          <Route path="pacientes/:id/morbilidad/:morbilidadId/editar" element={<MorbilidadForm />} />
+          <Route path="pacientes/:id/vacunas/nuevo" element={<VacunaForm />} />
+          <Route path="pacientes/:id/vacunas/:vacunaId/editar" element={<VacunaForm />} />
           <Route path="nuevo" element={<NuevaPaciente />} />
           <Route path="reportes" element={<Reportes />} />
           <Route path="usuarios" element={<PrivateRoute adminOnly><Usuarios /></PrivateRoute>} />

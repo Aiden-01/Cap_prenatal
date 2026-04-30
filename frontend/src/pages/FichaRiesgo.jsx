@@ -86,37 +86,114 @@ const INIT = {
   referida_a: "", nombre_personal_atendio: "",
 };
 
+function toDateInput(value) {
+  return value ? value.split("T")[0] : "";
+}
+
+function calcularEdadAnios(fechaNacimiento) {
+  if (!fechaNacimiento) return null;
+  const nacimiento = new Date(`${toDateInput(fechaNacimiento)}T00:00:00`);
+  if (Number.isNaN(nacimiento.getTime())) return null;
+
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - nacimiento.getFullYear();
+  const mes = hoy.getMonth() - nacimiento.getMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) edad -= 1;
+  return edad;
+}
+
+function defaultsDesdePaciente(paciente = {}) {
+  const edad = calcularEdadAnios(paciente.fecha_nacimiento);
+  const hijosMuertos =
+    Number(paciente.muertos_antes_1sem || 0) + Number(paciente.muertos_despues_1sem || 0);
+
+  return {
+    telefono: paciente.telefono || "",
+    pueblo: paciente.pueblo || "",
+    migrante: Boolean(paciente.es_migrante),
+    estado_civil: paciente.estado_civil || "",
+    escolaridad: paciente.nivel_estudios || "",
+    ocupacion: paciente.profesion_oficio || "",
+    nombre_esposo_conviviente: paciente.nombre_esposo_conviviente || "",
+    fecha_ultima_regla: toDateInput(paciente.fur),
+    fecha_probable_parto: toDateInput(paciente.fpp),
+    no_embarazos: paciente.gestas_previas ?? "",
+    no_partos: paciente.partos_vaginales ?? "",
+    no_cesareas: paciente.cesareas ?? "",
+    no_abortos: paciente.abortos ?? "",
+    no_hijos_vivos: paciente.hijos_viven ?? paciente.nacidos_vivos ?? "",
+    no_hijos_muertos: hijosMuertos || "",
+    gestas_3mas: Number(paciente.gestas_previas || 0) >= 3,
+    peso_ultimo_bebe_menor_2500g: Boolean(paciente.rn_menor_2500g),
+    peso_ultimo_bebe_mayor_4500g: Boolean(paciente.rn_mayor_4000g),
+    antec_hipertension_preeclampsia: Boolean(paciente.antec_hipertension || paciente.antec_preeclampsia),
+    cirugias_tracto_reproductivo: Boolean(paciente.cirugia_genito_urinaria || paciente.cirugia_genito_urinaria_pers),
+    menor_20_anos: edad !== null ? edad < 20 : false,
+    mayor_35_anos: edad !== null ? edad > 35 : false,
+    vih_positivo_sifilis: Boolean(paciente.antec_vih_positivo),
+    diabetes: Boolean(paciente.antec_diabetes),
+    enfermedad_renal: Boolean(paciente.antec_nefropatia),
+    enfermedad_corazon: Boolean(paciente.antec_cardiopatia),
+    hipertension_arterial: Boolean(paciente.antec_hipertension),
+    consumo_drogas_alcohol_tabaco: Boolean(
+      paciente.consume_drogas || paciente.consume_alcohol || paciente.fuma_activamente || paciente.fuma_pasivamente
+    ),
+    otra_enfermedad_severa: Boolean(paciente.antec_otra_condicion),
+    otra_enfermedad_descripcion: paciente.antec_otra_condicion_desc || "",
+  };
+}
+
 export default function FichaRiesgo() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useGlobalToast();
   const [form, setForm] = useState(INIT);
+  const [paciente, setPaciente] = useState(null);
+  const [existingRisk, setExistingRisk] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const p = { form, set };
 
   useEffect(() => {
-    api.get(`/pacientes/${id}/riesgo`)
+    api.get(`/pacientes/${id}/expediente`)
       .then(({ data }) => {
-        if (!data) return;
+        const pacienteData = data?.paciente;
+        const ficha = data?.ficha_riesgo;
+        setPaciente(pacienteData || null);
+        setExistingRisk(Boolean(ficha));
+
+        if (ficha) {
+          setForm((f) => ({
+            ...f,
+            ...ficha,
+            fecha: ficha.fecha ? toDateInput(ficha.fecha) : f.fecha,
+            fecha_ultima_regla: toDateInput(ficha.fecha_ultima_regla),
+            fecha_probable_parto: toDateInput(ficha.fecha_probable_parto),
+          }));
+          return;
+        }
+
         setForm((f) => ({
           ...f,
-          ...data,
-          fecha: data.fecha ? data.fecha.split("T")[0] : f.fecha,
-          fecha_ultima_regla: data.fecha_ultima_regla ? data.fecha_ultima_regla.split("T")[0] : "",
-          fecha_probable_parto: data.fecha_probable_parto ? data.fecha_probable_parto.split("T")[0] : "",
+          ...defaultsDesdePaciente(pacienteData),
         }));
       })
-      .catch(() => toast("Error al cargar ficha de riesgo", "error"));
+      .catch(() => toast("Error al cargar datos de la paciente", "error"))
+      .finally(() => setLoadingData(false));
   }, [id, toast]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post(`/pacientes/${id}/riesgo`, form);
-      toast("Ficha de riesgo guardada", "success");
+      if (existingRisk) {
+        await api.put(`/pacientes/${id}/riesgo`, form);
+      } else {
+        await api.post(`/pacientes/${id}/riesgo`, form);
+      }
+      toast(existingRisk ? "Ficha de riesgo actualizada" : "Ficha de riesgo guardada", "success");
       setTimeout(() => navigate(`/pacientes/${id}`), 600);
     } catch (err) {
       toast(err.response?.data?.error || "Error al guardar ficha de riesgo", "error");
@@ -139,6 +216,22 @@ export default function FichaRiesgo() {
         </div>
       </div>
 
+      {paciente && (
+        <div className="card" style={{ marginBottom: "1rem", padding: "0.9rem 1rem" }}>
+          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>
+            {existingRisk ? "Editando ficha de" : "Agregando ficha a"}
+          </span>
+          <div style={{ marginTop: 3, fontSize: "1rem", fontWeight: 800, color: "var(--text)" }}>
+            {paciente.nombres} {paciente.apellidos}
+          </div>
+        </div>
+      )}
+
+      {loadingData ? (
+        <div className="card" style={{ padding: "2rem", textAlign: "center", color: "var(--text-muted)" }}>
+          Cargando datos de la paciente...
+        </div>
+      ) : (
       <form onSubmit={handleSubmit} className="card">
         <div className="form-section">
           <div className="form-section-header">Datos generales</div>
@@ -202,10 +295,11 @@ export default function FichaRiesgo() {
             Cancelar
           </button>
           <button className="btn-primary" disabled={loading}>
-            <Save size={15} /> {loading ? "Guardando..." : "Guardar ficha"}
+            <Save size={15} /> {loading ? "Guardando..." : existingRisk ? "Guardar cambios" : "Guardar ficha"}
           </button>
         </div>
       </form>
+      )}
     </div>
   );
 }

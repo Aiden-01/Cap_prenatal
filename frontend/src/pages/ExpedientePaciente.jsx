@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../components/Layout";
 import {
-  ChevronLeft, Plus, AlertTriangle, CheckCircle, Pencil,
+  ChevronLeft, Plus, AlertTriangle, CheckCircle, Pencil, Trash2,
   Syringe, Activity, FlaskConical, Baby, FileText
 } from "lucide-react";
 
@@ -79,6 +79,12 @@ export default function ExpedientePaciente() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab]         = useState("general");
 
+  const cargarExpediente = () => {
+    api.get(`/pacientes/${id}/expediente`)
+      .then(({ data }) => setExp(data))
+      .catch(() => toast("Error al cargar expediente", "error"))
+  };
+
   useEffect(() => {
     api.get(`/pacientes/${id}/expediente`)
       .then(({ data }) => setExp(data))
@@ -98,6 +104,17 @@ export default function ExpedientePaciente() {
   );
 
   const p = exp.paciente;
+
+  const eliminarRegistro = async (mensaje, endpoint) => {
+    if (!window.confirm(mensaje)) return;
+    try {
+      await api.delete(endpoint);
+      toast("Registro eliminado", "success");
+      cargarExpediente();
+    } catch (err) {
+      toast(err.response?.data?.error || "Error al eliminar registro", "error");
+    }
+  };
 
   const TABS = [
     { id: "general",    label: "Datos generales",                          icon: FileText     },
@@ -294,6 +311,13 @@ export default function ExpedientePaciente() {
       ══════════════════════════════════════════ */}
       {tab === "controles" && (
         <div style={{ display: "grid", gap: "1rem" }}>
+          {exp.controles_prenatales?.length > 0 && (
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}>
+                <Plus size={14} /> Agregar siguiente control
+              </button>
+            </div>
+          )}
           {exp.controles_prenatales?.length === 0 ? (
             <div className="card" style={{ textAlign: "center", padding: "2.5rem", color: "var(--text-muted)" }}>
               No hay controles registrados.
@@ -308,9 +332,17 @@ export default function ExpedientePaciente() {
               <div className="card" key={ctrl.id}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
                   <span className="badge badge-blue">Control {ctrl.numero_control}</span>
-                  <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
-                    {fecha(ctrl.fecha)}{ctrl.hora ? ` — ${ctrl.hora}` : ""}
-                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                    <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                      {fecha(ctrl.fecha)}{ctrl.hora ? ` — ${ctrl.hora}` : ""}
+                    </span>
+                    <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/controles/${ctrl.id}/editar`)}>
+                      <Pencil size={13} /> Editar
+                    </button>
+                    <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar este control prenatal?", `/pacientes/${id}/controles/${ctrl.id}`)}>
+                      <Trash2 size={13} /> Eliminar
+                    </button>
+                  </div>
                 </div>
 
                 {/* Signos de peligro */}
@@ -374,6 +406,13 @@ export default function ExpedientePaciente() {
       ══════════════════════════════════════════ */}
       {tab === "puerperio" && (
         <div style={{ display: "grid", gap: "1rem" }}>
+          {(exp.controles_puerperio?.length ?? 0) < 2 && (
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/puerperio/nuevo`)}>
+                <Plus size={14} /> Registrar puerperio
+              </button>
+            </div>
+          )}
           {exp.controles_puerperio?.length === 0 ? (
             <div className="card" style={{ textAlign: "center", padding: "2.5rem", color: "var(--text-muted)" }}>
               No hay atenciones de puerperio registradas.
@@ -383,7 +422,15 @@ export default function ExpedientePaciente() {
               <div className="card" key={pu.id}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
                   <span className="badge badge-blue">{pu.numero_atencion === 1 ? "1ª Atención" : "2ª Atención"} — Puerperio</span>
-                  <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>{fecha(pu.fecha)}</span>
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>{fecha(pu.fecha)}</span>
+                    <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/puerperio/${pu.id}/editar`)}>
+                      <Pencil size={13} /> Editar
+                    </button>
+                    <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar esta atención de puerperio?", `/pacientes/${id}/controles/puerperio/${pu.id}`)}>
+                      <Trash2 size={13} /> Eliminar
+                    </button>
+                  </div>
                 </div>
 
                 {pu.signos_peligro && (
@@ -421,6 +468,11 @@ export default function ExpedientePaciente() {
       ══════════════════════════════════════════ */}
       {tab === "morbilidad" && (
         <div style={{ display: "grid", gap: "1rem" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/morbilidad/nuevo`)}>
+              <Plus size={14} /> Registrar morbilidad
+            </button>
+          </div>
           {exp.morbilidad?.length === 0 ? (
             <div className="card" style={{ textAlign: "center", padding: "2.5rem", color: "var(--text-muted)" }}>
               No hay consultas intercurrentes registradas.
@@ -430,9 +482,17 @@ export default function ExpedientePaciente() {
               <div className="card" key={m.id}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
                   <span style={{ fontWeight: 600, color: "var(--text)", fontSize: "0.9rem" }}>{m.motivo_consulta}</span>
-                  <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
-                    {fecha(m.fecha)}{m.hora ? ` — ${m.hora}` : ""}
-                  </span>
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                      {fecha(m.fecha)}{m.hora ? ` — ${m.hora}` : ""}
+                    </span>
+                    <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/morbilidad/${m.id}/editar`)}>
+                      <Pencil size={13} /> Editar
+                    </button>
+                    <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar esta morbilidad?", `/pacientes/${id}/morbilidad/${m.id}`)}>
+                      <Trash2 size={13} /> Eliminar
+                    </button>
+                  </div>
                 </div>
                 <div style={{ display: "grid", gap: "0.5rem" }}>
                   <Row label="Historia enfermedad actual" value={m.historia_enfermedad_actual} />
@@ -466,9 +526,17 @@ export default function ExpedientePaciente() {
             <>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
                 <h3 style={{ fontFamily: "Syne", fontSize: "1rem", fontWeight: 700 }}>Ficha de Riesgo Obstétrico</h3>
-                {exp.ficha_riesgo.tiene_riesgo
-                  ? <span className="badge badge-red">⚠ PRESENTA RIESGO</span>
-                  : <span className="badge badge-green"><CheckCircle size={11} /> SIN RIESGO</span>}
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                  {exp.ficha_riesgo.tiene_riesgo
+                    ? <span className="badge badge-red">⚠ PRESENTA RIESGO</span>
+                    : <span className="badge badge-green"><CheckCircle size={11} /> SIN RIESGO</span>}
+                  <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/riesgo`)}>
+                    <Pencil size={13} /> Editar
+                  </button>
+                  <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar la ficha de riesgo?", `/pacientes/${id}/riesgo`)}>
+                    <Trash2 size={13} /> Eliminar
+                  </button>
+                </div>
               </div>
 
               <SecTitle>Antecedentes Obstétricos (criterios 1-7)</SecTitle>
@@ -524,6 +592,11 @@ export default function ExpedientePaciente() {
       ══════════════════════════════════════════ */}
       {tab === "vacunas" && (
         <div className="card">
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
+            <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/vacunas/nuevo`)}>
+              <Plus size={14} /> Registrar vacuna
+            </button>
+          </div>
           {!exp.vacunas?.length ? (
             <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
               No hay vacunas registradas.
@@ -537,6 +610,7 @@ export default function ExpedientePaciente() {
                     <th>Momento</th>
                     <th>No. Dosis</th>
                     <th>Fecha</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -552,6 +626,16 @@ export default function ExpedientePaciente() {
                       </td>
                       <td>{v.numero_dosis}</td>
                       <td>{fecha(v.fecha_dosis)}</td>
+                      <td>
+                        <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                          <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/vacunas/${v.id}/editar`)}>
+                            <Pencil size={13} /> Editar
+                          </button>
+                          <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar esta vacuna?", `/pacientes/${id}/vacunas/${v.id}`)}>
+                            <Trash2 size={13} /> Eliminar
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
