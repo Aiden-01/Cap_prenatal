@@ -188,6 +188,17 @@ h1, h2, h3, h4 { font-family: "Syne", sans-serif; }
 
 .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
 
+.age-preview {
+  grid-column: 1 / -1;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-lt);
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
 /* ── Secciones de formulario ───────────────────────────────── */
 .form-section {
   background: var(--surface);
@@ -299,6 +310,38 @@ h1, h2, h3, h4 { font-family: "Syne", sans-serif; }
 
 /* Tabla responsive — scroll horizontal en móvil */
 .tabla-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+.trimester-list {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.trimester-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) 1fr;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.trimester-label {
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.trimester-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 0.55rem;
+}
+
+@media (max-width: 900px) {
+  .trimester-row,
+  .trimester-options {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* ── Reportes MSPAS ───────────────────────────────────────── */
 .reportes-page {

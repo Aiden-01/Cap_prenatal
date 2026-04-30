@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS pacientes (
   distrito                  VARCHAR(100),
   area_salud                VARCHAR(150),
   -- Categoría del servicio: CCS | PS | CS_B | CS_A
-  categoria_servicio        VARCHAR(10) CHECK (categoria_servicio IN ('CCS','PS','CS_B','CS_A')),
+  categoria_servicio        VARCHAR(10) CHECK (categoria_servicio IN ('CCS','PS','CS_B','CS_A','CAP')),
 
   -- ── Datos de la embarazada ───────────────────────────────────
   nombres                   VARCHAR(150) NOT NULL,
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS pacientes (
   -- Clasificación edad al momento del registro (calculada en backend, guardada para histórico)
   rango_edad                VARCHAR(10) CHECK (rango_edad IN ('menor_14','14_19','20_35','mayor_35')),
   -- Alfa/Beta (sistema clasificación interna MSPAS)
-  clasificacion_alfa_beta   VARCHAR(5)  CHECK (clasificacion_alfa_beta IN ('ALFA','BETA')),
+  clasificacion_alfa_beta   VARCHAR(5)  CHECK (clasificacion_alfa_beta IN ('SI','NO','ALFA','BETA')),
 
   domicilio                 VARCHAR(255),
   municipio                 VARCHAR(100),
@@ -77,12 +77,13 @@ CREATE TABLE IF NOT EXISTS pacientes (
 
   -- Estudios y situación personal
   -- Nivel: ninguno | primaria | secundaria | universitaria
-  nivel_estudios            VARCHAR(20) CHECK (nivel_estudios IN ('ninguno','primaria','secundaria','universitaria')),
+  nivel_estudios            VARCHAR(20) CHECK (nivel_estudios IN ('ninguno','primaria','basico','diversificado','universitaria','secundaria')),
   ultimo_anio_aprobado      INTEGER,
   profesion_oficio          VARCHAR(100),
 
   -- Estado civil: casada | unida | soltera | separada | vive_sola
   estado_civil              VARCHAR(15) CHECK (estado_civil IN ('casada','unida','soltera','separada','vive_sola')),
+  vive_sola                 BOOLEAN DEFAULT FALSE,
 
   nombre_esposo_conviviente VARCHAR(200),
 
@@ -99,6 +100,18 @@ CREATE TABLE IF NOT EXISTS pacientes (
   fuma_pasivamente          BOOLEAN DEFAULT FALSE,
   consume_drogas            BOOLEAN DEFAULT FALSE,
   consume_alcohol           BOOLEAN DEFAULT FALSE,
+  fuma_activamente_1er_trimestre BOOLEAN DEFAULT FALSE,
+  fuma_activamente_2do_trimestre BOOLEAN DEFAULT FALSE,
+  fuma_activamente_3er_trimestre BOOLEAN DEFAULT FALSE,
+  fuma_pasivamente_1er_trimestre BOOLEAN DEFAULT FALSE,
+  fuma_pasivamente_2do_trimestre BOOLEAN DEFAULT FALSE,
+  fuma_pasivamente_3er_trimestre BOOLEAN DEFAULT FALSE,
+  consume_alcohol_1er_trimestre  BOOLEAN DEFAULT FALSE,
+  consume_alcohol_2do_trimestre  BOOLEAN DEFAULT FALSE,
+  consume_alcohol_3er_trimestre  BOOLEAN DEFAULT FALSE,
+  consume_drogas_1er_trimestre   BOOLEAN DEFAULT FALSE,
+  consume_drogas_2do_trimestre   BOOLEAN DEFAULT FALSE,
+  consume_drogas_3er_trimestre   BOOLEAN DEFAULT FALSE,
 
   -- Violencia (desglosada por trimestre según nueva ficha)
   violencia_1er_trimestre   BOOLEAN DEFAULT FALSE,
@@ -137,6 +150,7 @@ CREATE TABLE IF NOT EXISTS pacientes (
 
   -- ── Antecedentes personales ──────────────────────────────────
   antec_diabetes            BOOLEAN DEFAULT FALSE,
+  antec_diabetes_tipo       VARCHAR(1) CHECK (antec_diabetes_tipo IN ('1','2','G')),
   antec_tbc                 BOOLEAN DEFAULT FALSE,
   antec_hipertension        BOOLEAN DEFAULT FALSE,
   antec_preeclampsia        BOOLEAN DEFAULT FALSE,
@@ -155,6 +169,7 @@ CREATE TABLE IF NOT EXISTS pacientes (
   fam_eclampsia             BOOLEAN DEFAULT FALSE,
   fam_cardiopatia           BOOLEAN DEFAULT FALSE,
   fam_gemelos               BOOLEAN DEFAULT FALSE,       -- Antecedente de gemelares
+  fam_otra_condicion_medica_grave BOOLEAN DEFAULT FALSE,
 
   -- Notas de antecedentes obstétricos adicionales
   -- N/C | 3 espontáneos consecutivos | normal | último previo
@@ -517,6 +532,17 @@ CREATE TABLE IF NOT EXISTS planes_parto (
 -- Sin cambios estructurales respecto a v1.0
 -- ============================================================
 
+CREATE TABLE IF NOT EXISTS referencias_efectuadas (
+  id                SERIAL PRIMARY KEY,
+  paciente_id       INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+  fecha             DATE NOT NULL,
+  lugar_referencia  VARCHAR(200) NOT NULL,
+  diagnostico       TEXT,
+  registrado_por    INTEGER REFERENCES usuarios(id),
+  created_at        TIMESTAMPTZ DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS fichas_riesgo_obstetrico (
   id                                SERIAL PRIMARY KEY,
   paciente_id                       INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
@@ -613,4 +639,46 @@ CREATE INDEX IF NOT EXISTS idx_morbilidad_paciente    ON morbilidad_embarazo(pac
 CREATE INDEX IF NOT EXISTS idx_puerperio_paciente     ON controles_puerperio(paciente_id);
 CREATE INDEX IF NOT EXISTS idx_riesgo_paciente        ON fichas_riesgo_obstetrico(paciente_id);
 CREATE INDEX IF NOT EXISTS idx_vacunas_paciente       ON vacunas_paciente(paciente_id);
+CREATE INDEX IF NOT EXISTS idx_referencias_paciente   ON referencias_efectuadas(paciente_id);
 CREATE INDEX IF NOT EXISTS idx_usuarios_username      ON usuarios(username);
+
+-- ============================================================
+-- AJUSTES INCREMENTALES PACIENTES
+-- ============================================================
+
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS vive_sola BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_diabetes_tipo VARCHAR(1);
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fam_otra_condicion_medica_grave BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fuma_activamente_1er_trimestre BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fuma_activamente_2do_trimestre BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fuma_activamente_3er_trimestre BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fuma_pasivamente_1er_trimestre BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fuma_pasivamente_2do_trimestre BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fuma_pasivamente_3er_trimestre BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS consume_alcohol_1er_trimestre BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS consume_alcohol_2do_trimestre BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS consume_alcohol_3er_trimestre BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS consume_drogas_1er_trimestre BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS consume_drogas_2do_trimestre BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS consume_drogas_3er_trimestre BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE pacientes DROP CONSTRAINT IF EXISTS pacientes_categoria_servicio_check;
+ALTER TABLE pacientes ADD CONSTRAINT pacientes_categoria_servicio_check
+  CHECK (categoria_servicio IN ('CCS','PS','CS_B','CS_A','CAP')) NOT VALID;
+
+ALTER TABLE pacientes DROP CONSTRAINT IF EXISTS pacientes_clasificacion_alfa_beta_check;
+ALTER TABLE pacientes ADD CONSTRAINT pacientes_clasificacion_alfa_beta_check
+  CHECK (clasificacion_alfa_beta IN ('SI','NO','ALFA','BETA')) NOT VALID;
+
+ALTER TABLE pacientes DROP CONSTRAINT IF EXISTS pacientes_nivel_estudios_check;
+ALTER TABLE pacientes ADD CONSTRAINT pacientes_nivel_estudios_check
+  CHECK (nivel_estudios IN ('ninguno','primaria','basico','diversificado','universitaria','secundaria')) NOT VALID;
+
+ALTER TABLE pacientes DROP CONSTRAINT IF EXISTS pacientes_estado_civil_check;
+ALTER TABLE pacientes ADD CONSTRAINT pacientes_estado_civil_check
+  CHECK (estado_civil IN ('casada','unida','soltera','separada','vive_sola')) NOT VALID;
+
+ALTER TABLE pacientes DROP CONSTRAINT IF EXISTS pacientes_antec_diabetes_tipo_check;
+ALTER TABLE pacientes ADD CONSTRAINT pacientes_antec_diabetes_tipo_check
+  CHECK (antec_diabetes_tipo IN ('1','2','G')) NOT VALID;

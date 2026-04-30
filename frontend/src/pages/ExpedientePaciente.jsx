@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../components/Layout";
 import {
-  ChevronLeft, Plus, AlertTriangle, CheckCircle,
+  ChevronLeft, Plus, AlertTriangle, CheckCircle, Pencil,
   Syringe, Activity, FlaskConical, Baby, FileText
 } from "lucide-react";
 
@@ -139,6 +139,10 @@ export default function ExpedientePaciente() {
           <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}
             style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <Plus size={14} /> Control
+          </button>
+          <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/editar`)}
+            style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <Pencil size={14} /> Editar paciente
           </button>
         </div>
       </div>

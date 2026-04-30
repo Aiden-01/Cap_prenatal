@@ -1,5 +1,6 @@
 ﻿import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { useEffect } from "react";
 import api from "../api/axios";
 import { useGlobalToast } from "../components/Layout";
 import {
@@ -85,16 +86,15 @@ function Toggle({ label, name, form, set }) {
   );
 }
 
-function SectionTitle({ children }) {
+function TrimesterChecks({ label, names, form, set }) {
   return (
-    <div style={{
-      gridColumn: "1 / -1",
-      fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.09em",
-      textTransform: "uppercase", color: "var(--primary)",
-      borderBottom: "1.5px solid var(--primary-lt)",
-      paddingBottom: "0.4rem", marginTop: "0.5rem",
-    }}>
-      {children}
+    <div className="trimester-row">
+      <span className="trimester-label">{label}</span>
+      <div className="trimester-options">
+        <Toggle label="1er trimestre" name={names[0]} form={form} set={set} />
+        <Toggle label="2do trimestre" name={names[1]} form={form} set={set} />
+        <Toggle label="3er trimestre" name={names[2]} form={form} set={set} />
+      </div>
     </div>
   );
 }
@@ -109,12 +109,13 @@ const INIT = {
   categoria_servicio: "CS_B",
   // Datos personales
   nombres: "", apellidos: "",
-  fecha_nacimiento: "", rango_edad: "",
+  fecha_nacimiento: "", edad_manual: "", edad_calculada: "", rango_edad: "",
   clasificacion_alfa_beta: "",
   domicilio: "", municipio: "El Chal", territorio: "",
   sector: "", comunidad: "", telefono: "",
   nivel_estudios: "", ultimo_anio_aprobado: "",
   profesion_oficio: "", estado_civil: "",
+  vive_sola: false,
   nombre_esposo_conviviente: "",
   cobertura_igss: false, cobertura_privada: false, cobertura_privada_detalle: "",
   viene_referida: false, referida_de: "",
@@ -134,7 +135,7 @@ const INIT = {
   rn_menor_2500g: false, rn_mayor_4000g: false,
   antec_vih_positivo: false, antec_emb_ectopico: false, antec_violencia: false,
   // Antecedentes personales
-  antec_diabetes: false, antec_tbc: false, antec_hipertension: false,
+  antec_diabetes: false, antec_diabetes_tipo: "", antec_tbc: false, antec_hipertension: false,
   antec_preeclampsia: false, antec_eclampsia: false, antec_cardiopatia: false,
   antec_nefropatia: false, antec_otra_condicion: false, antec_otra_condicion_desc: "",
   cirugia_genito_urinaria_pers: false,
@@ -142,9 +143,22 @@ const INIT = {
   fam_diabetes: false, fam_tbc: false, fam_hipertension: false,
   fam_preeclampsia: false, fam_eclampsia: false,
   fam_cardiopatia: false, fam_gemelos: false,
+  fam_otra_condicion_medica_grave: false,
   // Riesgo social
   fuma_activamente: false, fuma_pasivamente: false,
   consume_drogas: false, consume_alcohol: false,
+  fuma_activamente_1er_trimestre: false,
+  fuma_activamente_2do_trimestre: false,
+  fuma_activamente_3er_trimestre: false,
+  fuma_pasivamente_1er_trimestre: false,
+  fuma_pasivamente_2do_trimestre: false,
+  fuma_pasivamente_3er_trimestre: false,
+  consume_alcohol_1er_trimestre: false,
+  consume_alcohol_2do_trimestre: false,
+  consume_alcohol_3er_trimestre: false,
+  consume_drogas_1er_trimestre: false,
+  consume_drogas_2do_trimestre: false,
+  consume_drogas_3er_trimestre: false,
   violencia_1er_trimestre: false, violencia_2do_trimestre: false,
   violencia_3er_trimestre: false, embarazo_abuso_sexual: false,
   tiene_ficha_riesgo: false,
@@ -152,13 +166,102 @@ const INIT = {
 
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────
 export default function NuevaPaciente() {
+  const { id } = useParams();
   const [step, setStep]       = useState(0);
   const [form, setForm]       = useState(INIT);
   const [loading, setLoading] = useState(false);
   const navigate              = useNavigate();
   const toast                 = useGlobalToast();
+  const editando              = Boolean(id);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    if (!editando) return;
+
+    api.get(`/pacientes/${id}`)
+      .then(({ data }) => {
+        setForm((f) => ({
+          ...f,
+          ...data,
+          fecha_nacimiento: data.fecha_nacimiento ? data.fecha_nacimiento.split("T")[0] : "",
+          fur: data.fur ? data.fur.split("T")[0] : "",
+          fpp: data.fpp ? data.fpp.split("T")[0] : "",
+          fin_embarazo_anterior: data.fin_embarazo_anterior ? data.fin_embarazo_anterior.split("T")[0] : "",
+        }));
+      })
+      .catch(() => toast("Error al cargar datos de la paciente", "error"))
+  }, [editando, id, toast]);
+
+  const clasificarEdad = (edad) => {
+    if (edad === "" || edad === null || edad === undefined) return "";
+    if (edad < 14) return "menor_14";
+    if (edad <= 19) return "14_19";
+    if (edad <= 35) return "20_35";
+    return "mayor_35";
+  };
+
+  const calcularEdad = (fecha) => {
+    if (!fecha) return { texto: "", anios: "" };
+
+    const nacimiento = new Date(`${fecha}T00:00:00`);
+    const hoy = new Date();
+    if (Number.isNaN(nacimiento.getTime()) || nacimiento > hoy) {
+      return { texto: "", anios: "" };
+    }
+
+    let anios = hoy.getFullYear() - nacimiento.getFullYear();
+    let meses = hoy.getMonth() - nacimiento.getMonth();
+    let dias = hoy.getDate() - nacimiento.getDate();
+
+    if (dias < 0) {
+      meses -= 1;
+      const ultimoDiaMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0).getDate();
+      dias += ultimoDiaMesAnterior;
+    }
+
+    if (meses < 0) {
+      anios -= 1;
+      meses += 12;
+    }
+
+    return {
+      texto: `${anios} año${anios !== 1 ? "s" : ""}, ${meses} mes${meses !== 1 ? "es" : ""} y ${dias} día${dias !== 1 ? "s" : ""}`,
+      anios,
+    };
+  };
+
+  const fechaDesdeEdad = (edad) => {
+    if (edad === "" || edad === null || edad === undefined) return "";
+    const hoy = new Date();
+    const fecha = new Date(hoy.getFullYear() - Number(edad), hoy.getMonth(), hoy.getDate());
+    return fecha.toISOString().split("T")[0];
+  };
+
+  const handleFechaNacimiento = (val) => {
+    const edad = calcularEdad(val);
+    setForm((f) => ({
+      ...f,
+      fecha_nacimiento: val,
+      edad_manual: edad.anios,
+      edad_calculada: edad.texto,
+      rango_edad: clasificarEdad(edad.anios),
+    }));
+  };
+
+  const handleEdadManual = (val) => {
+    const edad = val === "" ? "" : Number(val);
+    const fecha = fechaDesdeEdad(edad);
+    const edadCalculada = calcularEdad(fecha);
+
+    setForm((f) => ({
+      ...f,
+      edad_manual: edad,
+      fecha_nacimiento: fecha,
+      edad_calculada: edadCalculada.texto,
+      rango_edad: clasificarEdad(edad),
+    }));
+  };
 
   // FPP automática al ingresar FUR
   const handleFUR = (val) => {
@@ -179,9 +282,37 @@ export default function NuevaPaciente() {
     }
     setLoading(true);
     try {
-      const { data } = await api.post("/pacientes", form);
-      toast("Paciente registrada exitosamente", "success");
-      setTimeout(() => navigate(`/pacientes/${data.id}`), 800);
+      const payload = {
+        ...form,
+        antec_diabetes: Boolean(form.antec_diabetes_tipo),
+        fuma_activamente: Boolean(
+          form.fuma_activamente_1er_trimestre ||
+          form.fuma_activamente_2do_trimestre ||
+          form.fuma_activamente_3er_trimestre
+        ),
+        fuma_pasivamente: Boolean(
+          form.fuma_pasivamente_1er_trimestre ||
+          form.fuma_pasivamente_2do_trimestre ||
+          form.fuma_pasivamente_3er_trimestre
+        ),
+        consume_alcohol: Boolean(
+          form.consume_alcohol_1er_trimestre ||
+          form.consume_alcohol_2do_trimestre ||
+          form.consume_alcohol_3er_trimestre
+        ),
+        consume_drogas: Boolean(
+          form.consume_drogas_1er_trimestre ||
+          form.consume_drogas_2do_trimestre ||
+          form.consume_drogas_3er_trimestre
+        ),
+      };
+
+      const { data } = editando
+        ? await api.put(`/pacientes/${id}`, payload)
+        : await api.post("/pacientes", payload);
+
+      toast(editando ? "Paciente actualizada exitosamente" : "Paciente registrada exitosamente", "success");
+      setTimeout(() => navigate(`/pacientes/${editando ? id : data.id}`), 800);
     } catch (e) {
       const msg = e.response?.data?.error || "Error al guardar";
       toast(msg, "error");
@@ -202,7 +333,7 @@ export default function NuevaPaciente() {
         <div>
           <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--text)" }}>Nueva paciente</h1>
           <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 2 }}>
-            Ficha Clínica Prenatal y Puerperio — MSPAS
+            {editando ? "Modificar datos de la paciente" : "Ficha Clínica Prenatal y Puerperio — MSPAS"}
           </p>
         </div>
       </div>
@@ -256,6 +387,7 @@ export default function NuevaPaciente() {
                     { value: "PS",  label: "PS" },
                     { value: "CS_B", label: 'CS "B"' },
                     { value: "CS_A", label: 'CS "A"' },
+                    { value: "CAP",  label: "CAP" },
                   ]}
                 />
               </div>
@@ -271,14 +403,44 @@ export default function NuevaPaciente() {
               <div className="form-section-body col-2">
                 <Input label="Nombres" name="nombres" required form={form} set={set} />
                 <Input label="Apellidos" name="apellidos" required form={form} set={set} />
-                <Input label="Fecha de Nacimiento" name="fecha_nacimiento" type="date" form={form} set={set} />
-                <Select label="Clasificación Alfa/Beta" name="clasificacion_alfa_beta" form={form} set={set}
-                  options={["ALFA", "BETA"]}
+                <Field label="Fecha de Nacimiento">
+                  <input
+                    className="input-field"
+                    type="date"
+                    value={form.fecha_nacimiento}
+                    onChange={(e) => handleFechaNacimiento(e.target.value)}
+                  />
+                </Field>
+                <Field label="Edad">
+                  <input
+                    className="input-field"
+                    type="number"
+                    min="0"
+                    max="120"
+                    value={form.edad_manual ?? ""}
+                    onChange={(e) => handleEdadManual(e.target.value)}
+                    placeholder="Si no conoce la fecha, ingrese edad"
+                  />
+                </Field>
+                {form.edad_calculada && (
+                  <div className="age-preview">
+                    Edad calculada: <strong>{form.edad_calculada}</strong>
+                  </div>
+                )}
+                <Select label="Alfabeta" name="clasificacion_alfa_beta" form={form} set={set}
+                  options={[
+                    { value: "SI", label: "Sí" },
+                    { value: "NO", label: "No" },
+                  ]}
                 />
                 <Input label="Domicilio" name="domicilio" form={form} set={set} />
                 <Input label="Municipio" name="municipio" form={form} set={set} />
-                <Input label="Territorio" name="territorio" form={form} set={set} />
-                <Input label="Sector" name="sector" form={form} set={set} />
+                <Select label="Territorio" name="territorio" form={form} set={set}
+                  options={["1", "2", "3", "4"]}
+                />
+                <Select label="Sector" name="sector" form={form} set={set}
+                  options={["A", "B"]}
+                />
                 <Input label="Comunidad" name="comunidad" form={form} set={set} />
                 <Input label="Teléfono" name="telefono" form={form} set={set} />
               </div>
@@ -291,7 +453,8 @@ export default function NuevaPaciente() {
                   options={[
                     { value: "ninguno",      label: "Ninguno" },
                     { value: "primaria",     label: "Primaria" },
-                    { value: "secundaria",   label: "Secundaria" },
+                    { value: "basico",       label: "Básico" },
+                    { value: "diversificado",label: "Diversificado" },
                     { value: "universitaria",label: "Universitaria" },
                   ]}
                 />
@@ -303,9 +466,19 @@ export default function NuevaPaciente() {
                     { value: "unida",     label: "Unida" },
                     { value: "soltera",   label: "Soltera" },
                     { value: "separada",  label: "Separada" },
-                    { value: "vive_sola", label: "Vive sola" },
                   ]}
                 />
+                <Field label="¿Vive sola?">
+                  <select
+                    className="input-field"
+                    value={form.vive_sola === "" ? "" : String(form.vive_sola)}
+                    onChange={(e) => set("vive_sola", e.target.value === "true")}
+                  >
+                    <option value="">— Seleccionar —</option>
+                    <option value="true">Sí</option>
+                    <option value="false">No</option>
+                  </select>
+                </Field>
                 <Input label="Nombre del esposo/conviviente" name="nombre_esposo_conviviente" form={form} set={set} />
               </div>
             </div>
@@ -423,15 +596,24 @@ export default function NuevaPaciente() {
             <div className="form-section">
               <div className="form-section-header">Antecedentes Personales</div>
               <div className="form-section-body col-2" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: "0.6rem" }}>
-                <Toggle label="Diabetes" name="antec_diabetes" {...p} />
                 <Toggle label="Tuberculosis" name="antec_tbc" {...p} />
+                <Select label="Diabetes" name="antec_diabetes_tipo" form={form} set={set}
+                  options={[
+                    { value: "1", label: "Tipo 1" },
+                    { value: "2", label: "Tipo 2" },
+                    { value: "G", label: "Gestacional" },
+                  ]}
+                />
                 <Toggle label="Hipertensión arterial" name="antec_hipertension" {...p} />
                 <Toggle label="Preeclampsia" name="antec_preeclampsia" {...p} />
                 <Toggle label="Eclampsia" name="antec_eclampsia" {...p} />
+                <Toggle label="Otra condición médica grave" name="antec_otra_condicion" {...p} />
+                <Toggle label="Cirugía génito-urinaria" name="cirugia_genito_urinaria_pers" {...p} />
+                <Toggle label="Infertilidad" name="infertilidad" {...p} />
                 <Toggle label="Cardiopatía" name="antec_cardiopatia" {...p} />
                 <Toggle label="Nefropatía" name="antec_nefropatia" {...p} />
-                <Toggle label="Cirugía génito-urinaria" name="cirugia_genito_urinaria_pers" {...p} />
-                <Toggle label="Otra condición médica grave" name="antec_otra_condicion" {...p} />
+                <Toggle label="Violencia" name="antec_violencia" {...p} />
+                <Toggle label="VIH+" name="antec_vih_positivo" {...p} />
               </div>
               {form.antec_otra_condicion && (
                 <div style={{ marginTop: "0.75rem" }}>
@@ -448,8 +630,7 @@ export default function NuevaPaciente() {
                 <Toggle label="Hipertensión" name="fam_hipertension" {...p} />
                 <Toggle label="Preeclampsia" name="fam_preeclampsia" {...p} />
                 <Toggle label="Eclampsia" name="fam_eclampsia" {...p} />
-                <Toggle label="Cardiopatía" name="fam_cardiopatia" {...p} />
-                <Toggle label="Antecedente de gemelares" name="fam_gemelos" {...p} />
+                <Toggle label="Otra condición médica grave" name="fam_otra_condicion_medica_grave" {...p} />
               </div>
             </div>
           </div>
@@ -459,12 +640,28 @@ export default function NuevaPaciente() {
         {step === 4 && (
           <div>
             <div className="form-section">
-              <div className="form-section-header">Hábitos</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: "0.6rem", padding: "1rem" }}>
-                <Toggle label="Fuma activamente" name="fuma_activamente" {...p} />
-                <Toggle label="Fuma pasivamente" name="fuma_pasivamente" {...p} />
-                <Toggle label="Consume alcohol" name="consume_alcohol" {...p} />
-                <Toggle label="Consume drogas" name="consume_drogas" {...p} />
+              <div className="form-section-header">Hábitos por trimestre</div>
+              <div className="trimester-list">
+                <TrimesterChecks
+                  label="Fuma activamente"
+                  names={["fuma_activamente_1er_trimestre", "fuma_activamente_2do_trimestre", "fuma_activamente_3er_trimestre"]}
+                  {...p}
+                />
+                <TrimesterChecks
+                  label="Fuma pasivamente"
+                  names={["fuma_pasivamente_1er_trimestre", "fuma_pasivamente_2do_trimestre", "fuma_pasivamente_3er_trimestre"]}
+                  {...p}
+                />
+                <TrimesterChecks
+                  label="Consume alcohol"
+                  names={["consume_alcohol_1er_trimestre", "consume_alcohol_2do_trimestre", "consume_alcohol_3er_trimestre"]}
+                  {...p}
+                />
+                <TrimesterChecks
+                  label="Consume drogas"
+                  names={["consume_drogas_1er_trimestre", "consume_drogas_2do_trimestre", "consume_drogas_3er_trimestre"]}
+                  {...p}
+                />
               </div>
             </div>
 
@@ -474,8 +671,13 @@ export default function NuevaPaciente() {
                 <Toggle label="Violencia 1er trimestre" name="violencia_1er_trimestre" {...p} />
                 <Toggle label="Violencia 2do trimestre" name="violencia_2do_trimestre" {...p} />
                 <Toggle label="Violencia 3er trimestre" name="violencia_3er_trimestre" {...p} />
-                <Toggle label="Embarazo producto de abuso sexual" name="embarazo_abuso_sexual" {...p} />
-                <Toggle label="Antecedente de violencia" name="antec_violencia" {...p} />
+              </div>
+            </div>
+
+            <div className="form-section">
+              <div className="form-section-header">Embarazo producto de violencia sexual</div>
+              <div style={{ padding: "1rem" }}>
+                <Toggle label="Sí, embarazo producto de violencia sexual" name="embarazo_abuso_sexual" {...p} />
               </div>
             </div>
 
@@ -572,7 +774,7 @@ export default function NuevaPaciente() {
               style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
             >
               <Save size={15} />
-              {loading ? "Guardando..." : "Registrar paciente"}
+              {loading ? "Guardando..." : editando ? "Guardar cambios" : "Registrar paciente"}
             </button>
           )}
         </div>

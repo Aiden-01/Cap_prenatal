@@ -7,6 +7,7 @@ import Pacientes from "./pages/Pacientes";
 import NuevaPaciente from "./pages/NuevaPaciente";
 import ExpedientePaciente from "./pages/ExpedientePaciente";
 import NuevoControl from "./pages/NuevoControl";
+import FichaRiesgo from "./pages/FichaRiesgo";
 import Reportes from "./pages/Reportes";
 import Usuarios from "./pages/Usuarios";
 
@@ -28,7 +29,9 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="pacientes" element={<Pacientes />} />
           <Route path="pacientes/:id" element={<ExpedientePaciente />} />
+          <Route path="pacientes/:id/editar" element={<NuevaPaciente />} />
           <Route path="pacientes/:id/controles/nuevo" element={<NuevoControl />} />
+          <Route path="pacientes/:id/riesgo" element={<FichaRiesgo />} />
           <Route path="nuevo" element={<NuevaPaciente />} />
           <Route path="reportes" element={<Reportes />} />
           <Route path="usuarios" element={<PrivateRoute adminOnly><Usuarios /></PrivateRoute>} />

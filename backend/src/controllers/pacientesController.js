@@ -52,8 +52,129 @@ async function obtener(req, res) {
     if (!rows[0]) return res.status(404).json({ error: 'Paciente no encontrado' });
     return res.json(rows[0]);
   } catch (err) {
+    console.error(err);
     return res.status(500).json({ error: 'Error al obtener paciente' });
   }
+}
+
+const emptyToNull = (value) => value === '' ? null : value;
+const bool = (value) => value ?? false;
+const num = (value, fallback = 0) => {
+  if (value === '' || value === null || value === undefined) return fallback;
+  return value;
+};
+
+function buildPacienteInsertData(d, usuarioId) {
+  return {
+    no_expediente: d.no_expediente,
+    cui: emptyToNull(d.cui),
+
+    nombre_establecimiento: emptyToNull(d.nombre_establecimiento),
+    distrito: emptyToNull(d.distrito),
+    area_salud: emptyToNull(d.area_salud),
+    categoria_servicio: emptyToNull(d.categoria_servicio),
+
+    nombres: d.nombres,
+    apellidos: d.apellidos,
+    fecha_nacimiento: emptyToNull(d.fecha_nacimiento),
+    rango_edad: emptyToNull(d.rango_edad),
+    clasificacion_alfa_beta: emptyToNull(d.clasificacion_alfa_beta),
+    domicilio: emptyToNull(d.domicilio),
+    municipio: emptyToNull(d.municipio),
+    territorio: emptyToNull(d.territorio),
+    sector: emptyToNull(d.sector),
+    comunidad: emptyToNull(d.comunidad),
+    telefono: emptyToNull(d.telefono),
+
+    cobertura_igss: bool(d.cobertura_igss),
+    cobertura_privada: bool(d.cobertura_privada),
+    cobertura_privada_detalle: emptyToNull(d.cobertura_privada_detalle),
+    viene_referida: bool(d.viene_referida),
+    referida_de: emptyToNull(d.referida_de),
+
+    nivel_estudios: emptyToNull(d.nivel_estudios),
+    ultimo_anio_aprobado: emptyToNull(d.ultimo_anio_aprobado),
+    profesion_oficio: emptyToNull(d.profesion_oficio),
+    estado_civil: emptyToNull(d.estado_civil),
+    vive_sola: bool(d.vive_sola),
+    nombre_esposo_conviviente: emptyToNull(d.nombre_esposo_conviviente),
+
+    es_migrante: bool(d.es_migrante),
+    migrante_municipio_depto_pais: emptyToNull(d.migrante_municipio_depto_pais),
+    pueblo: emptyToNull(d.pueblo),
+    comunidad_linguistica: emptyToNull(d.comunidad_linguistica),
+
+    fuma_activamente: bool(d.fuma_activamente),
+    fuma_pasivamente: bool(d.fuma_pasivamente),
+    consume_drogas: bool(d.consume_drogas),
+    consume_alcohol: bool(d.consume_alcohol),
+    fuma_activamente_1er_trimestre: bool(d.fuma_activamente_1er_trimestre),
+    fuma_activamente_2do_trimestre: bool(d.fuma_activamente_2do_trimestre),
+    fuma_activamente_3er_trimestre: bool(d.fuma_activamente_3er_trimestre),
+    fuma_pasivamente_1er_trimestre: bool(d.fuma_pasivamente_1er_trimestre),
+    fuma_pasivamente_2do_trimestre: bool(d.fuma_pasivamente_2do_trimestre),
+    fuma_pasivamente_3er_trimestre: bool(d.fuma_pasivamente_3er_trimestre),
+    consume_alcohol_1er_trimestre: bool(d.consume_alcohol_1er_trimestre),
+    consume_alcohol_2do_trimestre: bool(d.consume_alcohol_2do_trimestre),
+    consume_alcohol_3er_trimestre: bool(d.consume_alcohol_3er_trimestre),
+    consume_drogas_1er_trimestre: bool(d.consume_drogas_1er_trimestre),
+    consume_drogas_2do_trimestre: bool(d.consume_drogas_2do_trimestre),
+    consume_drogas_3er_trimestre: bool(d.consume_drogas_3er_trimestre),
+    violencia_1er_trimestre: bool(d.violencia_1er_trimestre),
+    violencia_2do_trimestre: bool(d.violencia_2do_trimestre),
+    violencia_3er_trimestre: bool(d.violencia_3er_trimestre),
+    embarazo_abuso_sexual: bool(d.embarazo_abuso_sexual),
+
+    fur: emptyToNull(d.fur),
+    fpp: emptyToNull(d.fpp),
+    eg_confiable_fur: bool(d.eg_confiable_fur),
+    eg_confiable_usg: bool(d.eg_confiable_usg),
+
+    gestas_previas: num(d.gestas_previas),
+    abortos: num(d.abortos),
+    partos_vaginales: num(d.partos_vaginales),
+    cesareas: num(d.cesareas),
+    nacidos_vivos: num(d.nacidos_vivos),
+    hijos_viven: num(d.hijos_viven),
+    muertos_antes_1sem: num(d.muertos_antes_1sem),
+    muertos_despues_1sem: num(d.muertos_despues_1sem),
+    cirugia_genito_urinaria: bool(d.cirugia_genito_urinaria),
+    infertilidad: bool(d.infertilidad),
+    fin_embarazo_anterior: emptyToNull(d.fin_embarazo_anterior),
+    fin_embarazo_menos_1anio: bool(d.fin_embarazo_menos_1anio),
+    embarazo_planeado: bool(d.embarazo_planeado),
+    fracaso_metodo: emptyToNull(d.fracaso_metodo),
+    clasificacion_antec_obstetrico: emptyToNull(d.clasificacion_antec_obstetrico),
+    rn_menor_2500g: bool(d.rn_menor_2500g),
+    rn_mayor_4000g: bool(d.rn_mayor_4000g),
+    antec_vih_positivo: bool(d.antec_vih_positivo),
+    antec_emb_ectopico: bool(d.antec_emb_ectopico),
+    antec_violencia: bool(d.antec_violencia),
+
+    antec_diabetes: bool(d.antec_diabetes),
+    antec_diabetes_tipo: emptyToNull(d.antec_diabetes_tipo),
+    antec_tbc: bool(d.antec_tbc),
+    antec_hipertension: bool(d.antec_hipertension),
+    antec_preeclampsia: bool(d.antec_preeclampsia),
+    antec_eclampsia: bool(d.antec_eclampsia),
+    antec_cardiopatia: bool(d.antec_cardiopatia),
+    antec_nefropatia: bool(d.antec_nefropatia),
+    antec_otra_condicion: bool(d.antec_otra_condicion),
+    antec_otra_condicion_desc: emptyToNull(d.antec_otra_condicion_desc),
+    cirugia_genito_urinaria_pers: bool(d.cirugia_genito_urinaria_pers),
+
+    fam_diabetes: bool(d.fam_diabetes),
+    fam_tbc: bool(d.fam_tbc),
+    fam_hipertension: bool(d.fam_hipertension),
+    fam_preeclampsia: bool(d.fam_preeclampsia),
+    fam_eclampsia: bool(d.fam_eclampsia),
+    fam_cardiopatia: bool(d.fam_cardiopatia),
+    fam_gemelos: bool(d.fam_gemelos),
+    fam_otra_condicion_medica_grave: bool(d.fam_otra_condicion_medica_grave),
+
+    tiene_ficha_riesgo: bool(d.tiene_ficha_riesgo),
+    registrado_por: usuarioId,
+  };
 }
 
 // ============================================================
@@ -64,131 +185,41 @@ async function crear(req, res) {
 
   if (!d.no_expediente || !d.nombres || !d.apellidos) {
     return res.status(400).json({
-      error: 'no_expediente, nombres y apellidos son requeridos'
+      error: 'no_expediente, nombres y apellidos son requeridos',
     });
   }
 
   try {
+    const data = buildPacienteInsertData(d, req.usuario.id);
+    const campos = Object.keys(data);
+    const placeholders = campos.map((_, i) => `$${i + 1}`).join(', ');
+    const valores = campos.map((campo) => data[campo]);
+
     const { rows } = await pool.query(
-      `INSERT INTO pacientes (
-        -- Identificación
-        no_expediente, cui,
-        -- Establecimiento
-        nombre_establecimiento, distrito, area_salud, categoria_servicio,
-        -- Datos personales
-        nombres, apellidos, fecha_nacimiento, rango_edad, clasificacion_alfa_beta,
-        domicilio, municipio, territorio, sector, comunidad, telefono,
-        -- Cobertura
-        cobertura_igss, cobertura_privada, cobertura_privada_detalle,
-        viene_referida, referida_de,
-        -- Estudios / situación
-        nivel_estudios, ultimo_anio_aprobado, profesion_oficio,
-        estado_civil, nombre_esposo_conviviente,
-        -- Migración / etnia
-        es_migrante, migrante_municipio_depto_pais, pueblo, comunidad_linguistica,
-        -- Hábitos / riesgo social
-        fuma_activamente, fuma_pasivamente, consume_drogas, consume_alcohol,
-        violencia_1er_trimestre, violencia_2do_trimestre, violencia_3er_trimestre,
-        embarazo_abuso_sexual,
-        -- Gestación actual
-        fur, fpp, eg_confiable_fur, eg_confiable_usg,
-        -- Antecedentes obstétricos
-        gestas_previas, abortos, partos_vaginales, cesareas,
-        nacidos_vivos, hijos_viven, muertos_antes_1sem, muertos_despues_1sem,
-        cirugia_genito_urinaria, infertilidad,
-        fin_embarazo_anterior, fin_embarazo_menos_1anio,
-        embarazo_planeado, fracaso_metodo,
-        clasificacion_antec_obstetrico, rn_menor_2500g, rn_mayor_4000g,
-        antec_vih_positivo, antec_emb_ectopico, antec_violencia,
-        -- Antecedentes personales
-        antec_diabetes, antec_tbc, antec_hipertension, antec_preeclampsia,
-        antec_eclampsia, antec_cardiopatia, antec_nefropatia,
-        antec_otra_condicion, antec_otra_condicion_desc,
-        cirugia_genito_urinaria_pers,
-        -- Antecedentes familiares
-        fam_diabetes, fam_tbc, fam_hipertension, fam_preeclampsia,
-        fam_eclampsia, fam_cardiopatia, fam_gemelos,
-        -- Ficha riesgo
-        tiene_ficha_riesgo,
-        -- Auditoría
-        registrado_por
-      ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-        $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,
-        $31,$32,$33,$34,$35,$36,$37,$38,$39,$40,
-        $41,$42,$43,$44,$45,$46,$47,$48,$49,$50,
-        $51,$52,$53,$54,$55,$56,$57,$58,$59,$60,
-        $61,$62,$63,$64,$65,$66,$67,$68,$69,$70,
-        $71,$72,$73,$74,$75,$76,$77,$78,$79
-      )
-      RETURNING id, no_expediente, cui, nombres, apellidos`,
-      [
-        // Identificación
-        d.no_expediente, d.cui,
-        // Establecimiento
-        d.nombre_establecimiento, d.distrito, d.area_salud, d.categoria_servicio,
-        // Datos personales
-        d.nombres, d.apellidos, d.fecha_nacimiento, d.rango_edad, d.clasificacion_alfa_beta,
-        d.domicilio, d.municipio, d.territorio, d.sector, d.comunidad, d.telefono,
-        // Cobertura
-        d.cobertura_igss ?? false, d.cobertura_privada ?? false, d.cobertura_privada_detalle,
-        d.viene_referida ?? false, d.referida_de,
-        // Estudios / situación
-        d.nivel_estudios, d.ultimo_anio_aprobado, d.profesion_oficio,
-        d.estado_civil, d.nombre_esposo_conviviente,
-        // Migración / etnia
-        d.es_migrante ?? false, d.migrante_municipio_depto_pais, d.pueblo, d.comunidad_linguistica,
-        // Hábitos / riesgo social
-        d.fuma_activamente ?? false, d.fuma_pasivamente ?? false,
-        d.consume_drogas ?? false, d.consume_alcohol ?? false,
-        d.violencia_1er_trimestre ?? false, d.violencia_2do_trimestre ?? false,
-        d.violencia_3er_trimestre ?? false, d.embarazo_abuso_sexual ?? false,
-        // Gestación actual
-        d.fur, d.fpp, d.eg_confiable_fur ?? false, d.eg_confiable_usg ?? false,
-        // Antecedentes obstétricos
-        d.gestas_previas ?? 0, d.abortos ?? 0, d.partos_vaginales ?? 0, d.cesareas ?? 0,
-        d.nacidos_vivos ?? 0, d.hijos_viven ?? 0,
-        d.muertos_antes_1sem ?? 0, d.muertos_despues_1sem ?? 0,
-        d.cirugia_genito_urinaria ?? false, d.infertilidad ?? false,
-        d.fin_embarazo_anterior, d.fin_embarazo_menos_1anio ?? false,
-        d.embarazo_planeado ?? false, d.fracaso_metodo,
-        d.clasificacion_antec_obstetrico, d.rn_menor_2500g ?? false, d.rn_mayor_4000g ?? false,
-        d.antec_vih_positivo ?? false, d.antec_emb_ectopico ?? false, d.antec_violencia ?? false,
-        // Antecedentes personales
-        d.antec_diabetes ?? false, d.antec_tbc ?? false, d.antec_hipertension ?? false,
-        d.antec_preeclampsia ?? false, d.antec_eclampsia ?? false, d.antec_cardiopatia ?? false,
-        d.antec_nefropatia ?? false, d.antec_otra_condicion ?? false, d.antec_otra_condicion_desc,
-        d.cirugia_genito_urinaria_pers ?? false,
-        // Antecedentes familiares
-        d.fam_diabetes ?? false, d.fam_tbc ?? false, d.fam_hipertension ?? false,
-        d.fam_preeclampsia ?? false, d.fam_eclampsia ?? false,
-        d.fam_cardiopatia ?? false, d.fam_gemelos ?? false,
-        // Ficha riesgo
-        d.tiene_ficha_riesgo ?? false,
-        // Auditoría
-        req.usuario.id
-      ]
+      `INSERT INTO pacientes (${campos.join(', ')})
+       VALUES (${placeholders})
+       RETURNING id, no_expediente, cui, nombres, apellidos`,
+      valores
     );
 
     return res.status(201).json(rows[0]);
   } catch (err) {
     console.error(err);
     if (err.code === '23505') {
-      return res.status(409).json({ error: 'Ya existe un expediente con ese número' });
+      return res.status(409).json({ error: 'Ya existe un expediente con ese numero' });
     }
     return res.status(500).json({ error: 'Error al crear paciente' });
   }
 }
 
 // ============================================================
-// PUT /api/pacientes/:id  (SET dinámico)
+// PUT /api/pacientes/:id  (SET dinamico)
 // ============================================================
 async function actualizar(req, res) {
   const { id } = req.params;
   const data = req.body;
 
-  const CAMPOS_BLOQUEADOS = ['id', 'registrado_por', 'created_at'];
+  const CAMPOS_BLOQUEADOS = ['id', 'registrado_por', 'created_at', 'updated_at', 'edad_manual', 'edad_calculada'];
   const campos = Object.keys(data).filter(k => !CAMPOS_BLOQUEADOS.includes(k));
 
   if (campos.length === 0) {
@@ -196,7 +227,7 @@ async function actualizar(req, res) {
   }
 
   const sets = campos.map((c, i) => `${c} = $${i + 1}`).join(', ');
-  const valores = campos.map(c => data[c]);
+  const valores = campos.map(c => emptyToNull(data[c]));
   valores.push(id);
 
   try {
@@ -213,7 +244,7 @@ async function actualizar(req, res) {
 }
 
 // ============================================================
-// GET /api/pacientes/:id/expediente  — expediente completo
+// GET /api/pacientes/:id/expediente  - expediente completo
 // ============================================================
 async function expedienteCompleto(req, res) {
   const { id } = req.params;
@@ -226,7 +257,7 @@ async function expedienteCompleto(req, res) {
       riesgo,
       planParto,
       vacunas,
-      referencias
+      referencias,
     ] = await Promise.all([
       pool.query('SELECT * FROM pacientes WHERE id = $1', [id]),
       pool.query(
