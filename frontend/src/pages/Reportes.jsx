@@ -80,7 +80,7 @@ export default function Reportes() {
       // 🔥 reset animación
       setTimeout(() => setDescargado(false), 2000);
 
-    } catch (err) {
+    } catch {
       setError("Error descargando Excel");
     } finally {
       setDownloading(false);
@@ -110,7 +110,7 @@ export default function Reportes() {
     if (nivel === "medio") {
       return (
         <span className="badge badge-yellow">
-          ⚠ Medio
+          <AlertTriangle size={12} /> Medio
         </span>
       );
     }
@@ -123,18 +123,26 @@ export default function Reportes() {
   };
 
   return (
-    <div>
-      <h1 style={{ fontSize: "1.6rem", fontWeight: 800, marginBottom: "1.75rem" }}>
-        Reportes y estadísticas
-      </h1>
+    <div className="reportes-page">
+      <div className="reportes-titlebar">
+        <div>
+          <span className="reportes-kicker">Ministerio de Salud Pública y Asistencia Social</span>
+          <h1>Reportes y estadísticas</h1>
+          <p>Censo nominal de mujeres embarazadas por periodo seleccionado.</p>
+        </div>
+      </div>
 
       {/* FILTROS */}
-      <div className="card" style={{ marginBottom: "1.5rem" }}>
-        <h2 style={{ fontFamily: "Syne", fontSize: "1rem", marginBottom: "1.25rem" }}>
-          Censo de mujeres embarazadas
-        </h2>
+      <div className="card reportes-filter-card">
+        <div className="reportes-section-heading">
+          <div>
+            <span className="reportes-kicker">Módulo de reportes</span>
+            <h2>Censo de mujeres embarazadas</h2>
+          </div>
+          <span className="reportes-periodo">{labelPeriodo}</span>
+        </div>
 
-        <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div className="reportes-filtros">
           
           <div className="form-group">
             <label className="input-label">Desde</label>
@@ -189,17 +197,24 @@ export default function Reportes() {
 
       {/* RESULTADO */}
       {censo && (
-        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="card reportes-censo-card">
           
-          <div className="card-header">
+          <div className="card-header reportes-card-header">
             <div>
               <h3>Censo — {labelPeriodo}</h3>
               <p>Pacientes registradas en el período seleccionado</p>
             </div>
 
-            <span className="badge badge-blue">
-              {censo.total} paciente{censo.total !== 1 ? "s" : ""}
-            </span>
+            <div className="reportes-header-actions">
+              <span className="badge badge-blue">
+                {censo.total} paciente{censo.total !== 1 ? "s" : ""}
+              </span>
+              <div className="reportes-semaforo">
+                <span><i className="riesgo-dot riesgo-alto" /> Alto</span>
+                <span><i className="riesgo-dot riesgo-medio" /> Medio</span>
+                <span><i className="riesgo-dot riesgo-bajo" /> Bajo</span>
+              </div>
+            </div>
           </div>
 
           {censo.total === 0 ? (
@@ -207,8 +222,8 @@ export default function Reportes() {
               No se encontraron pacientes en este período.
             </div>
           ) : (
-            <div className="tabla-wrapper">
-              <table className="tabla">
+            <div className="tabla-wrapper reportes-tabla-wrapper">
+              <table className="tabla reportes-tabla">
                 <thead>
                   <tr>
                     <th>#</th>
@@ -230,7 +245,7 @@ export default function Reportes() {
                     <tr key={p.id}>
                       <td>{i + 1}</td>
                       <td>{p.no_historia_clinica}</td>
-                      <td>{p.nombre}</td>
+                      <td>{p.nombre_completo}</td>
                       <td>{p.edad ?? "—"}</td>
                       <td>{p.grupo_etnico ?? "—"}</td>
                       <td>{p.fur ? new Date(p.fur).toLocaleDateString("es-GT") : "—"}</td>
