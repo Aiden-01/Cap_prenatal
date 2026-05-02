@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
-import { useGlobalToast } from "../components/Layout";
+import { useGlobalToast } from "../context/ToastContext";
 
 const INIT = { nombre_completo: "", username: "", password: "", rol: "personal_salud" };
 

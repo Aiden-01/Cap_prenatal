@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/axios";
-import { useGlobalToast } from "../components/Layout";
+import { useGlobalToast } from "../context/ToastContext";
 import { ChevronLeft, Save, Stethoscope, FlaskConical, Pill, BookOpen } from "lucide-react";
 
 // ─── HELPERS ────────────────────────────────────────────────

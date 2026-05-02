@@ -6,12 +6,40 @@ const authRoutes      = require('./routes/auth');
 const usuariosRoutes  = require('./routes/usuarios');
 const pacientesRoutes = require('./routes/pacientes');
 const reportesRoutes  = require('./routes/reportes');
+const chatbotRoutes   = require('./routes/chatbot');
 
 const app = express();
 
+const allowedOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+function isAllowedDevOrigin(origin) {
+  if (!origin) return true;
+
+  try {
+    const url = new URL(origin);
+    const host = url.hostname;
+    const isVitePort = url.port === '5173';
+    const isLocalhost = host === 'localhost' || host === '127.0.0.1';
+    const isPrivateLan =
+      host.startsWith('192.168.') ||
+      host.startsWith('10.') ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
+
+    return allowedOrigins.includes(origin) || (isVitePort && (isLocalhost || isPrivateLan));
+  } catch {
+    return false;
+  }
+}
+
 // ── Middlewares globales ──────────────────────────────────────
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin(origin, callback) {
+    if (isAllowedDevOrigin(origin)) return callback(null, true);
+    return callback(new Error(`Origen no permitido por CORS: ${origin}`));
+  },
   credentials: true,
 }));
 app.use(express.json());
@@ -21,6 +49,7 @@ app.use('/api/auth',      authRoutes);
 app.use('/api/usuarios',  usuariosRoutes);
 app.use('/api/pacientes', pacientesRoutes);   // incluye sub-rutas controles/riesgo/morbilidad/vacunas/referencias/pdf
 app.use('/api/reportes',  reportesRoutes);
+app.use('/api/chatbot',   chatbotRoutes);
 
 // ── Health check ──────────────────────────────────────────────
 app.get('/api/health', (_, res) => res.json({

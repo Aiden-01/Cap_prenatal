@@ -1,13 +1,12 @@
 ﻿import { Outlet, useNavigate } from "react-router-dom";
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect } from "react";
 import { Menu } from "lucide-react";
 import Sidebar from "./Sidebar";
 import Toast from "./Toast";
+import ChatbotWidget from "./ChatbotWidget";
+import { ToastContext } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
-
-export const ToastContext = createContext(null);
-export const useGlobalToast = () => useContext(ToastContext);
 
 export default function Layout() {
   const { usuario, logout } = useAuth();
@@ -77,6 +76,7 @@ export default function Layout() {
         </main>
 
         <Toast toasts={toasts} />
+        <ChatbotWidget />
       </div>
     </ToastContext.Provider>
   );

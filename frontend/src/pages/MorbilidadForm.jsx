@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
-import { useGlobalToast } from "../components/Layout";
+import { useGlobalToast } from "../context/ToastContext";
 
 const INIT = {
   fecha: new Date().toISOString().split("T")[0],

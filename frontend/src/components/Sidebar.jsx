@@ -27,8 +27,8 @@ export default function Sidebar({
   const navigate  = useNavigate();
   const location  = useLocation();
 
-  const [visible, setVisible] = useState(false);
   const [dark, setDark]       = useState(localStorage.getItem("theme") === "dark");
+  const visible = !isMobile || menuOpen;
 
   // 🌙 DARK MODE
   useEffect(() => {
@@ -41,13 +41,6 @@ export default function Sidebar({
       localStorage.setItem("theme", "light");
     }
   }, [dark]);
-
-  // 🎬 Animación entrada
-  useEffect(() => {
-    if (!isMobile) { setVisible(true); return; }
-    if (menuOpen)  { setTimeout(() => setVisible(true), 60); }
-    else           { setVisible(false); }
-  }, [menuOpen, isMobile]);
 
   const handleNav = (path) => {
     navigate(path);

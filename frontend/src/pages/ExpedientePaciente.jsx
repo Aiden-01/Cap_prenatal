@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/axios";
-import { useGlobalToast } from "../components/Layout";
+import { useGlobalToast } from "../context/ToastContext";
 import {
   ChevronLeft, Plus, AlertTriangle, CheckCircle, Pencil, Trash2,
   Syringe, Activity, FlaskConical, Baby, FileText
@@ -90,7 +90,7 @@ export default function ExpedientePaciente() {
       .then(({ data }) => setExp(data))
       .catch(() => toast("Error al cargar expediente", "error"))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, toast]);
 
   if (loading) return (
     <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>

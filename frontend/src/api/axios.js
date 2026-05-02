@@ -1,7 +1,10 @@
-﻿import axios from "axios";
+import axios from "axios";
+
+const apiHost = import.meta.env.VITE_API_URL
+  || `${window.location.protocol}//${window.location.hostname}:3001/api`;
 
 const api = axios.create({
-  baseURL: "http://localhost:3001/api",
+  baseURL: apiHost,
 });
 
 // Inyectar token en cada request

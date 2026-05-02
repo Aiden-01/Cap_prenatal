@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Search, UserPlus } from "lucide-react";
 import api from "../api/axios";
 
+const LIMITE = 20;
+
 export default function Pacientes() {
   const [pacientes, setPacientes] = useState([]);
   const [total, setTotal]         = useState(0);
@@ -10,17 +12,24 @@ export default function Pacientes() {
   const [pagina, setPagina]       = useState(1);
   const [loading, setLoading]     = useState(true);
   const navigate = useNavigate();
-  const LIMITE = 20;
 
-  const cargar = () => {
-    setLoading(true);
+  useEffect(() => {
+    let cancelado = false;
+
     api.get("/pacientes", { params: { buscar, pagina, limite: LIMITE } })
-      .then(({ data }) => { setPacientes(data.data); setTotal(data.total); })
+      .then(({ data }) => {
+        if (!cancelado) {
+          setPacientes(data.data);
+          setTotal(data.total);
+        }
+      })
       .catch(console.error)
-      .finally(() => setLoading(false));
-  };
+      .finally(() => {
+        if (!cancelado) setLoading(false);
+      });
 
-  useEffect(() => { cargar(); }, [buscar, pagina]);
+    return () => { cancelado = true; };
+  }, [buscar, pagina]);
 
   const totalPaginas = Math.ceil(total / LIMITE);
 
