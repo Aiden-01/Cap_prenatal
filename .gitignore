@@ -1,1 +1,3 @@
 node_modules
+backend/.python-packages/
+backend/mspas_pdf_preview/

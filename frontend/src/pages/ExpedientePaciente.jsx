@@ -4,7 +4,7 @@ import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import {
   ChevronLeft, Plus, AlertTriangle, CheckCircle, Pencil, Trash2,
-  Syringe, Activity, FlaskConical, Baby, FileText
+  Syringe, Activity, FlaskConical, Baby, FileText, Printer
 } from "lucide-react";
 
 // ─── HELPERS ────────────────────────────────────────────────
@@ -78,6 +78,7 @@ export default function ExpedientePaciente() {
   const [exp, setExp]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab]         = useState("general");
+  const [printing, setPrinting] = useState(false);
 
   const cargarExpediente = () => {
     api.get(`/pacientes/${id}/expediente`)
@@ -133,6 +134,43 @@ export default function ExpedientePaciente() {
     }
   };
 
+  const imprimirFichaMspas = async () => {
+    setPrinting(true);
+    try {
+      const res = await api.get(`/pacientes/${id}/mspas/pdf`, { responseType: "blob" });
+      const contentType = res.headers["content-type"] || "";
+      if (!contentType.includes("application/pdf")) {
+        const errorText = await res.data.text();
+        let message = "Error al generar expediente";
+        try {
+          message = JSON.parse(errorText).error || message;
+        } catch {
+          message = errorText || message;
+        }
+        throw new Error(message);
+      }
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      let message = err.message || "Error al generar expediente";
+      if (err.response?.data instanceof Blob) {
+        const errorText = await err.response.data.text();
+        try {
+          message = JSON.parse(errorText).error || message;
+        } catch {
+          message = errorText || message;
+        }
+      } else if (err.response?.data?.error) {
+        message = err.response.data.error;
+      }
+      toast(message, "error");
+    } finally {
+      setPrinting(false);
+    }
+  };
+
   const TABS = [
     { id: "general",    label: "Datos generales",                          icon: FileText     },
     { id: "controles",  label: `Controles (${exp.controles_prenatales?.length ?? 0})`, icon: Activity     },
@@ -178,6 +216,10 @@ export default function ExpedientePaciente() {
           <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/editar`)}
             style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <Pencil size={14} /> Editar paciente
+          </button>
+          <button className="btn-primary" onClick={imprimirFichaMspas} disabled={printing}
+            style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <Printer size={14} /> {printing ? "Generando..." : "Expediente"}
           </button>
           <button className="btn-secondary" onClick={crearNuevoEmbarazo}
             style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
