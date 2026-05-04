@@ -99,6 +99,48 @@ function TrimesterChecks({ label, names, form, set }) {
   );
 }
 
+function AgeRiskChecks({ form }) {
+  const selected = form.rango_edad;
+  const items = [
+    { value: "14_19", label: "14 a 19" },
+    { value: "menor_14", label: "< de 14" },
+    { value: "mayor_35", label: "> de 35" },
+  ];
+
+  return (
+    <div className="form-group">
+      <label className="input-label">Clasificación por edad</label>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))", gap: "0.5rem" }}>
+        {items.map((item) => {
+          const checked = selected === item.value;
+          return (
+            <div
+              key={item.value}
+              style={{
+                display: "flex", alignItems: "center", gap: "0.5rem",
+                padding: "0.5rem 0.65rem", borderRadius: 8,
+                background: checked ? "var(--primary-lt)" : "var(--surface2)",
+                border: `1.5px solid ${checked ? "var(--primary)" : "var(--border)"}`,
+              }}
+            >
+              <div style={{
+                width: 16, height: 16, borderRadius: 4,
+                background: checked ? "var(--primary)" : "var(--border)",
+                display: "grid", placeItems: "center", flexShrink: 0,
+              }}>
+                {checked && <span style={{ color: "#fff", fontSize: "0.65rem", fontWeight: 800 }}>✓</span>}
+              </div>
+              <span style={{ fontSize: "0.82rem", color: checked ? "var(--primary)" : "var(--text-muted)", fontWeight: checked ? 600 : 400 }}>
+                {item.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── ESTADO INICIAL ──────────────────────────────────────────
 const INIT = {
   // Establecimiento
@@ -106,7 +148,7 @@ const INIT = {
   nombre_establecimiento: "CAP El Chal",
   distrito: "El Chal",
   area_salud: "Petén Sur Oriente",
-  categoria_servicio: "CS_B",
+  categoria_servicio: "CAP",
   // Datos personales
   nombres: "", apellidos: "",
   fecha_nacimiento: "", edad_manual: "", edad_calculada: "", rango_edad: "",
@@ -126,14 +168,14 @@ const INIT = {
   eg_confiable_fur: false, eg_confiable_usg: false,
   // Antecedentes obstétricos
   gestas_previas: 0, abortos: 0, partos_vaginales: 0, cesareas: 0,
-  nacidos_vivos: 0, hijos_viven: 0,
+  nacidos_vivos: 0, nacidos_muertos: 0, hijos_viven: 0,
   muertos_antes_1sem: 0, muertos_despues_1sem: 0,
   cirugia_genito_urinaria: false, infertilidad: false,
   fin_embarazo_anterior: "", fin_embarazo_menos_1anio: false,
   embarazo_planeado: false, fracaso_metodo: "",
-  clasificacion_antec_obstetrico: "",
-  rn_menor_2500g: false, rn_mayor_4000g: false,
-  antec_vih_positivo: false, antec_emb_ectopico: false, antec_violencia: false,
+  rn_nc: false, rn_normal: false, rn_menor_2500g: false, rn_mayor_4000g: false,
+  antec_vih_positivo: false, antec_emb_ectopico_num: 0, antec_emb_ectopico: false,
+  antec_gemelares: false, abortos_3_espont_consecutivos: false, antec_violencia: false,
   // Antecedentes personales
   antec_diabetes: false, antec_diabetes_tipo: "", antec_tbc: false, antec_hipertension: false,
   antec_preeclampsia: false, antec_eclampsia: false, antec_cardiopatia: false,
@@ -188,6 +230,7 @@ export default function NuevaPaciente() {
           fur: data.fur ? data.fur.split("T")[0] : "",
           fpp: data.fpp ? data.fpp.split("T")[0] : "",
           fin_embarazo_anterior: data.fin_embarazo_anterior ? data.fin_embarazo_anterior.split("T")[0] : "",
+          antec_emb_ectopico_num: data.antec_emb_ectopico_num ?? (data.antec_emb_ectopico ? 1 : 0),
         }));
       })
       .catch(() => toast("Error al cargar datos de la paciente", "error"))
@@ -305,6 +348,7 @@ export default function NuevaPaciente() {
           form.consume_drogas_2do_trimestre ||
           form.consume_drogas_3er_trimestre
         ),
+        antec_emb_ectopico: Number(form.antec_emb_ectopico_num || 0) > 0,
       };
 
       const { data } = editando
@@ -422,6 +466,7 @@ export default function NuevaPaciente() {
                     placeholder="Si no conoce la fecha, ingrese edad"
                   />
                 </Field>
+                <AgeRiskChecks form={form} />
                 {form.edad_calculada && (
                   <div className="age-preview">
                     Edad calculada: <strong>{form.edad_calculada}</strong>
@@ -546,17 +591,31 @@ export default function NuevaPaciente() {
                 <Input label="Partos vaginales" name="partos_vaginales" type="number" form={form} set={set} />
                 <Input label="Cesáreas" name="cesareas" type="number" form={form} set={set} />
                 <Input label="Nacidos vivos" name="nacidos_vivos" type="number" form={form} set={set} />
+                <Input label="Nacidos muertos" name="nacidos_muertos" type="number" form={form} set={set} />
                 <Input label="Hijos que viven" name="hijos_viven" type="number" form={form} set={set} />
                 <Input label="Muertos antes 1ª sem." name="muertos_antes_1sem" type="number" form={form} set={set} />
                 <Input label="Muertos después 1ª sem." name="muertos_despues_1sem" type="number" form={form} set={set} />
+                <Input label="Emb. ectópico" name="antec_emb_ectopico_num" type="number" form={form} set={set} min="0" />
               </div>
               <div className="form-section-body col-2" style={{ marginTop: "0.75rem" }}>
-                <Toggle label="Cirugía génito-urinaria" name="cirugia_genito_urinaria" {...p} />
-                <Toggle label="Infertilidad" name="infertilidad" {...p} />
-                <Toggle label="RN anterior &lt; 2500g" name="rn_menor_2500g" {...p} />
-                <Toggle label="RN anterior ≥ 4000g" name="rn_mayor_4000g" {...p} />
-                <Toggle label="Antec. VIH+" name="antec_vih_positivo" {...p} />
-                <Toggle label="Antec. embarazo ectópico" name="antec_emb_ectopico" {...p} />
+                <Toggle label="Antecedentes gemelares" name="antec_gemelares" {...p} />
+                <Toggle label="3 espont. consecutivos" name="abortos_3_espont_consecutivos" {...p} />
+              </div>
+              <div style={{ padding: "0 1rem 1rem" }}>
+                <div style={{
+                  border: "1.5px solid var(--border)", borderRadius: 10,
+                  padding: "0.85rem", background: "var(--surface2)",
+                }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--primary)", fontWeight: 700, marginBottom: "0.65rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    Ultimo Previo
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: "0.55rem" }}>
+                    <Toggle label="N/C" name="rn_nc" {...p} />
+                    <Toggle label="Normal" name="rn_normal" {...p} />
+                    <Toggle label="< 2500g" name="rn_menor_2500g" {...p} />
+                    <Toggle label=">= 4000g" name="rn_mayor_4000g" {...p} />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -581,9 +640,6 @@ export default function NuevaPaciente() {
                     { value: "natural",   label: "Natural" },
                     { value: "emergencia",label: "Emergencia" },
                   ]}
-                />
-                <Select label="Clasificación antec. obstétrico" name="clasificacion_antec_obstetrico" form={form} set={set}
-                  options={["N/C", "Normal", "3 espontáneos consecutivos", "Último previo"]}
                 />
               </div>
             </div>

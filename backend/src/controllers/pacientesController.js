@@ -21,7 +21,7 @@ async function listar(req, res) {
           OR apellidos ILIKE $1
           OR no_expediente ILIKE $1
           OR cui ILIKE $1
-       ORDER BY apellidos ASC, nombres ASC
+       ORDER BY nombres ASC, apellidos ASC
        LIMIT $2 OFFSET $3`,
       [q, parseInt(limite), offset]
     );
@@ -136,6 +136,7 @@ function buildPacienteInsertData(d, usuarioId) {
     partos_vaginales: num(d.partos_vaginales),
     cesareas: num(d.cesareas),
     nacidos_vivos: num(d.nacidos_vivos),
+    nacidos_muertos: num(d.nacidos_muertos),
     hijos_viven: num(d.hijos_viven),
     muertos_antes_1sem: num(d.muertos_antes_1sem),
     muertos_despues_1sem: num(d.muertos_despues_1sem),
@@ -145,11 +146,15 @@ function buildPacienteInsertData(d, usuarioId) {
     fin_embarazo_menos_1anio: bool(d.fin_embarazo_menos_1anio),
     embarazo_planeado: bool(d.embarazo_planeado),
     fracaso_metodo: emptyToNull(d.fracaso_metodo),
-    clasificacion_antec_obstetrico: emptyToNull(d.clasificacion_antec_obstetrico),
+    rn_nc: bool(d.rn_nc),
+    rn_normal: bool(d.rn_normal),
     rn_menor_2500g: bool(d.rn_menor_2500g),
     rn_mayor_4000g: bool(d.rn_mayor_4000g),
     antec_vih_positivo: bool(d.antec_vih_positivo),
-    antec_emb_ectopico: bool(d.antec_emb_ectopico),
+    antec_emb_ectopico_num: num(d.antec_emb_ectopico_num),
+    antec_emb_ectopico: bool(d.antec_emb_ectopico) || Number(d.antec_emb_ectopico_num || 0) > 0,
+    antec_gemelares: bool(d.antec_gemelares),
+    abortos_3_espont_consecutivos: bool(d.abortos_3_espont_consecutivos),
     antec_violencia: bool(d.antec_violencia),
 
     antec_diabetes: bool(d.antec_diabetes),

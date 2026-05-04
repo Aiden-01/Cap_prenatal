@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS pacientes (
   partos_vaginales          INTEGER DEFAULT 0,
   cesareas                  INTEGER DEFAULT 0,
   nacidos_vivos             INTEGER DEFAULT 0,
+  nacidos_muertos           INTEGER DEFAULT 0,
   hijos_viven               INTEGER DEFAULT 0,
   muertos_antes_1sem        INTEGER DEFAULT 0,           -- muertos < 1 semana
   muertos_despues_1sem      INTEGER DEFAULT 0,           -- muertos > 1 semana
@@ -171,15 +172,16 @@ CREATE TABLE IF NOT EXISTS pacientes (
   fam_gemelos               BOOLEAN DEFAULT FALSE,       -- Antecedente de gemelares
   fam_otra_condicion_medica_grave BOOLEAN DEFAULT FALSE,
 
-  -- Notas de antecedentes obstétricos adicionales
-  -- N/C | 3 espontáneos consecutivos | normal | último previo
-  clasificacion_antec_obstetrico VARCHAR(30),
-
   -- Peso neonatal previo
+  rn_nc                     BOOLEAN DEFAULT FALSE,
+  rn_normal                 BOOLEAN DEFAULT FALSE,
   rn_menor_2500g            BOOLEAN DEFAULT FALSE,
   rn_mayor_4000g            BOOLEAN DEFAULT FALSE,
   antec_vih_positivo        BOOLEAN DEFAULT FALSE,
+  antec_emb_ectopico_num    INTEGER DEFAULT 0,
   antec_emb_ectopico        BOOLEAN DEFAULT FALSE,
+  antec_gemelares           BOOLEAN DEFAULT FALSE,
+  abortos_3_espont_consecutivos BOOLEAN DEFAULT FALSE,
   antec_violencia           BOOLEAN DEFAULT FALSE,
 
   -- ── Ficha de riesgo obstétrico ───────────────────────────────
@@ -731,6 +733,17 @@ CREATE INDEX IF NOT EXISTS idx_usuarios_username      ON usuarios(username);
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS vive_sola BOOLEAN DEFAULT FALSE;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_diabetes_tipo VARCHAR(1);
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fam_otra_condicion_medica_grave BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS nacidos_muertos INTEGER DEFAULT 0;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS rn_nc BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS rn_normal BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_emb_ectopico_num INTEGER DEFAULT 0;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_gemelares BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS abortos_3_espont_consecutivos BOOLEAN DEFAULT FALSE;
+
+UPDATE pacientes
+SET antec_emb_ectopico_num = 1
+WHERE antec_emb_ectopico = TRUE
+  AND COALESCE(antec_emb_ectopico_num, 0) = 0;
 
 ALTER TABLE vacunas_paciente ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
 ALTER TABLE controles_prenatales ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;

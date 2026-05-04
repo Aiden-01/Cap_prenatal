@@ -283,18 +283,23 @@ export default function ExpedientePaciente() {
               <Row label="Cesáreas"          value={p.cesareas} />
               <Row label="Abortos"           value={p.abortos} />
               <Row label="Nacidos vivos"     value={p.nacidos_vivos} />
+              <Row label="Nacidos muertos"   value={p.nacidos_muertos} />
               <Row label="Hijos que viven"   value={p.hijos_viven} />
               <Row label="Muertos < 1 sem"   value={p.muertos_antes_1sem} />
               <Row label="Muertos > 1 sem"   value={p.muertos_despues_1sem} />
+              <Row label="Emb. ectópico"      value={p.antec_emb_ectopico_num} />
             </Grid>
             <div style={{ marginTop: "0.85rem" }}>
               <GridAuto>
                 <SiNo label="Cirugía génito-urinaria" value={p.cirugia_genito_urinaria} />
                 <SiNo label="Infertilidad"            value={p.infertilidad} />
+                <SiNo label="RN anterior N/C"          value={p.rn_nc} />
+                <SiNo label="RN anterior normal"       value={p.rn_normal} />
                 <SiNo label="RN anterior < 2500g"     value={p.rn_menor_2500g} />
                 <SiNo label="RN anterior ≥ 4000g"     value={p.rn_mayor_4000g} />
                 <SiNo label="Antec. VIH+"             value={p.antec_vih_positivo} />
-                <SiNo label="Antec. emb. ectópico"    value={p.antec_emb_ectopico} />
+                <SiNo label="Antecedentes gemelares"  value={p.antec_gemelares} />
+                <SiNo label="3 espont. consecutivos"  value={p.abortos_3_espont_consecutivos} />
               </GridAuto>
             </div>
             <div style={{ marginTop: "0.75rem" }}>
@@ -327,7 +332,6 @@ export default function ExpedientePaciente() {
               <SiNo label="Preeclamp." value={p.fam_preeclampsia} />
               <SiNo label="Eclampsia"  value={p.fam_eclampsia} />
               <SiNo label="Cardiopatía"value={p.fam_cardiopatia} />
-              <SiNo label="Gemelares"  value={p.fam_gemelos} />
             </GridAuto>
           </div>
 

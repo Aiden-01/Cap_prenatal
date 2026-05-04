@@ -105,7 +105,9 @@ function calcularEdadAnios(fechaNacimiento) {
 function defaultsDesdePaciente(paciente = {}, embarazo = {}) {
   const edad = calcularEdadAnios(paciente.fecha_nacimiento);
   const hijosMuertos =
-    Number(paciente.muertos_antes_1sem || 0) + Number(paciente.muertos_despues_1sem || 0);
+    Number(paciente.nacidos_muertos || 0) +
+    Number(paciente.muertos_antes_1sem || 0) +
+    Number(paciente.muertos_despues_1sem || 0);
 
   return {
     telefono: paciente.telefono || "",
@@ -123,6 +125,7 @@ function defaultsDesdePaciente(paciente = {}, embarazo = {}) {
     no_abortos: paciente.abortos ?? "",
     no_hijos_vivos: paciente.hijos_viven ?? paciente.nacidos_vivos ?? "",
     no_hijos_muertos: hijosMuertos || "",
+    abortos_espontaneos_3mas: Boolean(paciente.abortos_3_espont_consecutivos),
     gestas_3mas: Number(paciente.gestas_previas || 0) >= 3,
     peso_ultimo_bebe_menor_2500g: Boolean(paciente.rn_menor_2500g),
     peso_ultimo_bebe_mayor_4500g: Boolean(paciente.rn_mayor_4000g),

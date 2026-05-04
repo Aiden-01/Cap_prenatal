@@ -75,8 +75,8 @@ export default function Pacientes() {
               <thead>
                 <tr>
                   <th>No. Expediente</th>
-                  <th>Apellidos</th>
                   <th>Nombres</th>
+                  <th>Apellidos</th>
                   <th>Municipio</th>
                   <th>FUR</th>
                   <th>FPP (est.)</th>
@@ -94,8 +94,8 @@ export default function Pacientes() {
                       <td>
                         <span className="badge badge-blue">{p.no_expediente}</span>
                       </td>
-                      <td style={{ fontWeight: 600 }}>{p.apellidos}</td>
-                      <td>{p.nombres}</td>
+                      <td style={{ fontWeight: 600 }}>{p.nombres}</td>
+                      <td>{p.apellidos}</td>
                       <td style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>{p.municipio || "—"}</td>
                       <td style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
                         {p.fur ? new Date(p.fur).toLocaleDateString("es-GT") : "—"}
