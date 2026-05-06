@@ -171,12 +171,50 @@ export default function ExpedientePaciente() {
     }
   };
 
+  const imprimirFichaRiesgo = async () => {
+    setPrinting(true);
+    try {
+      const res = await api.get(`/pacientes/${id}/riesgo/pdf`, { responseType: "blob" });
+      const contentType = res.headers["content-type"] || "";
+      if (!contentType.includes("application/pdf")) {
+        const errorText = await res.data.text();
+        let message = "Error al generar ficha de riesgo";
+        try {
+          message = JSON.parse(errorText).error || message;
+        } catch {
+          message = errorText || message;
+        }
+        throw new Error(message);
+      }
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      let message = err.message || "Error al generar ficha de riesgo";
+      if (err.response?.data instanceof Blob) {
+        const errorText = await err.response.data.text();
+        try {
+          message = JSON.parse(errorText).error || message;
+        } catch {
+          message = errorText || message;
+        }
+      } else if (err.response?.data?.error) {
+        message = err.response.data.error;
+      }
+      toast(message, "error");
+    } finally {
+      setPrinting(false);
+    }
+  };
+
   const TABS = [
     { id: "general",    label: "Datos generales",                          icon: FileText     },
     { id: "controles",  label: `Controles (${exp.controles_prenatales?.length ?? 0})`, icon: Activity     },
     { id: "puerperio",  label: `Puerperio (${exp.controles_puerperio?.length ?? 0})`,  icon: Baby         },
     { id: "morbilidad", label: `Morbilidad (${exp.morbilidad?.length ?? 0})`,          icon: Plus         },
     { id: "riesgo",     label: "Riesgo obstétrico",                        icon: AlertTriangle },
+    { id: "plan",       label: "Plan de parto",                            icon: FileText },
     { id: "vacunas",    label: "Vacunas",                                  icon: Syringe      },
     { id: "laboratorio",label: "Laboratorios",                             icon: FlaskConical },
   ];
@@ -618,6 +656,9 @@ export default function ExpedientePaciente() {
                   {exp.ficha_riesgo.tiene_riesgo
                     ? <span className="badge badge-red">⚠ PRESENTA RIESGO</span>
                     : <span className="badge badge-green"><CheckCircle size={11} /> SIN RIESGO</span>}
+                  <button className="btn-primary" onClick={imprimirFichaRiesgo} disabled={printing}>
+                    <Printer size={13} /> {printing ? "Generando..." : "Imprimir"}
+                  </button>
                   <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/riesgo`)}>
                     <Pencil size={13} /> Editar
                   </button>
@@ -670,6 +711,104 @@ export default function ExpedientePaciente() {
                   <span style={{ fontSize: "0.85rem" }}>{exp.ficha_riesgo.referida_a}</span>
                 </div>
               )}
+            </>
+          )}
+        </div>
+      )}
+
+      {tab === "plan" && (
+        <div className="card">
+          {!exp.plan_parto ? (
+            <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
+              No hay plan de parto registrado.
+              <div style={{ marginTop: "1rem" }}>
+                <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/plan-parto`)}>
+                  Registrar plan de parto
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                <h3 style={{ fontFamily: "Syne", fontSize: "1rem", fontWeight: 700 }}>Plan de Parto</h3>
+                <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/plan-parto`)}>
+                  <Pencil size={13} /> Editar
+                </button>
+              </div>
+
+              <SecTitle>Datos generales</SecTitle>
+              <Grid cols={3}>
+                <Row label="Fecha" value={fecha(exp.plan_parto.fecha)} />
+                <Row label="Nombre cónyuge" value={exp.plan_parto.nombre_conyuge} />
+                <Row label="Teléfono" value={exp.plan_parto.telefono} />
+                <Row label="Fecha de nacimiento" value={fecha(exp.plan_parto.fecha_nacimiento)} />
+                <Row label="Estado civil" value={exp.plan_parto.estado_civil} />
+                <Row label="Pueblo" value={exp.plan_parto.pueblo} />
+                <Row label="Escolaridad" value={exp.plan_parto.escolaridad} />
+                <Row label="Con quién vive" value={exp.plan_parto.con_quien_vive} />
+                <Row label="Idioma" value={exp.plan_parto.idioma} />
+              </Grid>
+
+              <div style={{ marginTop: "0.85rem" }}>
+                <GridAuto>
+                  <SiNo label="Atención prenatal" value={exp.plan_parto.ha_tenido_atencion_prenatal} />
+                  <SiNo label="Casa materna cercana" value={exp.plan_parto.casa_materna_cercana} />
+                  <SiNo label="Usará casa materna" value={exp.plan_parto.usara_casa_materna} />
+                  <SiNo label="Ropa niño" value={exp.plan_parto.ropa_nino} />
+                  <SiNo label="Ropa madre" value={exp.plan_parto.ropa_madre} />
+                  <SiNo label="Lleva DPI madre" value={exp.plan_parto.lleva_dpi_madre} />
+                  <SiNo label="Lleva DPI cónyuge" value={exp.plan_parto.lleva_dpi_conyuge} />
+                  <SiNo label="Lleva partida" value={exp.plan_parto.lleva_partida_nacimiento} />
+                  <SiNo label="Cuenta ahorro" value={exp.plan_parto.cuenta_ahorro} />
+                  <SiNo label="Comité comunicado" value={exp.plan_parto.comunicado_comite} />
+                </GridAuto>
+              </div>
+
+              <SecTitle style={{ marginTop: "1rem" }}>Resumen obstétrico</SecTitle>
+              <Grid cols={4}>
+                <Row label="No. embarazos" value={exp.plan_parto.no_embarazos} />
+                <Row label="No. partos" value={exp.plan_parto.no_partos} />
+                <Row label="No. abortos" value={exp.plan_parto.no_abortos} />
+                <Row label="No. hijos vivos" value={exp.plan_parto.no_hijos_vivos} />
+                <Row label="No. hijos muertos" value={exp.plan_parto.no_hijos_muertos} />
+                <Row label="FUR" value={fecha(exp.plan_parto.fur)} />
+                <Row label="FPP" value={fecha(exp.plan_parto.fecha_probable_parto)} />
+                <Row label="No. cesáreas" value={exp.plan_parto.no_cesareas} />
+                <Row label="Última cesárea" value={fecha(exp.plan_parto.fecha_ultima_cesarea)} />
+                <Row label="Edad gestacional" value={exp.plan_parto.edad_gestacional_semanas} />
+              </Grid>
+
+              <SecTitle style={{ marginTop: "1rem" }}>Logística y responsables</SecTitle>
+              <Grid cols={3}>
+                <Row label="Posición parto" value={exp.plan_parto.posicion_parto} />
+                <Row label="Lugar atención parto" value={exp.plan_parto.lugar_atencion_parto} />
+                <Row label="Cómo se trasladará" value={exp.plan_parto.como_trasladara} />
+                <Row label="Quién acompañará" value={exp.plan_parto.quien_acompanara} />
+                <Row label="Horas distancia" value={exp.plan_parto.horas_distancia} />
+                <Row label="Kms servicio" value={exp.plan_parto.kms_servicio} />
+                <Row label="Con quién hijos" value={exp.plan_parto.con_quien_hijos} />
+                <Row label="Quién cuida casa" value={exp.plan_parto.quien_cuida_casa} />
+                <Row label="Teléfono vehículo" value={exp.plan_parto.telefono_vehiculo} />
+                <Row label="Responsable activar" value={exp.plan_parto.responsable_activar} />
+                <Row label="Nombre activa plan" value={exp.plan_parto.nombre_activara_plan} />
+                <Row label="Proveedor salud" value={exp.plan_parto.nombre_proveedor_salud} />
+              </Grid>
+
+              <SecTitle style={{ marginTop: "1rem" }}>Signos de peligro</SecTitle>
+              <GridAuto>
+                <SiNo label="Dolor de cabeza" value={exp.plan_parto.peligro_dolor_cabeza} />
+                <SiNo label="Visión borrosa" value={exp.plan_parto.peligro_vision_borrosa} />
+                <SiNo label="Embarazo múltiple" value={exp.plan_parto.peligro_embarazo_multiple} />
+                <SiNo label="Hemorragia vaginal" value={exp.plan_parto.peligro_hemorragia_vaginal} />
+                <SiNo label="Edema MI" value={exp.plan_parto.peligro_edema_mi} />
+                <SiNo label="Niño transverso" value={exp.plan_parto.peligro_nino_transverso} />
+                <SiNo label="Dolor de estómago" value={exp.plan_parto.peligro_dolor_estomago} />
+                <SiNo label="Salida de líquidos" value={exp.plan_parto.peligro_salida_liquidos} />
+                <SiNo label="Convulsiones" value={exp.plan_parto.peligro_convulsiones} />
+                <SiNo label="Fiebre" value={exp.plan_parto.peligro_fiebre} />
+                <SiNo label="Ausencia movimientos fetales" value={exp.plan_parto.peligro_ausencia_mov_fetales} />
+                <SiNo label="Placenta no salió" value={exp.plan_parto.peligro_placenta_no_salia} />
+              </GridAuto>
             </>
           )}
         </div>

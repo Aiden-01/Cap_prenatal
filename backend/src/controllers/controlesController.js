@@ -56,6 +56,25 @@ const PUERPERIO_FIELDS = [
   'nombre_cargo_atiende',
 ];
 
+const PLAN_PARTO_FIELDS = [
+  'fecha', 'nombre_conyuge', 'telefono', 'fecha_nacimiento', 'estado_civil',
+  'pueblo', 'escolaridad', 'con_quien_vive', 'idioma', 'ha_tenido_atencion_prenatal',
+  'no_embarazos', 'no_partos', 'no_abortos', 'no_hijos_vivos', 'no_hijos_muertos',
+  'fur', 'fecha_probable_parto', 'no_cesareas', 'fecha_ultima_cesarea',
+  'edad_gestacional_semanas', 'parto_anterior_hospital', 'parto_anterior_caimi',
+  'parto_anterior_comadrona', 'parto_anterior_clinica_privada', 'parto_anterior_otro',
+  'peligro_dolor_cabeza', 'peligro_vision_borrosa', 'peligro_embarazo_multiple',
+  'peligro_hemorragia_vaginal', 'peligro_edema_mi', 'peligro_nino_transverso',
+  'peligro_dolor_estomago', 'peligro_salida_liquidos', 'peligro_convulsiones',
+  'peligro_fiebre', 'peligro_ausencia_mov_fetales', 'peligro_placenta_no_salia',
+  'posicion_parto', 'lugar_atencion_parto', 'horas_distancia', 'kms_servicio',
+  'casa_materna_cercana', 'usara_casa_materna', 'como_trasladara', 'quien_acompanara',
+  'bebida_durante_parto', 'bebida_despues_parto', 'ropa_nino', 'ropa_madre',
+  'otros_articulos', 'lleva_dpi_madre', 'lleva_dpi_conyuge', 'lleva_partida_nacimiento',
+  'cuenta_ahorro', 'comunicado_comite', 'con_quien_hijos', 'quien_cuida_casa',
+  'telefono_vehiculo', 'responsable_activar', 'nombre_activara_plan', 'nombre_proveedor_salud',
+];
+
 // ============================================================
 // GET /api/pacientes/:pacienteId/controles
 // ============================================================
@@ -405,10 +424,7 @@ async function guardarPlanParto(req, res) {
       'SELECT id FROM planes_parto WHERE embarazo_id = $1',
       [embarazoId]
     );
-
-    const BLOQUEADOS = ['id', 'registrado_por', 'created_at', 'updated_at'];
-    const campos = Object.keys(data).filter(k => !BLOQUEADOS.includes(k));
-    const valores = campos.map(c => data[c]);
+    const { campos, valores } = buildUpdate(data, PLAN_PARTO_FIELDS);
 
     let result;
     if (existe.rows[0]) {

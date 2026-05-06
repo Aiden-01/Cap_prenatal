@@ -1,8 +1,13 @@
 const pool = require('../db/pool');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const puppeteer = require('puppeteer');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
 const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
+
+const execFileAsync = promisify(execFile);
 
 async function pdfControl(req, res) {
   const { id } = req.params;
@@ -100,6 +105,11 @@ function assetBase64(fileName) {
   return `data:image/png;base64,${fs.readFileSync(filePath).toString('base64')}`;
 }
 
+function assetOfficialBase64(fileName, mime = 'image/png') {
+  const filePath = path.join(__dirname, '../assets/official_forms', fileName);
+  return `data:${mime};base64,${fs.readFileSync(filePath).toString('base64')}`;
+}
+
 function dateParts(value) {
   if (!value) return { d: '', m: '', y: '' };
   const dt = new Date(value);
@@ -162,6 +172,376 @@ function boxDigits(value, x, y, gap = 10.25, size = 5.8) {
 function wrapField(text, x, y, w, h, size = 6.5) {
   if (!text) return '';
   return `<div class="f wrap" style="left:${x}pt;top:${y}pt;width:${w}pt;height:${h}pt;font-size:${size}pt;">${esc(text)}</div>`;
+}
+
+function cleanCellText(value) {
+  if (value === null || value === undefined) return '';
+  return String(value);
+}
+
+function setMapValue(map, address, value) {
+  if (value === null || value === undefined || value === '') return;
+  map[address] = cleanCellText(value);
+}
+
+function markMap(map, address, active) {
+  if (active) map[address] = 'X';
+}
+
+function mapChoice(map, value, options) {
+  if (!value) return;
+  const addr = options[value];
+  if (addr) map[addr] = 'X';
+}
+
+function buildHistoriaClinicaMap(noExpediente) {
+  const boxes = ['N6', 'O6', 'P6', 'Q6', 'S6', 'T6', 'U6', 'V6', 'Y6', 'Z6', 'AA6', 'AB6'];
+  const clean = String(noExpediente ?? '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  const out = {};
+  boxes.forEach((addr, index) => {
+    if (clean[index]) out[addr] = clean[index];
+  });
+  return out;
+}
+
+function buildRiskCellMap({ paciente, embarazo, riesgo }) {
+  const edad = edadAnios(paciente.fecha_nacimiento);
+  const fur = riesgo.fecha_ultima_regla || embarazo?.fur || paciente.fur;
+  const fpp = riesgo.fecha_probable_parto || embarazo?.fpp || paciente.fpp;
+  const map = {
+    ...buildHistoriaClinicaMap(paciente.no_expediente),
+  };
+
+  setMapValue(map, 'H7', `${paciente.nombres || ''} ${paciente.apellidos || ''}`.trim());
+  setMapValue(map, 'Z7', edad);
+  setMapValue(map, 'F8', paciente.municipio || paciente.domicilio || paciente.comunidad);
+  setMapValue(map, 'V8', riesgo.telefono || paciente.telefono);
+  mapChoice(map, riesgo.pueblo || paciente.pueblo, {
+    maya: 'F10',
+    xinca: 'I10',
+    garifuna: 'L10',
+    mestizo: 'O10',
+    mestiza: 'O10',
+  });
+  markMap(map, 'S10', Boolean(riesgo.migrante));
+  setMapValue(map, 'W10', riesgo.estado_civil || paciente.estado_civil);
+  mapChoice(map, riesgo.escolaridad || paciente.nivel_estudios, {
+    primaria: 'G12',
+    basico: 'J12',
+    secundaria: 'J12',
+    diversificado: 'N12',
+    universitaria: 'R12',
+    universitario: 'R12',
+    ninguno: 'U12',
+  });
+  setMapValue(map, 'X12', riesgo.ocupacion || paciente.profesion_oficio);
+  setMapValue(map, 'F13', riesgo.nombre_esposo_conviviente || paciente.nombre_esposo_conviviente);
+  setMapValue(map, 'Z13', riesgo.edad_esposo);
+  mapChoice(map, riesgo.pueblo_esposo, {
+    maya: 'F15',
+    xinca: 'I15',
+    garifuna: 'L15',
+    mestizo: 'O15',
+    mestiza: 'O15',
+  });
+  mapChoice(map, riesgo.escolaridad_esposo, {
+    primaria: 'G17',
+    basico: 'J17',
+    secundaria: 'J17',
+    diversificado: 'N17',
+    universitaria: 'R17',
+    universitario: 'R17',
+    ninguno: 'U17',
+  });
+  setMapValue(map, 'X17', riesgo.ocupacion_esposo);
+  setMapValue(map, 'K18', riesgo.distancia_servicio_km);
+  setMapValue(map, 'X18', riesgo.tiempo_horas);
+  setMapValue(map, 'F19', formatDate(fur));
+  setMapValue(map, 'O19', formatDate(fpp));
+  setMapValue(map, 'X19', riesgo.no_embarazos);
+  setMapValue(map, 'E20', riesgo.no_partos);
+  setMapValue(map, 'K20', riesgo.no_cesareas);
+  setMapValue(map, 'Q20', riesgo.no_abortos);
+  setMapValue(map, 'X20', riesgo.no_hijos_vivos);
+  setMapValue(map, 'F21', riesgo.no_hijos_muertos);
+  setMapValue(map, 'M21', riesgo.edad_embarazo_semanas);
+
+  const yesNoRows = [
+    ['24', riesgo.muerte_fetal_neonatal_previa],
+    ['25', riesgo.abortos_espontaneos_3mas],
+    ['26', riesgo.gestas_3mas],
+    ['27', riesgo.peso_ultimo_bebe_menor_2500g],
+    ['28', riesgo.peso_ultimo_bebe_mayor_4500g],
+    ['29', riesgo.antec_hipertension_preeclampsia],
+    ['30', riesgo.cirugias_tracto_reproductivo],
+    ['33', riesgo.embarazo_multiple],
+    ['34', riesgo.menor_20_anos],
+    ['35', riesgo.mayor_35_anos],
+    ['36', riesgo.paciente_rh_negativo],
+    ['37', riesgo.hemorragia_vaginal],
+    ['38', riesgo.vih_positivo_sifilis],
+    ['39', riesgo.presion_diastolica_90mas],
+    ['40', riesgo.anemia],
+    ['41', riesgo.desnutricion_obesidad],
+    ['42', riesgo.dolor_abdominal],
+    ['43', riesgo.sintomatologia_urinaria],
+    ['44', riesgo.ictericia],
+    ['48', riesgo.diabetes],
+    ['49', riesgo.enfermedad_renal],
+    ['50', riesgo.enfermedad_corazon],
+    ['51', riesgo.hipertension_arterial],
+    ['52', riesgo.consumo_drogas_alcohol_tabaco],
+    ['53', riesgo.otra_enfermedad_severa],
+  ];
+  yesNoRows.forEach(([row, active]) => {
+    markMap(map, active ? `Z${row}` : `AB${row}`, true);
+  });
+
+  markMap(map, riesgo.tiene_riesgo ? 'V56' : 'Y56', true);
+  setMapValue(map, 'M57', riesgo.referida_a);
+  setMapValue(map, 'R59', riesgo.nombre_personal_atendio);
+
+  return map;
+}
+
+async function exportExcelTemplateToPdf(templatePath, cellMap, pdfFileName) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cap-prenatal-'));
+  const tempXlsx = path.join(tempDir, 'template.xlsx');
+  const tempPdf = path.join(tempDir, pdfFileName);
+  const tempJson = path.join(tempDir, 'cells.json');
+
+  fs.copyFileSync(templatePath, tempXlsx);
+  fs.writeFileSync(tempJson, JSON.stringify(cellMap), 'utf8');
+
+  const psScript = `
+$ErrorActionPreference = 'Stop'
+$xlsx = '${tempXlsx.replace(/'/g, "''")}'
+$pdf = '${tempPdf.replace(/'/g, "''")}'
+$jsonPath = '${tempJson.replace(/'/g, "''")}'
+$excel = $null
+$wb = $null
+try {
+  $map = Get-Content -LiteralPath $jsonPath -Raw | ConvertFrom-Json
+  $excel = New-Object -ComObject Excel.Application
+  $excel.Visible = $false
+  $excel.DisplayAlerts = $false
+  $wb = $excel.Workbooks.Open($xlsx)
+  $ws = $wb.Worksheets.Item(1)
+  foreach ($prop in $map.PSObject.Properties) {
+    $addr = $prop.Name
+    $val = [string]$prop.Value
+    $range = $ws.Range($addr)
+    $range.Value2 = $val
+    if ($val.Length -eq 1 -and $val -eq 'X') {
+      $range.HorizontalAlignment = -4108
+      $range.VerticalAlignment = -4108
+    }
+    elseif ($addr -match '^(N6|O6|P6|Q6|S6|T6|U6|V6|Y6|Z6|AA6|AB6|Z7|Z13|K18|X18|X19|E20|K20|Q20|X20|F21|M21)$') {
+      $range.HorizontalAlignment = -4108
+      $range.VerticalAlignment = -4108
+    }
+  }
+  $wb.ExportAsFixedFormat(0, $pdf)
+  Write-Output $pdf
+}
+finally {
+  if ($wb -ne $null) { $wb.Close($false) | Out-Null; [System.Runtime.Interopservices.Marshal]::ReleaseComObject($wb) | Out-Null }
+  if ($excel -ne $null) { $excel.Quit(); [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null }
+  [GC]::Collect()
+  [GC]::WaitForPendingFinalizers()
+}
+`;
+
+  try {
+    await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', psScript], {
+      windowsHide: true,
+      maxBuffer: 1024 * 1024 * 10,
+    });
+    const buffer = fs.readFileSync(tempPdf);
+    return buffer;
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+function formatDate(value) {
+  if (!value) return '';
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return '';
+  return dt.toLocaleDateString('es-GT');
+}
+
+function yesNo(value) {
+  return value ? 'Si' : 'No';
+}
+
+function riskCriteria(riesgo) {
+  return [
+    ['Muerte fetal/neonatal previa', riesgo.muerte_fetal_neonatal_previa],
+    ['3 o mas abortos espontaneos consecutivos', riesgo.abortos_espontaneos_3mas],
+    ['Tres o mas gestas', riesgo.gestas_3mas],
+    ['RN anterior menor de 2500 g', riesgo.peso_ultimo_bebe_menor_2500g],
+    ['RN anterior mayor de 4500 g', riesgo.peso_ultimo_bebe_mayor_4500g],
+    ['Antecedente de HTA/preeclampsia', riesgo.antec_hipertension_preeclampsia],
+    ['Cirugias del tracto reproductivo', riesgo.cirugias_tracto_reproductivo],
+    ['Embarazo multiple', riesgo.embarazo_multiple],
+    ['Menor de 20 anos', riesgo.menor_20_anos],
+    ['Mayor de 35 anos', riesgo.mayor_35_anos],
+    ['Paciente Rh negativo', riesgo.paciente_rh_negativo],
+    ['Hemorragia vaginal', riesgo.hemorragia_vaginal],
+    ['VIH positivo o sifilis', riesgo.vih_positivo_sifilis],
+    ['Presion arterial diastolica mayor o igual a 90', riesgo.presion_diastolica_90mas],
+    ['Anemia', riesgo.anemia],
+    ['Desnutricion u obesidad', riesgo.desnutricion_obesidad],
+    ['Dolor abdominal', riesgo.dolor_abdominal],
+    ['Sintomatologia urinaria', riesgo.sintomatologia_urinaria],
+    ['Ictericia', riesgo.ictericia],
+    ['Diabetes', riesgo.diabetes],
+    ['Enfermedad renal', riesgo.enfermedad_renal],
+    ['Enfermedad del corazon', riesgo.enfermedad_corazon],
+    ['Hipertension arterial', riesgo.hipertension_arterial],
+    ['Consumo de drogas, alcohol o tabaco', riesgo.consumo_drogas_alcohol_tabaco],
+    ['Otra enfermedad severa', riesgo.otra_enfermedad_severa],
+  ];
+}
+
+function buildRiskPdfHtml({ paciente, embarazo, riesgo }) {
+  const criteria = riskCriteria(riesgo);
+  const bg = assetOfficialBase64('riesgo_oficial_page1.png');
+  const nombre = `${paciente.nombres || ''} ${paciente.apellidos || ''}`.trim();
+  const edad = edadAnios(paciente.fecha_nacimiento);
+  const fur = riesgo.fecha_ultima_regla || embarazo?.fur || paciente.fur;
+  const fpp = riesgo.fecha_probable_parto || embarazo?.fpp || paciente.fpp;
+
+  const field = (text, x, y, w, size = 8.2, align = 'left', weight = 600) => {
+    if (text === null || text === undefined || text === '') return '';
+    return `<div class="f" style="left:${x}pt;top:${y}pt;width:${w}pt;font-size:${size}pt;text-align:${align};font-weight:${weight};">${esc(text)}</div>`;
+  };
+
+  const mark = (active, x, y) =>
+    active
+      ? `<div class="mark" style="left:${x}pt;top:${y}pt;">X</div>`
+      : '';
+
+  const yesNoRowMarks = (active, y) => [
+    mark(active, 500, y),
+    mark(!active, 532, y),
+  ].join('');
+
+  const checks = [
+    yesNoRowMarks(riesgo.muerte_fetal_neonatal_previa, 323),
+    yesNoRowMarks(riesgo.abortos_espontaneos_3mas, 344),
+    yesNoRowMarks(riesgo.gestas_3mas, 364.5),
+    yesNoRowMarks(riesgo.peso_ultimo_bebe_menor_2500g, 384.5),
+    yesNoRowMarks(riesgo.peso_ultimo_bebe_mayor_4500g, 405),
+    yesNoRowMarks(riesgo.antec_hipertension_preeclampsia, 425),
+    yesNoRowMarks(riesgo.cirugias_tracto_reproductivo, 445),
+    yesNoRowMarks(riesgo.embarazo_multiple, 489),
+    yesNoRowMarks(riesgo.menor_20_anos, 509.5),
+    yesNoRowMarks(riesgo.mayor_35_anos, 530),
+    yesNoRowMarks(riesgo.paciente_rh_negativo, 550),
+    yesNoRowMarks(riesgo.hemorragia_vaginal, 570.5),
+    yesNoRowMarks(riesgo.vih_positivo_sifilis, 591),
+    yesNoRowMarks(riesgo.presion_diastolica_90mas, 611),
+    yesNoRowMarks(riesgo.anemia, 632),
+    yesNoRowMarks(riesgo.desnutricion_obesidad, 652),
+    yesNoRowMarks(riesgo.dolor_abdominal, 672.5),
+    yesNoRowMarks(riesgo.sintomatologia_urinaria, 693),
+    yesNoRowMarks(riesgo.ictericia, 713),
+    yesNoRowMarks(riesgo.diabetes, 765),
+    yesNoRowMarks(riesgo.enfermedad_renal, 785),
+    yesNoRowMarks(riesgo.enfermedad_corazon, 805.5),
+    yesNoRowMarks(riesgo.hipertension_arterial, 826),
+    yesNoRowMarks(riesgo.consumo_drogas_alcohol_tabaco, 846.5),
+    yesNoRowMarks(riesgo.otra_enfermedad_severa, 867),
+  ].join('');
+
+  const overlay = [
+    field(nombre, 85, 157, 380, 9),
+    field(edad, 500, 157, 45, 9, 'center'),
+    field(paciente.municipio || paciente.domicilio, 85, 171, 320, 8.4),
+    field(riesgo.telefono || paciente.telefono, 430, 171, 115, 8.4),
+
+    mark((riesgo.pueblo || paciente.pueblo) === 'maya', 112, 185),
+    mark((riesgo.pueblo || paciente.pueblo) === 'xinca', 167, 185),
+    mark((riesgo.pueblo || paciente.pueblo) === 'garifuna', 224, 185),
+    mark((riesgo.pueblo || paciente.pueblo) === 'mestizo', 281, 185),
+    mark(Boolean(riesgo.migrante), 393, 185),
+    field(riesgo.estado_civil || paciente.estado_civil, 446, 178, 100, 8.1),
+
+    field(riesgo.escolaridad || paciente.nivel_estudios, 87, 199, 180, 8.1),
+    mark((riesgo.escolaridad || paciente.nivel_estudios) === 'primaria', 131, 205),
+    mark((riesgo.escolaridad || paciente.nivel_estudios) === 'basico' || (riesgo.escolaridad || paciente.nivel_estudios) === 'secundaria', 188, 205),
+    mark((riesgo.escolaridad || paciente.nivel_estudios) === 'diversificado', 264, 205),
+    mark((riesgo.escolaridad || paciente.nivel_estudios) === 'ninguno', 393, 205),
+    field(riesgo.ocupacion || paciente.profesion_oficio, 445, 199, 100, 8.1),
+
+    field(riesgo.nombre_esposo_conviviente || paciente.nombre_esposo_conviviente, 159, 220, 306, 8.1),
+    field(riesgo.edad_esposo, 500, 220, 45, 8.4, 'center'),
+
+    field(riesgo.pueblo_esposo, 83, 238, 235, 8.1),
+    field(riesgo.escolaridad_esposo, 84, 256, 320, 8.1),
+    field(riesgo.ocupacion_esposo, 424, 256, 121, 8.1),
+
+    field(riesgo.distancia_servicio_km, 283, 274, 30, 8.1, 'center'),
+    field(riesgo.tiempo_horas, 479, 274, 66, 8.1, 'center'),
+    field(formatDate(fur), 84, 292, 130, 8.1),
+    field(formatDate(fpp), 237, 292, 160, 8.1),
+    field(riesgo.no_embarazos, 475, 292, 70, 8.1, 'center'),
+    field(riesgo.no_partos, 85, 304, 62, 8.1, 'center'),
+    field(riesgo.no_cesareas, 237, 304, 60, 8.1, 'center'),
+    field(riesgo.no_abortos, 386, 304, 68, 8.1, 'center'),
+    field(riesgo.no_hijos_vivos, 475, 304, 70, 8.1, 'center'),
+    field(riesgo.no_hijos_muertos, 113, 316, 55, 8.1, 'center'),
+    field(riesgo.edad_embarazo_semanas, 243, 316, 58, 8.1, 'center'),
+
+    checks,
+
+    mark(Boolean(riesgo.tiene_riesgo), 425, 894),
+    mark(!riesgo.tiene_riesgo, 482, 894),
+    field(riesgo.referida_a, 240, 911, 305, 8.2),
+    field(riesgo.nombre_personal_atendio, 343, 935, 202, 8.2, 'center'),
+  ].join('');
+
+  return `<!doctype html>
+  <html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      @page { size: letter portrait; margin: 0; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #fff; }
+      .sheet {
+        position: relative;
+        width: 612pt;
+        height: 792pt;
+        margin: 0 auto;
+        overflow: hidden;
+      }
+      .bg { position: absolute; inset: 0; width: 612pt; height: 792pt; }
+      .f {
+        position: absolute;
+        line-height: 1.05;
+        white-space: nowrap;
+        color: #111;
+      }
+      .mark {
+        position: absolute;
+        width: 10pt;
+        text-align: center;
+        font-size: 9pt;
+        font-weight: 800;
+        color: #111;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="sheet">
+      <img class="bg" src="${bg}" />
+      ${overlay}
+    </main>
+  </body>
+  </html>`;
 }
 
 function controlAt(controles, numero) {
@@ -453,7 +833,51 @@ async function pdfMspas(req, res) {
   }
 }
 
+async function pdfRiesgoObstetrico(req, res) {
+  const { pacienteId } = req.params;
+
+  try {
+    const embarazoActivoId = await obtenerEmbarazoActivoId(pacienteId);
+    const [pacienteRes, embarazoRes, riesgoRes] = await Promise.all([
+      pool.query('SELECT * FROM pacientes WHERE id = $1', [pacienteId]),
+      pool.query('SELECT * FROM embarazos WHERE id = $1', [embarazoActivoId]),
+      pool.query(
+        'SELECT * FROM fichas_riesgo_obstetrico WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
+        [embarazoActivoId]
+      ),
+    ]);
+
+    const paciente = pacienteRes.rows[0];
+    const riesgo = riesgoRes.rows[0];
+
+    if (!paciente) {
+      return res.status(404).json({ error: 'Paciente no encontrada' });
+    }
+    if (!riesgo) {
+      return res.status(404).json({ error: 'La paciente no tiene ficha de riesgo registrada' });
+    }
+
+    const cellMap = buildRiskCellMap({
+      paciente,
+      embarazo: embarazoRes.rows[0] || null,
+      riesgo,
+    });
+    const templatePath = path.join(__dirname, '../assets/official_forms/riesgo_oficial.xlsx');
+    const pdf = await exportExcelTemplateToPdf(templatePath, cellMap, `ficha-riesgo-${pacienteId}.pdf`);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename=ficha-riesgo-${pacienteId}.pdf`,
+    });
+    return res.send(Buffer.from(pdf));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Error al generar PDF de ficha de riesgo' });
+  }
+}
+
 module.exports = {
   pdfControl,
   pdfMspas,
+  pdfRiesgoObstetrico,
 };

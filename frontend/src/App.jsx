@@ -8,6 +8,7 @@ import NuevaPaciente from "./pages/NuevaPaciente";
 import ExpedientePaciente from "./pages/ExpedientePaciente";
 import NuevoControl from "./pages/NuevoControl";
 import FichaRiesgo from "./pages/FichaRiesgo";
+import PlanPartoForm from "./pages/PlanPartoForm";
 import PuerperioForm from "./pages/PuerperioForm";
 import MorbilidadForm from "./pages/MorbilidadForm";
 import VacunaForm from "./pages/VacunaForm";
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="pacientes/:id/controles/nuevo" element={<NuevoControl />} />
           <Route path="pacientes/:id/controles/:controlId/editar" element={<NuevoControl />} />
           <Route path="pacientes/:id/riesgo" element={<FichaRiesgo />} />
+          <Route path="pacientes/:id/plan-parto" element={<PlanPartoForm />} />
           <Route path="pacientes/:id/puerperio/nuevo" element={<PuerperioForm />} />
           <Route path="pacientes/:id/puerperio/:puerperioId/editar" element={<PuerperioForm />} />
           <Route path="pacientes/:id/morbilidad/nuevo" element={<MorbilidadForm />} />
