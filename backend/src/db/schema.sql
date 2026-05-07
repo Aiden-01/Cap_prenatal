@@ -553,6 +553,13 @@ CREATE TABLE IF NOT EXISTS planes_parto (
   updated_at                      TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE planes_parto ADD COLUMN IF NOT EXISTS no_registro VARCHAR(80);
+ALTER TABLE planes_parto ADD COLUMN IF NOT EXISTS servicio_salud VARCHAR(200);
+ALTER TABLE planes_parto ADD COLUMN IF NOT EXISTS lugar_residencia VARCHAR(250);
+ALTER TABLE planes_parto ADD COLUMN IF NOT EXISTS edad_gestacional_au INTEGER;
+ALTER TABLE planes_parto ADD COLUMN IF NOT EXISTS acompana_traslado VARCHAR(80);
+ALTER TABLE planes_parto ADD COLUMN IF NOT EXISTS acompana_parto VARCHAR(80);
+
 -- ============================================================
 -- MÓDULO 7 — FICHA DE RIESGO OBSTÉTRICO
 -- 25 criterios con clasificación automática STORED

@@ -1,5 +1,6 @@
 const pool = require('../db/pool');
 const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
+const { withGuatemalaTimeFallback } = require('../utils/guatemalaTime');
 
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
 
@@ -57,18 +58,19 @@ const PUERPERIO_FIELDS = [
 ];
 
 const PLAN_PARTO_FIELDS = [
+  'no_registro', 'servicio_salud', 'lugar_residencia',
   'fecha', 'nombre_conyuge', 'telefono', 'fecha_nacimiento', 'estado_civil',
   'pueblo', 'escolaridad', 'con_quien_vive', 'idioma', 'ha_tenido_atencion_prenatal',
   'no_embarazos', 'no_partos', 'no_abortos', 'no_hijos_vivos', 'no_hijos_muertos',
   'fur', 'fecha_probable_parto', 'no_cesareas', 'fecha_ultima_cesarea',
-  'edad_gestacional_semanas', 'parto_anterior_hospital', 'parto_anterior_caimi',
+  'edad_gestacional_semanas', 'edad_gestacional_au', 'parto_anterior_hospital', 'parto_anterior_caimi',
   'parto_anterior_comadrona', 'parto_anterior_clinica_privada', 'parto_anterior_otro',
   'peligro_dolor_cabeza', 'peligro_vision_borrosa', 'peligro_embarazo_multiple',
   'peligro_hemorragia_vaginal', 'peligro_edema_mi', 'peligro_nino_transverso',
   'peligro_dolor_estomago', 'peligro_salida_liquidos', 'peligro_convulsiones',
   'peligro_fiebre', 'peligro_ausencia_mov_fetales', 'peligro_placenta_no_salia',
   'posicion_parto', 'lugar_atencion_parto', 'horas_distancia', 'kms_servicio',
-  'casa_materna_cercana', 'usara_casa_materna', 'como_trasladara', 'quien_acompanara',
+  'casa_materna_cercana', 'usara_casa_materna', 'como_trasladara', 'acompana_traslado', 'acompana_parto',
   'bebida_durante_parto', 'bebida_despues_parto', 'ropa_nino', 'ropa_madre',
   'otros_articulos', 'lleva_dpi_madre', 'lleva_dpi_conyuge', 'lleva_partida_nacimiento',
   'cuenta_ahorro', 'comunicado_comite', 'con_quien_hijos', 'quien_cuida_casa',
@@ -118,7 +120,10 @@ async function obtener(req, res) {
 async function actualizar(req, res) {
   const { pacienteId, id } = req.params;
   const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
-  const { campos, sets, valores } = buildUpdate(req.body, CONTROL_FIELDS);
+  const { campos, sets, valores } = buildUpdate(
+    withGuatemalaTimeFallback(req.body, { onlyWhenHoraIsPresent: true }),
+    CONTROL_FIELDS
+  );
 
   if (campos.length === 0) return res.status(400).json({ error: 'Sin campos para actualizar' });
 
@@ -166,7 +171,7 @@ async function eliminar(req, res) {
 // ============================================================
 async function crear(req, res) {
   const { pacienteId } = req.params;
-  const d = req.body;
+  const d = withGuatemalaTimeFallback(req.body);
 
   if (!d.numero_control || !d.fecha) {
     return res.status(400).json({ error: 'numero_control y fecha son requeridos' });
@@ -486,7 +491,7 @@ async function obtenerPuerperio(req, res) {
 
 async function guardarPuerperio(req, res) {
   const { pacienteId } = req.params;
-  const d = req.body;
+  const d = withGuatemalaTimeFallback(req.body);
 
   if (!d.numero_atencion || !d.fecha) {
     return res.status(400).json({ error: 'numero_atencion (1|2) y fecha son requeridos' });
@@ -564,7 +569,10 @@ async function guardarPuerperio(req, res) {
 async function actualizarPuerperio(req, res) {
   const { pacienteId, id } = req.params;
   const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
-  const { campos, sets, valores } = buildUpdate(req.body, PUERPERIO_FIELDS);
+  const { campos, sets, valores } = buildUpdate(
+    withGuatemalaTimeFallback(req.body, { onlyWhenHoraIsPresent: true }),
+    PUERPERIO_FIELDS
+  );
 
   if (campos.length === 0) return res.status(400).json({ error: 'Sin campos para actualizar' });
 

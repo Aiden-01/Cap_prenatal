@@ -3,11 +3,12 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
+import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
 
 const INIT = {
   numero_atencion: 1,
-  fecha: new Date().toISOString().split("T")[0],
-  hora: "",
+  fecha: getGuatemalaDateInputValue(),
+  hora: getGuatemalaTimeInputValue(),
   signos_peligro: "",
   dias_despues_parto: "",
   lugar_atencion_parto: "",
@@ -29,6 +30,12 @@ const INIT = {
   tratamiento: "",
   nombre_cargo_atiende: "",
 };
+
+const initialPuerperioForm = () => ({
+  ...INIT,
+  fecha: getGuatemalaDateInputValue(),
+  hora: getGuatemalaTimeInputValue(),
+});
 
 function Field({ label, children }) {
   return <div className="form-group"><label className="input-label">{label}</label>{children}</div>;
@@ -56,7 +63,7 @@ export default function PuerperioForm() {
   const { id, puerperioId } = useParams();
   const navigate = useNavigate();
   const toast = useGlobalToast();
-  const [form, setForm] = useState(INIT);
+  const [form, setForm] = useState(initialPuerperioForm);
   const [loading, setLoading] = useState(false);
   const editando = Boolean(puerperioId);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -67,7 +74,7 @@ export default function PuerperioForm() {
       : api.get(`/pacientes/${id}/controles/puerperio`);
     request.then(({ data }) => {
       if (editando) {
-        setForm({ ...INIT, ...data, fecha: data.fecha ? data.fecha.split("T")[0] : INIT.fecha });
+        setForm({ ...initialPuerperioForm(), ...data, fecha: data.fecha ? data.fecha.split("T")[0] : INIT.fecha });
       } else {
         const siguiente = Math.min(2, Math.max(0, ...(data || []).map((r) => Number(r.numero_atencion) || 0)) + 1);
         setForm((f) => ({ ...f, numero_atencion: siguiente }));

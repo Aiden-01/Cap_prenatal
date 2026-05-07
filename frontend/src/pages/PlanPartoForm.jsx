@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
+import { getGuatemalaDateInputValue } from "../utils/guatemalaTime";
+import { calculateGestationalWeeks } from "../utils/gestationalAge";
 
 function Field({ label, children }) {
   return (
@@ -13,7 +15,7 @@ function Field({ label, children }) {
   );
 }
 
-function Input({ label, name, form, set, type = "text", placeholder = "" }) {
+function Input({ label, name, form, set, type = "text", placeholder = "", ...rest }) {
   return (
     <Field label={label}>
       <input
@@ -24,6 +26,7 @@ function Input({ label, name, form, set, type = "text", placeholder = "" }) {
         onChange={(e) =>
           set(name, type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)
         }
+        {...rest}
       />
     </Field>
   );
@@ -93,7 +96,10 @@ function Section({ title, children }) {
 }
 
 const INIT = {
-  fecha: new Date().toISOString().split("T")[0],
+  no_registro: "",
+  servicio_salud: "",
+  lugar_residencia: "",
+  fecha: getGuatemalaDateInputValue(),
   nombre_conyuge: "",
   telefono: "",
   fecha_nacimiento: "",
@@ -113,6 +119,7 @@ const INIT = {
   no_cesareas: "",
   fecha_ultima_cesarea: "",
   edad_gestacional_semanas: "",
+  edad_gestacional_au: "",
   parto_anterior_hospital: false,
   parto_anterior_caimi: false,
   parto_anterior_cap: false,
@@ -138,7 +145,8 @@ const INIT = {
   casa_materna_cercana: false,
   usara_casa_materna: false,
   como_trasladara: "",
-  quien_acompanara: "",
+  acompana_traslado: "",
+  acompana_parto: "",
   bebida_durante_parto: "",
   bebida_despues_parto: "",
   ropa_nino: false,
@@ -169,14 +177,17 @@ function defaultsDesdeExpediente(exp) {
   const ultimoControl = controles.at(-1) || {};
 
   return {
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: getGuatemalaDateInputValue(),
+    no_registro: p.cui || "",
+    servicio_salud: p.nombre_establecimiento || "CAP El Chal",
+    lugar_residencia: p.comunidad || p.domicilio || "",
     nombre_conyuge: r.nombre_esposo_conviviente || p.nombre_esposo_conviviente || "",
     telefono: r.telefono || p.telefono || "",
     fecha_nacimiento: toDateInput(p.fecha_nacimiento),
     estado_civil: r.estado_civil || p.estado_civil || "",
     pueblo: r.pueblo || p.pueblo || "",
     escolaridad: r.escolaridad || p.nivel_estudios || "",
-    con_quien_vive: p.nombre_esposo_conviviente ? "conyuge" : p.vive_sola ? "sola" : "",
+    con_quien_vive: p.nombre_esposo_conviviente ? "esposo" : p.vive_sola ? "sola" : "",
     idioma: p.comunidad_linguistica || "",
     ha_tenido_atencion_prenatal: controles.length > 0,
     no_embarazos: r.no_embarazos ?? p.gestas_previas ?? "",
@@ -189,6 +200,7 @@ function defaultsDesdeExpediente(exp) {
     no_cesareas: r.no_cesareas ?? p.cesareas ?? "",
     fecha_ultima_cesarea: toDateInput(p.fin_embarazo_anterior),
     edad_gestacional_semanas: r.edad_embarazo_semanas ?? ultimoControl.edad_gestacional_semanas ?? "",
+    edad_gestacional_au: ultimoControl.edad_gestacional_semanas ?? "",
     parto_anterior_hospital: false,
     parto_anterior_caimi: false,
     parto_anterior_cap: false,
@@ -206,13 +218,14 @@ function defaultsDesdeExpediente(exp) {
     peligro_ausencia_mov_fetales: ultimoControl.movimientos_fetales === false,
     peligro_placenta_no_salia: false,
     posicion_parto: ultimoControl.situacion_fetal || "",
-    lugar_atencion_parto: p.viene_referida ? "servicio_salud" : "",
+    lugar_atencion_parto: p.viene_referida ? "cap" : "",
     horas_distancia: r.tiempo_horas ?? "",
     kms_servicio: r.distancia_servicio_km ?? "",
     casa_materna_cercana: false,
     usara_casa_materna: false,
     como_trasladara: "",
-    quien_acompanara: r.nombre_esposo_conviviente || p.nombre_esposo_conviviente || "",
+    acompana_traslado: p.nombre_esposo_conviviente ? "conyuge" : "",
+    acompana_parto: p.nombre_esposo_conviviente ? "esposo" : "",
     bebida_durante_parto: "",
     bebida_despues_parto: "",
     ropa_nino: false,
@@ -247,27 +260,71 @@ function normalizePayload(form) {
 }
 
 const viveOptions = [
-  { value: "conyuge", label: "Con cónyuge" },
-  { value: "padres", label: "Con padres" },
-  { value: "familia", label: "Con familia" },
+  { value: "esposo", label: "Esposo" },
   { value: "sola", label: "Sola" },
-  { value: "otro", label: "Otro" },
+  { value: "familia", label: "Familia" },
+  { value: "amigo", label: "Amigo/a" },
 ];
 
 const posicionOptions = [
-  { value: "vertical", label: "Vertical" },
-  { value: "sentada", label: "Sentada" },
-  { value: "cuclillas", label: "Cuclillas" },
+  { value: "semi_reclinada", label: "Semi-reclinada" },
   { value: "acostada", label: "Acostada" },
-  { value: "libre", label: "Libre elección" },
+  { value: "cuclillas", label: "En cuclillas" },
+  { value: "rodillas", label: "De rodillas" },
+  { value: "de_pie", label: "De pie" },
+  { value: "otro", label: "Otro" },
 ];
 
 const lugarOptions = [
-  { value: "hospital", label: "Hospital" },
+  { value: "cap", label: "CAP" },
   { value: "caimi", label: "CAIMI" },
-  { value: "CAP", label: "CAP" },
-  { value: "clinica", label: "Clínica privada" },
+  { value: "hospital", label: "Hospital" },
+  { value: "clinica", label: "Clinica privada" },
   { value: "otro", label: "Otro" },
+];
+
+const trasladoOptions = [
+  { value: "vehiculo_familiar", label: "Vehiculo familiar" },
+  { value: "ambulancia", label: "Ambulancia" },
+  { value: "bomberos", label: "Bomberos" },
+  { value: "otro", label: "Otro" },
+];
+
+const acompanaTrasladoOptions = [
+  { value: "conyuge", label: "Conyuge" },
+  { value: "hermano", label: "Hermano/a" },
+  { value: "madre_padre", label: "Madre/Padre" },
+  { value: "suegra", label: "Suegra" },
+  { value: "vecina", label: "Vecina" },
+];
+
+const acompanaPartoOptions = [
+  { value: "esposo", label: "Esposo" },
+  { value: "comadrona", label: "Comadrona" },
+  { value: "familiar", label: "Familiar" },
+];
+
+const cuidadoHijosOptions = [
+  { value: "hijos_mayores", label: "Hijos mayores" },
+  { value: "parientes", label: "Parientes" },
+  { value: "vecinos", label: "Vecinos" },
+  { value: "otros", label: "Otros" },
+];
+
+const cuidadoCasaOptions = [
+  { value: "parientes", label: "Parientes" },
+  { value: "vecinos", label: "Vecinos" },
+  { value: "otros", label: "Otros" },
+];
+
+const responsableOptions = [
+  { value: "conyuge", label: "Conyuge" },
+  { value: "hermano", label: "Hermano/a" },
+  { value: "madre_padre", label: "Madre/Padre" },
+  { value: "vecina", label: "Vecina" },
+  { value: "suegra", label: "Suegra/o" },
+  { value: "comadrona", label: "Comadrona" },
+  { value: "otro_familiar", label: "Otro familiar" },
 ];
 
 export default function PlanPartoForm() {
@@ -293,6 +350,7 @@ export default function PlanPartoForm() {
           setForm((f) => ({
             ...f,
             ...data.plan_parto,
+            no_registro: data.plan_parto.no_registro || data?.paciente?.cui || "",
             fecha: toDateInput(data.plan_parto.fecha) || f.fecha,
             fecha_nacimiento: toDateInput(data.plan_parto.fecha_nacimiento),
             fur: toDateInput(data.plan_parto.fur),
@@ -307,11 +365,20 @@ export default function PlanPartoForm() {
       .finally(() => setLoadingData(false));
   }, [id, toast]);
 
+  const edadGestacionalSemanas = calculateGestationalWeeks(form.fur, form.fecha);
+  const formConEdadGestacional = {
+    ...form,
+    edad_gestacional_semanas: edadGestacionalSemanas,
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post(`/pacientes/${id}/controles/plan-parto`, normalizePayload(form));
+      await api.post(
+        `/pacientes/${id}/controles/plan-parto`,
+        normalizePayload({ ...form, edad_gestacional_semanas: edadGestacionalSemanas })
+      );
       toast(existingPlan ? "Plan de parto actualizado" : "Plan de parto guardado", "success");
       setTimeout(() => navigate(`/pacientes/${id}`), 600);
     } catch (err) {
@@ -355,7 +422,10 @@ export default function PlanPartoForm() {
           <div className="form-section">
             <div className="form-section-header">Datos generales</div>
             <div className="form-section-body col-4">
+              <Input label="CUI (No. de registro)" name="no_registro" form={form} set={set} />
+              <Input label="Servicio de salud" name="servicio_salud" form={form} set={set} />
               <Input label="Fecha" name="fecha" type="date" form={form} set={set} />
+              <Input label="Lugar de residencia" name="lugar_residencia" form={form} set={set} />
               <Input label="Nombre cónyuge / conviviente" name="nombre_conyuge" form={form} set={set} />
               <Input label="Teléfono" name="telefono" form={form} set={set} />
               <Input label="Fecha de nacimiento" name="fecha_nacimiento" type="date" form={form} set={set} />
@@ -378,7 +448,8 @@ export default function PlanPartoForm() {
             <Input label="FPP" name="fecha_probable_parto" type="date" form={form} set={set} />
             <Input label="No. cesáreas" name="no_cesareas" type="number" form={form} set={set} />
             <Input label="Fecha última cesárea" name="fecha_ultima_cesarea" type="date" form={form} set={set} />
-            <Input label="Edad gestacional (semanas)" name="edad_gestacional_semanas" type="number" form={form} set={set} />
+            <Input label="Edad gestacional por UR" name="edad_gestacional_semanas" type="number" form={formConEdadGestacional} set={set} readOnly />
+            <Input label="Edad gestacional por AU" name="edad_gestacional_au" type="number" form={form} set={set} />
           </Section>
 
           <Section title="Lugar de partos anteriores">
@@ -410,14 +481,15 @@ export default function PlanPartoForm() {
               <Select label="Posición para parir" name="posicion_parto" form={form} set={set} options={posicionOptions} />
               <Select label="Lugar de atención del parto" name="lugar_atencion_parto" form={form} set={set} options={lugarOptions} />
               <Input label="Horas de distancia" name="horas_distancia" type="number" form={form} set={set} />
-              <Input label="Kilómetros al servicio" name="kms_servicio" type="number" form={form} set={set} />
-              <Input label="Cómo se trasladará" name="como_trasladara" form={form} set={set} />
-              <Input label="Quién la acompañará" name="quien_acompanara" form={form} set={set} />
+              <Input label="Kilometros al servicio" name="kms_servicio" type="number" form={form} set={set} />
+              <Select label="Como se trasladara" name="como_trasladara" form={form} set={set} options={trasladoOptions} />
+              <Select label="Quien acompanara el traslado" name="acompana_traslado" form={form} set={set} options={acompanaTrasladoOptions} />
+              <Select label="Quien acompanara durante el parto" name="acompana_parto" form={form} set={set} options={acompanaPartoOptions} />
               <Input label="Bebida durante el parto" name="bebida_durante_parto" form={form} set={set} />
-              <Input label="Bebida después del parto" name="bebida_despues_parto" form={form} set={set} />
-              <Input label="Con quién quedarán los hijos" name="con_quien_hijos" form={form} set={set} />
-              <Input label="Quién cuidará la casa" name="quien_cuida_casa" form={form} set={set} />
-              <Input label="Teléfono del vehículo" name="telefono_vehiculo" form={form} set={set} />
+              <Input label="Bebida despues del parto" name="bebida_despues_parto" form={form} set={set} />
+              <Select label="Con quien quedaran los hijos" name="con_quien_hijos" form={form} set={set} options={cuidadoHijosOptions} />
+              <Select label="Quien cuidara la casa" name="quien_cuida_casa" form={form} set={set} options={cuidadoCasaOptions} />
+              <Input label="Telefono del vehiculo" name="telefono_vehiculo" form={form} set={set} />
               <Input label="Nombre proveedor de salud" name="nombre_proveedor_salud" form={form} set={set} />
             </div>
           </div>
@@ -438,7 +510,7 @@ export default function PlanPartoForm() {
           <div className="form-section">
             <div className="form-section-header">Responsables del plan</div>
             <div className="form-section-body col-3">
-              <Input label="Responsable de activar" name="responsable_activar" form={form} set={set} />
+              <Select label="Responsable de activar" name="responsable_activar" form={form} set={set} options={responsableOptions} />
               <Input label="Nombre quien activará el plan" name="nombre_activara_plan" form={form} set={set} />
               <Input label="Nombre proveedor de salud" name="nombre_proveedor_salud" form={form} set={set} />
             </div>

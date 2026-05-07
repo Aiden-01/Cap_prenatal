@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { ChevronLeft, Save, Stethoscope, FlaskConical, Pill, BookOpen } from "lucide-react";
+import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
+import { calculateGestationalWeeks } from "../utils/gestationalAge";
 
 // ─── HELPERS ────────────────────────────────────────────────
 function Field({ label, children, col }) {
@@ -84,8 +86,8 @@ function LabRow({ label, realizadoKey, resultadoKey, form, set, extra }) {
 // ─── ESTADO INICIAL ──────────────────────────────────────────
 const INIT = {
   numero_control: 1,
-  fecha: new Date().toISOString().split("T")[0],
-  hora: "",
+  fecha: getGuatemalaDateInputValue(),
+  hora: getGuatemalaTimeInputValue(),
   motivo_consulta: "",
   // Signos de peligro
   peligro_hemorragia_vaginal: false, peligro_palidez: false,
@@ -134,6 +136,12 @@ const INIT = {
   impresion_clinica: "", tratamiento: "", cita_siguiente: "",
 };
 
+const initialControlForm = () => ({
+  ...INIT,
+  fecha: getGuatemalaDateInputValue(),
+  hora: getGuatemalaTimeInputValue(),
+});
+
 const TABS = [
   { id: "general",       label: "General",       icon: Stethoscope  },
   { id: "laboratorio",   label: "Laboratorios",  icon: FlaskConical },
@@ -149,7 +157,8 @@ export default function NuevoControl() {
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [tab, setTab]         = useState("general");
-  const [form, setForm]       = useState(INIT);
+  const [form, setForm]       = useState(initialControlForm);
+  const [fur, setFur]         = useState("");
   const editando = Boolean(controlId);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -157,7 +166,7 @@ export default function NuevoControl() {
 
   useEffect(() => {
     const parseControl = (control) => ({
-      ...INIT,
+      ...initialControlForm(),
       ...control,
       fecha: control.fecha ? control.fecha.split("T")[0] : INIT.fecha,
       cita_siguiente: control.cita_siguiente ? control.cita_siguiente.split("T")[0] : "",
@@ -166,12 +175,13 @@ export default function NuevoControl() {
         : "",
     });
 
-    const request = editando
+    const controlesRequest = editando
       ? api.get(`/pacientes/${id}/controles/${controlId}`)
       : api.get(`/pacientes/${id}/controles`);
 
-    request
-      .then(({ data }) => {
+    Promise.all([controlesRequest, api.get(`/pacientes/${id}/expediente`)])
+      .then(([{ data }, { data: expediente }]) => {
+        setFur(expediente?.embarazo_activo?.fur || expediente?.paciente?.fur || "");
         if (editando) {
           setForm(parseControl(data));
           return;
@@ -182,6 +192,12 @@ export default function NuevoControl() {
       .catch(() => toast(editando ? "Error al cargar control" : "Error al calcular siguiente control", "error"))
       .finally(() => setLoadingData(false));
   }, [id, controlId, editando, toast]);
+
+  const edadGestacionalSemanas = calculateGestationalWeeks(fur, form.fecha);
+  const formConEdadGestacional = {
+    ...form,
+    edad_gestacional_semanas: edadGestacionalSemanas,
+  };
 
   // IMC automático
   const handlePeso = (v) => {
@@ -202,11 +218,15 @@ export default function NuevoControl() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    const payload = {
+      ...form,
+      edad_gestacional_semanas: edadGestacionalSemanas,
+    };
     try {
       if (editando) {
-        await api.put(`/pacientes/${id}/controles/${controlId}`, form);
+        await api.put(`/pacientes/${id}/controles/${controlId}`, payload);
       } else {
-        await api.post(`/pacientes/${id}/controles`, form);
+        await api.post(`/pacientes/${id}/controles`, payload);
       }
       toast(editando ? "Control actualizado exitosamente" : "Control registrado exitosamente", "success");
       setTimeout(() => navigate(`/pacientes/${id}`), 800);
@@ -249,7 +269,7 @@ export default function NuevoControl() {
             </Field>
             <Inp label="Fecha" name="fecha" type="date" form={form} set={set} />
             <Inp label="Hora" name="hora" type="time" form={form} set={set} />
-            <Inp label="Semanas de gestación" name="edad_gestacional_semanas" type="number" form={form} set={set} />
+            <Inp label="Semanas de gestación" name="edad_gestacional_semanas" type="number" form={formConEdadGestacional} set={set} readOnly />
           </div>
           <div className="form-section-body col-2" style={{ marginTop: "0.5rem" }}>
             <Inp label="Motivo de consulta" name="motivo_consulta" form={form} set={set} />

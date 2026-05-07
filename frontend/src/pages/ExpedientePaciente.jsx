@@ -208,6 +208,43 @@ export default function ExpedientePaciente() {
     }
   };
 
+  const imprimirPlanParto = async () => {
+    setPrinting(true);
+    try {
+      const res = await api.get(`/pacientes/${id}/plan-parto/pdf`, { responseType: "blob" });
+      const contentType = res.headers["content-type"] || "";
+      if (!contentType.includes("application/pdf")) {
+        const errorText = await res.data.text();
+        let message = "Error al generar plan de parto";
+        try {
+          message = JSON.parse(errorText).error || message;
+        } catch {
+          message = errorText || message;
+        }
+        throw new Error(message);
+      }
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      let message = err.message || "Error al generar plan de parto";
+      if (err.response?.data instanceof Blob) {
+        const errorText = await err.response.data.text();
+        try {
+          message = JSON.parse(errorText).error || message;
+        } catch {
+          message = errorText || message;
+        }
+      } else if (err.response?.data?.error) {
+        message = err.response.data.error;
+      }
+      toast(message, "error");
+    } finally {
+      setPrinting(false);
+    }
+  };
+
   const TABS = [
     { id: "general",    label: "Datos generales",                          icon: FileText     },
     { id: "controles",  label: `Controles (${exp.controles_prenatales?.length ?? 0})`, icon: Activity     },
@@ -731,13 +768,21 @@ export default function ExpedientePaciente() {
             <>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
                 <h3 style={{ fontFamily: "Syne", fontSize: "1rem", fontWeight: 700 }}>Plan de Parto</h3>
-                <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/plan-parto`)}>
-                  <Pencil size={13} /> Editar
-                </button>
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                  <button className="btn-secondary" onClick={imprimirPlanParto} disabled={printing}>
+                    <Printer size={13} /> {printing ? "Generando..." : "Imprimir"}
+                  </button>
+                  <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/plan-parto`)}>
+                    <Pencil size={13} /> Editar
+                  </button>
+                </div>
               </div>
 
               <SecTitle>Datos generales</SecTitle>
               <Grid cols={3}>
+                <Row label="No. registro" value={exp.plan_parto.no_registro} />
+                <Row label="Servicio de salud" value={exp.plan_parto.servicio_salud} />
+                <Row label="Lugar residencia" value={exp.plan_parto.lugar_residencia} />
                 <Row label="Fecha" value={fecha(exp.plan_parto.fecha)} />
                 <Row label="Nombre cónyuge" value={exp.plan_parto.nombre_conyuge} />
                 <Row label="Teléfono" value={exp.plan_parto.telefono} />
@@ -775,7 +820,8 @@ export default function ExpedientePaciente() {
                 <Row label="FPP" value={fecha(exp.plan_parto.fecha_probable_parto)} />
                 <Row label="No. cesáreas" value={exp.plan_parto.no_cesareas} />
                 <Row label="Última cesárea" value={fecha(exp.plan_parto.fecha_ultima_cesarea)} />
-                <Row label="Edad gestacional" value={exp.plan_parto.edad_gestacional_semanas} />
+                <Row label="Edad gestacional UR" value={exp.plan_parto.edad_gestacional_semanas} />
+                <Row label="Edad gestacional AU" value={exp.plan_parto.edad_gestacional_au} />
               </Grid>
 
               <SecTitle style={{ marginTop: "1rem" }}>Logística y responsables</SecTitle>
@@ -783,7 +829,8 @@ export default function ExpedientePaciente() {
                 <Row label="Posición parto" value={exp.plan_parto.posicion_parto} />
                 <Row label="Lugar atención parto" value={exp.plan_parto.lugar_atencion_parto} />
                 <Row label="Cómo se trasladará" value={exp.plan_parto.como_trasladara} />
-                <Row label="Quién acompañará" value={exp.plan_parto.quien_acompanara} />
+                <Row label="Acompaña traslado" value={exp.plan_parto.acompana_traslado} />
+                <Row label="Acompaña parto" value={exp.plan_parto.acompana_parto} />
                 <Row label="Horas distancia" value={exp.plan_parto.horas_distancia} />
                 <Row label="Kms servicio" value={exp.plan_parto.kms_servicio} />
                 <Row label="Con quién hijos" value={exp.plan_parto.con_quien_hijos} />

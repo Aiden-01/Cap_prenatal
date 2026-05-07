@@ -3,10 +3,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
+import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
 
 const INIT = {
-  fecha: new Date().toISOString().split("T")[0],
-  hora: "",
+  fecha: getGuatemalaDateInputValue(),
+  hora: getGuatemalaTimeInputValue(),
   motivo_consulta: "",
   historia_enfermedad_actual: "",
   revision_por_sistemas: "",
@@ -16,6 +17,12 @@ const INIT = {
   nombre_cargo_atiende: "",
 };
 
+const initialMorbilidadForm = () => ({
+  ...INIT,
+  fecha: getGuatemalaDateInputValue(),
+  hora: getGuatemalaTimeInputValue(),
+});
+
 function Field({ label, children }) {
   return <div className="form-group"><label className="input-label">{label}</label>{children}</div>;
 }
@@ -24,7 +31,7 @@ export default function MorbilidadForm() {
   const { id, morbilidadId } = useParams();
   const navigate = useNavigate();
   const toast = useGlobalToast();
-  const [form, setForm] = useState(INIT);
+  const [form, setForm] = useState(initialMorbilidadForm);
   const [loading, setLoading] = useState(false);
   const editando = Boolean(morbilidadId);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -32,7 +39,7 @@ export default function MorbilidadForm() {
   useEffect(() => {
     if (!editando) return;
     api.get(`/pacientes/${id}/morbilidad/${morbilidadId}`)
-      .then(({ data }) => setForm({ ...INIT, ...data, fecha: data.fecha ? data.fecha.split("T")[0] : INIT.fecha }))
+      .then(({ data }) => setForm({ ...initialMorbilidadForm(), ...data, fecha: data.fecha ? data.fecha.split("T")[0] : INIT.fecha }))
       .catch(() => toast("Error al cargar morbilidad", "error"));
   }, [id, morbilidadId, editando, toast]);
 

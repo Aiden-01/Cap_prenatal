@@ -1,5 +1,6 @@
 const pool = require('../db/pool');
 const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
+const { withGuatemalaTimeFallback } = require('../utils/guatemalaTime');
 
 // ============================================================
 // GET /api/pacientes/:pacienteId/morbilidad
@@ -45,7 +46,7 @@ async function obtener(req, res) {
 // ============================================================
 async function guardar(req, res) {
   const { pacienteId } = req.params;
-  const d = req.body;
+  const d = withGuatemalaTimeFallback(req.body, { onlyWhenHoraIsPresent: true });
 
   if (!d.fecha || !d.motivo_consulta) {
     return res.status(400).json({ error: 'fecha y motivo_consulta son requeridos' });
@@ -96,7 +97,7 @@ async function guardar(req, res) {
 // ============================================================
 async function actualizar(req, res) {
   const { pacienteId, id } = req.params;
-  const d = req.body;
+  const d = withGuatemalaTimeFallback(req.body);
 
   const BLOQUEADOS = ['id', 'paciente_id', 'embarazo_id', 'registrado_por', 'created_at'];
   const campos = Object.keys(d).filter(k => !BLOQUEADOS.includes(k));
