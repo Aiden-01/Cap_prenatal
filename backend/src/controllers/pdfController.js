@@ -112,6 +112,12 @@ function assetOfficialBase64(fileName, mime = 'image/png') {
 
 function dateParts(value) {
   if (!value) return { d: '', m: '', y: '' };
+  if (typeof value === 'string') {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      return { d: match[3], m: match[2], y: match[1] };
+    }
+  }
   const dt = new Date(value);
   if (Number.isNaN(dt.getTime())) return { d: '', m: '', y: '' };
   return {
@@ -188,9 +194,22 @@ function markMap(map, address, active) {
   if (active) map[address] = 'X';
 }
 
+function normalizeChoiceKey(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
 function mapChoice(map, value, options) {
   if (!value) return;
-  const addr = options[value];
+  const normalizedValue = normalizeChoiceKey(value);
+  const normalizedOptions = Object.fromEntries(
+    Object.entries(options).map(([key, addr]) => [normalizeChoiceKey(key), addr])
+  );
+  const addr = normalizedOptions[normalizedValue];
   if (addr) map[addr] = 'X';
 }
 
@@ -330,60 +349,63 @@ function buildPlanPartoCellMap({ paciente, plan }) {
   setMapValue(map, 'J7', nombre);
   setMapValue(map, 'AL7', edadAnios(plan.fecha_nacimiento || paciente.fecha_nacimiento));
   setMapValue(map, 'J8', plan.nombre_conyuge || paciente.nombre_esposo_conviviente);
-  setMapValue(map, 'U8', plan.telefono || paciente.telefono);
-  setMapValue(map, 'AD8', formatDate(plan.fecha_nacimiento || paciente.fecha_nacimiento));
+  setMapValue(map, 'T8', cleanCellText(plan.telefono || paciente.telefono).replace(/\s+/g, ' '));
+  setMapValue(map, 'AE8', formatDate(plan.fecha_nacimiento || paciente.fecha_nacimiento));
 
   mapChoice(map, plan.estado_civil || paciente.estado_civil, {
-    soltera: 'B12',
-    casada: 'F12',
-    unida: 'I12',
-    viuda: 'B14',
-    separada: 'F14',
-    otro: 'I14',
+    soltera: 'D12',
+    casada: 'G12',
+    unida: 'K12',
+    viuda: 'D14',
+    separada: 'G14',
+    otro: 'K14',
+    vive_sola: 'D12',
   });
   mapChoice(map, plan.pueblo || paciente.pueblo, {
-    mestizo: 'N12',
-    mestiza: 'N12',
+    mestizo: 'P12',
+    mestiza: 'P12',
     maya: 'R12',
     xinca: 'T12',
-    garifuna: 'N14',
+    garifuna: 'P14',
     otro: 'R14',
   });
   mapChoice(map, plan.escolaridad || paciente.nivel_estudios, {
-    ninguno: 'X12',
-    primaria: 'AB12',
-    basico: 'X14',
-    secundaria: 'X14',
-    diversificado: 'X14',
-    universitaria: 'AB14',
-    universitario: 'AB14',
+    ninguno: 'Z12',
+    ninguna: 'Z12',
+    primaria: 'AD12',
+    basico: 'Z14',
+    secundaria: 'Z14',
+    diversificado: 'Z14',
+    universitaria: 'AD14',
+    universitario: 'AD14',
   });
   mapChoice(map, plan.con_quien_vive, {
-    sola: 'AG12',
-    esposo: 'AK12',
-    conyuge: 'AK12',
-    familia: 'AG14',
-    amigo: 'AK14',
+    sola: 'AH12',
+    esposo: 'AN12',
+    conyuge: 'AN12',
+    familia: 'AH14',
+    amigo: 'AN14',
+    amiga: 'AN14',
   });
   setMapValue(map, 'I16', plan.idioma || paciente.comunidad_linguistica);
-  markYesNo(map, plan.ha_tenido_atencion_prenatal, 'AG16', 'AI16');
+  markYesNo(map, plan.ha_tenido_atencion_prenatal, 'AH16', 'AJ16');
 
   setMapValue(map, 'H18', plan.no_embarazos);
   setMapValue(map, 'Q18', plan.no_partos);
   setMapValue(map, 'X18', plan.no_abortos);
-  setMapValue(map, 'AD18', plan.no_hijos_vivos);
+  setMapValue(map, 'AE18', plan.no_hijos_vivos);
   setMapValue(map, 'AL18', plan.no_hijos_muertos);
-  setMapValue(map, 'F19', formatDate(plan.fur));
-  setMapValue(map, 'P19', formatDate(plan.fecha_probable_parto));
+  setMapValue(map, 'E19', formatDate(plan.fur));
+  setMapValue(map, 'Q19', formatDate(plan.fecha_probable_parto));
   setMapValue(map, 'AB19', plan.no_cesareas);
-  setMapValue(map, 'AL19', formatDate(plan.fecha_ultima_cesarea));
+  setMapValue(map, 'AK19', formatDate(plan.fecha_ultima_cesarea));
   setMapValue(map, 'J20', plan.edad_gestacional_semanas);
-  setMapValue(map, 'AA20', plan.edad_gestacional_au);
+  setMapValue(map, 'AC20', plan.edad_gestacional_au);
 
-  markMap(map, 'M22', plan.parto_anterior_hospital);
-  markMap(map, 'Q22', plan.parto_anterior_caimi);
+  markMap(map, 'O22', plan.parto_anterior_hospital);
+  markMap(map, 'R22', plan.parto_anterior_caimi);
   markMap(map, 'X22', plan.parto_anterior_comadrona);
-  markMap(map, 'AD22', plan.parto_anterior_clinica_privada);
+  markMap(map, 'AE22', plan.parto_anterior_clinica_privada);
   if (plan.parto_anterior_otro) setMapValue(map, 'AL22', plan.parto_anterior_otro);
 
   const dangerRows = [
@@ -399,19 +421,20 @@ function buildPlanPartoCellMap({ paciente, plan }) {
   });
 
   mapChoice(map, plan.posicion_parto, {
-    semi_reclinada: 'H33',
-    acostada: 'H34',
-    cuclillas: 'H35',
-    rodillas: 'H36',
-    de_pie: 'H37',
+    semi_reclinada: 'G33',
+    acostada: 'G34',
+    cuclillas: 'G35',
+    rodillas: 'G36',
+    de_pie: 'G37',
     otro: 'H38',
   });
   mapChoice(map, String(plan.lugar_atencion_parto || '').toLowerCase(), {
-    cap: 'K32',
-    caimi: 'O32',
-    hospital: 'S32',
-    clinica: 'Y32',
-    otro: 'AF32',
+    cap: 'L32',
+    caimi: 'Q32',
+    hospital: 'V32',
+    clinica: 'AC32',
+    clinica_privada: 'AC32',
+    otro: 'AG32',
   });
   mapChoice(map, String(plan.horas_distancia || ''), {
     '-1': 'K35',
@@ -423,60 +446,70 @@ function buildPlanPartoCellMap({ paciente, plan }) {
   });
   if (Number(plan.horas_distancia) > 5) markMap(map, 'S35', true);
   setMapValue(map, 'AH37', plan.kms_servicio);
-  markYesNo(map, plan.casa_materna_cercana, 'AF38', 'AI38');
-  markYesNo(map, plan.usara_casa_materna, 'S39', 'V39');
+  markYesNo(map, plan.casa_materna_cercana, 'AG38', 'AK38');
+  markYesNo(map, plan.usara_casa_materna, 'T39', 'W39');
 
   mapChoice(map, plan.como_trasladara, {
-    vehiculo_familiar: 'K42',
-    ambulancia: 'K43',
-    bomberos: 'K44',
-    otro: 'K45',
+    vehiculo_familiar: 'F42',
+    vehiculo: 'F42',
+    ambulancia: 'E43',
+    bomberos: 'E44',
+    otro: 'C45',
   });
   mapChoice(map, plan.acompana_traslado, {
     conyuge: 'Q42',
-    hermano: 'V42',
-    madre_padre: 'AA42',
+    hermano: 'W42',
+    hermana: 'W42',
+    madre_padre: 'AC42',
+    padre_madre: 'AC42',
     suegra: 'AG42',
-    vecina: 'AL42',
+    suegro: 'AG42',
+    vecina: 'AK42',
   });
   mapChoice(map, plan.acompana_parto, {
     esposo: 'AD43',
     comadrona: 'AI43',
-    familiar: 'AN43',
+    conyuge: 'AD43',
+    familiar: 'AM43',
   });
   setMapValue(map, 'X45', plan.bebida_durante_parto);
   setMapValue(map, 'X46', plan.bebida_despues_parto);
-  markYesNo(map, plan.cuenta_ahorro, 'B48', 'E48');
-  markMap(map, 'S48', plan.ropa_nino);
+  markYesNo(map, plan.cuenta_ahorro, 'C48', 'E48');
+  markMap(map, 'T48', plan.ropa_nino);
   markMap(map, 'AB48', plan.ropa_madre);
-  setMapValue(map, 'AI48', plan.otros_articulos);
+  setMapValue(map, 'AH48', plan.otros_articulos);
 
   mapChoice(map, plan.con_quien_hijos, {
-    hijos_mayores: 'K51',
-    parientes: 'K52',
-    vecinos: 'K53',
-    otros: 'K54',
+    hijos_mayores: 'F51',
+    parientes: 'E52',
+    vecinos: 'D53',
+    otros: 'C54',
+    otro: 'C54',
   });
-  markMap(map, 'V51', plan.lleva_dpi_madre);
-  markMap(map, 'AD51', plan.lleva_dpi_conyuge);
-  markMap(map, 'W53', plan.lleva_partida_nacimiento);
-  markYesNo(map, plan.comunicado_comite, 'S56', 'W56');
+  markMap(map, 'T51', plan.lleva_dpi_madre);
+  markMap(map, 'AC51', plan.lleva_dpi_conyuge);
+  markMap(map, 'AG53', plan.lleva_partida_nacimiento);
+  markYesNo(map, plan.comunicado_comite, 'T56', 'X56');
   mapChoice(map, plan.quien_cuida_casa, {
-    parientes: 'K57',
-    vecinos: 'K58',
-    otros: 'K59',
+    parientes: 'D57',
+    vecinos: 'D58',
+    otros: 'C59',
+    otro: 'C59',
   });
   setMapValue(map, 'J60', plan.telefono_vehiculo);
   mapChoice(map, plan.responsable_activar, {
     conyuge: 'Q58',
-    hermano: 'U58',
-    madre_padre: 'AB58',
+    hermano: 'V58',
+    hermana: 'V58',
+    madre_padre: 'AC58',
+    padre_madre: 'AC58',
     vecina: 'Q59',
-    suegra: 'U59',
-    comadrona: 'AB59',
-    otro_familiar: 'AI59',
+    suegra: 'V59',
+    suegro: 'V59',
+    comadrona: 'AC59',
+    otro_familiar: 'AJ59',
   });
-  setMapValue(map, 'Z60', plan.nombre_activara_plan);
+  setMapValue(map, 'AE60', plan.nombre_activara_plan);
   setMapValue(map, 'H70', plan.nombre_proveedor_salud);
 
   return map;
@@ -509,6 +542,9 @@ try {
     $addr = $prop.Name
     $val = [string]$prop.Value
     $range = $ws.Range($addr)
+    if ($addr -match '^(T8|J60)$') {
+      $range.NumberFormat = '@'
+    }
     $range.Value2 = $val
     if ($val.Length -eq 1 -and $val -eq 'X') {
       $range.HorizontalAlignment = -4108
@@ -543,10 +579,9 @@ finally {
 }
 
 function formatDate(value) {
-  if (!value) return '';
-  const dt = new Date(value);
-  if (Number.isNaN(dt.getTime())) return '';
-  return dt.toLocaleDateString('es-GT');
+  const { d, m, y } = dateParts(value);
+  if (!d || !m || !y) return '';
+  return `${d}/${m}/${y}`;
 }
 
 function yesNo(value) {
