@@ -139,7 +139,9 @@ const INIT = {
   peligro_ausencia_mov_fetales: false,
   peligro_placenta_no_salia: false,
   posicion_parto: "",
+  posicion_parto_otro: "",
   lugar_atencion_parto: "",
+  lugar_atencion_parto_otro: "",
   horas_distancia: "",
   kms_servicio: "",
   casa_materna_cercana: false,
@@ -218,7 +220,9 @@ function defaultsDesdeExpediente(exp) {
     peligro_ausencia_mov_fetales: ultimoControl.movimientos_fetales === false,
     peligro_placenta_no_salia: false,
     posicion_parto: ultimoControl.situacion_fetal || "",
+    posicion_parto_otro: "",
     lugar_atencion_parto: p.viene_referida ? "cap" : "",
+    lugar_atencion_parto_otro: "",
     horas_distancia: r.tiempo_horas ?? "",
     kms_servicio: r.distancia_servicio_km ?? "",
     casa_materna_cercana: false,
@@ -327,6 +331,8 @@ const responsableOptions = [
   { value: "otro_familiar", label: "Otro familiar" },
 ];
 
+const hasOptionValue = (options, value) => options.some((option) => option.value === value);
+
 export default function PlanPartoForm() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -346,10 +352,16 @@ export default function PlanPartoForm() {
       .then(({ data }) => {
         setPaciente(data?.paciente || null);
         if (data?.plan_parto) {
+          const posicionParto = data.plan_parto.posicion_parto || "";
+          const lugarAtencionParto = data.plan_parto.lugar_atencion_parto || "";
           setExistingPlan(true);
           setForm((f) => ({
             ...f,
             ...data.plan_parto,
+            posicion_parto: posicionParto && !hasOptionValue(posicionOptions, posicionParto) ? "otro" : posicionParto,
+            posicion_parto_otro: posicionParto && !hasOptionValue(posicionOptions, posicionParto) ? posicionParto : "",
+            lugar_atencion_parto: lugarAtencionParto && !hasOptionValue(lugarOptions, lugarAtencionParto) ? "otro" : lugarAtencionParto,
+            lugar_atencion_parto_otro: lugarAtencionParto && !hasOptionValue(lugarOptions, lugarAtencionParto) ? lugarAtencionParto : "",
             no_registro: data.plan_parto.no_registro || data?.paciente?.cui || "",
             fecha: toDateInput(data.plan_parto.fecha) || f.fecha,
             fecha_nacimiento: toDateInput(data.plan_parto.fecha_nacimiento),
@@ -374,10 +386,16 @@ export default function PlanPartoForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    const payload = {
+      ...form,
+      edad_gestacional_semanas: edadGestacionalSemanas,
+      posicion_parto: form.posicion_parto === "otro" ? form.posicion_parto_otro || "otro" : form.posicion_parto,
+      lugar_atencion_parto: form.lugar_atencion_parto === "otro" ? form.lugar_atencion_parto_otro || "otro" : form.lugar_atencion_parto,
+    };
     try {
       await api.post(
         `/pacientes/${id}/controles/plan-parto`,
-        normalizePayload({ ...form, edad_gestacional_semanas: edadGestacionalSemanas })
+        normalizePayload(payload)
       );
       toast(existingPlan ? "Plan de parto actualizado" : "Plan de parto guardado", "success");
       setTimeout(() => navigate(`/pacientes/${id}`), 600);
@@ -478,8 +496,14 @@ export default function PlanPartoForm() {
           <div className="form-section">
             <div className="form-section-header">Logística para el parto</div>
             <div className="form-section-body col-4">
-              <Select label="Posición para parir" name="posicion_parto" form={form} set={set} options={posicionOptions} />
+              <Select label="Posición para la atención del parto" name="posicion_parto" form={form} set={set} options={posicionOptions} />
+              {form.posicion_parto === "otro" && (
+                <Input label="Especifique otra posicion" name="posicion_parto_otro" form={form} set={set} />
+              )}
               <Select label="Lugar de atención del parto" name="lugar_atencion_parto" form={form} set={set} options={lugarOptions} />
+              {form.lugar_atencion_parto === "otro" && (
+                <Input label="Especifique otro lugar" name="lugar_atencion_parto_otro" form={form} set={set} />
+              )}
               <Input label="Horas de distancia" name="horas_distancia" type="number" form={form} set={set} />
               <Input label="Kilometros al servicio" name="kms_servicio" type="number" form={form} set={set} />
               <Select label="Como se trasladara" name="como_trasladara" form={form} set={set} options={trasladoOptions} />

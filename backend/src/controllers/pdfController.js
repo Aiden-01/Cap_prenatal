@@ -190,6 +190,21 @@ function setMapValue(map, address, value) {
   map[address] = cleanCellText(value);
 }
 
+function splitTextAtWord(value, maxLength) {
+  const text = cleanCellText(value).replace(/\s+/g, ' ').trim();
+  if (!text || text.length <= maxLength) return [text, ''];
+
+  const cutAt = text.lastIndexOf(' ', maxLength);
+  const splitAt = cutAt > 0 ? cutAt : maxLength;
+  return [text.slice(0, splitAt).trim(), text.slice(splitAt).trim()];
+}
+
+function setTwoLineMapValue(map, firstAddress, secondAddress, value, firstMaxLength) {
+  const [firstLine, secondLine] = splitTextAtWord(value, firstMaxLength);
+  setMapValue(map, firstAddress, firstLine);
+  setMapValue(map, secondAddress, secondLine);
+}
+
 function markMap(map, address, active) {
   if (active) map[address] = 'X';
 }
@@ -346,7 +361,7 @@ function buildPlanPartoCellMap({ paciente, plan }) {
   setMapValue(map, 'I5', plan.servicio_salud || paciente.nombre_establecimiento || 'CAP El Chal');
   setMapValue(map, 'AA5', formatDate(plan.fecha));
   setMapValue(map, 'I6', plan.lugar_residencia || paciente.comunidad || paciente.domicilio);
-  setMapValue(map, 'J7', nombre);
+  setMapValue(map, 'J7:V7', nombre);
   setMapValue(map, 'AL7', edadAnios(plan.fecha_nacimiento || paciente.fecha_nacimiento));
   setMapValue(map, 'J8', plan.nombre_conyuge || paciente.nombre_esposo_conviviente);
   setMapValue(map, 'T8', cleanCellText(plan.telefono || paciente.telefono).replace(/\s+/g, ' '));
@@ -394,11 +409,11 @@ function buildPlanPartoCellMap({ paciente, plan }) {
   setMapValue(map, 'Q18', plan.no_partos);
   setMapValue(map, 'X18', plan.no_abortos);
   setMapValue(map, 'AE18', plan.no_hijos_vivos);
-  setMapValue(map, 'AL18', plan.no_hijos_muertos);
+  setMapValue(map, 'AM18', plan.no_hijos_muertos);
   setMapValue(map, 'E19', formatDate(plan.fur));
-  setMapValue(map, 'Q19', formatDate(plan.fecha_probable_parto));
+  setMapValue(map, 'Q19:T19', formatDate(plan.fecha_probable_parto));
   setMapValue(map, 'AB19', plan.no_cesareas);
-  setMapValue(map, 'AK19', formatDate(plan.fecha_ultima_cesarea));
+  setMapValue(map, 'AK19:AN19', formatDate(plan.fecha_ultima_cesarea));
   setMapValue(map, 'J20', plan.edad_gestacional_semanas);
   setMapValue(map, 'AC20', plan.edad_gestacional_au);
 
@@ -420,22 +435,30 @@ function buildPlanPartoCellMap({ paciente, plan }) {
     markYesNo(map, c, `AL${row}`, `AN${row}`);
   });
 
-  mapChoice(map, plan.posicion_parto, {
-    semi_reclinada: 'G33',
-    acostada: 'G34',
-    cuclillas: 'G35',
-    rodillas: 'G36',
-    de_pie: 'G37',
-    otro: 'H38',
-  });
-  mapChoice(map, String(plan.lugar_atencion_parto || '').toLowerCase(), {
-    cap: 'L32',
-    caimi: 'Q32',
-    hospital: 'V32',
-    clinica: 'AC32',
-    clinica_privada: 'AC32',
-    otro: 'AG32',
-  });
+  const posicionParto = normalizeChoiceKey(plan.posicion_parto);
+  if (posicionParto === 'otro' || (plan.posicion_parto && !['semi_reclinada', 'acostada', 'cuclillas', 'rodillas', 'de_pie'].includes(posicionParto))) {
+    setMapValue(map, 'C38:G38', posicionParto === 'otro' ? 'X' : plan.posicion_parto);
+  } else {
+    mapChoice(map, plan.posicion_parto, {
+      semi_reclinada: 'G33',
+      acostada: 'G34',
+      cuclillas: 'G35',
+      rodillas: 'G36',
+      de_pie: 'G37',
+    });
+  }
+  const lugarAtencionParto = normalizeChoiceKey(plan.lugar_atencion_parto);
+  if (lugarAtencionParto === 'otro' || (plan.lugar_atencion_parto && !['cap', 'caimi', 'hospital', 'clinica', 'clinica_privada'].includes(lugarAtencionParto))) {
+    setMapValue(map, 'AG32:AN32', lugarAtencionParto === 'otro' ? 'X' : plan.lugar_atencion_parto);
+  } else {
+    mapChoice(map, String(plan.lugar_atencion_parto || '').toLowerCase(), {
+      cap: 'L32',
+      caimi: 'Q32',
+      hospital: 'V32',
+      clinica: 'AC32',
+      clinica_privada: 'AC32',
+    });
+  }
   mapChoice(map, String(plan.horas_distancia || ''), {
     '-1': 'K35',
     '1': 'K35',
@@ -445,7 +468,7 @@ function buildPlanPartoCellMap({ paciente, plan }) {
     '5': 'S35',
   });
   if (Number(plan.horas_distancia) > 5) markMap(map, 'S35', true);
-  setMapValue(map, 'AH37', plan.kms_servicio);
+  setMapValue(map, 'V37:AH37', plan.kms_servicio);
   markYesNo(map, plan.casa_materna_cercana, 'AG38', 'AK38');
   markYesNo(map, plan.usara_casa_materna, 'T39', 'W39');
 
@@ -477,7 +500,7 @@ function buildPlanPartoCellMap({ paciente, plan }) {
   markYesNo(map, plan.cuenta_ahorro, 'C48', 'E48');
   markMap(map, 'T48', plan.ropa_nino);
   markMap(map, 'AB48', plan.ropa_madre);
-  setMapValue(map, 'AH48', plan.otros_articulos);
+  setTwoLineMapValue(map, 'AH48', 'O49', plan.otros_articulos, 20);
 
   mapChoice(map, plan.con_quien_hijos, {
     hijos_mayores: 'F51',
@@ -496,7 +519,7 @@ function buildPlanPartoCellMap({ paciente, plan }) {
     otros: 'C59',
     otro: 'C59',
   });
-  setMapValue(map, 'J60', plan.telefono_vehiculo);
+  setMapValue(map, 'F61', plan.telefono_vehiculo);
   mapChoice(map, plan.responsable_activar, {
     conyuge: 'Q58',
     hermano: 'V58',
@@ -510,7 +533,7 @@ function buildPlanPartoCellMap({ paciente, plan }) {
     otro_familiar: 'AJ59',
   });
   setMapValue(map, 'AE60', plan.nombre_activara_plan);
-  setMapValue(map, 'H70', plan.nombre_proveedor_salud);
+  setMapValue(map, 'K70:T70', plan.nombre_proveedor_salud);
 
   return map;
 }
@@ -542,7 +565,11 @@ try {
     $addr = $prop.Name
     $val = [string]$prop.Value
     $range = $ws.Range($addr)
-    if ($addr -match '^(T8|J60)$') {
+    if ($addr -match ':') {
+      $range.Merge() | Out-Null
+      $range = $ws.Range($addr)
+    }
+    if (@('T8', 'F61', 'Q19:T19', 'AK19:AN19').Contains($addr)) {
       $range.NumberFormat = '@'
     }
     $range.Value2 = $val
