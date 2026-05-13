@@ -828,3 +828,11 @@ ALTER TABLE pacientes ADD CONSTRAINT pacientes_estado_civil_check
 ALTER TABLE pacientes DROP CONSTRAINT IF EXISTS pacientes_antec_diabetes_tipo_check;
 ALTER TABLE pacientes ADD CONSTRAINT pacientes_antec_diabetes_tipo_check
   CHECK (antec_diabetes_tipo IN ('1','2','G')) NOT VALID;
+
+UPDATE pacientes
+SET fpp = (fur + INTERVAL '280 days')::date
+WHERE fpp IS NULL AND fur IS NOT NULL;
+
+UPDATE embarazos
+SET fpp = (fur + INTERVAL '280 days')::date
+WHERE fpp IS NULL AND fur IS NOT NULL;

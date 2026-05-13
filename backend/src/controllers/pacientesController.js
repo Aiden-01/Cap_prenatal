@@ -66,8 +66,22 @@ const num = (value, fallback = 0) => {
   if (value === '' || value === null || value === undefined) return fallback;
   return value;
 };
+const calcularFppDesdeFur = (fur) => {
+  const value = emptyToNull(fur);
+  if (!value) return null;
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const fecha = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  if (Number.isNaN(fecha.getTime())) return null;
+  fecha.setUTCDate(fecha.getUTCDate() + 280);
+  return fecha.toISOString().slice(0, 10);
+};
+
+const fppOrCalculated = (fur, fpp) => emptyToNull(fpp) || calcularFppDesdeFur(fur);
 
 function buildPacienteInsertData(d, usuarioId) {
+  const fpp = fppOrCalculated(d.fur, d.fpp);
+
   return {
     no_expediente: d.no_expediente,
     cui: emptyToNull(d.cui),
@@ -129,7 +143,7 @@ function buildPacienteInsertData(d, usuarioId) {
     embarazo_abuso_sexual: bool(d.embarazo_abuso_sexual),
 
     fur: emptyToNull(d.fur),
-    fpp: emptyToNull(d.fpp),
+    fpp,
     eg_confiable_fur: bool(d.eg_confiable_fur),
     eg_confiable_usg: bool(d.eg_confiable_usg),
 
@@ -216,7 +230,7 @@ async function crear(req, res) {
     await pool.query(
       `INSERT INTO embarazos (paciente_id, numero_embarazo, estado, fur, fpp, fecha_inicio, registrado_por)
        VALUES ($1, 1, 'activo', $2, $3, COALESCE($2, CURRENT_DATE), $4)`,
-      [rows[0].id, emptyToNull(d.fur), emptyToNull(d.fpp), req.usuario.id]
+      [rows[0].id, data.fur, data.fpp, req.usuario.id]
     );
 
     return res.status(201).json(rows[0]);
@@ -235,6 +249,13 @@ async function crear(req, res) {
 async function actualizar(req, res) {
   const { id } = req.params;
   const data = req.body;
+
+  if (
+    Object.prototype.hasOwnProperty.call(data, 'fur') &&
+    !emptyToNull(data.fpp)
+  ) {
+    data.fpp = calcularFppDesdeFur(data.fur);
+  }
 
   const campos = PACIENTE_UPDATE_FIELDS
     .filter((campo) => Object.prototype.hasOwnProperty.call(data, campo));
@@ -348,6 +369,7 @@ async function expedienteCompleto(req, res) {
 async function nuevoEmbarazo(req, res) {
   const { id } = req.params;
   const d = req.body || {};
+  const fpp = fppOrCalculated(d.fur, d.fpp);
 
   try {
     const paciente = await pool.query('SELECT id FROM pacientes WHERE id = $1', [id]);
@@ -373,7 +395,7 @@ async function nuevoEmbarazo(req, res) {
         id,
         nextRows[0].siguiente,
         emptyToNull(d.fur),
-        emptyToNull(d.fpp),
+        fpp,
         emptyToNull(d.observaciones),
         req.usuario.id,
       ]
@@ -382,7 +404,7 @@ async function nuevoEmbarazo(req, res) {
     await pool.query(
       `UPDATE pacientes SET fur = $2, fpp = $3, tiene_ficha_riesgo = FALSE, updated_at = NOW()
        WHERE id = $1`,
-      [id, emptyToNull(d.fur), emptyToNull(d.fpp)]
+      [id, emptyToNull(d.fur), fpp]
     );
 
     return res.status(201).json(rows[0]);

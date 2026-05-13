@@ -60,6 +60,16 @@ function edadAnios(fecha) {
   return edad;
 }
 
+function calcularFppDesdeFur(fur) {
+  if (!fur) return '';
+  const parts = dateParts(fur);
+  if (!parts.y || !parts.m || !parts.d) return '';
+  const dt = new Date(Date.UTC(Number(parts.y), Number(parts.m) - 1, Number(parts.d)));
+  if (Number.isNaN(dt.getTime())) return '';
+  dt.setUTCDate(dt.getUTCDate() + 280);
+  return dt.toISOString().slice(0, 10);
+}
+
 function yFromTop(page, yTop, size = 7) {
   return page.getHeight() - yTop - size;
 }
@@ -266,7 +276,7 @@ function drawPage1({ page, font, paciente, embarazo, controles }) {
   const c1 = controlAt(controles, 1);
   const c2 = controlAt(controles, 2);
   const fur = embarazo?.fur || p.fur;
-  const fpp = embarazo?.fpp || p.fpp;
+  const fpp = embarazo?.fpp || p.fpp || calcularFppDesdeFur(fur);
 
   const textValues = {
     noExpediente: p.no_expediente,

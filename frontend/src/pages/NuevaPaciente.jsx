@@ -141,6 +141,16 @@ function AgeRiskChecks({ form }) {
   );
 }
 
+function calcularFppDesdeFur(fur) {
+  if (!fur) return "";
+  const [year, month, day] = String(fur).split("-").map(Number);
+  if (!year || !month || !day) return "";
+  const fecha = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(fecha.getTime())) return "";
+  fecha.setUTCDate(fecha.getUTCDate() + 280);
+  return fecha.toISOString().split("T")[0];
+}
+
 // ─── ESTADO INICIAL ──────────────────────────────────────────
 const INIT = {
   // Establecimiento
@@ -308,11 +318,11 @@ export default function NuevaPaciente() {
 
   // FPP automática al ingresar FUR
   const handleFUR = (val) => {
-    set("fur", val);
-    if (val) {
-      const fpp = new Date(new Date(val).getTime() + 280 * 86400000);
-      set("fpp", fpp.toISOString().split("T")[0]);
-    }
+    setForm((f) => ({
+      ...f,
+      fur: val,
+      fpp: val ? calcularFppDesdeFur(val) : "",
+    }));
   };
 
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -327,6 +337,7 @@ export default function NuevaPaciente() {
     try {
       const payload = {
         ...form,
+        fpp: form.fpp || calcularFppDesdeFur(form.fur),
         antec_diabetes: Boolean(form.antec_diabetes_tipo),
         fuma_activamente: Boolean(
           form.fuma_activamente_1er_trimestre ||
