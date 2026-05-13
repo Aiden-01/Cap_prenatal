@@ -167,7 +167,7 @@ export default function Dashboard() {
       {/* HEADER */}
       <div>
         <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--text)" }}>
-          Dashboard
+          Inicio
         </h1>
         <p style={{ color: "var(--text-muted)", marginTop: 4, fontSize: "0.9rem" }}>
           Bienvenido/a, {usuario?.nombre_completo}

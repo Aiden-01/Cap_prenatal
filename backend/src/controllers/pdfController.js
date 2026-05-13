@@ -6,6 +6,7 @@ const puppeteer = require('puppeteer');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
+const { generarFichaClinicaPrenatalPdf } = require('../services/fichaClinicaPrenatalPdf');
 
 const execFileAsync = promisify(execFile);
 
@@ -1042,29 +1043,15 @@ async function pdfMspas(req, res) {
       return res.status(404).json({ error: 'Paciente no encontrada' });
     }
 
-    const html = buildMspasHtml({
+    const pdf = await generarFichaClinicaPrenatalPdf({
       paciente: pacienteRes.rows[0],
       embarazo: embarazoRes.rows[0] || null,
       controles: controlesRes.rows,
     });
 
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    const pdf = await page.pdf({
-      width: '8.5in',
-      height: '13in',
-      printBackground: true,
-      margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
-    });
-    await browser.close();
-
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename=ficha-mspas-${pacienteId}.pdf`,
+      'Content-Disposition': 'inline; filename="ficha-prenatal.pdf"',
     });
     return res.send(Buffer.from(pdf));
   } catch (err) {

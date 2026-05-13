@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 
 const NAV = [
-  { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard, delay: 0 },
+  { label: "Inicio", path: "/dashboard", icon: LayoutDashboard, delay: 0 },
   { label: "Pacientes",  path: "/pacientes", icon: Users,           delay: 50 },
   { label: "Nueva",      path: "/nuevo",     icon: UserPlus,        delay: 100 },
   { label: "Reportes",   path: "/reportes",  icon: BarChart3,       delay: 150 },
