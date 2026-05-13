@@ -229,8 +229,8 @@ function mapChoice(map, value, options) {
 }
 
 function buildHistoriaClinicaMap(noExpediente) {
-  const boxes = ['N6', 'O6', 'P6', 'Q6', 'S6', 'T6', 'U6', 'V6', 'Y6', 'Z6', 'AA6', 'AB6'];
-  const clean = String(noExpediente ?? '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  const boxes = ['N6', 'O6', 'P6', 'Q6', 'S6', 'T6', 'U6', 'V6', 'W6', 'Y6', 'Z6', 'AA6', 'AB6'];
+  const clean = String(noExpediente ?? '').replace(/\D/g, '');
   const out = {};
   boxes.forEach((addr, index) => {
     if (clean[index]) out[addr] = clean[index];
@@ -253,13 +253,13 @@ function buildRiskCellMap({ paciente, embarazo, riesgo }) {
   const fur = riesgo.fecha_ultima_regla || embarazo?.fur || paciente.fur;
   const fpp = riesgo.fecha_probable_parto || embarazo?.fpp || paciente.fpp;
   const map = {
-    ...buildHistoriaClinicaMap(paciente.no_expediente),
+    ...buildHistoriaClinicaMap(paciente.cui || paciente.no_expediente),
   };
 
   setMapValue(map, 'H7', `${paciente.nombres || ''} ${paciente.apellidos || ''}`.trim());
   setMapValue(map, 'Z7', edad);
   setMapValue(map, 'F8', paciente.municipio || paciente.domicilio || paciente.comunidad);
-  setMapValue(map, 'V8', riesgo.telefono || paciente.telefono);
+  setMapValue(map, 'V8', cleanCellText(riesgo.telefono || paciente.telefono).replace(/\s+/g, ' '));
   mapChoice(map, riesgo.pueblo || paciente.pueblo, {
     maya: 'F10',
     xinca: 'I10',
@@ -279,7 +279,7 @@ function buildRiskCellMap({ paciente, embarazo, riesgo }) {
     ninguno: 'U12',
   });
   setMapValue(map, 'X12', riesgo.ocupacion || paciente.profesion_oficio);
-  setMapValue(map, 'F13', riesgo.nombre_esposo_conviviente || paciente.nombre_esposo_conviviente);
+  setMapValue(map, 'J13:W13', riesgo.nombre_esposo_conviviente || paciente.nombre_esposo_conviviente);
   setMapValue(map, 'Z13', riesgo.edad_esposo);
   mapChoice(map, riesgo.pueblo_esposo, {
     maya: 'F15',
@@ -300,8 +300,8 @@ function buildRiskCellMap({ paciente, embarazo, riesgo }) {
   setMapValue(map, 'X17', riesgo.ocupacion_esposo);
   setMapValue(map, 'K18', riesgo.distancia_servicio_km);
   setMapValue(map, 'X18', riesgo.tiempo_horas);
-  setMapValue(map, 'F19', formatDate(fur));
-  setMapValue(map, 'O19', formatDate(fpp));
+  setMapValue(map, 'G19:J19', formatDate(fur));
+  setMapValue(map, 'P19:S19', formatDate(fpp));
   setMapValue(map, 'X19', riesgo.no_embarazos);
   setMapValue(map, 'E20', riesgo.no_partos);
   setMapValue(map, 'K20', riesgo.no_cesareas);
@@ -569,7 +569,7 @@ try {
       $range.Merge() | Out-Null
       $range = $ws.Range($addr)
     }
-    if (@('T8', 'F61', 'Q19:T19', 'AK19:AN19').Contains($addr)) {
+    if (@('T8', 'V8', 'F61', 'G19:J19', 'P19:S19', 'Q19:T19', 'AK19:AN19').Contains($addr)) {
       $range.NumberFormat = '@'
     }
     $range.Value2 = $val
