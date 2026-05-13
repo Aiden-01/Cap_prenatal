@@ -6,7 +6,9 @@ const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
 // ============================================================
 async function listar(req, res) {
   const { buscar = '', pagina = 1, limite = 20 } = req.query;
-  const offset = (parseInt(pagina) - 1) * parseInt(limite);
+  const paginaActual = Math.max(parseInt(pagina, 10) || 1, 1);
+  const limiteActual = Math.min(Math.max(parseInt(limite, 10) || 20, 1), 100);
+  const offset = (paginaActual - 1) * limiteActual;
   const q = `%${buscar}%`;
 
   try {
@@ -23,7 +25,7 @@ async function listar(req, res) {
           OR cui ILIKE $1
        ORDER BY nombres ASC, apellidos ASC
        LIMIT $2 OFFSET $3`,
-      [q, parseInt(limite), offset]
+      [q, limiteActual, offset]
     );
 
     const { rows: total } = await pool.query(

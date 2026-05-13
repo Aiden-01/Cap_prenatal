@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 
 const AUTH_COOKIE_NAME = 'cap_prenatal_token';
+const CSRF_COOKIE_NAME = 'cap_prenatal_csrf';
+const CSRF_HEADER_NAME = 'x-csrf-token';
 
 function readCookie(req, name) {
   const cookies = req.headers.cookie || '';
@@ -31,6 +33,25 @@ function authMiddleware(req, res, next) {
   }
 }
 
+function csrfMiddleware(req, res, next) {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    return next();
+  }
+
+  if (req.originalUrl === '/api/auth/login' || req.path === '/auth/login') {
+    return next();
+  }
+
+  const csrfCookie = readCookie(req, CSRF_COOKIE_NAME);
+  const csrfHeader = req.headers[CSRF_HEADER_NAME];
+
+  if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
+    return res.status(403).json({ error: 'Token CSRF invalido' });
+  }
+
+  return next();
+}
+
 function soloAdmin(req, res, next) {
   if (req.usuario?.rol !== 'admin') {
     return res.status(403).json({ error: 'Acceso restringido a administradores' });
@@ -38,4 +59,11 @@ function soloAdmin(req, res, next) {
   next();
 }
 
-module.exports = { AUTH_COOKIE_NAME, authMiddleware, soloAdmin };
+module.exports = {
+  AUTH_COOKIE_NAME,
+  CSRF_COOKIE_NAME,
+  authMiddleware,
+  csrfMiddleware,
+  readCookie,
+  soloAdmin,
+};

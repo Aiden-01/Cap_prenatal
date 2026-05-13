@@ -1,7 +1,8 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const pool = require('../db/pool');
-const { AUTH_COOKIE_NAME } = require('../middleware/auth');
+const { AUTH_COOKIE_NAME, CSRF_COOKIE_NAME } = require('../middleware/auth');
 
 function parseDurationMs(value = '8h') {
   const match = String(value).trim().match(/^(\d+)([smhd])$/i);
@@ -24,6 +25,18 @@ function authCookieOptions() {
 
   return {
     httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite,
+    maxAge: parseDurationMs(process.env.JWT_EXPIRES_IN || '8h'),
+    path: '/',
+  };
+}
+
+function csrfCookieOptions() {
+  const sameSite = (process.env.COOKIE_SAMESITE || 'lax').toLowerCase();
+
+  return {
+    httpOnly: false,
     secure: process.env.NODE_ENV === 'production',
     sameSite,
     maxAge: parseDurationMs(process.env.JWT_EXPIRES_IN || '8h'),
@@ -74,7 +87,9 @@ async function login(req, res) {
       { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
     );
 
+    const csrfToken = crypto.randomBytes(32).toString('hex');
     res.cookie(AUTH_COOKIE_NAME, token, authCookieOptions());
+    res.cookie(CSRF_COOKIE_NAME, csrfToken, csrfCookieOptions());
 
     return res.json({
       usuario: {
@@ -93,6 +108,10 @@ async function login(req, res) {
 async function logout(_req, res) {
   res.clearCookie(AUTH_COOKIE_NAME, {
     ...authCookieOptions(),
+    maxAge: undefined,
+  });
+  res.clearCookie(CSRF_COOKIE_NAME, {
+    ...csrfCookieOptions(),
     maxAge: undefined,
   });
   return res.json({ ok: true });

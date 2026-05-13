@@ -8,6 +8,7 @@ const usuariosRoutes  = require('./routes/usuarios');
 const pacientesRoutes = require('./routes/pacientes');
 const reportesRoutes  = require('./routes/reportes');
 const chatbotRoutes   = require('./routes/chatbot');
+const { csrfMiddleware } = require('./middleware/auth');
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb' }));
+app.use('/api', csrfMiddleware);
 
 // ── Rutas ─────────────────────────────────────────────────────
 app.use('/api/auth',      authRoutes);

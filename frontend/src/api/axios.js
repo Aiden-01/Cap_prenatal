@@ -8,6 +8,25 @@ const api = axios.create({
   withCredentials: true,
 });
 
+function readCookie(name) {
+  return document.cookie
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(`${name}=`))
+    ?.slice(name.length + 1);
+}
+
+api.interceptors.request.use((config) => {
+  const method = (config.method || "get").toLowerCase();
+  if (["post", "put", "patch", "delete"].includes(method)) {
+    const csrfToken = readCookie("cap_prenatal_csrf");
+    if (csrfToken) {
+      config.headers["X-CSRF-Token"] = decodeURIComponent(csrfToken);
+    }
+  }
+  return config;
+});
+
 // Si el token expira, redirigir al login
 api.interceptors.response.use(
   (res) => res,

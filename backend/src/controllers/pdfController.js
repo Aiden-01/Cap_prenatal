@@ -35,24 +35,24 @@ async function pdfControl(req, res) {
     );
 
     html = html
-      .replace('{{nombre}}', `${c.nombres} ${c.apellidos}`)
-      .replace('{{expediente}}', c.no_expediente)
-      .replace('{{fecha}}', c.fecha)
-      .replace('{{hora}}', c.hora || '')
-      .replace('{{eg}}', c.edad_embarazo_semanas || '')
-      .replace('{{motivo}}', c.motivo_consulta || '')
-      .replace('{{temp}}', c.temperatura || '')
-      .replace('{{pulso}}', c.pulso || '')
-      .replace('{{resp}}', c.respiraciones || '')
-      .replace('{{pa}}', `${c.pa_sistolica}/${c.pa_diastolica}`)
-      .replace('{{peso}}', c.peso_kg || '')
-      .replace('{{talla}}', c.talla_cm || '')
-      .replace('{{au}}', c.au_cm || '')
-      .replace('{{fcf}}', c.fcf || '')
-      .replace('{{imc}}', c.imc || '')
-      .replace('{{tratamiento}}', c.tratamiento || '')
-      .replace('{{consejeria}}', c.consejeria || '')
-      .replace('{{personal}}', c.personal_atendio || '');
+      .replace('{{nombre}}', esc(`${c.nombres} ${c.apellidos}`))
+      .replace('{{expediente}}', esc(c.no_expediente))
+      .replace('{{fecha}}', esc(c.fecha))
+      .replace('{{hora}}', esc(c.hora || ''))
+      .replace('{{eg}}', esc(c.edad_embarazo_semanas || ''))
+      .replace('{{motivo}}', esc(c.motivo_consulta || ''))
+      .replace('{{temp}}', esc(c.temperatura || ''))
+      .replace('{{pulso}}', esc(c.pulso || ''))
+      .replace('{{resp}}', esc(c.respiraciones || ''))
+      .replace('{{pa}}', esc(`${c.pa_sistolica || ''}/${c.pa_diastolica || ''}`))
+      .replace('{{peso}}', esc(c.peso_kg || ''))
+      .replace('{{talla}}', esc(c.talla_cm || ''))
+      .replace('{{au}}', esc(c.au_cm || ''))
+      .replace('{{fcf}}', esc(c.fcf || ''))
+      .replace('{{imc}}', esc(c.imc || ''))
+      .replace('{{tratamiento}}', esc(c.tratamiento || ''))
+      .replace('{{consejeria}}', esc(c.consejeria || ''))
+      .replace('{{personal}}', esc(c.personal_atendio || ''));
 
     const browser = await puppeteer.launch({
       headless: "new",
