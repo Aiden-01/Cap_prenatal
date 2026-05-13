@@ -1,5 +1,11 @@
 const pool = require('../db/pool');
 
+const REFERENCIA_FIELDS = [
+  'fecha',
+  'lugar_referencia',
+  'diagnostico',
+];
+
 // ============================================================
 // GET /api/pacientes/:pacienteId/referencias
 // ============================================================
@@ -55,21 +61,21 @@ async function guardar(req, res) {
 // PUT /api/pacientes/:pacienteId/referencias/:id
 // ============================================================
 async function actualizar(req, res) {
-  const { id } = req.params;
+  const { pacienteId, id } = req.params;
   const d = req.body;
 
-  const BLOQUEADOS = ['id', 'paciente_id', 'registrado_por', 'created_at'];
-  const campos = Object.keys(d).filter(k => !BLOQUEADOS.includes(k));
+  const campos = REFERENCIA_FIELDS
+    .filter((campo) => Object.prototype.hasOwnProperty.call(d, campo));
 
   if (campos.length === 0) return res.status(400).json({ error: 'Sin campos para actualizar' });
 
   const sets = campos.map((c, i) => `${c} = $${i + 1}`).join(', ');
-  const valores = [...campos.map(c => d[c]), id];
+  const valores = [...campos.map(c => d[c]), id, pacienteId];
 
   try {
     const { rowCount } = await pool.query(
       `UPDATE referencias_efectuadas SET ${sets}, updated_at = NOW()
-       WHERE id = $${valores.length}`,
+       WHERE id = $${valores.length - 1} AND paciente_id = $${valores.length}`,
       valores
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Referencia no encontrada' });
@@ -84,11 +90,11 @@ async function actualizar(req, res) {
 // DELETE /api/pacientes/:pacienteId/referencias/:id
 // ============================================================
 async function eliminar(req, res) {
-  const { id } = req.params;
+  const { pacienteId, id } = req.params;
   try {
     const { rowCount } = await pool.query(
-      'DELETE FROM referencias_efectuadas WHERE id = $1',
-      [id]
+      'DELETE FROM referencias_efectuadas WHERE id = $1 AND paciente_id = $2',
+      [id, pacienteId]
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Referencia no encontrada' });
     return res.json({ message: 'Referencia eliminada' });

@@ -5,13 +5,7 @@ const apiHost = import.meta.env.VITE_API_URL
 
 const api = axios.create({
   baseURL: apiHost,
-});
-
-// Inyectar token en cada request
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+  withCredentials: true,
 });
 
 // Si el token expira, redirigir al login
@@ -19,7 +13,6 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      localStorage.removeItem("token");
       localStorage.removeItem("usuario");
       window.location.href = "/login";
     }

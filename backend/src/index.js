@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
+const helmet  = require('helmet');
 
 const authRoutes      = require('./routes/auth');
 const usuariosRoutes  = require('./routes/usuarios');
@@ -35,6 +36,9 @@ function isAllowedDevOrigin(origin) {
 }
 
 // ── Middlewares globales ──────────────────────────────────────
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+}));
 app.use(cors({
   origin(origin, callback) {
     if (isAllowedDevOrigin(origin)) return callback(null, true);
@@ -42,7 +46,7 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb' }));
 
 // ── Rutas ─────────────────────────────────────────────────────
 app.use('/api/auth',      authRoutes);

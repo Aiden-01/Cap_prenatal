@@ -17,7 +17,7 @@ export default function Login() {
     setError(""); setLoading(true);
     try {
       const { data } = await api.post("/auth/login", form);
-      login(data.token, data.usuario);
+      login(data.usuario);
       navigate("/dashboard");
     } catch (err) {
       setError(err.response?.data?.error || "Error al iniciar sesión");

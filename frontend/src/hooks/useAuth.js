@@ -6,8 +6,8 @@ export function useAuth() {
     catch { return null; }
   });
 
-  const login = (token, user) => {
-    localStorage.setItem("token", token);
+  const login = (user) => {
+    localStorage.removeItem("token");
     localStorage.setItem("usuario", JSON.stringify(user));
     setUsuario(user);
   };

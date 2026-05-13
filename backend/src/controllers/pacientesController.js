@@ -183,6 +183,9 @@ function buildPacienteInsertData(d, usuarioId) {
   };
 }
 
+const PACIENTE_UPDATE_FIELDS = Object.keys(buildPacienteInsertData({}, null))
+  .filter((campo) => campo !== 'registrado_por');
+
 // ============================================================
 // POST /api/pacientes
 // ============================================================
@@ -225,14 +228,14 @@ async function crear(req, res) {
 }
 
 // ============================================================
-// PUT /api/pacientes/:id  (SET dinamico)
+// PUT /api/pacientes/:id
 // ============================================================
 async function actualizar(req, res) {
   const { id } = req.params;
   const data = req.body;
 
-  const CAMPOS_BLOQUEADOS = ['id', 'registrado_por', 'created_at', 'updated_at', 'edad_manual', 'edad_calculada'];
-  const campos = Object.keys(data).filter(k => !CAMPOS_BLOQUEADOS.includes(k));
+  const campos = PACIENTE_UPDATE_FIELDS
+    .filter((campo) => Object.prototype.hasOwnProperty.call(data, campo));
 
   if (campos.length === 0) {
     return res.status(400).json({ error: 'Sin campos para actualizar' });

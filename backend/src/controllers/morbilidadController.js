@@ -2,6 +2,18 @@ const pool = require('../db/pool');
 const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
 const { withGuatemalaTimeFallback } = require('../utils/guatemalaTime');
 
+const MORBILIDAD_FIELDS = [
+  'fecha',
+  'hora',
+  'motivo_consulta',
+  'historia_enfermedad_actual',
+  'revision_por_sistemas',
+  'examen_fisico',
+  'impresion_clinica',
+  'tratamiento_referencia',
+  'nombre_cargo_atiende',
+];
+
 // ============================================================
 // GET /api/pacientes/:pacienteId/morbilidad
 // ============================================================
@@ -99,8 +111,8 @@ async function actualizar(req, res) {
   const { pacienteId, id } = req.params;
   const d = withGuatemalaTimeFallback(req.body);
 
-  const BLOQUEADOS = ['id', 'paciente_id', 'embarazo_id', 'registrado_por', 'created_at'];
-  const campos = Object.keys(d).filter(k => !BLOQUEADOS.includes(k));
+  const campos = MORBILIDAD_FIELDS
+    .filter((campo) => Object.prototype.hasOwnProperty.call(d, campo));
 
   if (campos.length === 0) return res.status(400).json({ error: 'Sin campos para actualizar' });
 

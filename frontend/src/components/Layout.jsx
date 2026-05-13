@@ -4,6 +4,7 @@ import { Menu } from "lucide-react";
 import Sidebar from "./Sidebar";
 import Toast from "./Toast";
 import ChatbotWidget from "./ChatbotWidget";
+import api from "../api/axios";
 import { ToastContext } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
@@ -26,7 +27,12 @@ export default function Layout() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // La limpieza local debe ocurrir aunque el servidor no responda.
+    }
     logout();
     navigate("/login");
   };

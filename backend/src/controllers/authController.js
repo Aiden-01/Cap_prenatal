@@ -1,6 +1,35 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../db/pool');
+const { AUTH_COOKIE_NAME } = require('../middleware/auth');
+
+function parseDurationMs(value = '8h') {
+  const match = String(value).trim().match(/^(\d+)([smhd])$/i);
+  if (!match) return 8 * 60 * 60 * 1000;
+
+  const amount = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  const multipliers = {
+    s: 1000,
+    m: 60 * 1000,
+    h: 60 * 60 * 1000,
+    d: 24 * 60 * 60 * 1000,
+  };
+
+  return amount * multipliers[unit];
+}
+
+function authCookieOptions() {
+  const sameSite = (process.env.COOKIE_SAMESITE || 'lax').toLowerCase();
+
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite,
+    maxAge: parseDurationMs(process.env.JWT_EXPIRES_IN || '8h'),
+    path: '/',
+  };
+}
 
 async function login(req, res) {
   const { username, password } = req.body;
@@ -10,6 +39,11 @@ async function login(req, res) {
   }
 
   try {
+    if (!process.env.JWT_SECRET) {
+      console.error('JWT_SECRET no configurado');
+      return res.status(500).json({ error: 'Error interno del servidor' });
+    }
+
     const { rows } = await pool.query(
       `SELECT u.id, u.nombre_completo, u.username, u.password_hash, u.activo,
               r.nombre AS rol
@@ -40,8 +74,9 @@ async function login(req, res) {
       { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
     );
 
+    res.cookie(AUTH_COOKIE_NAME, token, authCookieOptions());
+
     return res.json({
-      token,
       usuario: {
         id: usuario.id,
         nombre_completo: usuario.nombre_completo,
@@ -53,6 +88,14 @@ async function login(req, res) {
     console.error('Error en login:', err);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
+}
+
+async function logout(_req, res) {
+  res.clearCookie(AUTH_COOKIE_NAME, {
+    ...authCookieOptions(),
+    maxAge: undefined,
+  });
+  return res.json({ ok: true });
 }
 
 async function me(req, res) {
@@ -69,4 +112,4 @@ async function me(req, res) {
   }
 }
 
-module.exports = { login, me };
+module.exports = { login, logout, me };

@@ -1,8 +1,22 @@
 const jwt = require('jsonwebtoken');
 
+const AUTH_COOKIE_NAME = 'cap_prenatal_token';
+
+function readCookie(req, name) {
+  const cookies = req.headers.cookie || '';
+  const match = cookies
+    .split(';')
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(`${name}=`));
+
+  if (!match) return null;
+  return decodeURIComponent(match.slice(name.length + 1));
+}
+
 function authMiddleware(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
+  const bearerToken = authHeader && authHeader.split(' ')[1]; // Bearer <token>
+  const token = bearerToken || readCookie(req, AUTH_COOKIE_NAME);
 
   if (!token) {
     return res.status(401).json({ error: 'Token requerido' });
@@ -24,4 +38,4 @@ function soloAdmin(req, res, next) {
   next();
 }
 
-module.exports = { authMiddleware, soloAdmin };
+module.exports = { AUTH_COOKIE_NAME, authMiddleware, soloAdmin };
