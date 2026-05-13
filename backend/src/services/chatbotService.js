@@ -16,21 +16,27 @@ const knowledgeBase = [
       'sacar fecha',
     ],
     answer:
-      'Para calcular la FPP usa la FUR y suma 280 dias. Tambien puedes escribir una fecha, por ejemplo: "mi FUR fue 2026-01-10", y te dare la FPP aproximada.',
+      'Para calcular la FPP:\n1. Confirma la FUR de la paciente.\n2. Suma 280 dias a esa fecha.\n3. Registra la FPP en el formulario donde corresponda.\n\nTambien puedes escribirme una fecha, por ejemplo: "mi FUR fue 2026-01-10", y te dare la FPP aproximada.',
   },
   {
     intent: 'registrar_paciente',
     title: 'Registro de paciente',
     keywords: [
       'registrar paciente',
+      'registrar una paciente',
+      'registro paciente',
+      'registro una paciente',
       'nueva paciente',
       'crear paciente',
       'agregar paciente',
+      'agrego paciente',
       'ingresar paciente',
+      'ingreso paciente',
+      'ingreso una paciente',
       'datos paciente',
     ],
     answer:
-      'Para registrar una paciente entra en "Nueva", completa los datos obligatorios y guarda el formulario. Luego podras abrir su expediente desde "Pacientes".',
+      'Para registrar una paciente nueva:\n1. En el menu lateral, entra en "Nueva".\n2. Completa primero No. de Expediente, nombres y apellidos.\n3. Ingresa los datos de establecimiento, datos personales, gestacion actual, antecedentes y riesgo social.\n4. Revisa la pantalla de confirmacion.\n5. Presiona "Guardar paciente".\n\nAl guardar, el sistema abre el expediente de la paciente. Despues podras encontrarla desde "Pacientes".',
   },
   {
     intent: 'buscar_paciente',
@@ -45,7 +51,7 @@ const knowledgeBase = [
       'abrir expediente',
     ],
     answer:
-      'Para buscar una paciente entra en "Pacientes". Desde la lista puedes abrir el expediente y revisar controles, riesgo, vacunas, morbilidades, referencias y documentos.',
+      'Para buscar una paciente:\n1. Entra en "Pacientes" desde el menu lateral.\n2. Usa el buscador o revisa la lista.\n3. Haz clic sobre la paciente para abrir su expediente.\n4. Dentro del expediente puedes revisar datos generales, controles, puerperio, morbilidad, riesgo, plan de parto, vacunas y laboratorios.',
   },
   {
     intent: 'editar_paciente',
@@ -63,7 +69,7 @@ const knowledgeBase = [
       'equivoque datos',
     ],
     answer:
-      'Para editar los datos de una paciente abre su expediente y usa la opcion de editar. Revisa los campos modificados antes de guardar para mantener el expediente consistente.',
+      'Para editar datos de una paciente:\n1. Entra en "Pacientes".\n2. Abre el expediente de la paciente.\n3. Presiona "Editar paciente".\n4. Corrige los campos necesarios.\n5. Avanza a confirmar y guarda los cambios.\n\nAntes de guardar, revisa especialmente CUI, expediente, FUR/FPP y datos de contacto.',
   },
   {
     intent: 'embarazo_activo',
@@ -78,7 +84,7 @@ const knowledgeBase = [
       'gestacion nueva',
     ],
     answer:
-      'El sistema trabaja con el embarazo activo de la paciente. Si necesitas registrar un nuevo embarazo, abre el expediente y usa la opcion correspondiente para crear el nuevo registro de embarazo.',
+      'El sistema trabaja con el embarazo activo de la paciente. Para crear un nuevo embarazo:\n1. Abre el expediente de la paciente.\n2. Presiona "Nuevo embarazo".\n3. Confirma que deseas cerrar el embarazo activo.\n4. Ingresa la FUR y FPP del nuevo embarazo si las tienes.\n5. Guarda y verifica que aparezca como embarazo activo.\n\nUsa esta opcion solo cuando realmente inicia una nueva gestacion.',
   },
   {
     intent: 'control_prenatal',
@@ -87,7 +93,10 @@ const knowledgeBase = [
       'control prenatal',
       'nuevo control',
       'agregar control',
+      'agrego control',
+      'agrego un control',
       'registrar control',
+      'registro control',
       'consulta prenatal',
       'editar control',
       'peso',
@@ -96,7 +105,7 @@ const knowledgeBase = [
       'frecuencia cardiaca fetal',
     ],
     answer:
-      'Para agregar un control prenatal abre el expediente de la paciente y usa la opcion de nuevo control. Completa los datos del control y guarda los cambios.',
+      'Para agregar un control prenatal:\n1. Busca la paciente en "Pacientes" y abre su expediente.\n2. Presiona el boton "Control".\n3. Revisa el No. de control, fecha, hora y semanas de gestacion.\n4. Completa motivo de consulta, acompanante y personal que atiende.\n5. Marca signos de peligro si existen.\n6. Llena las pestanas necesarias: General, Laboratorios, Suplementacion y Orientaciones.\n7. Presiona "Guardar control".\n\nLos laboratorios se registran dentro del control prenatal, en la pestana "Laboratorios".',
   },
   {
     intent: 'impresion_no_disponible',
@@ -113,7 +122,7 @@ const knowledgeBase = [
       'pdf expediente',
     ],
     answer:
-      'La impresion del expediente todavia no esta disponible como orientacion del asistente. Esa parte debe usarse hasta que el formato del sistema este completamente ajustado al formato fisico.',
+      'Para imprimir o generar documentos desde el expediente:\n1. Abre el expediente de la paciente.\n2. Usa el boton "Expediente" para generar el PDF MSPAS.\n3. En la pestana "Riesgo obstetrico", usa "Imprimir" para la ficha de riesgo.\n4. En la pestana "Plan de parto", usa "Imprimir" para ese formato.\n\nSi un PDF no se genera, revisa que el registro exista y que los datos principales esten completos.',
   },
   {
     intent: 'editar_control_prenatal',
@@ -127,7 +136,7 @@ const knowledgeBase = [
       'me equivoque en control',
     ],
     answer:
-      'Para editar un control prenatal abre el expediente de la paciente, busca el control registrado y selecciona la opcion de editar. Guarda solamente cuando hayas verificado los datos.',
+      'Para editar un control prenatal:\n1. Abre el expediente de la paciente.\n2. Entra en la pestana "Controles".\n3. Busca el control que deseas corregir.\n4. Presiona "Editar".\n5. Ajusta datos generales, examen, laboratorios, suplementacion u orientaciones.\n6. Guarda los cambios.\n\nVerifica que estes editando el control correcto antes de guardar.',
   },
   {
     intent: 'eliminar_registro',
@@ -142,7 +151,7 @@ const knowledgeBase = [
       'borrar registro',
     ],
     answer:
-      'Si necesitas eliminar un registro, abre el expediente de la paciente y usa la opcion de eliminar en el registro correspondiente. El sistema pedira confirmacion antes de borrar.',
+      'Para eliminar un registro:\n1. Abre el expediente de la paciente.\n2. Entra en la pestana donde esta el registro: controles, puerperio, morbilidad, riesgo o vacunas.\n3. Presiona "Eliminar" en el registro correcto.\n4. Confirma solo si estas seguro.\n\nEsta accion borra el registro seleccionado. Si solo hay un error de captura, normalmente conviene usar "Editar".',
   },
   {
     intent: 'ficha_riesgo',
@@ -158,7 +167,7 @@ const knowledgeBase = [
       'factores de riesgo',
     ],
     answer:
-      'La ficha de riesgo se gestiona desde el expediente de la paciente, en la seccion de riesgo. Registra los factores encontrados y guarda la evaluacion.',
+      'Para llenar la ficha de riesgo:\n1. Abre el expediente de la paciente.\n2. Entra en la pestana "Riesgo obstetrico".\n3. Presiona "Registrar ficha de riesgo" o "Editar".\n4. Verifica fecha, telefono, pueblo, estado civil, escolaridad, ocupacion, FUR y FPP.\n5. Marca los criterios que apliquen en antecedentes obstetricos, embarazo actual e historia clinica general.\n6. Si corresponde, completa "Referida a" y el nombre del personal que atendio.\n7. Presiona "Guardar ficha".',
   },
   {
     intent: 'interpretar_riesgo',
@@ -172,7 +181,7 @@ const knowledgeBase = [
       'semaforo riesgo',
     ],
     answer:
-      'La clasificacion de riesgo ayuda a identificar prioridad de seguimiento dentro del sistema. Si aparece riesgo alto, revisa la ficha registrada y aplica el protocolo clinico local correspondiente.',
+      'La ficha de riesgo marca si la paciente presenta criterios de riesgo obstetrico dentro del sistema.\n\nComo usarlo:\n1. Abre el expediente y revisa la pestana "Riesgo obstetrico".\n2. Confirma que los criterios marcados sean correctos.\n3. Si aparece "Presenta riesgo", revisa el detalle de los factores.\n4. Aplica el protocolo clinico local correspondiente y registra referencia si corresponde.\n\nEl asistente solo orienta sobre el sistema; no sustituye criterio clinico.',
   },
   {
     intent: 'vacunas',
@@ -190,7 +199,7 @@ const knowledgeBase = [
       'dosis',
     ],
     answer:
-      'Para registrar vacunas abre el expediente de la paciente y entra a la seccion de vacunas. Agrega la vacuna aplicada con su fecha correspondiente.',
+      'Para registrar una vacuna:\n1. Abre el expediente de la paciente.\n2. Entra en la pestana "Vacunas".\n3. Presiona "Registrar vacuna".\n4. Selecciona el tipo: Td/Tdap, Influenza o SPR/SR.\n5. Selecciona el momento: previo embarazo, durante embarazo o postparto/aborto.\n6. Ingresa No. de dosis y fecha de dosis.\n7. Presiona "Guardar".',
   },
   {
     intent: 'editar_vacuna',
@@ -204,7 +213,7 @@ const knowledgeBase = [
       'me equivoque en vacuna',
     ],
     answer:
-      'Para editar una vacuna abre el expediente de la paciente, entra a vacunas y selecciona el registro que deseas modificar. Verifica fecha, tipo de vacuna y dosis antes de guardar.',
+      'Para editar una vacuna:\n1. Abre el expediente de la paciente.\n2. Entra en la pestana "Vacunas".\n3. Busca la vacuna registrada.\n4. Presiona "Editar".\n5. Corrige tipo, momento, dosis o fecha.\n6. Presiona "Guardar".\n\nVerifica fecha, tipo de vacuna y dosis antes de guardar.',
   },
   {
     intent: 'morbilidad',
@@ -219,7 +228,7 @@ const knowledgeBase = [
       'antecedente',
     ],
     answer:
-      'Para registrar una morbilidad abre el expediente de la paciente y usa la seccion de morbilidad. El sistema guardara el evento dentro del embarazo activo.',
+      'Para registrar morbilidad:\n1. Abre el expediente de la paciente.\n2. Entra en la pestana "Morbilidad".\n3. Presiona "Registrar morbilidad".\n4. Ingresa fecha, hora y motivo de consulta.\n5. Completa historia de enfermedad actual, revision por sistemas, examen fisico, impresion clinica y tratamiento/referencia.\n6. Agrega nombre y cargo de quien atiende.\n7. Presiona "Guardar".\n\nEl registro queda asociado al embarazo activo.',
   },
   {
     intent: 'puerperio',
@@ -234,7 +243,7 @@ const knowledgeBase = [
       'despues del parto',
     ],
     answer:
-      'Para registrar puerperio abre el expediente de la paciente y usa la seccion de puerperio. Completa los datos del seguimiento y guarda el registro.',
+      'Para registrar puerperio:\n1. Abre el expediente de la paciente.\n2. Entra en la pestana "Puerperio".\n3. Presiona "Registrar puerperio".\n4. Completa No. de atencion, fecha, hora y dias despues del parto.\n5. Ingresa lugar del parto, quien atendio, tipo de parto, presion, temperatura y personal que atiende.\n6. Marca RN vivo, apego inmediato y lactancia materna exclusiva si corresponde.\n7. Completa los demas campos del seguimiento y guarda.',
   },
   {
     intent: 'laboratorio',
@@ -251,7 +260,7 @@ const knowledgeBase = [
       'registrar laboratorio',
     ],
     answer:
-      'Los datos de laboratorio deben registrarse desde el expediente de la paciente en la seccion correspondiente. Ingresa resultados claros y verifica la fecha del examen antes de guardar.',
+      'Para registrar laboratorios:\n1. Abre el expediente de la paciente.\n2. Presiona "Control" o edita un control existente.\n3. En el formulario del control, entra en la pestana "Laboratorios".\n4. Marca el examen realizado: hematologia, glicemia, grupo/RH, orina, heces, VIH, VDRL/RPR, TORCH, Papanicolau/IVAA, Hepatitis B o USG.\n5. Ingresa el resultado o detalle que corresponda.\n6. Guarda el control.\n\nLuego los resultados se ven en la pestana "Laboratorios" del expediente.',
   },
   {
     intent: 'referencias',
@@ -266,7 +275,7 @@ const knowledgeBase = [
       'contrarreferencia',
     ],
     answer:
-      'Las referencias se registran desde el expediente de la paciente. Usa esa seccion cuando necesites dejar constancia de una referencia o traslado.',
+      'Para dejar constancia de una referencia:\n1. Abre el expediente de la paciente.\n2. Si es por morbilidad, entra en "Morbilidad" y registra el tratamiento/referencia.\n3. Si es por ficha de riesgo, entra en "Riesgo obstetrico" y completa "Referida a".\n4. Guarda el formulario.\n\nAnota el lugar de referencia de forma clara para que quede visible en el expediente.',
   },
   {
     intent: 'citas_seguimiento',
@@ -281,7 +290,7 @@ const knowledgeBase = [
       'agenda',
     ],
     answer:
-      'Para dar seguimiento, revisa el expediente de la paciente y sus controles prenatales registrados. Usa la informacion del ultimo control para definir la proxima atencion segun el protocolo local.',
+      'Para revisar seguimiento prenatal:\n1. Abre el expediente de la paciente.\n2. Entra en "Controles" y revisa el ultimo control registrado.\n3. Verifica la fecha de "Cita siguiente" si fue registrada.\n4. En el Dashboard puedes revisar "Citas proximas" y "Sin control reciente".\n5. Define la proxima atencion segun el protocolo local.',
   },
   {
     intent: 'reportes',
@@ -299,7 +308,7 @@ const knowledgeBase = [
       'rango fechas',
     ],
     answer:
-      'Para generar reportes entra en "Reportes", selecciona el periodo que necesitas y consulta la informacion disponible. Si tu usuario tiene permiso, tambien podras exportar datos.',
+      'Para generar reportes:\n1. Entra en "Reportes" desde el menu lateral.\n2. Selecciona el modo de censo o consulta disponible.\n3. Elige el periodo cuando el sistema lo solicite.\n4. Presiona "Generar censo mensual" o "Ver censo actual".\n5. Revisa la tabla resultante.\n6. Si el boton de exportacion esta disponible para tu usuario, puedes descargar el archivo.',
   },
   {
     intent: 'filtrar_reportes',
@@ -314,7 +323,7 @@ const knowledgeBase = [
       'periodo reporte',
     ],
     answer:
-      'En "Reportes" puedes seleccionar el periodo que deseas consultar. Verifica las fechas antes de generar o exportar la informacion.',
+      'Para filtrar reportes por fecha o periodo:\n1. Entra en "Reportes".\n2. Selecciona el tipo de reporte.\n3. Ajusta mes, anio o rango de fechas segun aparezca en pantalla.\n4. Genera el reporte.\n5. Antes de exportar, confirma que el periodo mostrado sea el correcto.',
   },
   {
     intent: 'usuarios',
@@ -331,7 +340,7 @@ const knowledgeBase = [
       'contraseña',
     ],
     answer:
-      'La gestion de usuarios esta disponible solo para administradores. Entra en "Usuarios" para crear cuentas, editar roles o administrar accesos.',
+      'Para gestionar usuarios, debes entrar con rol administrador.\n\nPasos:\n1. En el menu lateral, entra en "Usuarios".\n2. Para crear una cuenta, llena nombre completo, usuario, contrasena y rol.\n3. Para editar, selecciona el usuario existente y cambia los datos necesarios.\n4. Guarda los cambios.\n\nSi no ves "Usuarios", tu cuenta no tiene permiso de administrador.',
   },
   {
     intent: 'olvido_contrasena',
@@ -394,7 +403,7 @@ const knowledgeBase = [
       'pantalla clara',
     ],
     answer:
-      'Puedes cambiar entre modo claro y modo oscuro desde el menu lateral usando el boton de tema.',
+      'Para cambiar el tema:\n1. Ve al menu lateral.\n2. Busca el boton "Modo oscuro" o "Modo claro".\n3. Presionalo para alternar el tema.\n\nEl sistema recordara tu preferencia en ese navegador.',
   },
   {
     intent: 'dashboard',
@@ -408,7 +417,7 @@ const knowledgeBase = [
       'tarjetas',
     ],
     answer:
-      'El Dashboard muestra un resumen general del sistema. Usalo como pantalla inicial para revisar indicadores y acceder rapidamente a las secciones principales.',
+      'El Dashboard sirve para revisar el estado general del sistema.\n\nAhi puedes ver:\n1. Total de pacientes.\n2. Controles del mes.\n3. Pacientes con riesgo.\n4. Pacientes proximas al parto.\n5. Pacientes sin control reciente.\n6. Citas proximas.\n\nPuedes hacer clic en varias tarjetas o filas para abrir el expediente relacionado.',
   },
   {
     intent: 'errores_guardado',
@@ -422,7 +431,7 @@ const knowledgeBase = [
       'formulario no guarda',
     ],
     answer:
-      'Si un formulario no guarda, revisa que los campos obligatorios esten completos y que los datos tengan el formato correcto. Si el problema continua, reportalo al administrador del sistema.',
+      'Si un formulario no guarda:\n1. Revisa los campos obligatorios marcados con asterisco o mensajes de error.\n2. Verifica fechas en formato correcto.\n3. Confirma que los numeros no lleven letras o simbolos raros.\n4. Si estas editando, revisa que el registro todavia exista.\n5. Intenta guardar nuevamente.\n6. Si continua, reporta el error al responsable tecnico con el nombre de la pantalla y la accion que estabas haciendo.',
   },
   {
     intent: 'datos_obligatorios',
@@ -436,7 +445,7 @@ const knowledgeBase = [
       'validacion',
     ],
     answer:
-      'Los campos obligatorios deben completarse antes de guardar. El sistema usa esas validaciones para evitar expedientes incompletos o inconsistentes.',
+      'Los campos obligatorios deben completarse antes de guardar.\n\nEn paciente nueva, revisa especialmente:\n1. No. de Expediente.\n2. Nombres.\n3. Apellidos.\n4. Datos basicos de gestacion cuando apliquen.\n\nEn otros formularios, revisa fecha, tipo de registro y datos principales antes de guardar.',
   },
   {
     intent: 'privacidad_datos',
@@ -479,7 +488,88 @@ const knowledgeBase = [
       'bot',
     ],
     answer:
-      'Puedo orientarte sobre el uso del sistema: pacientes, controles prenatales, FPP, riesgo, vacunas, morbilidad, referencias, reportes y usuarios. No doy diagnosticos medicos.',
+      'Puedo orientarte paso a paso sobre el uso del sistema.\n\nPuedes preguntarme cosas como:\n1. Como registrar una paciente.\n2. Como agregar un control prenatal.\n3. Como registrar laboratorios.\n4. Como llenar ficha de riesgo.\n5. Como registrar plan de parto, puerperio, morbilidad o vacunas.\n6. Como imprimir expediente, ficha de riesgo o plan de parto.\n7. Como generar reportes o gestionar usuarios.\n\nNo doy diagnosticos medicos ni sustituyo criterio clinico.',
+  },
+  {
+    intent: 'imprimir_plan_parto',
+    title: 'Imprimir plan de parto',
+    keywords: [
+      'imprimir plan de parto',
+      'imprimo plan de parto',
+      'imprimir plan parto',
+      'imprimo plan parto',
+      'pdf plan de parto',
+      'pdf plan parto',
+      'descargar plan de parto',
+      'descargar plan parto',
+      'generar plan de parto',
+      'generar plan parto',
+      'formato plan de parto',
+      'formato plan parto',
+    ],
+    answer:
+      'Para imprimir el plan de parto:\n1. Abre el expediente de la paciente.\n2. Entra en la pestana "Plan de parto".\n3. Verifica que ya exista un plan guardado.\n4. Presiona "Imprimir".\n5. El sistema abrira el PDF en una nueva pestana.\n\nSi no aparece el boton o falla el PDF, primero guarda el plan de parto.',
+  },
+  {
+    intent: 'plan_parto',
+    title: 'Plan de parto',
+    keywords: [
+      'plan de parto',
+      'registrar plan parto',
+      'registrar plan de parto',
+      'llenar plan de parto',
+      'editar plan de parto',
+      'formulario plan parto',
+      'formulario plan de parto',
+      'plan parto',
+    ],
+    answer:
+      'Para registrar o editar el plan de parto:\n1. Abre el expediente de la paciente.\n2. Entra en la pestana "Plan de parto".\n3. Presiona "Registrar plan de parto" o "Editar".\n4. Revisa los datos precargados desde paciente, riesgo y ultimo control.\n5. Completa datos generales, resumen obstetrico, logistica, responsables y signos de peligro.\n6. Presiona "Guardar plan".\n7. Para generar el formato, vuelve a la pestana "Plan de parto" y presiona "Imprimir".',
+  },
+  {
+    intent: 'imprimir_riesgo',
+    title: 'Imprimir ficha de riesgo',
+    keywords: [
+      'imprimir riesgo',
+      'imprimo riesgo',
+      'pdf riesgo',
+      'descargar ficha riesgo',
+      'imprimir ficha riesgo',
+      'imprimo ficha riesgo',
+      'generar ficha riesgo',
+      'formato riesgo',
+    ],
+    answer:
+      'Para imprimir la ficha de riesgo:\n1. Abre el expediente de la paciente.\n2. Entra en la pestana "Riesgo obstetrico".\n3. Verifica que la ficha este guardada.\n4. Presiona "Imprimir".\n5. El sistema generara el PDF de la ficha.\n\nSi no hay ficha registrada, primero presiona "Registrar ficha de riesgo" y guarda.',
+  },
+  {
+    intent: 'secciones_expediente',
+    title: 'Secciones del expediente',
+    keywords: [
+      'que tiene expediente',
+      'secciones expediente',
+      'pestanas expediente',
+      'donde esta laboratorio',
+      'donde esta morbilidad',
+      'donde esta puerperio',
+      'donde esta plan',
+    ],
+    answer:
+      'El expediente de una paciente se organiza por pestanas:\n1. Datos generales: establecimiento, datos personales, gestacion y antecedentes.\n2. Controles: controles prenatales y sus acciones.\n3. Puerperio: seguimientos posteriores al parto.\n4. Morbilidad: eventos o consultas por enfermedad/complicacion.\n5. Riesgo obstetrico: ficha de riesgo e impresion.\n6. Plan de parto: plan, responsables, signos de peligro e impresion.\n7. Vacunas: registro y edicion de vacunas.\n8. Laboratorios: resultados guardados desde controles prenatales.',
+  },
+  {
+    intent: 'primeros_pasos',
+    title: 'Flujo recomendado',
+    keywords: [
+      'por donde empiezo',
+      'primeros pasos',
+      'flujo sistema',
+      'orden registro',
+      'como usar sistema',
+      'que hago primero',
+    ],
+    answer:
+      'Flujo recomendado para trabajar una paciente:\n1. Registra la paciente desde "Nueva".\n2. Abre el expediente desde "Pacientes".\n3. Registra o revisa la ficha de riesgo.\n4. Agrega controles prenatales conforme se atienda a la paciente.\n5. Dentro de cada control, registra laboratorios, suplementacion y orientaciones.\n6. Registra plan de parto cuando corresponda.\n7. Agrega vacunas, morbilidad o puerperio segun el caso.\n8. Usa "Reportes" para revisar censos e indicadores.',
   },
 ];
 

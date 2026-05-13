@@ -11,17 +11,17 @@ import {
 import api from "../api/axios";
 
 const QUICK_PROMPTS = [
-  "Como calculo la FPP?",
-  "Como registro una paciente?",
+  "Como registrar una paciente?",
   "Como agrego un control prenatal?",
-  "Donde veo reportes?",
+  "Como lleno ficha de riesgo?",
+  "Como registro laboratorios?",
 ];
 
 const initialMessages = [
   {
     id: "welcome",
     from: "bot",
-    text: "Hola. Puedo ayudarte con el uso del sistema: pacientes, controles, FPP, riesgo, vacunas, reportes y usuarios.",
+    text: "Hola. Puedo guiarte paso a paso con pacientes, controles, FPP, riesgo, plan de parto, vacunas, laboratorios, puerperio, morbilidad, reportes y usuarios.",
     intent: "bienvenida",
   },
 ];

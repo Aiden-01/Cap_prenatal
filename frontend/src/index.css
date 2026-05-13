@@ -815,6 +815,7 @@ html.dark .badge-yellow { background: var(--warn-lt); color: var(--warn); }
 .chatbot-message p {
   margin: 0;
   color: inherit;
+  white-space: pre-line;
 }
 
 .chatbot-message small {
