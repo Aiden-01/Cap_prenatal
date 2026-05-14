@@ -13,15 +13,30 @@ function Field({ label, children }) {
   );
 }
 
-function Input({ label, name, form, set, type = "text" }) {
+function Input({ label, name, form, set, type = "text", ...rest }) {
   return (
     <Field label={label}>
       <input
         className="input-field"
+        name={name}
         type={type}
         value={form[name] ?? ""}
         onChange={(e) => set(name, type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
+        {...rest}
       />
+    </Field>
+  );
+}
+
+function Select({ label, name, options, form, set }) {
+  return (
+    <Field label={label}>
+      <select className="input-field" value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)}>
+        <option value="">— Seleccionar —</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
     </Field>
   );
 }
@@ -85,6 +100,49 @@ const INIT = {
   otra_enfermedad_severa: false, otra_enfermedad_descripcion: "",
   referida_a: "", nombre_personal_atendio: "",
 };
+
+const PUEBLO_CONVIVIENTE_OPTIONS = [
+  { value: "maya", label: "Maya" },
+  { value: "xinca", label: "Xinca" },
+  { value: "garifuna", label: "Garífuna" },
+  { value: "mestiza", label: "Mestiza" },
+];
+
+const ESCOLARIDAD_CONVIVIENTE_OPTIONS = [
+  { value: "primaria", label: "Primaria" },
+  { value: "basico", label: "Básico" },
+  { value: "diversificado", label: "Diversificado" },
+  { value: "universitario", label: "Universitario" },
+  { value: "ninguna", label: "Ninguna" },
+];
+
+const RISK_FIELDS = [
+  "muerte_fetal_neonatal_previa",
+  "abortos_espontaneos_3mas",
+  "gestas_3mas",
+  "peso_ultimo_bebe_menor_2500g",
+  "peso_ultimo_bebe_mayor_4500g",
+  "antec_hipertension_preeclampsia",
+  "cirugias_tracto_reproductivo",
+  "embarazo_multiple",
+  "menor_20_anos",
+  "mayor_35_anos",
+  "paciente_rh_negativo",
+  "hemorragia_vaginal",
+  "vih_positivo_sifilis",
+  "presion_diastolica_90mas",
+  "anemia",
+  "desnutricion_obesidad",
+  "dolor_abdominal",
+  "sintomatologia_urinaria",
+  "ictericia",
+  "diabetes",
+  "enfermedad_renal",
+  "enfermedad_corazon",
+  "hipertension_arterial",
+  "consumo_drogas_alcohol_tabaco",
+  "otra_enfermedad_severa",
+];
 
 function toDateInput(value) {
   return value ? value.split("T")[0] : "";
@@ -160,10 +218,13 @@ export default function FichaRiesgo() {
   const [existingRisk, setExistingRisk] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [showReferralAlert, setShowReferralAlert] = useState(false);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const p = { form, set };
   const edadPaciente = paciente ? calcularEdadAnios(paciente.fecha_nacimiento) : null;
+  const hasRiskFeatures = RISK_FIELDS.some((field) => Boolean(form[field]));
+  const referralMissing = !String(form.referida_a || "").trim();
 
   useEffect(() => {
     api.get(`/pacientes/${id}/expediente`)
@@ -194,8 +255,7 @@ export default function FichaRiesgo() {
       .finally(() => setLoadingData(false));
   }, [id, toast]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const saveFicha = async () => {
     setLoading(true);
     try {
       if (existingRisk) {
@@ -212,8 +272,94 @@ export default function FichaRiesgo() {
     }
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (hasRiskFeatures && referralMissing) {
+      setShowReferralAlert(true);
+      return;
+    }
+    await saveFicha();
+  };
+
+  const handleAddReferral = () => {
+    setShowReferralAlert(false);
+    setTimeout(() => {
+      const field = document.querySelector('input[name="referida_a"]');
+      field?.scrollIntoView({ behavior: "smooth", block: "center" });
+      field?.focus();
+    }, 50);
+  };
+
+  const handleSkipReferral = async () => {
+    setShowReferralAlert(false);
+    await saveFicha();
+  };
+
   return (
     <div>
+      {showReferralAlert && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(15, 23, 42, 0.42)",
+            display: "grid",
+            placeItems: "center",
+            padding: "1rem",
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              width: "min(460px, 100%)",
+              padding: "1.25rem",
+              boxShadow: "0 24px 80px rgba(15, 23, 42, 0.22)",
+            }}
+          >
+            <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text)", marginBottom: "0.45rem" }}>
+              Referencia pendiente
+            </div>
+            <p style={{ fontSize: "0.86rem", color: "var(--text-muted)", lineHeight: 1.45, margin: 0 }}>
+              Se marcó una o más características de riesgo. Debe añadir el campo "Referida a" antes de guardar, o confirmar que no desea añadirlo.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.65rem", marginTop: "1rem", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={handleSkipReferral}
+                disabled={loading}
+                style={{
+                  border: "1px solid #eab308",
+                  background: "#fef3c7",
+                  color: "#854d0e",
+                  borderRadius: 8,
+                  padding: "0.55rem 0.85rem",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                No añadir
+              </button>
+              <button
+                type="button"
+                onClick={handleAddReferral}
+                style={{
+                  border: "1px solid #16a34a",
+                  background: "#16a34a",
+                  color: "#fff",
+                  borderRadius: 8,
+                  padding: "0.55rem 0.85rem",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Añadir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.5rem" }}>
         <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}`)}>
           <ChevronLeft size={15} /> Volver
@@ -260,12 +406,32 @@ export default function FichaRiesgo() {
             <Input label="Estado civil" name="estado_civil" form={form} set={set} />
             <Input label="Escolaridad" name="escolaridad" form={form} set={set} />
             <Input label="Ocupación" name="ocupacion" form={form} set={set} />
+            <Input label="Distancia al servicio (km)" name="distancia_servicio_km" type="number" form={form} set={set} min="0" />
+            <Input label="Tiempo al servicio (horas)" name="tiempo_horas" type="number" form={form} set={set} min="0" />
             <Input label="FUR" name="fecha_ultima_regla" type="date" form={form} set={set} />
             <Input label="FPP" name="fecha_probable_parto" type="date" form={form} set={set} />
           </div>
         </div>
 
+        <div className="form-section">
+          <div className="form-section-header">Esposo o conviviente</div>
+          <div className="form-section-body col-4">
+            <Input label="Nombre del esposo o conviviente" name="nombre_esposo_conviviente" form={form} set={set} />
+            <Input label="Edad" name="edad_esposo" type="number" form={form} set={set} min="0" />
+            <Select label="Pueblo" name="pueblo_esposo" options={PUEBLO_CONVIVIENTE_OPTIONS} form={form} set={set} />
+            <Select label="Escolaridad" name="escolaridad_esposo" options={ESCOLARIDAD_CONVIVIENTE_OPTIONS} form={form} set={set} />
+            <Input label="Ocupación" name="ocupacion_esposo" form={form} set={set} />
+          </div>
+        </div>
+
         <Section title="Antecedentes obstétricos">
+          <Input label="No. de embarazos" name="no_embarazos" type="number" form={form} set={set} min="0" />
+          <Input label="No. de partos" name="no_partos" type="number" form={form} set={set} min="0" />
+          <Input label="No. de cesáreas" name="no_cesareas" type="number" form={form} set={set} min="0" />
+          <Input label="No. de abortos" name="no_abortos" type="number" form={form} set={set} min="0" />
+          <Input label="No. de hijos vivos" name="no_hijos_vivos" type="number" form={form} set={set} min="0" />
+          <Input label="No. de hijos muertos" name="no_hijos_muertos" type="number" form={form} set={set} min="0" />
+          <Input label="Edad de embarazo (semanas)" name="edad_embarazo_semanas" type="number" form={form} set={set} min="0" />
           <Toggle label="Muerte fetal/neonatal previa" name="muerte_fetal_neonatal_previa" {...p} />
           <Toggle label="3+ abortos espontáneos consecutivos" name="abortos_espontaneos_3mas" {...p} />
           <Toggle label="3+ gestas" name="gestas_3mas" {...p} />

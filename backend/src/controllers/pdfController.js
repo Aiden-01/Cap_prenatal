@@ -258,7 +258,7 @@ function buildRiskCellMap({ paciente, embarazo, riesgo }) {
   };
 
   setMapValue(map, 'H7', `${paciente.nombres || ''} ${paciente.apellidos || ''}`.trim());
-  setMapValue(map, 'Z7:AB7', edad);
+  setMapValue(map, 'AA7:AB7', edad);
   setMapValue(map, 'F8', paciente.municipio || paciente.domicilio || paciente.comunidad);
   setMapValue(map, 'V8', cleanCellText(riesgo.telefono || paciente.telefono).replace(/\s+/g, ' '));
   mapChoice(map, riesgo.pueblo || paciente.pueblo, {
@@ -281,7 +281,7 @@ function buildRiskCellMap({ paciente, embarazo, riesgo }) {
   });
   setMapValue(map, 'X12', riesgo.ocupacion || paciente.profesion_oficio);
   setMapValue(map, 'J13:W13', riesgo.nombre_esposo_conviviente || paciente.nombre_esposo_conviviente);
-  setMapValue(map, 'Z13', riesgo.edad_esposo);
+  setMapValue(map, 'AA13:AB13', riesgo.edad_esposo);
   mapChoice(map, riesgo.pueblo_esposo, {
     maya: 'F15',
     xinca: 'I15',
@@ -297,6 +297,7 @@ function buildRiskCellMap({ paciente, embarazo, riesgo }) {
     universitaria: 'R17',
     universitario: 'R17',
     ninguno: 'U17',
+    ninguna: 'U17',
   });
   setMapValue(map, 'X17', riesgo.ocupacion_esposo);
   setMapValue(map, 'K18', riesgo.distancia_servicio_km);
@@ -578,7 +579,7 @@ try {
       $range.HorizontalAlignment = -4108
       $range.VerticalAlignment = -4108
     }
-    elseif ($addr -match '^(N6|O6|P6|Q6|S6|T6|U6|V6|Y6|Z6|AA6|AB6|Z7|Z13|K18|X18|X19|E20|K20|Q20|X20|F21|M21)$') {
+    elseif ($addr -match '^(N6|O6|P6|Q6|S6|T6|U6|V6|Y6|Z6|AA6|AB6|AA7:AB7|AA13:AB13|K18|X18|X19|E20|K20|Q20|X20|F21|M21)$') {
       $range.HorizontalAlignment = -4108
       $range.VerticalAlignment = -4108
     }
