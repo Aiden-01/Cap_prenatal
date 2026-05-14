@@ -258,7 +258,7 @@ function buildRiskCellMap({ paciente, embarazo, riesgo }) {
   };
 
   setMapValue(map, 'H7', `${paciente.nombres || ''} ${paciente.apellidos || ''}`.trim());
-  setMapValue(map, 'Z7', edad);
+  setMapValue(map, 'Z7:AB7', edad);
   setMapValue(map, 'F8', paciente.municipio || paciente.domicilio || paciente.comunidad);
   setMapValue(map, 'V8', cleanCellText(riesgo.telefono || paciente.telefono).replace(/\s+/g, ' '));
   mapChoice(map, riesgo.pueblo || paciente.pueblo, {
@@ -1030,11 +1030,19 @@ async function pdfMspas(req, res) {
 
   try {
     const embarazoActivoId = await obtenerEmbarazoActivoId(pacienteId);
-    const [pacienteRes, embarazoRes, controlesRes] = await Promise.all([
+    const [pacienteRes, embarazoRes, controlesRes, riesgoRes, planPartoRes] = await Promise.all([
       pool.query('SELECT * FROM pacientes WHERE id = $1', [pacienteId]),
       pool.query('SELECT * FROM embarazos WHERE id = $1', [embarazoActivoId]),
       pool.query(
         'SELECT * FROM controles_prenatales WHERE embarazo_id = $1 ORDER BY numero_control LIMIT 5',
+        [embarazoActivoId]
+      ),
+      pool.query(
+        'SELECT * FROM fichas_riesgo_obstetrico WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
+        [embarazoActivoId]
+      ),
+      pool.query(
+        'SELECT * FROM planes_parto WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
         [embarazoActivoId]
       ),
     ]);
@@ -1047,6 +1055,8 @@ async function pdfMspas(req, res) {
       paciente: pacienteRes.rows[0],
       embarazo: embarazoRes.rows[0] || null,
       controles: controlesRes.rows,
+      riesgo: riesgoRes.rows[0] || null,
+      planParto: planPartoRes.rows[0] || null,
     });
 
     res.set({

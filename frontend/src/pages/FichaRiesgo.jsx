@@ -102,6 +102,11 @@ function calcularEdadAnios(fechaNacimiento) {
   return edad;
 }
 
+function formatEdad(edad) {
+  if (edad === null || edad === undefined || edad === "") return "";
+  return `${edad} año${edad === 1 ? "" : "s"}`;
+}
+
 function defaultsDesdePaciente(paciente = {}, embarazo = {}) {
   const edad = calcularEdadAnios(paciente.fecha_nacimiento);
   const hijosMuertos =
@@ -158,6 +163,7 @@ export default function FichaRiesgo() {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const p = { form, set };
+  const edadPaciente = paciente ? calcularEdadAnios(paciente.fecha_nacimiento) : null;
 
   useEffect(() => {
     api.get(`/pacientes/${id}/expediente`)
@@ -228,6 +234,11 @@ export default function FichaRiesgo() {
           <div style={{ marginTop: 3, fontSize: "1rem", fontWeight: 800, color: "var(--text)" }}>
             {paciente.nombres} {paciente.apellidos}
           </div>
+          {edadPaciente !== null && (
+            <div style={{ marginTop: 4, fontSize: "0.82rem", color: "var(--text-muted)" }}>
+              Edad: <strong style={{ color: "var(--text)" }}>{formatEdad(edadPaciente)}</strong>
+            </div>
+          )}
         </div>
       )}
 
@@ -241,6 +252,9 @@ export default function FichaRiesgo() {
           <div className="form-section-header">Datos generales</div>
           <div className="form-section-body col-4">
             <Input label="Fecha" name="fecha" type="date" form={form} set={set} />
+            <Field label="Edad">
+              <input className="input-field" value={formatEdad(edadPaciente)} readOnly />
+            </Field>
             <Input label="Teléfono" name="telefono" form={form} set={set} />
             <Input label="Pueblo" name="pueblo" form={form} set={set} />
             <Input label="Estado civil" name="estado_civil" form={form} set={set} />

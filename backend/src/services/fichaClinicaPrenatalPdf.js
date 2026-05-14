@@ -70,6 +70,13 @@ function calcularFppDesdeFur(fur) {
   return dt.toISOString().slice(0, 10);
 }
 
+function firstDateValue(...values) {
+  return values.find((value) => {
+    const parts = dateParts(value);
+    return Boolean(parts.y && parts.m && parts.d);
+  }) || '';
+}
+
 function yFromTop(page, yTop, size = 7) {
   return page.getHeight() - yTop - size;
 }
@@ -270,13 +277,27 @@ function controlAt(controles, numero) {
   return controles.find((c) => Number(c.numero_control) === numero) || {};
 }
 
-function drawPage1({ page, font, paciente, embarazo, controles }) {
+function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planParto }) {
   const p = paciente;
   const c = coords.pages[1];
   const c1 = controlAt(controles, 1);
   const c2 = controlAt(controles, 2);
-  const fur = embarazo?.fur || p.fur;
-  const fpp = embarazo?.fpp || p.fpp || calcularFppDesdeFur(fur);
+  const fur = firstDateValue(
+    embarazo?.fur,
+    riesgo?.fecha_ultima_regla,
+    planParto?.fur,
+    p.fur,
+    p.fecha_ultima_regla
+  );
+  const fpp = firstDateValue(
+    embarazo?.fpp,
+    embarazo?.fecha_probable_parto,
+    riesgo?.fecha_probable_parto,
+    planParto?.fecha_probable_parto,
+    p.fpp,
+    p.fecha_probable_parto,
+    calcularFppDesdeFur(fur)
+  );
 
   const textValues = {
     noExpediente: p.no_expediente,
@@ -381,7 +402,13 @@ function drawPage1({ page, font, paciente, embarazo, controles }) {
   drawDebugReferences(page, font);
 }
 
-async function generarFichaClinicaPrenatalPdf({ paciente, embarazo, controles = [] }) {
+async function generarFichaClinicaPrenatalPdf({
+  paciente,
+  embarazo,
+  controles = [],
+  riesgo = null,
+  planParto = null,
+}) {
   const templatePath = process.env.FICHA_CLINICA_TEMPLATE_PATH || DEFAULT_TEMPLATE_PATH;
   const templateBytes = fs.readFileSync(templatePath);
   const pdfDoc = await PDFDocument.load(templateBytes);
@@ -396,6 +423,8 @@ async function generarFichaClinicaPrenatalPdf({ paciente, embarazo, controles = 
     paciente,
     embarazo,
     controles,
+    riesgo,
+    planParto,
   });
 
   return Buffer.from(await pdfDoc.save());
