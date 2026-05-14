@@ -233,10 +233,14 @@ export default function NuevaPaciente() {
 
     api.get(`/pacientes/${id}`)
       .then(({ data }) => {
+        const fechaNacimiento = data.fecha_nacimiento ? data.fecha_nacimiento.split("T")[0] : "";
+        const edadDesdeFecha = calcularEdad(fechaNacimiento);
         setForm((f) => ({
           ...f,
           ...data,
-          fecha_nacimiento: data.fecha_nacimiento ? data.fecha_nacimiento.split("T")[0] : "",
+          fecha_nacimiento: fechaNacimiento,
+          edad_manual: data.edad_manual ?? edadDesdeFecha.anios,
+          edad_calculada: data.edad_calculada ?? edadDesdeFecha.texto,
           fur: data.fur ? data.fur.split("T")[0] : "",
           fpp: data.fpp ? data.fpp.split("T")[0] : "",
           fin_embarazo_anterior: data.fin_embarazo_anterior ? data.fin_embarazo_anterior.split("T")[0] : "",

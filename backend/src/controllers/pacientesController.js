@@ -66,6 +66,32 @@ const num = (value, fallback = 0) => {
   if (value === '' || value === null || value === undefined) return fallback;
   return value;
 };
+const numOrNull = (value) => {
+  if (value === '' || value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+const calcularEdadAnios = (fechaNacimiento) => {
+  const value = emptyToNull(fechaNacimiento);
+  if (!value) return null;
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const nacimiento = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (Number.isNaN(nacimiento.getTime())) return null;
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - nacimiento.getFullYear();
+  const mes = hoy.getMonth() - nacimiento.getMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) edad -= 1;
+  return edad;
+};
+const fechaNacimientoDesdeEdad = (edad) => {
+  if (edad === null || edad === undefined || edad === '') return null;
+  const parsed = Number(edad);
+  if (Number.isNaN(parsed)) return null;
+  const hoy = new Date();
+  const fecha = new Date(hoy.getFullYear() - parsed, hoy.getMonth(), hoy.getDate());
+  return fecha.toISOString().slice(0, 10);
+};
 const calcularFppDesdeFur = (fur) => {
   const value = emptyToNull(fur);
   if (!value) return null;
@@ -81,6 +107,8 @@ const fppOrCalculated = (fur, fpp) => emptyToNull(fpp) || calcularFppDesdeFur(fu
 
 function buildPacienteInsertData(d, usuarioId) {
   const fpp = fppOrCalculated(d.fur, d.fpp);
+  const edadManual = numOrNull(d.edad_manual) ?? calcularEdadAnios(d.fecha_nacimiento);
+  const fechaNacimiento = emptyToNull(d.fecha_nacimiento) || fechaNacimientoDesdeEdad(edadManual);
 
   return {
     no_expediente: d.no_expediente,
@@ -93,7 +121,9 @@ function buildPacienteInsertData(d, usuarioId) {
 
     nombres: d.nombres,
     apellidos: d.apellidos,
-    fecha_nacimiento: emptyToNull(d.fecha_nacimiento),
+    fecha_nacimiento: fechaNacimiento,
+    edad_manual: edadManual,
+    edad_calculada: emptyToNull(d.edad_calculada),
     rango_edad: emptyToNull(d.rango_edad),
     clasificacion_alfa_beta: emptyToNull(d.clasificacion_alfa_beta),
     domicilio: emptyToNull(d.domicilio),

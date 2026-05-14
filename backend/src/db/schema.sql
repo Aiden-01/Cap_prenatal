@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS pacientes (
   nombres                   VARCHAR(150) NOT NULL,
   apellidos                 VARCHAR(150) NOT NULL,
   fecha_nacimiento          DATE,
+  edad_manual               INTEGER,
+  edad_calculada            VARCHAR(80),
   -- Clasificación edad al momento del registro (calculada en backend, guardada para histórico)
   rango_edad                VARCHAR(10) CHECK (rango_edad IN ('menor_14','14_19','20_35','mayor_35')),
   -- Alfa/Beta (sistema clasificación interna MSPAS)
@@ -738,14 +740,45 @@ CREATE INDEX IF NOT EXISTS idx_usuarios_username      ON usuarios(username);
 -- ============================================================
 
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS vive_sola BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS cobertura_igss BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS cobertura_privada BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS viene_referida BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS es_migrante BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS eg_confiable_fur BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS eg_confiable_usg BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS cirugia_genito_urinaria BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS infertilidad BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fin_embarazo_menos_1anio BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS embarazo_planeado BOOLEAN DEFAULT FALSE;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_diabetes_tipo VARCHAR(1);
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_diabetes BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_tbc BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_hipertension BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_preeclampsia BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_eclampsia BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_cardiopatia BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_nefropatia BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_otra_condicion BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS cirugia_genito_urinaria_pers BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fam_diabetes BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fam_tbc BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fam_hipertension BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fam_preeclampsia BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fam_eclampsia BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fam_cardiopatia BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fam_gemelos BOOLEAN DEFAULT FALSE;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fam_otra_condicion_medica_grave BOOLEAN DEFAULT FALSE;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS nacidos_muertos INTEGER DEFAULT 0;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS rn_nc BOOLEAN DEFAULT FALSE;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS rn_normal BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS rn_menor_2500g BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS rn_mayor_4000g BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_vih_positivo BOOLEAN DEFAULT FALSE;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_emb_ectopico_num INTEGER DEFAULT 0;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_emb_ectopico BOOLEAN DEFAULT FALSE;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_gemelares BOOLEAN DEFAULT FALSE;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS abortos_3_espont_consecutivos BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_violencia BOOLEAN DEFAULT FALSE;
 
 UPDATE pacientes
 SET antec_emb_ectopico_num = 1
@@ -808,6 +841,17 @@ ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS consume_alcohol_3er_trimestre BOO
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS consume_drogas_1er_trimestre BOOLEAN DEFAULT FALSE;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS consume_drogas_2do_trimestre BOOLEAN DEFAULT FALSE;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS consume_drogas_3er_trimestre BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fuma_activamente BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fuma_pasivamente BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS consume_alcohol BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS consume_drogas BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS violencia_1er_trimestre BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS violencia_2do_trimestre BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS violencia_3er_trimestre BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS embarazo_abuso_sexual BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS tiene_ficha_riesgo BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS edad_manual INTEGER;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS edad_calculada VARCHAR(80);
 
 ALTER TABLE pacientes DROP CONSTRAINT IF EXISTS pacientes_categoria_servicio_check;
 ALTER TABLE pacientes ADD CONSTRAINT pacientes_categoria_servicio_check
