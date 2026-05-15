@@ -2,3 +2,9 @@ node_modules
 backend/.env
 backend/.python-packages/
 backend/mspas_pdf_preview/
+
+# Archivos temporales generados localmente
+tmp_*/
+tmp_*.pdf
+tmp_*.xlsx
+tmp_*.csv
