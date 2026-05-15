@@ -258,23 +258,6 @@ cap_prenatal/
 | 7 | Plan de parto, puerperio y morbilidad | Documenta el plan de parto, controles posteriores y eventos de morbilidad relacionados. |
 | 8 | Reportes y PDF MSPAS | Genera reportes, censo mensual y documentos PDF alineados al formato oficial del MSPAS. |
 
-## 🖼️ Capturas de pantalla
-
-### Inicio de sesión
-
-[imagen aquí]
-
-### Panel principal
-
-[imagen aquí]
-
-### Expediente clínico prenatal
-
-[imagen aquí]
-
-### Reporte PDF MSPAS
-
-[imagen aquí]
 
 ## 📝 Notas de implementación
 
