@@ -272,8 +272,7 @@ cap_prenatal/
 
 | Campo | Información |
 | --- | --- |
-| Autor | Hugo Yondani Corado Hernández |
-| Carné | 690-21-10427 |
+| Autor | Hugo Corado |
 | Universidad | Universidad Mariano Gálvez de Guatemala |
 | Facultad | Facultad de Ingeniería en Sistemas |
 | Tipo de proyecto | Tesis de graduación universitaria |
