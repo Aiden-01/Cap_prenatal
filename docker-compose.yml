@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cap-prenatal-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cap_prenatal
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cap_prenatal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    container_name: cap-prenatal-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: cap_prenatal
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_SSL: "false"
+      JWT_SECRET: change_me_to_a_long_random_secret
+      JWT_EXPIRES_IN: 8h
+      PORT: 3001
+      NODE_ENV: development
+      FRONTEND_URL: http://localhost:8080,http://localhost:5173
+      COOKIE_SAMESITE: lax
+      PDF_EXCEL_ENGINE: libreoffice
+      LIBREOFFICE_PATH: /usr/bin/soffice
+    ports:
+      - "3001:3001"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:3001/api
+    container_name: cap-prenatal-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  postgres_data:

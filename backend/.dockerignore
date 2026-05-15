@@ -1,0 +1,7 @@
+node_modules
+npm-debug.log
+.env
+.python-packages
+mspas_pdf_preview
+tmp_*
+*.log

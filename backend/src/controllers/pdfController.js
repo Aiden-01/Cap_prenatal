@@ -3,12 +3,15 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const puppeteer = require('puppeteer');
+const ExcelJS = require('exceljs');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
 const { generarFichaClinicaPrenatalPdf } = require('../services/fichaClinicaPrenatalPdf');
 
 const execFileAsync = promisify(execFile);
+const TEXT_FORMAT_CELLS = new Set(['T8', 'V8', 'F61', 'G19:J19', 'P19:S19', 'Q19:T19', 'AK19:AN19']);
+const CENTER_FORMAT_RE = /^(N6|O6|P6|Q6|S6|T6|U6|V6|Y6|Z6|AA6|AB6|AA7:AB7|AA13:AB13|K18|X18|X19|E20|K20|Q20|X20|F21|M21)$/;
 
 async function pdfControl(req, res) {
   const { id } = req.params;
@@ -57,7 +60,8 @@ async function pdfControl(req, res) {
 
     const browser = await puppeteer.launch({
       headless: "new",
-      args: ['--no-sandbox', '--disable-setuid-sandbox'] // 👈 importante en Windows
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
     const page = await browser.newPage();
@@ -540,8 +544,82 @@ function buildPlanPartoCellMap({ paciente, plan }) {
   return map;
 }
 
-async function exportExcelTemplateToPdf(templatePath, cellMap, pdfFileName) {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cap-prenatal-'));
+function firstCellAddress(address) {
+  return String(address).split(':')[0];
+}
+
+function shouldCenterCell(address, value) {
+  return (String(value).length === 1 && value === 'X') || CENTER_FORMAT_RE.test(address);
+}
+
+async function writeExcelTemplate(templatePath, outputPath, cellMap) {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(templatePath);
+  const worksheet = workbook.worksheets[0];
+
+  Object.entries(cellMap).forEach(([address, value]) => {
+    if (value === null || value === undefined || value === '') return;
+
+    if (address.includes(':')) {
+      try {
+        worksheet.mergeCells(address);
+      } catch {
+        // Official templates often already contain merged cells.
+      }
+    }
+
+    const cell = worksheet.getCell(firstCellAddress(address));
+    cell.value = String(value);
+
+    if (TEXT_FORMAT_CELLS.has(address)) {
+      cell.numFmt = '@';
+    }
+
+    if (shouldCenterCell(address, String(value))) {
+      cell.alignment = {
+        ...(cell.alignment || {}),
+        horizontal: 'center',
+        vertical: 'middle',
+      };
+    }
+  });
+
+  await workbook.xlsx.writeFile(outputPath);
+}
+
+function libreOfficeExecutable() {
+  return process.env.LIBREOFFICE_PATH || (process.platform === 'win32' ? 'soffice.exe' : 'soffice');
+}
+
+async function exportWithLibreOffice(templatePath, cellMap, pdfFileName, tempDir) {
+  const tempXlsx = path.join(tempDir, 'template.xlsx');
+  const generatedPdf = path.join(tempDir, 'template.pdf');
+  const tempPdf = path.join(tempDir, pdfFileName);
+
+  await writeExcelTemplate(templatePath, tempXlsx, cellMap);
+  await execFileAsync(libreOfficeExecutable(), [
+    '--headless',
+    '--convert-to',
+    'pdf',
+    '--outdir',
+    tempDir,
+    tempXlsx,
+  ], {
+    maxBuffer: 1024 * 1024 * 10,
+  });
+
+  if (!fs.existsSync(generatedPdf)) {
+    throw new Error('LibreOffice no genero el PDF esperado');
+  }
+
+  if (generatedPdf !== tempPdf) {
+    fs.renameSync(generatedPdf, tempPdf);
+  }
+
+  return fs.readFileSync(tempPdf);
+}
+
+async function exportWithExcelCom(templatePath, cellMap, pdfFileName, tempDir) {
   const tempXlsx = path.join(tempDir, 'template.xlsx');
   const tempPdf = path.join(tempDir, pdfFileName);
   const tempJson = path.join(tempDir, 'cells.json');
@@ -595,13 +673,23 @@ finally {
 }
 `;
 
+  await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', psScript], {
+    windowsHide: true,
+    maxBuffer: 1024 * 1024 * 10,
+  });
+  return fs.readFileSync(tempPdf);
+}
+
+async function exportExcelTemplateToPdf(templatePath, cellMap, pdfFileName) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cap-prenatal-'));
+  const engine = (process.env.PDF_EXCEL_ENGINE || 'auto').toLowerCase();
+
   try {
-    await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', psScript], {
-      windowsHide: true,
-      maxBuffer: 1024 * 1024 * 10,
-    });
-    const buffer = fs.readFileSync(tempPdf);
-    return buffer;
+    if (engine === 'excel' || (engine === 'auto' && process.platform === 'win32')) {
+      return await exportWithExcelCom(templatePath, cellMap, pdfFileName, tempDir);
+    }
+
+    return await exportWithLibreOffice(templatePath, cellMap, pdfFileName, tempDir);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
