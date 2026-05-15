@@ -61,6 +61,11 @@ export default function Reportes() {
 
   // 🔥 DESCARGA PRO
   const exportar = async () => {
+    if (!censo) {
+      setError("Primero genera un censo antes de descargar Excel.");
+      return;
+    }
+
     setDownloading(true);
     setDescargado(false);
 
@@ -210,7 +215,7 @@ export default function Reportes() {
           <button
             className={`btn-secondary btn-download ${descargado ? "done" : ""}`}
             onClick={exportar}
-            disabled={downloading}
+            disabled={downloading || loading || !censo}
           >
             {downloading ? (
               <Loader2 className="spin" size={15} />

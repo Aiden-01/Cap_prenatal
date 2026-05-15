@@ -228,36 +228,6 @@ export default function NuevaPaciente() {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  useEffect(() => {
-    if (!editando) return;
-
-    api.get(`/pacientes/${id}`)
-      .then(({ data }) => {
-        const fechaNacimiento = data.fecha_nacimiento ? data.fecha_nacimiento.split("T")[0] : "";
-        const edadDesdeFecha = calcularEdad(fechaNacimiento);
-        setForm((f) => ({
-          ...f,
-          ...data,
-          fecha_nacimiento: fechaNacimiento,
-          edad_manual: data.edad_manual ?? edadDesdeFecha.anios,
-          edad_calculada: data.edad_calculada ?? edadDesdeFecha.texto,
-          fur: data.fur ? data.fur.split("T")[0] : "",
-          fpp: data.fpp ? data.fpp.split("T")[0] : "",
-          fin_embarazo_anterior: data.fin_embarazo_anterior ? data.fin_embarazo_anterior.split("T")[0] : "",
-          antec_emb_ectopico_num: data.antec_emb_ectopico_num ?? (data.antec_emb_ectopico ? 1 : 0),
-        }));
-      })
-      .catch(() => toast("Error al cargar datos de la paciente", "error"))
-  }, [editando, id, toast]);
-
-  const clasificarEdad = (edad) => {
-    if (edad === "" || edad === null || edad === undefined) return "";
-    if (edad < 14) return "menor_14";
-    if (edad <= 19) return "14_19";
-    if (edad <= 35) return "20_35";
-    return "mayor_35";
-  };
-
   const calcularEdad = (fecha) => {
     if (!fecha) return { texto: "", anios: "" };
 
@@ -286,6 +256,36 @@ export default function NuevaPaciente() {
       texto: `${anios} año${anios !== 1 ? "s" : ""}, ${meses} mes${meses !== 1 ? "es" : ""} y ${dias} día${dias !== 1 ? "s" : ""}`,
       anios,
     };
+  };
+
+  useEffect(() => {
+    if (!editando) return;
+
+    api.get(`/pacientes/${id}`)
+      .then(({ data }) => {
+        const fechaNacimiento = data.fecha_nacimiento ? data.fecha_nacimiento.split("T")[0] : "";
+        const edadDesdeFecha = calcularEdad(fechaNacimiento);
+        setForm((f) => ({
+          ...f,
+          ...data,
+          fecha_nacimiento: fechaNacimiento,
+          edad_manual: data.edad_manual ?? edadDesdeFecha.anios,
+          edad_calculada: data.edad_calculada ?? edadDesdeFecha.texto,
+          fur: data.fur ? data.fur.split("T")[0] : "",
+          fpp: data.fpp ? data.fpp.split("T")[0] : "",
+          fin_embarazo_anterior: data.fin_embarazo_anterior ? data.fin_embarazo_anterior.split("T")[0] : "",
+          antec_emb_ectopico_num: data.antec_emb_ectopico_num ?? (data.antec_emb_ectopico ? 1 : 0),
+        }));
+      })
+      .catch(() => toast("Error al cargar datos de la paciente", "error"))
+  }, [editando, id, toast]);
+
+  const clasificarEdad = (edad) => {
+    if (edad === "" || edad === null || edad === undefined) return "";
+    if (edad < 14) return "menor_14";
+    if (edad <= 19) return "14_19";
+    if (edad <= 35) return "20_35";
+    return "mayor_35";
   };
 
   const fechaDesdeEdad = (edad) => {
