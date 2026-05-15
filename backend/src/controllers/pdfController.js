@@ -557,7 +557,7 @@ $jsonPath = '${tempJson.replace(/'/g, "''")}'
 $excel = $null
 $wb = $null
 try {
-  $map = Get-Content -LiteralPath $jsonPath -Raw | ConvertFrom-Json
+  $map = Get-Content -LiteralPath $jsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
   $excel = New-Object -ComObject Excel.Application
   $excel.Visible = $false
   $excel.DisplayAlerts = $false

@@ -29,7 +29,7 @@ function StatCard({ label, value, variant = "primary", Icon, onClick, sublabel }
       onMouseEnter={(e) => {
         if (onClick) {
           e.currentTarget.style.transform = "translateY(-2px)";
-          e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.1)";
+          e.currentTarget.style.boxShadow = "var(--shadow-md)";
         }
       }}
       onMouseLeave={(e) => {
@@ -40,7 +40,7 @@ function StatCard({ label, value, variant = "primary", Icon, onClick, sublabel }
       }}
     >
       <div style={{
-        width: 52, height: 52, borderRadius: 14,
+        width: 52, height: 52, borderRadius: 10,
         background: bg, display: "grid", placeItems: "center", flexShrink: 0,
       }}>
         <Icon size={22} style={{ color: icon }} />
@@ -211,7 +211,7 @@ export default function Dashboard() {
             <StatCard
               label="Sin control reciente"
               value={stats?.sin_control_count ?? sinControl.length}
-              variant="danger" Icon={CalendarClock}
+              variant="warn" Icon={CalendarClock}
               sublabel="más de 4 semanas"
               onClick={() => setTabActiva("sincontrol")}
             />
@@ -219,22 +219,9 @@ export default function Dashboard() {
 
           {/* TABS */}
           <div>
-            <div style={{
-              display: "flex", gap: "0.25rem",
-              borderBottom: "2px solid var(--border)",
-              overflowX: "auto",
-            }}>
+            <div className="content-tabs">
               {TABS.map((t) => (
-                <button key={t.id} onClick={() => setTabActiva(t.id)} style={{
-                  padding: "0.6rem 1.1rem", border: "none", background: "transparent",
-                  borderBottom: tabActiva === t.id ? "2px solid var(--primary)" : "2px solid transparent",
-                  marginBottom: -2,
-                  color: tabActiva === t.id ? "var(--primary)" : "var(--text-muted)",
-                  fontFamily: "DM Sans", fontSize: "0.85rem",
-                  fontWeight: tabActiva === t.id ? 700 : 400,
-                  cursor: "pointer", display: "flex", alignItems: "center",
-                  gap: "0.4rem", whiteSpace: "nowrap",
-                }}>
+                <button key={t.id} onClick={() => setTabActiva(t.id)} className={`content-tab ${tabActiva === t.id ? "is-active" : ""}`}>
                   {t.label}
                   {t.alert && (
                     <span style={{

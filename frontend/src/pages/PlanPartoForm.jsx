@@ -52,32 +52,12 @@ function Toggle({ label, name, form, set }) {
   return (
     <div
       onClick={() => set(name, !val)}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "0.55rem",
-        cursor: "pointer",
-        padding: "0.45rem 0.65rem",
-        borderRadius: 8,
-        background: val ? "var(--primary-lt)" : "var(--surface2)",
-        border: `1.5px solid ${val ? "var(--primary)" : "var(--border)"}`,
-        userSelect: "none",
-      }}
+      className={`toggle-control ${val ? "is-on" : ""}`}
     >
-      <div
-        style={{
-          width: 15,
-          height: 15,
-          borderRadius: 4,
-          flexShrink: 0,
-          background: val ? "var(--primary)" : "var(--border)",
-          display: "grid",
-          placeItems: "center",
-        }}
-      >
-        {val && <span style={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800 }}>✓</span>}
+      <div className="toggle-mark">
+        {val && "✓"}
       </div>
-      <span style={{ fontSize: "0.8rem", color: val ? "var(--primary)" : "var(--text-muted)", fontWeight: val ? 600 : 400 }}>
+      <span className="toggle-label">
         {label}
       </span>
     </div>
@@ -88,7 +68,7 @@ function Section({ title, children }) {
   return (
     <div className="form-section">
       <div className="form-section-header">{title}</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(230px,1fr))", gap: "0.6rem", padding: "1rem" }}>
+      <div className="section-grid">
         {children}
       </div>
     </div>

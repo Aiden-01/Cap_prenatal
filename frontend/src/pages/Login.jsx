@@ -42,7 +42,7 @@ export default function Login() {
         {/* Círculos decorativos */}
         <div style={{ position: "absolute", width: 400, height: 400, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.06)", top: -100, left: -100 }} />
         <div style={{ position: "absolute", width: 300, height: 300, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.06)", bottom: -50, right: -50 }} />
-        <div style={{ position: "absolute", width: 200, height: 200, borderRadius: "50%", background: "rgba(29,111,164,0.15)", top: "40%", left: "10%" }} />
+        <div style={{ position: "absolute", width: 200, height: 200, borderRadius: "50%", background: "rgba(37,111,143,0.18)", top: "40%", left: "10%" }} />
 
         <div style={{ position: "relative", textAlign: "center" }}>
           <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
@@ -59,7 +59,7 @@ export default function Login() {
               <div key={item} style={{ display: "flex", alignItems: "center", gap: "0.75rem", color: "rgba(255,255,255,0.65)", fontSize: "0.88rem" }}>
                 <span style={{
                   width: 20, height: 20, borderRadius: "50%",
-                  background: "var(--primary)", display: "grid",
+                  background: "var(--accent)", display: "grid",
                   placeItems: "center", flexShrink: 0,
                 }}>
                   <Check size={11} color="#fff" strokeWidth={3} />
@@ -135,7 +135,7 @@ export default function Login() {
 
           {error && (
             <div style={{
-              background: "var(--danger-lt)", border: "1px solid #f5c2c7",
+              background: "var(--danger-lt)", border: "1px solid var(--danger)",
               borderRadius: 8, padding: "0.75rem 1rem",
               color: "var(--danger)", fontSize: "0.875rem",
             }}>

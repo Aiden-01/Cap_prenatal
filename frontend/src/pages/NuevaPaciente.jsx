@@ -62,24 +62,12 @@ function Toggle({ label, name, form, set }) {
   return (
     <div
       onClick={() => set(name, !val)}
-      style={{
-        display: "flex", alignItems: "center", gap: "0.6rem",
-        cursor: "pointer", padding: "0.45rem 0.6rem",
-        borderRadius: 8,
-        background: val ? "var(--primary-lt)" : "var(--surface2)",
-        border: `1.5px solid ${val ? "var(--primary)" : "var(--border)"}`,
-        transition: "all 0.15s",
-        userSelect: "none",
-      }}
+      className={`toggle-control ${val ? "is-on" : ""}`}
     >
-      <div style={{
-        width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-        background: val ? "var(--primary)" : "var(--border)",
-        display: "grid", placeItems: "center", transition: "background 0.15s",
-      }}>
-        {val && <span style={{ color: "#fff", fontSize: "0.65rem", fontWeight: 800 }}>✓</span>}
+      <div className="toggle-mark">
+        {val && "✓"}
       </div>
-      <span style={{ fontSize: "0.82rem", color: val ? "var(--primary)" : "var(--text-muted)", fontWeight: val ? 600 : 400 }}>
+      <span className="toggle-label">
         {label}
       </span>
     </div>

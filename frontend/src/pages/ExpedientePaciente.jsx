@@ -304,17 +304,11 @@ export default function ExpedientePaciente() {
       </div>
 
       {/* ── TABS ── */}
-      <div style={{ display: "flex", gap: "0.15rem", borderBottom: "2px solid var(--border)", marginBottom: "1.5rem", overflowX: "auto" }}>
+      <div className="content-tabs" style={{ marginBottom: "1.5rem" }}>
         {TABS.map((t) => {
           const Icon = t.icon;
           return (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
-              padding: "0.55rem 1rem", border: "none", background: "transparent", whiteSpace: "nowrap",
-              borderBottom: tab === t.id ? "2px solid var(--primary)" : "2px solid transparent",
-              marginBottom: -2, color: tab === t.id ? "var(--primary)" : "var(--text-muted)",
-              fontFamily: "DM Sans", fontSize: "0.82rem", fontWeight: tab === t.id ? 600 : 400,
-              cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem",
-            }}>
+            <button key={t.id} onClick={() => setTab(t.id)} className={`content-tab ${tab === t.id ? "is-active" : ""}`}>
               <Icon size={13} />{t.label}
             </button>
           );

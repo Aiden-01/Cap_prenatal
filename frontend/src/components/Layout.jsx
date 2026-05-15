@@ -53,7 +53,7 @@ export default function Layout() {
               border: "none", padding: "0.5rem",
               borderRadius: 8, cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+              boxShadow: "var(--shadow-md)",
             }}
           >
             <Menu size={22} />

@@ -37,22 +37,12 @@ function Toggle({ label, name, form, set }) {
   return (
     <div
       onClick={() => set(name, !val)}
-      style={{
-        display: "flex", alignItems: "center", gap: "0.55rem",
-        cursor: "pointer", padding: "0.4rem 0.65rem", borderRadius: 8,
-        background: val ? "var(--primary-lt)" : "var(--surface2)",
-        border: `1.5px solid ${val ? "var(--primary)" : "var(--border)"}`,
-        userSelect: "none", transition: "all 0.15s",
-      }}
+      className={`toggle-control ${val ? "is-on" : ""}`}
     >
-      <div style={{
-        width: 15, height: 15, borderRadius: 4, flexShrink: 0,
-        background: val ? "var(--primary)" : "var(--border)",
-        display: "grid", placeItems: "center",
-      }}>
-        {val && <span style={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800 }}>✓</span>}
+      <div className="toggle-mark">
+        {val && "✓"}
       </div>
-      <span style={{ fontSize: "0.8rem", color: val ? "var(--primary)" : "var(--text-muted)", fontWeight: val ? 600 : 400 }}>
+      <span className="toggle-label">
         {label}
       </span>
     </div>
@@ -61,11 +51,7 @@ function Toggle({ label, name, form, set }) {
 
 function LabRow({ label, realizadoKey, resultadoKey, form, set, extra }) {
   return (
-    <div style={{
-      display: "grid", gridTemplateColumns: "180px 1fr",
-      gap: "0.5rem", alignItems: "center",
-      padding: "0.5rem 0", borderBottom: "1px solid var(--border)",
-    }}>
+    <div className="lab-row">
       <Toggle label={label} name={realizadoKey} form={form} set={set} />
       {form[realizadoKey] && (
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
@@ -298,17 +284,11 @@ export default function NuevoControl() {
         </div>
 
         {/* TABS */}
-        <div style={{ display: "flex", gap: "0.25rem", borderBottom: "2px solid var(--border)", marginBottom: "1.25rem" }}>
+        <div className="content-tabs">
           {TABS.map((t) => {
             const Icon = t.icon;
             return (
-              <button key={t.id} type="button" onClick={() => setTab(t.id)} style={{
-                padding: "0.55rem 1.1rem", border: "none", background: "transparent",
-                borderBottom: tab === t.id ? "2px solid var(--primary)" : "2px solid transparent",
-                marginBottom: -2, color: tab === t.id ? "var(--primary)" : "var(--text-muted)",
-                fontFamily: "DM Sans", fontSize: "0.85rem", fontWeight: tab === t.id ? 600 : 400,
-                cursor: "pointer", display: "flex", alignItems: "center", gap: "0.4rem",
-              }}>
+              <button key={t.id} type="button" onClick={() => setTab(t.id)} className={`content-tab ${tab === t.id ? "is-active" : ""}`}>
                 <Icon size={14} />{t.label}
               </button>
             );

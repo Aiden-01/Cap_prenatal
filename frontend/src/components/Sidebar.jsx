@@ -17,8 +17,8 @@ const NAV_ADMIN = [
 ];
 
 // Color fijo del sidebar — no depende del tema, siempre oscuro
-const SIDEBAR_BG = "#0f172a";          // slate-900
-const SIDEBAR_BG_ITEM_HOVER = "rgba(255,255,255,0.06)";
+const SIDEBAR_BG = "#122033";
+const SIDEBAR_BG_ITEM_HOVER = "rgba(255,255,255,0.055)";
 
 export default function Sidebar({
   usuario, menuOpen, setMenuOpen, isMobile,
@@ -133,7 +133,7 @@ export default function Sidebar({
                     gap: "0.75rem",
                     width: "100%",
                     padding: "0.65rem 0.75rem",
-                    borderRadius: 10,
+                    borderRadius: 8,
                     marginBottom: 4,
                     border: "none",
                     cursor: "pointer",
@@ -141,7 +141,7 @@ export default function Sidebar({
                       ? "var(--primary)"
                       : SIDEBAR_BG_ITEM_HOVER,
                     color: isActive ? "#fff" : "rgba(255,255,255,0.72)",
-                    fontWeight: isActive ? 600 : 400,
+                    fontWeight: isActive ? 700 : 500,
                     fontSize: "0.9rem",
                     // 🎬 animación
                     opacity: visible ? 1 : 0,

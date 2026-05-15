@@ -11,12 +11,7 @@ const INIT = { nombre_completo: "", username: "", password: "", rol: "personal_s
 
 function SuccessBanner({ nombre }) {
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: "0.75rem",
-      background: "var(--accent-lt)", border: "1px solid var(--accent)",
-      borderRadius: 10, padding: "0.85rem 1.1rem",
-      animation: "bannerIn 0.4s cubic-bezier(0.34,1.56,0.64,1)",
-    }}>
+    <div className="status-banner success">
       <CheckCircle2 size={20} color="var(--accent)" strokeWidth={2.5} style={{ flexShrink: 0 }} />
       <div>
         <div style={{ color: "var(--accent)", fontWeight: 700, fontSize: "0.88rem" }}>
@@ -34,16 +29,8 @@ function SuccessBanner({ nombre }) {
 function ModalEliminar({ usuario, onConfirmar, onCancelar }) {
   if (!usuario) return null;
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 500,
-      background: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      padding: "1rem",
-    }}>
-      <div className="card" style={{
-        maxWidth: 400, width: "100%",
-        animation: "bannerIn 0.25s cubic-bezier(0.34,1.56,0.64,1)",
-      }}>
+    <div className="modal-backdrop">
+      <div className="card modal-card">
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
           <div style={{
             width: 40, height: 40, borderRadius: 10,
@@ -65,7 +52,7 @@ function ModalEliminar({ usuario, onConfirmar, onCancelar }) {
           Todos sus datos de acceso seran borrados del sistema.
         </p>
 
-        <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+        <div className="action-row">
           <button className="btn-secondary" onClick={onCancelar}>
             Cancelar
           </button>
@@ -144,20 +131,6 @@ export default function Usuarios() {
 
   return (
     <>
-      <style>{`
-        @keyframes bannerIn {
-          from { opacity: 0; transform: translateY(-10px) scale(0.97); }
-          to   { opacity: 1; transform: translateY(0)     scale(1);    }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
-        }
-        @media (max-width: 768px) {
-          .usuarios-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
-
       {/* Modal confirmacion eliminar */}
       <ModalEliminar
         usuario={aEliminar}
@@ -166,7 +139,7 @@ export default function Usuarios() {
       />
 
       <div>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.75rem" }}>
+        <div className="page-header">
           <ShieldCheck size={26} color="var(--primary)" />
           <div>
             <h1 style={{ fontSize: "1.5rem", fontWeight: 800, lineHeight: 1 }}>
@@ -180,24 +153,14 @@ export default function Usuarios() {
 
         <div
           className="usuarios-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 380px",
-            gap: "1.5rem",
-            alignItems: "start",
-          }}
         >
           {/* ── Tabla de usuarios ── */}
           <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-            <div style={{
-              padding: "0.9rem 1.25rem",
-              borderBottom: "1px solid var(--border)",
-              display: "flex", alignItems: "center", gap: "0.5rem",
-            }}>
+            <div className="card-titlebar">
               <User size={16} color="var(--text-muted)" />
-              <span style={{ fontFamily: "Syne", fontSize: "0.88rem", fontWeight: 700 }}>
+              <strong>
                 Usuarios registrados
-              </span>
+              </strong>
               <span className="badge badge-blue" style={{ marginLeft: "auto" }}>
                 {usuarios.length}
               </span>
@@ -221,11 +184,7 @@ export default function Usuarios() {
                       <tr key={u.id} style={{ opacity: u.activo ? 1 : 0.6 }}>
                         <td>
                           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                            <div style={{
-                              width: 30, height: 30, borderRadius: "50%",
-                              background: "var(--primary-lt)",
-                              display: "grid", placeItems: "center", flexShrink: 0,
-                            }}>
+                            <div className="avatar-token">
                               <User size={14} color="var(--primary)" />
                             </div>
                             <div>
@@ -259,16 +218,10 @@ export default function Usuarios() {
                           }
                         </td>
                         <td>
-                          <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+                          <div className="table-actions">
                             {/* Activar / Desactivar */}
                             <button
-                              className="btn-secondary"
-                              style={{
-                                padding: "0.3rem 0.65rem",
-                                fontSize: "0.8rem",
-                                opacity: esSelf ? 0.4 : 1,
-                                cursor: esSelf ? "not-allowed" : "pointer",
-                              }}
+                              className="btn-secondary btn-compact"
                               onClick={() => toggleActivo(u)}
                               disabled={esSelf}
                               title={esSelf ? "No puedes modificar tu propia cuenta" : ""}
@@ -281,22 +234,7 @@ export default function Usuarios() {
 
                             {/* Eliminar */}
                             <button
-                              style={{
-                                padding: "0.3rem 0.55rem",
-                                fontSize: "0.8rem",
-                                background: "var(--danger-lt)",
-                                color: "var(--danger)",
-                                border: "1px solid transparent",
-                                borderRadius: 8,
-                                cursor: esSelf ? "not-allowed" : "pointer",
-                                opacity: esSelf ? 0.4 : 1,
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "0.35rem",
-                                fontFamily: "DM Sans, sans-serif",
-                                fontWeight: 500,
-                                transition: "background 0.15s",
-                              }}
+                              className="btn-soft-danger"
                               onClick={() => !esSelf && setAEliminar(u)}
                               disabled={esSelf}
                               title={esSelf ? "No puedes eliminar tu propia cuenta" : "Eliminar usuario"}
@@ -344,18 +282,14 @@ export default function Usuarios() {
             <form onSubmit={handleCrear} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div className="form-group">
                 <label className="input-label">Nombre completo</label>
-                <div style={{ position: "relative" }}>
-                  <User size={15} style={{
-                    position: "absolute", left: "0.75rem", top: "50%",
-                    transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none",
-                  }} />
+                <div className="icon-input">
+                  <User size={15} />
                   <input
                     className="input-field"
                     type="text"
                     placeholder="Nombre completo"
                     value={form.nombre_completo}
                     onChange={(e) => setForm({ ...form, nombre_completo: e.target.value })}
-                    style={{ paddingLeft: "2.25rem" }}
                     required
                   />
                 </div>
@@ -363,18 +297,14 @@ export default function Usuarios() {
 
               <div className="form-group">
                 <label className="input-label">Usuario</label>
-                <div style={{ position: "relative" }}>
-                  <BadgeCheck size={15} style={{
-                    position: "absolute", left: "0.75rem", top: "50%",
-                    transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none",
-                  }} />
+                <div className="icon-input">
+                  <BadgeCheck size={15} />
                   <input
                     className="input-field"
                     type="text"
                     placeholder="nombre_usuario"
                     value={form.username}
                     onChange={(e) => setForm({ ...form, username: e.target.value })}
-                    style={{ paddingLeft: "2.25rem" }}
                     required
                   />
                 </div>
@@ -382,18 +312,14 @@ export default function Usuarios() {
 
               <div className="form-group">
                 <label className="input-label">Contrasena</label>
-                <div style={{ position: "relative" }}>
-                  <KeyRound size={15} style={{
-                    position: "absolute", left: "0.75rem", top: "50%",
-                    transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none",
-                  }} />
+                <div className="icon-input">
+                  <KeyRound size={15} />
                   <input
                     className="input-field"
                     type="password"
                     placeholder="••••••••"
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    style={{ paddingLeft: "2.25rem" }}
                     required
                   />
                 </div>
@@ -418,7 +344,7 @@ export default function Usuarios() {
                 style={{ justifyContent: "center", marginTop: "0.25rem" }}
               >
                 {loading
-                  ? <><Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} /> Creando...</>
+                  ? <><Loader2 className="spin" size={15} /> Creando...</>
                   : <><UserPlus size={15} /> Crear usuario</>
                 }
               </button>
