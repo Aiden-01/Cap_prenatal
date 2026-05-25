@@ -104,6 +104,32 @@ const calcularFppDesdeFur = (fur) => {
 };
 
 const fppOrCalculated = (fur, fpp) => emptyToNull(fpp) || calcularFppDesdeFur(fur);
+const normalizeCui = (value) => {
+  const clean = emptyToNull(value);
+  return clean ? String(clean).trim() : null;
+};
+const isValidCui = (value) => {
+  const clean = normalizeCui(value);
+  return !clean || /^\d{13}$/.test(clean);
+};
+
+async function cuiExiste(cui, pacienteId = null) {
+  const clean = normalizeCui(cui);
+  if (!clean) return false;
+
+  const params = [clean];
+  let where = 'cui = $1';
+  if (pacienteId) {
+    params.push(pacienteId);
+    where += ` AND id <> $${params.length}`;
+  }
+
+  const { rowCount } = await pool.query(
+    `SELECT 1 FROM pacientes WHERE ${where} LIMIT 1`,
+    params
+  );
+  return rowCount > 0;
+}
 
 function buildPacienteInsertData(d, usuarioId) {
   const fpp = fppOrCalculated(d.fur, d.fpp);
@@ -112,7 +138,7 @@ function buildPacienteInsertData(d, usuarioId) {
 
   return {
     no_expediente: d.no_expediente,
-    cui: emptyToNull(d.cui),
+    cui: normalizeCui(d.cui),
 
     nombre_establecimiento: emptyToNull(d.nombre_establecimiento),
     distrito: emptyToNull(d.distrito),
@@ -244,7 +270,15 @@ async function crear(req, res) {
     });
   }
 
+  if (!isValidCui(d.cui)) {
+    return res.status(400).json({ error: 'El CUI debe tener exactamente 13 digitos' });
+  }
+
   try {
+    if (await cuiExiste(d.cui)) {
+      return res.status(409).json({ error: 'Ya existe una paciente registrada con ese CUI' });
+    }
+
     const data = buildPacienteInsertData(d, req.usuario.id);
     const campos = Object.keys(data);
     const placeholders = campos.map((_, i) => `$${i + 1}`).join(', ');
@@ -267,6 +301,9 @@ async function crear(req, res) {
   } catch (err) {
     console.error(err);
     if (err.code === '23505') {
+      if (err.constraint === 'ux_pacientes_cui_unico') {
+        return res.status(409).json({ error: 'Ya existe una paciente registrada con ese CUI' });
+      }
       return res.status(409).json({ error: 'Ya existe un expediente con ese numero' });
     }
     return res.status(500).json({ error: 'Error al crear paciente' });
@@ -294,11 +331,25 @@ async function actualizar(req, res) {
     return res.status(400).json({ error: 'Sin campos para actualizar' });
   }
 
+  if (
+    Object.prototype.hasOwnProperty.call(data, 'cui') &&
+    !isValidCui(data.cui)
+  ) {
+    return res.status(400).json({ error: 'El CUI debe tener exactamente 13 digitos' });
+  }
+
   const sets = campos.map((c, i) => `${c} = $${i + 1}`).join(', ');
-  const valores = campos.map(c => emptyToNull(data[c]));
+  const valores = campos.map(c => c === 'cui' ? normalizeCui(data[c]) : emptyToNull(data[c]));
   valores.push(id);
 
   try {
+    if (
+      Object.prototype.hasOwnProperty.call(data, 'cui') &&
+      await cuiExiste(data.cui, id)
+    ) {
+      return res.status(409).json({ error: 'Ya existe una paciente registrada con ese CUI' });
+    }
+
     const { rowCount } = await pool.query(
       `UPDATE pacientes SET ${sets}, updated_at = NOW() WHERE id = $${valores.length}`,
       valores
@@ -318,6 +369,9 @@ async function actualizar(req, res) {
     return res.json({ message: 'Paciente actualizado' });
   } catch (err) {
     console.error(err);
+    if (err.code === '23505' && err.constraint === 'ux_pacientes_cui_unico') {
+      return res.status(409).json({ error: 'Ya existe una paciente registrada con ese CUI' });
+    }
     return res.status(500).json({ error: 'Error al actualizar paciente' });
   }
 }

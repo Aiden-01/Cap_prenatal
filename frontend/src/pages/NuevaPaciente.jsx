@@ -1,11 +1,11 @@
-﻿import { useState } from "react";
+﻿import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect } from "react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import {
   Building2, User, Heart, Baby, ShieldAlert, CheckCircle,
-  ChevronLeft, ChevronRight, Save
+  ChevronLeft, ChevronRight, Save, AlertTriangle
 } from "lucide-react";
 
 // ─── STEPS ──────────────────────────────────────────────────
@@ -30,12 +30,13 @@ function Field({ label, required, children }) {
   );
 }
 
-function Input({ label, name, type = "text", required, form, set, ...rest }) {
+function Input({ label, name, type = "text", required, form, set, inputRef, ...rest }) {
   return (
     <Field label={label} required={required}>
       <input
         className="input-field"
         type={type}
+        ref={inputRef}
         value={form[name] ?? ""}
         onChange={(e) => set(name, type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
         {...rest}
@@ -209,12 +210,22 @@ export default function NuevaPaciente() {
   const { id } = useParams();
   const [step, setStep]       = useState(0);
   const [form, setForm]       = useState(INIT);
+  const [cuiError, setCuiError] = useState("");
   const [loading, setLoading] = useState(false);
+  const cuiInputRef           = useRef(null);
   const navigate              = useNavigate();
   const toast                 = useGlobalToast();
   const editando              = Boolean(id);
 
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k, v) => {
+    if (k === "cui") setCuiError("");
+    setForm((f) => ({ ...f, [k]: v }));
+  };
+  const cuiIncompleto = form.cui && !/^\d{13}$/.test(form.cui);
+  const goToCuiField = () => {
+    setStep(0);
+    setTimeout(() => cuiInputRef.current?.focus(), 0);
+  };
 
   const calcularEdad = (fecha) => {
     if (!fecha) return { texto: "", anios: "" };
@@ -325,6 +336,12 @@ export default function NuevaPaciente() {
       toast("No. expediente, nombres y apellidos son requeridos", "error");
       return;
     }
+    if (cuiIncompleto) {
+      setCuiError("El CUI debe tener exactamente 13 dígitos.");
+      goToCuiField();
+      toast("El CUI debe tener exactamente 13 dígitos", "error");
+      return;
+    }
     setLoading(true);
     try {
       const payload = {
@@ -362,6 +379,10 @@ export default function NuevaPaciente() {
       setTimeout(() => navigate(`/pacientes/${editando ? id : data.id}`), 800);
     } catch (e) {
       const msg = e.response?.data?.error || "Error al guardar";
+      if (msg.toLowerCase().includes("cui")) {
+        setCuiError(msg);
+        goToCuiField();
+      }
       toast(msg, "error");
     } finally {
       setLoading(false);
@@ -424,7 +445,35 @@ export default function NuevaPaciente() {
               <div className="form-section-header">Datos del Establecimiento</div>
               <div className="form-section-body col-2">
                 <Input label="No. de Expediente" name="no_expediente" required form={form} set={set} placeholder="Ej: 2025-001" />
-                <Input label="CUI (DPI)" name="cui" form={form} set={set} placeholder="13 dígitos" maxLength={13} />
+                <Input
+                  label="CUI (DPI)"
+                  name="cui"
+                  form={form}
+                  set={(name, value) => set(name, String(value).replace(/\D/g, "").slice(0, 13))}
+                  placeholder="13 dígitos"
+                  maxLength={13}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  inputRef={cuiInputRef}
+                />
+                {cuiError && (
+                  <div style={{
+                    gridColumn: "1 / -1",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "0.55rem",
+                    padding: "0.75rem 0.85rem",
+                    borderRadius: 8,
+                    border: "1px solid var(--danger)",
+                    background: "var(--danger-lt)",
+                    color: "var(--danger)",
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                  }}>
+                    <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+                    <span>{cuiError}</span>
+                  </div>
+                )}
                 <Input label="Nombre del Establecimiento" name="nombre_establecimiento" form={form} set={set} />
                 <Input label="Distrito" name="distrito" form={form} set={set} />
                 <Input label="Área de Salud" name="area_salud" form={form} set={set} />

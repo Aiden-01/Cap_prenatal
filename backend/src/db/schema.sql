@@ -712,6 +712,9 @@ WHERE r.embarazo_id IS NULL AND r.paciente_id = e.paciente_id AND e.estado = 'ac
 
 CREATE INDEX IF NOT EXISTS idx_pacientes_expediente   ON pacientes(no_expediente);
 CREATE INDEX IF NOT EXISTS idx_pacientes_cui          ON pacientes(cui);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_pacientes_cui_unico
+  ON pacientes(cui)
+  WHERE cui IS NOT NULL AND BTRIM(cui) <> '';
 CREATE INDEX IF NOT EXISTS idx_pacientes_apellidos    ON pacientes(apellidos);
 CREATE INDEX IF NOT EXISTS idx_pacientes_nombres      ON pacientes(nombres);
 CREATE INDEX IF NOT EXISTS idx_controles_paciente     ON controles_prenatales(paciente_id);
