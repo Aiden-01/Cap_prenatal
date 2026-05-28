@@ -124,6 +124,7 @@ const page1 = {
     vieneReferida: { yes: { x: 353, y: 392 }, no: { x: 366, y: 392 } },
     viveSola: { yes: { x: 251, y: 364 }, no: { x: 236, y: 364 } },
     embarazoPlaneado: { yes: { x: 578, y: 443 }, no: { x: 560, y: 443 } },
+    embarazoAbusoSexual: { yes: { x: 259, y: 517 }, no: { x: 272, y: 517 } },
     famDiabetes: yn(52, 432),
     famTbc: yn(52, 442),
     famHipertension: yn(52, 453),

@@ -492,6 +492,7 @@ function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planPart
 
   drawYesNoMarks(page, font, [
     [p.vive_sola, c.yesNo.viveSola, 'viveSola'],
+    [p.embarazo_abuso_sexual, c.yesNo.embarazoAbusoSexual, 'embarazoAbusoSexual'],
     [p.fam_diabetes, c.yesNo.famDiabetes, 'famDiabetes'],
     [p.fam_tbc, c.yesNo.famTbc, 'famTbc'],
     [p.fam_hipertension, c.yesNo.famHipertension, 'famHipertension'],
