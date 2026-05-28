@@ -233,6 +233,12 @@ function drawBooleanMarks(page, font, entries) {
   });
 }
 
+function drawYesNoMarks(page, font, entries) {
+  entries.forEach(([value, cfg, label]) => {
+    markYesNo(page, font, value, cfg, label);
+  });
+}
+
 function drawDebugReferences(page, font) {
   if (!isDebugEnabled()) return;
   const c = coords.pages[1];
@@ -473,32 +479,37 @@ function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planPart
   markYesNo(page, font, p.tiene_ficha_riesgo, c.yesNo.tieneFichaRiesgo, 'tieneFichaRiesgo');
 
   drawBooleanMarks(page, font, [
-    [p.vive_sola, c.marks.booleans.viveSola, 'viveSola'],
-    [p.fam_diabetes, c.marks.booleans.famDiabetes, 'famDiabetes'],
-    [p.fam_hipertension, c.marks.booleans.famHipertension, 'famHipertension'],
-    [p.fam_preeclampsia, c.marks.booleans.famPreeclampsia, 'famPreeclampsia'],
-    [p.fam_eclampsia, c.marks.booleans.famEclampsia, 'famEclampsia'],
-    [p.fam_otra_condicion_medica_grave, c.marks.booleans.famOtraCondicion, 'famOtraCondicion'],
-    [p.antec_diabetes, c.marks.booleans.antecDiabetes, 'antecDiabetes'],
     [p.antec_diabetes_tipo === '1', c.marks.booleans.antecDiabetesTipo1, 'antecDiabetesTipo1'],
     [p.antec_diabetes_tipo === '2', c.marks.booleans.antecDiabetesTipo2, 'antecDiabetesTipo2'],
     [p.antec_diabetes_tipo === 'G', c.marks.booleans.antecDiabetesTipoG, 'antecDiabetesTipoG'],
-    [p.antec_hipertension, c.marks.booleans.antecHipertension, 'antecHipertension'],
-    [p.antec_preeclampsia, c.marks.booleans.antecPreeclampsia, 'antecPreeclampsia'],
-    [p.antec_eclampsia, c.marks.booleans.antecEclampsia, 'antecEclampsia'],
-    [p.antec_otra_condicion, c.marks.booleans.antecOtraCondicion, 'antecOtraCondicion'],
-    [p.cirugia_genito_urinaria_pers || p.cirugia_genito_urinaria, c.marks.booleans.cirugiaGenitoUrinaria, 'cirugiaGenitoUrinaria'],
-    [p.infertilidad, c.marks.booleans.infertilidad, 'infertilidad'],
-    [p.antec_cardiopatia, c.marks.booleans.antecCardiopatia, 'antecCardiopatia'],
-    [p.antec_nefropatia, c.marks.booleans.antecNefropatia, 'antecNefropatia'],
-    [p.antec_violencia, c.marks.booleans.antecViolencia, 'antecViolencia'],
-    [p.antec_vih_positivo, c.marks.booleans.antecVih, 'antecVih'],
     [p.rn_nc, c.marks.booleans.rnNc, 'rnNc'],
     [p.rn_normal, c.marks.booleans.rnNormal, 'rnNormal'],
     [p.rn_menor_2500g, c.marks.booleans.rnMenor2500, 'rnMenor2500'],
     [p.rn_mayor_4000g, c.marks.booleans.rnMayor4000, 'rnMayor4000'],
     [p.abortos_3_espont_consecutivos, c.marks.booleans.abortosConsecutivos, 'abortosConsecutivos'],
     [p.fin_embarazo_menos_1anio, c.marks.booleans.finEmbarazoMenos1Anio, 'finEmbarazoMenos1Anio'],
+  ]);
+
+  drawYesNoMarks(page, font, [
+    [p.vive_sola, c.yesNo.viveSola, 'viveSola'],
+    [p.fam_diabetes, c.yesNo.famDiabetes, 'famDiabetes'],
+    [p.fam_tbc, c.yesNo.famTbc, 'famTbc'],
+    [p.fam_hipertension, c.yesNo.famHipertension, 'famHipertension'],
+    [p.fam_preeclampsia, c.yesNo.famPreeclampsia, 'famPreeclampsia'],
+    [p.fam_eclampsia, c.yesNo.famEclampsia, 'famEclampsia'],
+    [p.fam_otra_condicion_medica_grave, c.yesNo.famOtraCondicion, 'famOtraCondicion'],
+    [p.antec_diabetes, c.yesNo.antecDiabetes, 'antecDiabetes'],
+    [p.antec_tbc, c.yesNo.antecTbc, 'antecTbc'],
+    [p.antec_hipertension, c.yesNo.antecHipertension, 'antecHipertension'],
+    [p.antec_preeclampsia, c.yesNo.antecPreeclampsia, 'antecPreeclampsia'],
+    [p.antec_eclampsia, c.yesNo.antecEclampsia, 'antecEclampsia'],
+    [p.antec_otra_condicion, c.yesNo.antecOtraCondicion, 'antecOtraCondicion'],
+    [p.cirugia_genito_urinaria_pers || p.cirugia_genito_urinaria, c.yesNo.cirugiaGenitoUrinaria, 'cirugiaGenitoUrinaria'],
+    [p.infertilidad, c.yesNo.infertilidad, 'infertilidad'],
+    [p.antec_cardiopatia, c.yesNo.antecCardiopatia, 'antecCardiopatia'],
+    [p.antec_nefropatia, c.yesNo.antecNefropatia, 'antecNefropatia'],
+    [p.antec_violencia, c.yesNo.antecViolencia, 'antecViolencia'],
+    [p.antec_vih_positivo, c.yesNo.antecVih, 'antecVih'],
   ]);
 
   drawMark(

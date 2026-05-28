@@ -390,6 +390,7 @@ export default function NuevaPaciente() {
   };
 
   const p = { form, set };
+  const nombrePaciente = `${form.nombres || ""} ${form.apellidos || ""}`.trim();
 
   return (
     <div>
@@ -399,9 +400,13 @@ export default function NuevaPaciente() {
           <ChevronLeft size={15} /> Volver
         </button>
         <div>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--text)" }}>Nueva paciente</h1>
+          <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--text)" }}>
+            {editando ? "Editando datos de la paciente" : "Nueva paciente"}
+          </h1>
           <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 2 }}>
-            {editando ? "Modificar datos de la paciente" : "Ficha Clínica Prenatal y Puerperio — MSPAS"}
+            {editando
+              ? nombrePaciente || "Cargando datos de la paciente..."
+              : "Ficha Clínica Prenatal y Puerperio — MSPAS"}
           </p>
         </div>
       </div>
