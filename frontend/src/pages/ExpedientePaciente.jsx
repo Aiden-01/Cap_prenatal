@@ -458,6 +458,7 @@ export default function ExpedientePaciente() {
             <SecTitle>Antecedentes Obstétricos</SecTitle>
             <Grid cols={4}>
               <Row label="Gestas previas"    value={p.gestas_previas} />
+              <Row label="Partos"            value={p.partos} />
               <Row label="Partos vaginales"  value={p.partos_vaginales} />
               <Row label="Cesáreas"          value={p.cesareas} />
               <Row label="Abortos"           value={p.abortos} />

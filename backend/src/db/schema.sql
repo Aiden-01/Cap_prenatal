@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS pacientes (
   -- ── Antecedentes obstétricos ─────────────────────────────────
   gestas_previas            INTEGER DEFAULT 0,
   abortos                   INTEGER DEFAULT 0,
+  partos                    INTEGER DEFAULT 0,
   partos_vaginales          INTEGER DEFAULT 0,
   cesareas                  INTEGER DEFAULT 0,
   nacidos_vivos             INTEGER DEFAULT 0,
@@ -781,6 +782,7 @@ ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_emb_ectopico_num INTEGER DE
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_emb_ectopico BOOLEAN DEFAULT FALSE;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_gemelares BOOLEAN DEFAULT FALSE;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS abortos_3_espont_consecutivos BOOLEAN DEFAULT FALSE;
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS partos INTEGER DEFAULT 0;
 ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS antec_violencia BOOLEAN DEFAULT FALSE;
 
 UPDATE pacientes

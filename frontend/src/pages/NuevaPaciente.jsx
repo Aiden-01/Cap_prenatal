@@ -166,7 +166,7 @@ const INIT = {
   fur: "", fpp: "",
   eg_confiable_fur: false, eg_confiable_usg: false,
   // Antecedentes obstétricos
-  gestas_previas: 0, abortos: 0, partos_vaginales: 0, cesareas: 0,
+  gestas_previas: 0, abortos: 0, partos: 0, partos_vaginales: 0, cesareas: 0,
   nacidos_vivos: 0, nacidos_muertos: 0, hijos_viven: 0,
   muertos_antes_1sem: 0, muertos_despues_1sem: 0,
   cirugia_genito_urinaria: false, infertilidad: false,
@@ -640,6 +640,7 @@ export default function NuevaPaciente() {
               <div className="form-section-body col-4">
                 <Input label="Gestas previas" name="gestas_previas" type="number" form={form} set={set} />
                 <Input label="Abortos" name="abortos" type="number" form={form} set={set} />
+                <Input label="Partos" name="partos" type="number" form={form} set={set} />
                 <Input label="Partos vaginales" name="partos_vaginales" type="number" form={form} set={set} />
                 <Input label="Cesáreas" name="cesareas" type="number" form={form} set={set} />
                 <Input label="Nacidos vivos" name="nacidos_vivos" type="number" form={form} set={set} />
@@ -826,6 +827,7 @@ export default function NuevaPaciente() {
                   ["FUR", form.fur],
                   ["FPP", form.fpp],
                   ["Gestas previas", form.gestas_previas],
+                  ["Partos", form.partos],
                   ["Partos vaginales", form.partos_vaginales],
                   ["Cesáreas", form.cesareas],
                   ["Abortos", form.abortos],

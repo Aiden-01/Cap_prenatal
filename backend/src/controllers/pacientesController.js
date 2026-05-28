@@ -205,6 +205,7 @@ function buildPacienteInsertData(d, usuarioId) {
 
     gestas_previas: num(d.gestas_previas),
     abortos: num(d.abortos),
+    partos: num(d.partos),
     partos_vaginales: num(d.partos_vaginales),
     cesareas: num(d.cesareas),
     nacidos_vivos: num(d.nacidos_vivos),

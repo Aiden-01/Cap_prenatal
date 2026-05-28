@@ -171,8 +171,8 @@ function drawTextBox(page, font, value, cfg, label) {
 
 function drawDate(page, font, value, cfg, label, tiny = false) {
   const parts = dateParts(value);
-  const gap = tiny ? 25 : 25;
-  const yearOffset = tiny ? 50 : 50;
+  const gap = tiny ? 25 : 22;
+  const yearOffset = tiny ? 50 : 43;
   const size = tiny ? 5.2 : 5.6;
   const boxes = [
     { value: parts.d, x: cfg.x, w: tiny ? 15 : 16 },
@@ -440,6 +440,7 @@ function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planPart
     nacidosMuertos: p.nacidos_muertos,
     muertosAntes1Semana: p.muertos_antes_1sem,
     muertosDespues1Semana: p.muertos_despues_1sem,
+    partos: p.partos,
     cesareas: p.cesareas,
     embarazoEctopicoNum: p.antec_emb_ectopico_num,
   };
@@ -497,9 +498,15 @@ function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planPart
     [p.rn_menor_2500g, c.marks.booleans.rnMenor2500, 'rnMenor2500'],
     [p.rn_mayor_4000g, c.marks.booleans.rnMayor4000, 'rnMayor4000'],
     [p.abortos_3_espont_consecutivos, c.marks.booleans.abortosConsecutivos, 'abortosConsecutivos'],
-    [p.antec_gemelares, c.marks.booleans.gemelares, 'gemelares'],
     [p.fin_embarazo_menos_1anio, c.marks.booleans.finEmbarazoMenos1Anio, 'finEmbarazoMenos1Anio'],
   ]);
+
+  drawMark(
+    page,
+    font,
+    bool(p.antec_gemelares) ? c.yesNo.antecGemelares.yes : c.yesNo.antecGemelares.no,
+    'antecGemelares'
+  );
 
   [c1, c2].forEach((control, idx) => {
     const cfg = c.controls[idx];
