@@ -105,6 +105,14 @@ export default function ExpedientePaciente() {
   );
 
   const p = exp.paciente;
+  const estadoEmbarazo = exp.embarazo_activo?.estado;
+  const puedeRegistrarPrenatal = estadoEmbarazo === "activo";
+  const puedeRegistrarPuerperio = estadoEmbarazo === "activo" || estadoEmbarazo === "puerperio";
+  const badgeEmbarazo = estadoEmbarazo === "activo"
+    ? "badge-green"
+    : estadoEmbarazo === "puerperio"
+      ? "badge-yellow"
+      : "badge-blue";
 
   const eliminarRegistro = async (mensaje, endpoint) => {
     if (!window.confirm(mensaje)) return;
@@ -132,6 +140,48 @@ export default function ExpedientePaciente() {
     } catch (err) {
       toast(err.response?.data?.error || "Error al crear nuevo embarazo", "error");
     }
+  };
+
+  const pasarAPuerperio = async () => {
+    if (!window.confirm("Esto marcara el embarazo activo como puerperio y lo quitara del seguimiento prenatal del dashboard. ¿Continuar?")) return;
+
+    try {
+      await api.post(`/pacientes/${id}/embarazo/puerperio`);
+      toast("Embarazo marcado en puerperio", "success");
+      cargarExpediente();
+      setTab("puerperio");
+    } catch (err) {
+      toast(err.response?.data?.error || "Error al pasar a puerperio", "error");
+    }
+  };
+
+  const cerrarEmbarazo = async () => {
+    if (!window.confirm("Esto cerrara el seguimiento de este embarazo. El expediente quedara en historial. ¿Continuar?")) return;
+
+    try {
+      await api.post(`/pacientes/${id}/embarazo/cerrar`);
+      toast("Embarazo cerrado", "success");
+      cargarExpediente();
+      setTab("general");
+    } catch (err) {
+      toast(err.response?.data?.error || "Error al cerrar embarazo", "error");
+    }
+  };
+
+  const registrarPuerperio = async () => {
+    if (estadoEmbarazo === "activo") {
+      if (!window.confirm("Para registrar puerperio primero se marcara el embarazo como postparto. ¿Continuar?")) return;
+      try {
+        await api.post(`/pacientes/${id}/embarazo/puerperio`);
+        toast("Embarazo marcado en puerperio", "success");
+        cargarExpediente();
+      } catch (err) {
+        toast(err.response?.data?.error || "Error al pasar a puerperio", "error");
+        return;
+      }
+    }
+
+    navigate(`/pacientes/${id}/puerperio/nuevo`);
   };
 
   const imprimirFichaMspas = async () => {
@@ -276,7 +326,11 @@ export default function ExpedientePaciente() {
           </div>
           <div style={{ display: "flex", gap: "0.75rem", marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
             <span className="badge badge-blue">Exp: {p.no_expediente}</span>
-            {exp.embarazo_activo && <span className="badge badge-green">Embarazo {exp.embarazo_activo.numero_embarazo} activo</span>}
+            {exp.embarazo_activo && (
+              <span className={`badge ${badgeEmbarazo}`}>
+                Embarazo {exp.embarazo_activo.numero_embarazo} {exp.embarazo_activo.estado}
+              </span>
+            )}
             {p.cui && <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>CUI: {p.cui}</span>}
             {(exp.embarazo_activo?.fur || p.fur)  && <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>FUR: {fecha(exp.embarazo_activo?.fur || p.fur)}</span>}
             {(exp.embarazo_activo?.fpp || p.fpp)  && <span style={{ color: "var(--accent)", fontSize: "0.82rem", fontWeight: 600 }}>FPP: {fecha(exp.embarazo_activo?.fpp || p.fpp)}</span>}
@@ -284,10 +338,24 @@ export default function ExpedientePaciente() {
         </div>
 
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}
-            style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            <Plus size={14} /> Control
-          </button>
+          {puedeRegistrarPrenatal && (
+            <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}
+              style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <Plus size={14} /> Control
+            </button>
+          )}
+          {estadoEmbarazo === "activo" && (
+            <button className="btn-secondary" onClick={pasarAPuerperio}
+              style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <Baby size={14} /> Pasar a puerperio
+            </button>
+          )}
+          {(estadoEmbarazo === "activo" || estadoEmbarazo === "puerperio") && (
+            <button className="btn-secondary" onClick={cerrarEmbarazo}
+              style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <CheckCircle size={14} /> Cerrar embarazo
+            </button>
+          )}
           <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/editar`)}
             style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <Pencil size={14} /> Editar paciente
@@ -468,7 +536,7 @@ export default function ExpedientePaciente() {
       ══════════════════════════════════════════ */}
       {tab === "controles" && (
         <div style={{ display: "grid", gap: "1rem" }}>
-          {exp.controles_prenatales?.length > 0 && (
+          {puedeRegistrarPrenatal && exp.controles_prenatales?.length > 0 && (
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}>
                 <Plus size={14} /> Agregar siguiente control
@@ -478,11 +546,11 @@ export default function ExpedientePaciente() {
           {exp.controles_prenatales?.length === 0 ? (
             <div className="card" style={{ textAlign: "center", padding: "2.5rem", color: "var(--text-muted)" }}>
               No hay controles registrados.
-              <div style={{ marginTop: "1rem" }}>
+              {puedeRegistrarPrenatal && <div style={{ marginTop: "1rem" }}>
                 <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}>
                   + Registrar 1er control
                 </button>
-              </div>
+              </div>}
             </div>
           ) : (
             exp.controles_prenatales.map((ctrl) => (
@@ -563,9 +631,9 @@ export default function ExpedientePaciente() {
       ══════════════════════════════════════════ */}
       {tab === "puerperio" && (
         <div style={{ display: "grid", gap: "1rem" }}>
-          {(exp.controles_puerperio?.length ?? 0) < 2 && (
+          {puedeRegistrarPuerperio && (exp.controles_puerperio?.length ?? 0) < 2 && (
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/puerperio/nuevo`)}>
+              <button className="btn-primary" onClick={registrarPuerperio}>
                 <Plus size={14} /> Registrar puerperio
               </button>
             </div>

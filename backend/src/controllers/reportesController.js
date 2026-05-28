@@ -549,19 +549,20 @@ async function proximasAParir(req, res) {
         p.telefono,
         p.comunidad,
         p.municipio,
-        p.fpp,
-        (p.fpp - CURRENT_DATE)::INTEGER        AS dias_restantes,
+        COALESCE(e.fpp, p.fpp)                 AS fpp,
+        (COALESCE(e.fpp, p.fpp) - CURRENT_DATE)::INTEGER AS dias_restantes,
         COALESCE(r.tiene_riesgo, FALSE)        AS tiene_riesgo,
         (
           SELECT MAX(c.numero_control)
           FROM controles_prenatales c
-          WHERE c.paciente_id = p.id
+          WHERE c.embarazo_id = e.id
         )                                      AS ultimo_control
       FROM pacientes p
-      LEFT JOIN fichas_riesgo_obstetrico r ON r.paciente_id = p.id
-      WHERE p.fpp IS NOT NULL
-        AND p.fpp BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
-      ORDER BY p.fpp ASC
+      JOIN embarazos e ON e.paciente_id = p.id AND e.estado = 'activo'
+      LEFT JOIN fichas_riesgo_obstetrico r ON r.embarazo_id = e.id
+      WHERE COALESCE(e.fpp, p.fpp) IS NOT NULL
+        AND COALESCE(e.fpp, p.fpp) BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
+      ORDER BY COALESCE(e.fpp, p.fpp) ASC
     `);
     return res.json(rows);
   } catch (err) {
@@ -585,21 +586,22 @@ async function sinControlReciente(req, res) {
         p.telefono,
         p.comunidad,
         p.municipio,
-        p.fur,
-        p.fpp,
+        COALESCE(e.fur, p.fur)                  AS fur,
+        COALESCE(e.fpp, p.fpp)                  AS fpp,
         COALESCE(r.tiene_riesgo, FALSE)         AS tiene_riesgo,
         MAX(c.fecha)                            AS ultimo_control_fecha,
         MAX(c.numero_control)                   AS ultimo_control_numero,
         (CURRENT_DATE - MAX(c.fecha))::INTEGER  AS dias_sin_control
       FROM pacientes p
-      LEFT JOIN controles_prenatales c  ON c.paciente_id = p.id
-      LEFT JOIN fichas_riesgo_obstetrico r ON r.paciente_id = p.id
+      JOIN embarazos e ON e.paciente_id = p.id AND e.estado = 'activo'
+      LEFT JOIN controles_prenatales c ON c.embarazo_id = e.id
+      LEFT JOIN fichas_riesgo_obstetrico r ON r.embarazo_id = e.id
       WHERE
         -- Solo embarazadas activas (FPP futura o sin FPP aún)
-        (p.fpp IS NULL OR p.fpp >= CURRENT_DATE)
+        (COALESCE(e.fpp, p.fpp) IS NULL OR COALESCE(e.fpp, p.fpp) >= CURRENT_DATE)
       GROUP BY p.id, p.nombres, p.apellidos, p.no_expediente,
                p.telefono, p.comunidad, p.municipio,
-               p.fur, p.fpp, r.tiene_riesgo
+               COALESCE(e.fur, p.fur), COALESCE(e.fpp, p.fpp), r.tiene_riesgo
       HAVING
         -- Sin ningún control O último control hace más de 28 días
         MAX(c.fecha) IS NULL

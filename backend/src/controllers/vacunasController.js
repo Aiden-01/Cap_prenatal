@@ -1,5 +1,5 @@
 const pool = require('../db/pool');
-const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
+const { obtenerEmbarazoSeguimientoId } = require('../utils/embarazos');
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
 
 // ============================================================
@@ -8,7 +8,7 @@ const emptyToNull = (value) => (value === '' || value === undefined ? null : val
 async function listar(req, res) {
   const { pacienteId } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
     const { rows } = await pool.query(
       `SELECT * FROM vacunas_paciente
        WHERE embarazo_id = $1
@@ -28,7 +28,7 @@ async function listar(req, res) {
 async function obtener(req, res) {
   const { pacienteId, id } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
     const { rows } = await pool.query(
       'SELECT * FROM vacunas_paciente WHERE id = $1 AND embarazo_id = $2',
       [id, embarazoId]
@@ -67,7 +67,10 @@ async function guardar(req, res) {
   }
 
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
+    if (!embarazoId) {
+      return res.status(409).json({ error: 'No hay embarazo activo o en puerperio para guardar vacunas' });
+    }
     const { rows } = await pool.query(
       `INSERT INTO vacunas_paciente (
         paciente_id,
@@ -121,7 +124,7 @@ async function actualizar(req, res) {
   }
 
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
     const { rows } = await pool.query(
       `UPDATE vacunas_paciente SET
         tipo_vacuna=$1, momento=$2, numero_dosis=$3, fecha_dosis=$4, registrado_por=$5
@@ -155,7 +158,7 @@ async function eliminar(req, res) {
   const { id } = req.params;
   const { pacienteId } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
     const { rowCount } = await pool.query(
       'DELETE FROM vacunas_paciente WHERE id = $1 AND embarazo_id = $2',
       [id, embarazoId]

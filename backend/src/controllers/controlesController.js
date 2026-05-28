@@ -1,5 +1,8 @@
 const pool = require('../db/pool');
-const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
+const {
+  obtenerEmbarazoActivoRequeridoId,
+  obtenerEmbarazoSeguimientoId,
+} = require('../utils/embarazos');
 const { withGuatemalaTimeFallback } = require('../utils/guatemalaTime');
 
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
@@ -83,7 +86,7 @@ const PLAN_PARTO_FIELDS = [
 async function listar(req, res) {
   const { pacienteId } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
     const { rows } = await pool.query(
       `SELECT * FROM controles_prenatales
        WHERE embarazo_id = $1
@@ -92,6 +95,7 @@ async function listar(req, res) {
     );
     return res.json(rows);
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     return res.status(500).json({ error: 'Error al listar controles' });
   }
 }
@@ -102,7 +106,7 @@ async function listar(req, res) {
 async function obtener(req, res) {
   const { pacienteId, id } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
     const { rows } = await pool.query(
       'SELECT * FROM controles_prenatales WHERE id = $1 AND embarazo_id = $2',
       [id, embarazoId]
@@ -110,6 +114,7 @@ async function obtener(req, res) {
     if (!rows[0]) return res.status(404).json({ error: 'Control no encontrado' });
     return res.json(rows[0]);
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     return res.status(500).json({ error: 'Error al obtener control' });
   }
 }
@@ -119,7 +124,6 @@ async function obtener(req, res) {
 // ============================================================
 async function actualizar(req, res) {
   const { pacienteId, id } = req.params;
-  const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
   const { campos, sets, valores } = buildUpdate(
     withGuatemalaTimeFallback(req.body, { onlyWhenHoraIsPresent: true }),
     CONTROL_FIELDS
@@ -128,6 +132,7 @@ async function actualizar(req, res) {
   if (campos.length === 0) return res.status(400).json({ error: 'Sin campos para actualizar' });
 
   try {
+    const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
     valores.push(id, embarazoId);
     const { rows } = await pool.query(
       `UPDATE controles_prenatales SET ${sets}, updated_at = NOW()
@@ -138,6 +143,7 @@ async function actualizar(req, res) {
     if (!rows[0]) return res.status(404).json({ error: 'Control no encontrado' });
     return res.json(rows[0]);
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     if (err.code === '23505') {
       return res.status(409).json({ error: 'Ya existe un control con ese numero para esta paciente' });
     }
@@ -152,7 +158,7 @@ async function actualizar(req, res) {
 async function eliminar(req, res) {
   const { pacienteId, id } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
     const { rowCount } = await pool.query(
       'DELETE FROM controles_prenatales WHERE id = $1 AND embarazo_id = $2',
       [id, embarazoId]
@@ -160,6 +166,7 @@ async function eliminar(req, res) {
     if (rowCount === 0) return res.status(404).json({ error: 'Control no encontrado' });
     return res.json({ message: 'Control eliminado' });
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     console.error(err);
     return res.status(500).json({ error: 'Error al eliminar control prenatal' });
   }
@@ -178,7 +185,7 @@ async function crear(req, res) {
   }
 
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
     const { rows } = await pool.query(
       `INSERT INTO controles_prenatales (
         paciente_id, embarazo_id, numero_control, fecha, hora,
@@ -395,6 +402,7 @@ async function crear(req, res) {
     );
     return res.status(201).json(rows[0]);
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     console.error(err);
     return res.status(500).json({ error: 'Error al guardar control prenatal' });
   }
@@ -406,7 +414,7 @@ async function crear(req, res) {
 async function obtenerPlanParto(req, res) {
   const { pacienteId } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
     const { rows } = await pool.query(
       'SELECT * FROM planes_parto WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
       [embarazoId]
@@ -424,7 +432,10 @@ async function guardarPlanParto(req, res) {
   if (!data.fecha) return res.status(400).json({ error: 'Fecha requerida' });
 
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
+    if (!embarazoId) {
+      return res.status(409).json({ error: 'No hay embarazo activo o en puerperio para guardar plan de parto' });
+    }
     const existe = await pool.query(
       'SELECT id FROM planes_parto WHERE embarazo_id = $1',
       [embarazoId]
@@ -463,7 +474,7 @@ async function guardarPlanParto(req, res) {
 async function listarPuerperio(req, res) {
   const { pacienteId } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
     const { rows } = await pool.query(
       'SELECT * FROM controles_puerperio WHERE embarazo_id = $1 ORDER BY numero_atencion',
       [embarazoId]
@@ -477,7 +488,7 @@ async function listarPuerperio(req, res) {
 async function obtenerPuerperio(req, res) {
   const { pacienteId, id } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
     const { rows } = await pool.query(
       'SELECT * FROM controles_puerperio WHERE id = $1 AND embarazo_id = $2',
       [id, embarazoId]
@@ -498,7 +509,18 @@ async function guardarPuerperio(req, res) {
   }
 
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
+    if (!embarazoId) {
+      return res.status(409).json({ error: 'No hay embarazo activo o en puerperio para registrar puerperio' });
+    }
+    await pool.query(
+      `UPDATE embarazos
+       SET estado = 'puerperio',
+           fecha_cierre = COALESCE(fecha_cierre, $2),
+           updated_at = NOW()
+       WHERE id = $1 AND estado = 'activo'`,
+      [embarazoId, d.fecha]
+    );
     const { rows } = await pool.query(
       `INSERT INTO controles_puerperio (
         paciente_id, embarazo_id, numero_atencion, fecha, hora,
@@ -568,7 +590,7 @@ async function guardarPuerperio(req, res) {
 
 async function actualizarPuerperio(req, res) {
   const { pacienteId, id } = req.params;
-  const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+  const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
   const { campos, sets, valores } = buildUpdate(
     withGuatemalaTimeFallback(req.body, { onlyWhenHoraIsPresent: true }),
     PUERPERIO_FIELDS
@@ -598,7 +620,7 @@ async function actualizarPuerperio(req, res) {
 async function eliminarPuerperio(req, res) {
   const { pacienteId, id } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
     const { rowCount } = await pool.query(
       'DELETE FROM controles_puerperio WHERE id = $1 AND embarazo_id = $2',
       [id, embarazoId]

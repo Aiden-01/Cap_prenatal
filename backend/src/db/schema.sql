@@ -207,7 +207,7 @@ CREATE TABLE IF NOT EXISTS embarazos (
   id                SERIAL PRIMARY KEY,
   paciente_id       INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
   numero_embarazo   INTEGER NOT NULL CHECK (numero_embarazo >= 1),
-  estado            VARCHAR(15) NOT NULL DEFAULT 'activo' CHECK (estado IN ('activo','cerrado')),
+  estado            VARCHAR(15) NOT NULL DEFAULT 'activo' CHECK (estado IN ('activo','puerperio','cerrado')),
   fur               DATE,
   fpp               DATE,
   fecha_inicio      DATE DEFAULT CURRENT_DATE,
@@ -883,3 +883,7 @@ WHERE fpp IS NULL AND fur IS NOT NULL;
 UPDATE embarazos
 SET fpp = (fur + INTERVAL '280 days')::date
 WHERE fpp IS NULL AND fur IS NOT NULL;
+
+ALTER TABLE embarazos DROP CONSTRAINT IF EXISTS embarazos_estado_check;
+ALTER TABLE embarazos ADD CONSTRAINT embarazos_estado_check
+  CHECK (estado IN ('activo','puerperio','cerrado')) NOT VALID;

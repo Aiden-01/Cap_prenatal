@@ -1,5 +1,14 @@
 const express = require('express');
-const { listar, obtener, crear, actualizar, expedienteCompleto, nuevoEmbarazo } =
+const {
+  listar,
+  obtener,
+  crear,
+  actualizar,
+  expedienteCompleto,
+  nuevoEmbarazo,
+  pasarAPuerperio,
+  cerrarEmbarazo,
+} =
   require('../controllers/pacientesController');
 const { authMiddleware } = require('../middleware/auth');
 
@@ -21,6 +30,8 @@ router.get('/:id',                obtener);
 router.put('/:id',                actualizar);
 router.get('/:id/expediente',     expedienteCompleto);
 router.post('/:id/embarazos',     nuevoEmbarazo);
+router.post('/:id/embarazo/puerperio', pasarAPuerperio);
+router.post('/:id/embarazo/cerrar',    cerrarEmbarazo);
 
 // Sub-rutas anidadas bajo /pacientes/:pacienteId/...
 router.use('/:pacienteId/controles',   controlesRouter);

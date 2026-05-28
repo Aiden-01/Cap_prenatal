@@ -1,5 +1,5 @@
 const pool = require('../db/pool');
-const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
+const { obtenerEmbarazoActivoId, obtenerEmbarazoVisibleId } = require('../utils/embarazos');
 
 // ============================================================
 // GET /api/pacientes?buscar=xxx&pagina=1&limite=20
@@ -382,7 +382,7 @@ async function actualizar(req, res) {
 async function expedienteCompleto(req, res) {
   const { id } = req.params;
   try {
-    const embarazoActivoId = await obtenerEmbarazoActivoId(id);
+    const embarazoSeguimientoId = await obtenerEmbarazoVisibleId(id);
     const [
       paciente,
       embarazos,
@@ -397,30 +397,30 @@ async function expedienteCompleto(req, res) {
     ] = await Promise.all([
       pool.query('SELECT * FROM pacientes WHERE id = $1', [id]),
       pool.query('SELECT * FROM embarazos WHERE paciente_id = $1 ORDER BY numero_embarazo DESC', [id]),
-      pool.query('SELECT * FROM embarazos WHERE id = $1', [embarazoActivoId]),
+      pool.query('SELECT * FROM embarazos WHERE id = $1', [embarazoSeguimientoId]),
       pool.query(
         'SELECT * FROM controles_prenatales WHERE embarazo_id = $1 ORDER BY numero_control',
-        [embarazoActivoId]
+        [embarazoSeguimientoId]
       ),
       pool.query(
         'SELECT * FROM controles_puerperio WHERE embarazo_id = $1 ORDER BY numero_atencion',
-        [embarazoActivoId]
+        [embarazoSeguimientoId]
       ),
       pool.query(
         'SELECT * FROM morbilidad_embarazo WHERE embarazo_id = $1 ORDER BY fecha DESC',
-        [embarazoActivoId]
+        [embarazoSeguimientoId]
       ),
       pool.query(
         'SELECT * FROM fichas_riesgo_obstetrico WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
-        [embarazoActivoId]
+        [embarazoSeguimientoId]
       ),
       pool.query(
         'SELECT * FROM planes_parto WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
-        [embarazoActivoId]
+        [embarazoSeguimientoId]
       ),
       pool.query(
         'SELECT * FROM vacunas_paciente WHERE embarazo_id = $1 ORDER BY tipo_vacuna, numero_dosis',
-        [embarazoActivoId]
+        [embarazoSeguimientoId]
       ),
       pool.query(
         'SELECT * FROM referencias_efectuadas WHERE paciente_id = $1 ORDER BY fecha DESC',
@@ -462,7 +462,7 @@ async function nuevoEmbarazo(req, res) {
     await pool.query(
       `UPDATE embarazos
        SET estado = 'cerrado', fecha_cierre = COALESCE($2, CURRENT_DATE), updated_at = NOW()
-       WHERE paciente_id = $1 AND estado = 'activo'`,
+       WHERE paciente_id = $1 AND estado IN ('activo', 'puerperio')`,
       [id, emptyToNull(d.fecha_cierre)]
     );
 
@@ -498,4 +498,67 @@ async function nuevoEmbarazo(req, res) {
   }
 }
 
-module.exports = { listar, obtener, crear, actualizar, expedienteCompleto, nuevoEmbarazo };
+async function pasarAPuerperio(req, res) {
+  const { id } = req.params;
+  const d = req.body || {};
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE embarazos
+       SET estado = 'puerperio',
+           fecha_cierre = COALESCE($2, fecha_cierre, CURRENT_DATE),
+           observaciones = COALESCE($3, observaciones),
+           updated_at = NOW()
+       WHERE paciente_id = $1 AND estado = 'activo'
+       RETURNING *`,
+      [id, emptyToNull(d.fecha_parto || d.fecha_cierre), emptyToNull(d.observaciones)]
+    );
+
+    if (!rows[0]) {
+      return res.status(409).json({ error: 'La paciente no tiene un embarazo activo para pasar a puerperio' });
+    }
+
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Error al pasar embarazo a puerperio' });
+  }
+}
+
+async function cerrarEmbarazo(req, res) {
+  const { id } = req.params;
+  const d = req.body || {};
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE embarazos
+       SET estado = 'cerrado',
+           fecha_cierre = COALESCE($2, fecha_cierre, CURRENT_DATE),
+           observaciones = COALESCE($3, observaciones),
+           updated_at = NOW()
+       WHERE paciente_id = $1 AND estado IN ('activo', 'puerperio')
+       RETURNING *`,
+      [id, emptyToNull(d.fecha_cierre), emptyToNull(d.observaciones)]
+    );
+
+    if (!rows[0]) {
+      return res.status(409).json({ error: 'La paciente no tiene un embarazo activo o en puerperio para cerrar' });
+    }
+
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Error al cerrar embarazo' });
+  }
+}
+
+module.exports = {
+  listar,
+  obtener,
+  crear,
+  actualizar,
+  expedienteCompleto,
+  nuevoEmbarazo,
+  pasarAPuerperio,
+  cerrarEmbarazo,
+};

@@ -277,6 +277,118 @@ function controlAt(controles, numero) {
   return controles.find((c) => Number(c.numero_control) === numero) || {};
 }
 
+function formatDate(value) {
+  const parts = dateParts(value);
+  if (!parts.y || !parts.m || !parts.d) return '';
+  return `${parts.d}/${parts.m}/${parts.y}`;
+}
+
+function compactYesNo(value) {
+  if (value === null || value === undefined || value === '') return '';
+  return bool(value) ? 'Si' : 'No';
+}
+
+function drawWrappedLine(page, font, label, value, x, y, width, size = 8.5) {
+  const cleanValue = safe(value).replace(/\s+/g, ' ').trim();
+  if (!cleanValue) return y;
+
+  const labelText = `${label}: `;
+  page.drawText(labelText, { x, y, size, font, color: rgb(0.05, 0.05, 0.05) });
+
+  const labelWidth = font.widthOfTextAtSize(labelText, size);
+  const lines = wrapText(cleanValue, font, size, width - labelWidth, 3);
+  lines.forEach((line, idx) => {
+    page.drawText(line, {
+      x: idx === 0 ? x + labelWidth : x,
+      y: y - idx * (size + 3),
+      size,
+      font,
+      color: rgb(0.05, 0.05, 0.05),
+    });
+  });
+
+  return y - Math.max(lines.length, 1) * (size + 3);
+}
+
+function drawPuerperioSummary({ pdfDoc, font, paciente, embarazo, puerperio = [] }) {
+  if (!puerperio.length) return;
+
+  const marginX = 42;
+  let page = pdfDoc.addPage([coords.PAGE.width, coords.PAGE.height]);
+  let y = page.getHeight() - 54;
+
+  const addContinuationPage = () => {
+    page = pdfDoc.addPage([coords.PAGE.width, coords.PAGE.height]);
+    y = page.getHeight() - 54;
+  };
+
+  page.drawText('Anexo de puerperio', {
+    x: marginX,
+    y,
+    size: 16,
+    font,
+    color: rgb(0.02, 0.12, 0.22),
+  });
+  y -= 22;
+
+  page.drawText('Resumen generado desde los controles de puerperio registrados en el sistema.', {
+    x: marginX,
+    y,
+    size: 8.5,
+    font,
+    color: rgb(0.18, 0.22, 0.25),
+  });
+  y -= 28;
+
+  const nombre = `${safe(paciente?.nombres)} ${safe(paciente?.apellidos)}`.trim();
+  y = drawWrappedLine(page, font, 'Paciente', nombre, marginX, y, 520, 8.5);
+  y = drawWrappedLine(page, font, 'No. expediente', paciente?.no_expediente, marginX, y, 520, 8.5);
+  y = drawWrappedLine(page, font, 'Embarazo', embarazo?.numero_embarazo, marginX, y, 520, 8.5);
+  y -= 10;
+
+  puerperio.forEach((registro) => {
+    if (y < 170) {
+      addContinuationPage();
+    }
+
+    page.drawText(`${registro.numero_atencion || ''}a atencion de puerperio`, {
+      x: marginX,
+      y,
+      size: 11,
+      font,
+      color: rgb(0.02, 0.12, 0.22),
+    });
+    y -= 18;
+
+    const fields = [
+      ['Fecha', formatDate(registro.fecha)],
+      ['Hora', safe(registro.hora).slice(0, 5)],
+      ['Dias despues del parto', registro.dias_despues_parto],
+      ['Lugar del parto', registro.lugar_atencion_parto],
+      ['Quien atendio parto', registro.quien_atendio_parto],
+      ['Tipo de parto', registro.tipo_parto],
+      ['RN vivo', compactYesNo(registro.recien_nacido_vivo)],
+      ['Apego inmediato', compactYesNo(registro.tuvo_apego_inmediato)],
+      ['Lactancia materna exclusiva', compactYesNo(registro.lactancia_materna_exclusiva)],
+      ['P/A', registro.pa_sistolica ? `${registro.pa_sistolica}/${registro.pa_diastolica || ''}` : ''],
+      ['Temperatura', registro.temperatura],
+      ['Signos de peligro', registro.signos_peligro],
+      ['Examen mamas', registro.examen_mamas],
+      ['Examen ginecologico', registro.examen_ginecologico],
+      ['Orientacion/consejeria', registro.orientacion_consejeria],
+      ['Impresion clinica', registro.impresion_clinica],
+      ['Tratamiento', registro.tratamiento],
+      ['Nombre/cargo atiende', registro.nombre_cargo_atiende],
+    ];
+
+    fields.forEach(([label, value]) => {
+      if (y < 80) addContinuationPage();
+      y = drawWrappedLine(page, font, label, value, marginX, y, 520, 8);
+    });
+    y -= 12;
+  });
+}
+
 function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planParto }) {
   const p = paciente;
   const c = coords.pages[1];
@@ -406,6 +518,7 @@ async function generarFichaClinicaPrenatalPdf({
   paciente,
   embarazo,
   controles = [],
+  puerperio = [],
   riesgo = null,
   planParto = null,
 }) {
@@ -425,6 +538,14 @@ async function generarFichaClinicaPrenatalPdf({
     controles,
     riesgo,
     planParto,
+  });
+
+  drawPuerperioSummary({
+    pdfDoc,
+    font,
+    paciente,
+    embarazo,
+    puerperio,
   });
 
   return Buffer.from(await pdfDoc.save());

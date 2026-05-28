@@ -6,7 +6,7 @@ const puppeteer = require('puppeteer');
 const ExcelJS = require('exceljs');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
-const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
+const { obtenerEmbarazoVisibleId } = require('../utils/embarazos');
 const { generarFichaClinicaPrenatalPdf } = require('../services/fichaClinicaPrenatalPdf');
 
 const execFileAsync = promisify(execFile);
@@ -1118,12 +1118,16 @@ async function pdfMspas(req, res) {
   const { pacienteId } = req.params;
 
   try {
-    const embarazoActivoId = await obtenerEmbarazoActivoId(pacienteId);
-    const [pacienteRes, embarazoRes, controlesRes, riesgoRes, planPartoRes] = await Promise.all([
+    const embarazoActivoId = await obtenerEmbarazoVisibleId(pacienteId);
+    const [pacienteRes, embarazoRes, controlesRes, puerperioRes, riesgoRes, planPartoRes] = await Promise.all([
       pool.query('SELECT * FROM pacientes WHERE id = $1', [pacienteId]),
       pool.query('SELECT * FROM embarazos WHERE id = $1', [embarazoActivoId]),
       pool.query(
         'SELECT * FROM controles_prenatales WHERE embarazo_id = $1 ORDER BY numero_control LIMIT 5',
+        [embarazoActivoId]
+      ),
+      pool.query(
+        'SELECT * FROM controles_puerperio WHERE embarazo_id = $1 ORDER BY numero_atencion',
         [embarazoActivoId]
       ),
       pool.query(
@@ -1144,6 +1148,7 @@ async function pdfMspas(req, res) {
       paciente: pacienteRes.rows[0],
       embarazo: embarazoRes.rows[0] || null,
       controles: controlesRes.rows,
+      puerperio: puerperioRes.rows,
       riesgo: riesgoRes.rows[0] || null,
       planParto: planPartoRes.rows[0] || null,
     });
@@ -1163,7 +1168,7 @@ async function pdfRiesgoObstetrico(req, res) {
   const { pacienteId } = req.params;
 
   try {
-    const embarazoActivoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoActivoId = await obtenerEmbarazoVisibleId(pacienteId);
     const [pacienteRes, embarazoRes, riesgoRes] = await Promise.all([
       pool.query('SELECT * FROM pacientes WHERE id = $1', [pacienteId]),
       pool.query('SELECT * FROM embarazos WHERE id = $1', [embarazoActivoId]),
@@ -1206,7 +1211,7 @@ async function pdfPlanParto(req, res) {
   const { pacienteId } = req.params;
 
   try {
-    const embarazoActivoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoActivoId = await obtenerEmbarazoVisibleId(pacienteId);
     const [pacienteRes, planRes] = await Promise.all([
       pool.query('SELECT * FROM pacientes WHERE id = $1', [pacienteId]),
       pool.query(

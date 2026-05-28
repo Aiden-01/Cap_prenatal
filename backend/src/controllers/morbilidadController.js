@@ -1,5 +1,5 @@
 const pool = require('../db/pool');
-const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
+const { obtenerEmbarazoSeguimientoId } = require('../utils/embarazos');
 const { withGuatemalaTimeFallback } = require('../utils/guatemalaTime');
 
 const MORBILIDAD_FIELDS = [
@@ -20,7 +20,7 @@ const MORBILIDAD_FIELDS = [
 async function listar(req, res) {
   const { pacienteId } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
     const { rows } = await pool.query(
       `SELECT * FROM morbilidad_embarazo
        WHERE embarazo_id = $1
@@ -40,7 +40,7 @@ async function listar(req, res) {
 async function obtener(req, res) {
   const { pacienteId, id } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
     const { rows } = await pool.query(
       'SELECT * FROM morbilidad_embarazo WHERE id = $1 AND embarazo_id = $2',
       [id, embarazoId]
@@ -65,7 +65,10 @@ async function guardar(req, res) {
   }
 
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
+    if (!embarazoId) {
+      return res.status(409).json({ error: 'No hay embarazo activo o en puerperio para guardar morbilidad' });
+    }
     const { rows } = await pool.query(
       `INSERT INTO morbilidad_embarazo (
         paciente_id,
@@ -117,10 +120,9 @@ async function actualizar(req, res) {
   if (campos.length === 0) return res.status(400).json({ error: 'Sin campos para actualizar' });
 
   const sets = campos.map((c, i) => `${c} = $${i + 1}`).join(', ');
-  const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
-  const valores = [...campos.map(c => d[c]), id, embarazoId];
-
   try {
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
+    const valores = [...campos.map(c => d[c]), id, embarazoId];
     const { rowCount } = await pool.query(
       `UPDATE morbilidad_embarazo SET ${sets}, updated_at = NOW()
        WHERE id = $${valores.length - 1} AND embarazo_id = $${valores.length}`,
@@ -140,7 +142,7 @@ async function actualizar(req, res) {
 async function eliminar(req, res) {
   const { pacienteId, id } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
     await pool.query('DELETE FROM morbilidad_embarazo WHERE id = $1 AND embarazo_id = $2', [id, embarazoId]);
     return res.json({ message: 'Registro eliminado' });
   } catch (err) {

@@ -1,5 +1,5 @@
 const pool = require('../db/pool');
-const { obtenerEmbarazoActivoId } = require('../utils/embarazos');
+const { obtenerEmbarazoActivoId, obtenerEmbarazoActivoRequeridoId } = require('../utils/embarazos');
 
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
 const boolOrFalse = (value) => value ?? false;
@@ -9,6 +9,7 @@ async function obtener(req, res) {
   const { pacienteId } = req.params;
   try {
     const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    if (!embarazoId) return res.json(null);
     const { rows } = await pool.query(
       'SELECT * FROM fichas_riesgo_obstetrico WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
       [embarazoId]
@@ -27,7 +28,7 @@ async function guardar(req, res) {
   if (!d.fecha) return res.status(400).json({ error: 'Fecha requerida' });
 
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
     const existe = await pool.query(
       'SELECT id FROM fichas_riesgo_obstetrico WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
       [embarazoId]
@@ -91,6 +92,7 @@ async function guardar(req, res) {
 
     return res.json(result.rows[0]);
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     if (err.code === '23505') {
       return res.status(409).json({ error: 'Esta paciente ya tiene una ficha de riesgo registrada' });
     }
@@ -106,7 +108,7 @@ async function actualizar(req, res) {
   if (!d.fecha) return res.status(400).json({ error: 'Fecha requerida' });
 
   try {
-    const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+    const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
     const valores = [
       embarazoId, d.fecha, emptyToNull(d.telefono), emptyToNull(d.pueblo), boolOrFalse(d.migrante), emptyToNull(d.estado_civil),
       emptyToNull(d.escolaridad), emptyToNull(d.ocupacion), emptyToNull(d.nombre_esposo_conviviente), emptyToNull(d.edad_esposo),
@@ -159,6 +161,7 @@ async function actualizar(req, res) {
     if (!result.rows[0]) return res.status(404).json({ error: 'Ficha de riesgo no encontrada' });
     return res.json(result.rows[0]);
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     console.error(err);
     return res.status(500).json({ error: 'Error al actualizar ficha de riesgo' });
   }
@@ -175,6 +178,7 @@ async function eliminar(req, res) {
     if (rowCount === 0) return res.status(404).json({ error: 'Ficha de riesgo no encontrada' });
     return res.json({ message: 'Ficha de riesgo eliminada' });
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     console.error(err);
     return res.status(500).json({ error: 'Error al eliminar ficha de riesgo' });
   }
