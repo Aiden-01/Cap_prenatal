@@ -2,6 +2,10 @@ node_modules
 backend/.env
 backend/.python-packages/
 backend/mspas_pdf_preview/
+ocr-service/.venv/
+ocr-service/tessdata/
+__pycache__/
+*.pyc
 
 # Archivos temporales generados localmente
 tmp_*/
