@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const { registrarAuditoria } = require('../utils/auditoria');
 
 const REFERENCIA_FIELDS = [
   'fecha',
@@ -50,6 +51,14 @@ async function guardar(req, res) {
         req.usuario.id
       ]
     );
+    await registrarAuditoria(req, {
+      accion: 'crear',
+      tabla: 'referencias_efectuadas',
+      registroId: rows[0].id,
+      pacienteId,
+      datosNuevos: rows[0],
+      descripcion: 'Referencia registrada',
+    });
     return res.status(201).json(rows[0]);
   } catch (err) {
     console.error(err);
@@ -73,12 +82,26 @@ async function actualizar(req, res) {
   const valores = [...campos.map(c => d[c]), id, pacienteId];
 
   try {
-    const { rowCount } = await pool.query(
+    const before = await pool.query(
+      'SELECT * FROM referencias_efectuadas WHERE id = $1 AND paciente_id = $2',
+      [id, pacienteId]
+    );
+    const { rows, rowCount } = await pool.query(
       `UPDATE referencias_efectuadas SET ${sets}, updated_at = NOW()
-       WHERE id = $${valores.length - 1} AND paciente_id = $${valores.length}`,
+       WHERE id = $${valores.length - 1} AND paciente_id = $${valores.length}
+       RETURNING *`,
       valores
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Referencia no encontrada' });
+    await registrarAuditoria(req, {
+      accion: 'actualizar',
+      tabla: 'referencias_efectuadas',
+      registroId: id,
+      pacienteId,
+      datosAnteriores: before.rows[0],
+      datosNuevos: rows[0],
+      descripcion: 'Referencia actualizada',
+    });
     return res.json({ message: 'Referencia actualizada' });
   } catch (err) {
     console.error(err);
@@ -92,11 +115,19 @@ async function actualizar(req, res) {
 async function eliminar(req, res) {
   const { pacienteId, id } = req.params;
   try {
-    const { rowCount } = await pool.query(
-      'DELETE FROM referencias_efectuadas WHERE id = $1 AND paciente_id = $2',
+    const { rows, rowCount } = await pool.query(
+      'DELETE FROM referencias_efectuadas WHERE id = $1 AND paciente_id = $2 RETURNING *',
       [id, pacienteId]
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Referencia no encontrada' });
+    await registrarAuditoria(req, {
+      accion: 'eliminar',
+      tabla: 'referencias_efectuadas',
+      registroId: id,
+      pacienteId,
+      datosAnteriores: rows[0],
+      descripcion: 'Referencia eliminada',
+    });
     return res.json({ message: 'Referencia eliminada' });
   } catch (err) {
     console.error(err);

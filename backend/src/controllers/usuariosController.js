@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const pool   = require('../db/pool');
+const { registrarAuditoria } = require('../utils/auditoria');
 
 async function listar(req, res) {
   try {
@@ -23,9 +24,16 @@ async function crear(req, res) {
     const { rows } = await pool.query(
       `INSERT INTO usuarios (nombre_completo, username, password_hash, rol_id)
        VALUES ($1, $2, $3, (SELECT id FROM roles WHERE nombre = $4))
-       RETURNING id, nombre_completo, username`,
+       RETURNING id, nombre_completo, username, activo, created_at`,
       [nombre_completo, username, hash, rol]
     );
+    await registrarAuditoria(req, {
+      accion: 'crear',
+      tabla: 'usuarios',
+      registroId: rows[0].id,
+      datosNuevos: { ...rows[0], rol },
+      descripcion: 'Usuario creado',
+    });
     return res.status(201).json(rows[0]);
   } catch (err) {
     if (err.code === '23505')
@@ -65,22 +73,41 @@ async function actualizar(req, res) {
   }
 
   try {
+    const before = await pool.query(
+      `SELECT u.id, u.nombre_completo, u.username, u.activo, r.nombre AS rol, u.created_at, u.updated_at
+       FROM usuarios u JOIN roles r ON r.id = u.rol_id
+       WHERE u.id = $1`,
+      [id]
+    );
+    if (!before.rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    let result;
     if (password) {
       const hash = await bcrypt.hash(password, 12);
-      await pool.query(
+      result = await pool.query(
         `UPDATE usuarios SET nombre_completo=$1, activo=$2,
          rol_id=(SELECT id FROM roles WHERE nombre=$3),
-         password_hash=$4, updated_at=NOW() WHERE id=$5`,
+         password_hash=$4, updated_at=NOW() WHERE id=$5
+         RETURNING id, nombre_completo, username, activo, created_at, updated_at`,
         [nombre_completo, activo, rol, hash, id]
       );
     } else {
-      await pool.query(
+      result = await pool.query(
         `UPDATE usuarios SET nombre_completo=$1, activo=$2,
          rol_id=(SELECT id FROM roles WHERE nombre=$3),
-         updated_at=NOW() WHERE id=$4`,
+         updated_at=NOW() WHERE id=$4
+         RETURNING id, nombre_completo, username, activo, created_at, updated_at`,
         [nombre_completo, activo, rol, id]
       );
     }
+    await registrarAuditoria(req, {
+      accion: 'actualizar',
+      tabla: 'usuarios',
+      registroId: id,
+      datosAnteriores: before.rows[0],
+      datosNuevos: { ...result.rows[0], rol, password_cambiado: Boolean(password) },
+      descripcion: 'Usuario actualizado',
+    });
     return res.json({ message: 'Usuario actualizado' });
   } catch {
     return res.status(500).json({ error: 'Error al actualizar usuario' });
@@ -123,6 +150,13 @@ async function eliminar(req, res) {
     }
 
     await pool.query('DELETE FROM usuarios WHERE id = $1', [id]);
+    await registrarAuditoria(req, {
+      accion: 'eliminar',
+      tabla: 'usuarios',
+      registroId: id,
+      datosAnteriores: target[0],
+      descripcion: 'Usuario eliminado',
+    });
     return res.json({ message: 'Usuario eliminado' });
   } catch {
     return res.status(500).json({ error: 'Error al eliminar usuario' });

@@ -1,6 +1,7 @@
 const pool = require('../db/pool');
 const { obtenerEmbarazoSeguimientoId } = require('../utils/embarazos');
 const { withGuatemalaTimeFallback } = require('../utils/guatemalaTime');
+const { registrarAuditoria } = require('../utils/auditoria');
 
 const MORBILIDAD_FIELDS = [
   'fecha',
@@ -100,6 +101,15 @@ async function guardar(req, res) {
         req.usuario.id
       ]
     );
+    await registrarAuditoria(req, {
+      accion: 'crear',
+      tabla: 'morbilidad_embarazo',
+      registroId: rows[0].id,
+      pacienteId,
+      embarazoId,
+      datosNuevos: rows[0],
+      descripcion: 'Registro de morbilidad creado',
+    });
     return res.status(201).json(rows[0]);
   } catch (err) {
     console.error(err);
@@ -122,13 +132,28 @@ async function actualizar(req, res) {
   const sets = campos.map((c, i) => `${c} = $${i + 1}`).join(', ');
   try {
     const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
+    const before = await pool.query(
+      'SELECT * FROM morbilidad_embarazo WHERE id = $1 AND embarazo_id = $2',
+      [id, embarazoId]
+    );
     const valores = [...campos.map(c => d[c]), id, embarazoId];
-    const { rowCount } = await pool.query(
+    const { rows, rowCount } = await pool.query(
       `UPDATE morbilidad_embarazo SET ${sets}, updated_at = NOW()
-       WHERE id = $${valores.length - 1} AND embarazo_id = $${valores.length}`,
+       WHERE id = $${valores.length - 1} AND embarazo_id = $${valores.length}
+       RETURNING *`,
       valores
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Registro no encontrado' });
+    await registrarAuditoria(req, {
+      accion: 'actualizar',
+      tabla: 'morbilidad_embarazo',
+      registroId: id,
+      pacienteId,
+      embarazoId,
+      datosAnteriores: before.rows[0],
+      datosNuevos: rows[0],
+      descripcion: 'Registro de morbilidad actualizado',
+    });
     return res.json({ message: 'Registro actualizado' });
   } catch (err) {
     console.error(err);
@@ -143,7 +168,20 @@ async function eliminar(req, res) {
   const { pacienteId, id } = req.params;
   try {
     const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
-    await pool.query('DELETE FROM morbilidad_embarazo WHERE id = $1 AND embarazo_id = $2', [id, embarazoId]);
+    const { rows, rowCount } = await pool.query(
+      'DELETE FROM morbilidad_embarazo WHERE id = $1 AND embarazo_id = $2 RETURNING *',
+      [id, embarazoId]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Registro no encontrado' });
+    await registrarAuditoria(req, {
+      accion: 'eliminar',
+      tabla: 'morbilidad_embarazo',
+      registroId: id,
+      pacienteId,
+      embarazoId,
+      datosAnteriores: rows[0],
+      descripcion: 'Registro de morbilidad eliminado',
+    });
     return res.json({ message: 'Registro eliminado' });
   } catch (err) {
     console.error(err);

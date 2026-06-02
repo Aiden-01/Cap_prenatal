@@ -1,5 +1,6 @@
 const pool = require('../db/pool');
 const { obtenerEmbarazoActivoId, obtenerEmbarazoVisibleId } = require('../utils/embarazos');
+const { registrarAuditoria } = require('../utils/auditoria');
 
 // ============================================================
 // GET /api/pacientes?buscar=xxx&pagina=1&limite=20
@@ -288,17 +289,45 @@ async function crear(req, res) {
     const { rows } = await pool.query(
       `INSERT INTO pacientes (${campos.join(', ')})
        VALUES (${placeholders})
-       RETURNING id, no_expediente, cui, nombres, apellidos`,
+       RETURNING *`,
       valores
     );
 
-    await pool.query(
+    const embarazo = await pool.query(
       `INSERT INTO embarazos (paciente_id, numero_embarazo, estado, fur, fpp, fecha_inicio, registrado_por)
-       VALUES ($1, 1, 'activo', $2, $3, COALESCE($2, CURRENT_DATE), $4)`,
+       VALUES ($1, 1, 'activo', $2, $3, COALESCE($2, CURRENT_DATE), $4)
+       RETURNING *`,
       [rows[0].id, data.fur, data.fpp, req.usuario.id]
     );
 
-    return res.status(201).json(rows[0]);
+    await registrarAuditoria(req, {
+      accion: 'crear',
+      tabla: 'pacientes',
+      registroId: rows[0].id,
+      pacienteId: rows[0].id,
+      datosNuevos: rows[0],
+      descripcion: 'Paciente creada',
+    });
+
+    if (embarazo.rows?.[0]) {
+      await registrarAuditoria(req, {
+        accion: 'crear',
+        tabla: 'embarazos',
+        registroId: embarazo.rows[0].id,
+        pacienteId: rows[0].id,
+        embarazoId: embarazo.rows[0].id,
+        datosNuevos: embarazo.rows[0],
+        descripcion: 'Embarazo inicial creado automaticamente',
+      });
+    }
+
+    return res.status(201).json({
+      id: rows[0].id,
+      no_expediente: rows[0].no_expediente,
+      cui: rows[0].cui,
+      nombres: rows[0].nombres,
+      apellidos: rows[0].apellidos,
+    });
   } catch (err) {
     console.error(err);
     if (err.code === '23505') {
@@ -351,20 +380,45 @@ async function actualizar(req, res) {
       return res.status(409).json({ error: 'Ya existe una paciente registrada con ese CUI' });
     }
 
-    const { rowCount } = await pool.query(
-      `UPDATE pacientes SET ${sets}, updated_at = NOW() WHERE id = $${valores.length}`,
+    const before = await pool.query('SELECT * FROM pacientes WHERE id = $1', [id]);
+    const { rows, rowCount } = await pool.query(
+      `UPDATE pacientes SET ${sets}, updated_at = NOW() WHERE id = $${valores.length} RETURNING *`,
       valores
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Paciente no encontrado' });
 
+    await registrarAuditoria(req, {
+      accion: 'actualizar',
+      tabla: 'pacientes',
+      registroId: id,
+      pacienteId: id,
+      datosAnteriores: before.rows[0],
+      datosNuevos: rows[0],
+      descripcion: 'Paciente actualizada',
+    });
+
     if (Object.prototype.hasOwnProperty.call(data, 'fur') || Object.prototype.hasOwnProperty.call(data, 'fpp')) {
       const embarazoId = await obtenerEmbarazoActivoId(id);
-      await pool.query(
+      const embarazoBefore = await pool.query('SELECT * FROM embarazos WHERE id = $1', [embarazoId]);
+      const embarazo = await pool.query(
         `UPDATE embarazos
          SET fur = COALESCE($2, fur), fpp = COALESCE($3, fpp), updated_at = NOW()
-         WHERE id = $1`,
+         WHERE id = $1
+         RETURNING *`,
         [embarazoId, emptyToNull(data.fur), emptyToNull(data.fpp)]
       );
+      if (embarazo.rows[0]) {
+        await registrarAuditoria(req, {
+          accion: 'actualizar',
+          tabla: 'embarazos',
+          registroId: embarazoId,
+          pacienteId: id,
+          embarazoId,
+          datosAnteriores: embarazoBefore.rows[0],
+          datosNuevos: embarazo.rows[0],
+          descripcion: 'Fechas de embarazo sincronizadas desde paciente',
+        });
+      }
     }
 
     return res.json({ message: 'Paciente actualizado' });
@@ -460,10 +514,11 @@ async function nuevoEmbarazo(req, res) {
     const paciente = await pool.query('SELECT id FROM pacientes WHERE id = $1', [id]);
     if (!paciente.rows[0]) return res.status(404).json({ error: 'Paciente no encontrado' });
 
-    await pool.query(
+    const cerrados = await pool.query(
       `UPDATE embarazos
        SET estado = 'cerrado', fecha_cierre = COALESCE($2, CURRENT_DATE), updated_at = NOW()
-       WHERE paciente_id = $1 AND estado IN ('activo', 'puerperio')`,
+       WHERE paciente_id = $1 AND estado IN ('activo', 'puerperio')
+       RETURNING *`,
       [id, emptyToNull(d.fecha_cierre)]
     );
 
@@ -486,11 +541,47 @@ async function nuevoEmbarazo(req, res) {
       ]
     );
 
-    await pool.query(
+    const pacienteBefore = await pool.query('SELECT * FROM pacientes WHERE id = $1', [id]);
+    const pacienteActualizado = await pool.query(
       `UPDATE pacientes SET fur = $2, fpp = $3, tiene_ficha_riesgo = FALSE, updated_at = NOW()
-       WHERE id = $1`,
+       WHERE id = $1
+       RETURNING *`,
       [id, emptyToNull(d.fur), fpp]
     );
+
+    if (cerrados.rows?.length) {
+      for (const cerrado of cerrados.rows) {
+        await registrarAuditoria(req, {
+          accion: 'estado',
+          tabla: 'embarazos',
+          registroId: cerrado.id,
+          pacienteId: id,
+          embarazoId: cerrado.id,
+          datosNuevos: cerrado,
+          descripcion: 'Embarazo anterior cerrado al iniciar nuevo embarazo',
+        });
+      }
+    }
+
+    await registrarAuditoria(req, {
+      accion: 'crear',
+      tabla: 'embarazos',
+      registroId: rows[0].id,
+      pacienteId: id,
+      embarazoId: rows[0].id,
+      datosNuevos: rows[0],
+      descripcion: 'Nuevo embarazo creado',
+    });
+
+    await registrarAuditoria(req, {
+      accion: 'actualizar',
+      tabla: 'pacientes',
+      registroId: id,
+      pacienteId: id,
+      datosAnteriores: pacienteBefore.rows[0],
+      datosNuevos: pacienteActualizado.rows[0],
+      descripcion: 'Paciente sincronizada con nuevo embarazo',
+    });
 
     return res.status(201).json(rows[0]);
   } catch (err) {
@@ -504,6 +595,12 @@ async function pasarAPuerperio(req, res) {
   const d = req.body || {};
 
   try {
+    const before = await pool.query(
+      `SELECT * FROM embarazos
+       WHERE paciente_id = $1 AND estado = 'activo'
+       ORDER BY id DESC LIMIT 1`,
+      [id]
+    );
     const { rows } = await pool.query(
       `UPDATE embarazos
        SET estado = 'puerperio',
@@ -519,6 +616,17 @@ async function pasarAPuerperio(req, res) {
       return res.status(409).json({ error: 'La paciente no tiene un embarazo activo para pasar a puerperio' });
     }
 
+    await registrarAuditoria(req, {
+      accion: 'estado',
+      tabla: 'embarazos',
+      registroId: rows[0].id,
+      pacienteId: id,
+      embarazoId: rows[0].id,
+      datosAnteriores: before.rows[0],
+      datosNuevos: rows[0],
+      descripcion: 'Embarazo pasado a puerperio',
+    });
+
     return res.json(rows[0]);
   } catch (err) {
     console.error(err);
@@ -531,6 +639,12 @@ async function cerrarEmbarazo(req, res) {
   const d = req.body || {};
 
   try {
+    const before = await pool.query(
+      `SELECT * FROM embarazos
+       WHERE paciente_id = $1 AND estado IN ('activo', 'puerperio')
+       ORDER BY id DESC LIMIT 1`,
+      [id]
+    );
     const { rows } = await pool.query(
       `UPDATE embarazos
        SET estado = 'cerrado',
@@ -545,6 +659,17 @@ async function cerrarEmbarazo(req, res) {
     if (!rows[0]) {
       return res.status(409).json({ error: 'La paciente no tiene un embarazo activo o en puerperio para cerrar' });
     }
+
+    await registrarAuditoria(req, {
+      accion: 'estado',
+      tabla: 'embarazos',
+      registroId: rows[0].id,
+      pacienteId: id,
+      embarazoId: rows[0].id,
+      datosAnteriores: before.rows[0],
+      datosNuevos: rows[0],
+      descripcion: 'Embarazo cerrado',
+    });
 
     return res.json(rows[0]);
   } catch (err) {

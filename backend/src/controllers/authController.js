@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const pool = require('../db/pool');
 const { AUTH_COOKIE_NAME, CSRF_COOKIE_NAME } = require('../middleware/auth');
+const { registrarAuditoria } = require('../utils/auditoria');
 
 function parseDurationMs(value = '8h') {
   const match = String(value).trim().match(/^(\d+)([smhd])$/i);
@@ -91,6 +92,19 @@ async function login(req, res) {
     res.cookie(AUTH_COOKIE_NAME, token, authCookieOptions());
     res.cookie(CSRF_COOKIE_NAME, csrfToken, csrfCookieOptions());
 
+    await registrarAuditoria(req, {
+      accion: 'login',
+      tabla: 'usuarios',
+      registroId: usuario.id,
+      usuarioId: usuario.id,
+      datosNuevos: {
+        id: usuario.id,
+        username: usuario.username,
+        rol: usuario.rol,
+      },
+      descripcion: 'Inicio de sesion exitoso',
+    });
+
     return res.json({
       usuario: {
         id: usuario.id,
@@ -105,7 +119,15 @@ async function login(req, res) {
   }
 }
 
-async function logout(_req, res) {
+async function logout(req, res) {
+  await registrarAuditoria(req, {
+    accion: 'logout',
+    tabla: 'usuarios',
+    registroId: req.usuario?.id || null,
+    usuarioId: req.usuario?.id || null,
+    descripcion: 'Cierre de sesion',
+  });
+
   res.clearCookie(AUTH_COOKIE_NAME, {
     ...authCookieOptions(),
     maxAge: undefined,

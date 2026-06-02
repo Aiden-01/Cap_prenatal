@@ -667,6 +667,30 @@ CREATE TABLE IF NOT EXISTS fichas_riesgo_obstetrico (
 -- ÍNDICES PARA PERFORMANCE
 -- ============================================================
 
+CREATE TABLE IF NOT EXISTS auditoria_eventos (
+  id                BIGSERIAL PRIMARY KEY,
+  usuario_id        INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  accion            VARCHAR(30) NOT NULL CHECK (
+    accion IN ('login','logout','crear','actualizar','eliminar','estado')
+  ),
+  tabla             VARCHAR(80) NOT NULL,
+  registro_id       TEXT,
+  paciente_id       INTEGER REFERENCES pacientes(id) ON DELETE SET NULL,
+  embarazo_id       INTEGER REFERENCES embarazos(id) ON DELETE SET NULL,
+  datos_anteriores  JSONB,
+  datos_nuevos      JSONB,
+  ip                VARCHAR(80),
+  user_agent        TEXT,
+  descripcion       TEXT,
+  created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_auditoria_usuario ON auditoria_eventos(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_auditoria_paciente ON auditoria_eventos(paciente_id);
+CREATE INDEX IF NOT EXISTS idx_auditoria_embarazo ON auditoria_eventos(embarazo_id);
+CREATE INDEX IF NOT EXISTS idx_auditoria_tabla_registro ON auditoria_eventos(tabla, registro_id);
+CREATE INDEX IF NOT EXISTS idx_auditoria_created_at ON auditoria_eventos(created_at);
+
 ALTER TABLE vacunas_paciente ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
 ALTER TABLE controles_prenatales ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
 ALTER TABLE morbilidad_embarazo ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;

@@ -1,5 +1,6 @@
 const pool = require('../db/pool');
 const { obtenerEmbarazoActivoId, obtenerEmbarazoActivoRequeridoId } = require('../utils/embarazos');
+const { registrarAuditoria } = require('../utils/auditoria');
 
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
 const boolOrFalse = (value) => value ?? false;
@@ -90,6 +91,16 @@ async function guardar(req, res) {
       [...valores, req.usuario.id]
     );
 
+    await registrarAuditoria(req, {
+      accion: 'crear',
+      tabla: 'fichas_riesgo_obstetrico',
+      registroId: result.rows[0].id,
+      pacienteId,
+      embarazoId,
+      datosNuevos: result.rows[0],
+      descripcion: 'Ficha de riesgo registrada',
+    });
+
     return res.json(result.rows[0]);
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
@@ -109,6 +120,10 @@ async function actualizar(req, res) {
 
   try {
     const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
+    const before = await pool.query(
+      'SELECT * FROM fichas_riesgo_obstetrico WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
+      [embarazoId]
+    );
     const valores = [
       embarazoId, d.fecha, emptyToNull(d.telefono), emptyToNull(d.pueblo), boolOrFalse(d.migrante), emptyToNull(d.estado_civil),
       emptyToNull(d.escolaridad), emptyToNull(d.ocupacion), emptyToNull(d.nombre_esposo_conviviente), emptyToNull(d.edad_esposo),
@@ -159,6 +174,16 @@ async function actualizar(req, res) {
     );
 
     if (!result.rows[0]) return res.status(404).json({ error: 'Ficha de riesgo no encontrada' });
+    await registrarAuditoria(req, {
+      accion: 'actualizar',
+      tabla: 'fichas_riesgo_obstetrico',
+      registroId: result.rows[0].id,
+      pacienteId,
+      embarazoId,
+      datosAnteriores: before.rows[0],
+      datosNuevos: result.rows[0],
+      descripcion: 'Ficha de riesgo actualizada',
+    });
     return res.json(result.rows[0]);
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
@@ -171,11 +196,20 @@ async function eliminar(req, res) {
   const { pacienteId } = req.params;
   try {
     const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
-    const { rowCount } = await pool.query(
-      'DELETE FROM fichas_riesgo_obstetrico WHERE embarazo_id = $1',
+    const { rows, rowCount } = await pool.query(
+      'DELETE FROM fichas_riesgo_obstetrico WHERE embarazo_id = $1 RETURNING *',
       [embarazoId]
     );
     if (rowCount === 0) return res.status(404).json({ error: 'Ficha de riesgo no encontrada' });
+    await registrarAuditoria(req, {
+      accion: 'eliminar',
+      tabla: 'fichas_riesgo_obstetrico',
+      registroId: rows[0].id,
+      pacienteId,
+      embarazoId,
+      datosAnteriores: rows[0],
+      descripcion: 'Ficha de riesgo eliminada',
+    });
     return res.json({ message: 'Ficha de riesgo eliminada' });
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
