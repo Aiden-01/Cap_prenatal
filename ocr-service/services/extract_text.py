@@ -15,8 +15,12 @@ elif WINDOWS_TESSERACT.exists():
 
 
 def extract_text(image) -> tuple[str, str]:
-    config = f"--tessdata-dir {LOCAL_TESSDATA}" if LOCAL_TESSDATA.exists() else ""
+    config_parts = ["--psm 6", "-c preserve_interword_spaces=1"]
+    if LOCAL_TESSDATA.exists():
+        config_parts.append(f"--tessdata-dir {LOCAL_TESSDATA}")
+    config = " ".join(config_parts)
+
     try:
         return pytesseract.image_to_string(image, lang="spa", config=config), "spa"
     except pytesseract.TesseractError:
-        return pytesseract.image_to_string(image), "default"
+        return pytesseract.image_to_string(image, config="--psm 6"), "default"

@@ -20,6 +20,14 @@ const NAV_ADMIN = [
 const SIDEBAR_BG = "#122033";
 const SIDEBAR_BG_ITEM_HOVER = "rgba(255,255,255,0.055)";
 
+function getThemeKey(usuario) {
+  return `theme:${usuario?.username || usuario?.id || "default"}`;
+}
+
+function getInitialTheme(usuario) {
+  return localStorage.getItem(getThemeKey(usuario)) || localStorage.getItem("theme") || "light";
+}
+
 export default function Sidebar({
   usuario, menuOpen, setMenuOpen, isMobile,
   onLogout, collapsed, setCollapsed
@@ -27,24 +35,55 @@ export default function Sidebar({
   const navigate  = useNavigate();
   const location  = useLocation();
 
-  const [dark, setDark]       = useState(localStorage.getItem("theme") === "dark");
+  const [dark, setDark]       = useState(() => getInitialTheme(usuario) === "dark");
+  const [themeSwitching, setThemeSwitching] = useState(false);
   const visible = !isMobile || menuOpen;
+
+  useEffect(() => {
+    setDark(getInitialTheme(usuario) === "dark");
+  }, [usuario?.username, usuario?.id]);
 
   // 🌙 DARK MODE
   useEffect(() => {
     const html = document.documentElement;
     if (dark) {
       html.classList.add("dark");
+      localStorage.setItem(getThemeKey(usuario), "dark");
       localStorage.setItem("theme", "dark");
     } else {
       html.classList.remove("dark");
+      localStorage.setItem(getThemeKey(usuario), "light");
       localStorage.setItem("theme", "light");
     }
-  }, [dark]);
+  }, [dark, usuario]);
+
+  useEffect(() => {
+    if (isMobile || collapsed) return;
+
+    const handleOutsideClick = (event) => {
+      const sidebar = document.querySelector("[data-app-sidebar]");
+      if (sidebar && !sidebar.contains(event.target)) {
+        setCollapsed(true);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("touchstart", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("touchstart", handleOutsideClick);
+    };
+  }, [collapsed, isMobile, setCollapsed]);
 
   const handleNav = (path) => {
     navigate(path);
     if (isMobile) setMenuOpen(false);
+  };
+
+  const handleThemeToggle = () => {
+    setThemeSwitching(true);
+    setDark(!dark);
+    window.setTimeout(() => setThemeSwitching(false), 520);
   };
 
   const items = usuario?.rol === "admin"
@@ -68,6 +107,7 @@ export default function Sidebar({
 
       {/* SIDEBAR */}
       <aside
+        data-app-sidebar
         style={{
           position: "fixed",
           top: 0, left: 0,
@@ -153,8 +193,8 @@ export default function Sidebar({
                   }}
                   className="sidebar-item"
                 >
-                  <Icon size={20} />
-                  {!collapsed && <span>{label}</span>}
+                  <Icon className="sidebar-item-icon" size={20} />
+                  {!collapsed && <span className="sidebar-item-label">{label}</span>}
                 </button>
 
                 {/* TOOLTIP cuando collapsed */}
@@ -173,7 +213,8 @@ export default function Sidebar({
         }}>
           {/* DARK MODE toggle */}
           <button
-            onClick={() => setDark(!dark)}
+            onClick={handleThemeToggle}
+            className={`sidebar-footer-action sidebar-theme-action ${themeSwitching ? "is-switching" : ""}`}
             style={{
               display: "flex",
               alignItems: "center",
@@ -197,6 +238,7 @@ export default function Sidebar({
           {/* LOGOUT */}
           <button
             onClick={onLogout}
+            className="sidebar-footer-action sidebar-logout-action"
             style={{
               display: "flex",
               alignItems: "center",

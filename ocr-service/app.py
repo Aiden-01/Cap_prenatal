@@ -3,9 +3,7 @@ import os
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 
-from services.extract_text import extract_text
-from services.parse_patient import parse_patient_text
-from services.preprocess import preprocess_image
+from services.template_form import extract_template_fields
 
 
 app = FastAPI(title="CAP Prenatal OCR Service")
@@ -33,17 +31,15 @@ async def procesar_nueva_paciente(documento: UploadFile = File(...)):
                 },
             )
 
-        processed = preprocess_image(image_bytes)
-        text, lang = extract_text(processed)
-        parsed = parse_patient_text(text)
+        template_result = extract_template_fields(image_bytes)
 
         return {
             "ok": True,
-            "campos_detectados": parsed["campos_detectados"],
-            "confianza": parsed["confianza"],
-            "texto_extraido": text,
+            "campos_detectados": template_result["campos_detectados"],
+            "confianza": template_result["confianza"],
+            "texto_extraido": template_result["texto_extraido"],
             "requiere_revision": True,
-            "ocr_lang": lang,
+            "ocr_lang": "spa-template",
         }
     except Exception as exc:
         return JSONResponse(
