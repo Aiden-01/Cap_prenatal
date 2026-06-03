@@ -1,9 +1,6 @@
-const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
-const pool = require('../db/pool');
+const authService = require('../services/authService');
 const { AUTH_COOKIE_NAME, CSRF_COOKIE_NAME } = require('../middleware/auth');
-const { registrarAuditoria } = require('../utils/auditoria');
+const { asyncHandler } = require('../middleware/asyncHandler');
 
 function parseDurationMs(value = '8h') {
   const match = String(value).trim().match(/^(\d+)([smhd])$/i);
@@ -45,88 +42,21 @@ function csrfCookieOptions() {
   };
 }
 
-async function login(req, res) {
-  const { username, password } = req.body;
-
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
-  }
-
-  try {
-    if (!process.env.JWT_SECRET) {
-      console.error('JWT_SECRET no configurado');
-      return res.status(500).json({ error: 'Error interno del servidor' });
-    }
-
-    const { rows } = await pool.query(
-      `SELECT u.id, u.nombre_completo, u.username, u.password_hash, u.activo,
-              r.nombre AS rol
-       FROM usuarios u
-       JOIN roles r ON r.id = u.rol_id
-       WHERE u.username = $1`,
-      [username]
-    );
-
-    const usuario = rows[0];
-
-    if (!usuario) {
-      return res.status(401).json({ error: 'Credenciales incorrectas' });
-    }
-
-    if (!usuario.activo) {
-      return res.status(403).json({ error: 'Usuario inactivo. Contacte al administrador.' });
-    }
-
-    const passwordOk = await bcrypt.compare(password, usuario.password_hash);
-    if (!passwordOk) {
-      return res.status(401).json({ error: 'Credenciales incorrectas' });
-    }
-
-    const token = jwt.sign(
-      { id: usuario.id, username: usuario.username, rol: usuario.rol },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
-    );
-
-    const csrfToken = crypto.randomBytes(32).toString('hex');
-    res.cookie(AUTH_COOKIE_NAME, token, authCookieOptions());
-    res.cookie(CSRF_COOKIE_NAME, csrfToken, csrfCookieOptions());
-
-    await registrarAuditoria(req, {
-      accion: 'login',
-      tabla: 'usuarios',
-      registroId: usuario.id,
-      usuarioId: usuario.id,
-      datosNuevos: {
-        id: usuario.id,
-        username: usuario.username,
-        rol: usuario.rol,
-      },
-      descripcion: 'Inicio de sesion exitoso',
-    });
-
-    return res.json({
-      usuario: {
-        id: usuario.id,
-        nombre_completo: usuario.nombre_completo,
-        username: usuario.username,
-        rol: usuario.rol,
-      },
-    });
-  } catch (err) {
-    console.error('Error en login:', err);
-    return res.status(500).json({ error: 'Error interno del servidor' });
-  }
-}
-
-async function logout(req, res) {
-  await registrarAuditoria(req, {
-    accion: 'logout',
-    tabla: 'usuarios',
-    registroId: req.usuario?.id || null,
-    usuarioId: req.usuario?.id || null,
-    descripcion: 'Cierre de sesion',
+const login = asyncHandler(async (req, res) => {
+  const result = await authService.login({
+    username: req.body.username,
+    password: req.body.password,
+    req,
   });
+
+  res.cookie(AUTH_COOKIE_NAME, result.token, authCookieOptions());
+  res.cookie(CSRF_COOKIE_NAME, result.csrfToken, csrfCookieOptions());
+
+  return res.json({ usuario: result.usuario });
+});
+
+const logout = asyncHandler(async (req, res) => {
+  const result = await authService.logout(req);
 
   res.clearCookie(AUTH_COOKIE_NAME, {
     ...authCookieOptions(),
@@ -136,21 +66,12 @@ async function logout(req, res) {
     ...csrfCookieOptions(),
     maxAge: undefined,
   });
-  return res.json({ ok: true });
-}
+  return res.json(result);
+});
 
-async function me(req, res) {
-  try {
-    const { rows } = await pool.query(
-      `SELECT u.id, u.nombre_completo, u.username, r.nombre AS rol
-       FROM usuarios u JOIN roles r ON r.id = u.rol_id
-       WHERE u.id = $1`,
-      [req.usuario.id]
-    );
-    return res.json(rows[0] || null);
-  } catch (err) {
-    return res.status(500).json({ error: 'Error interno' });
-  }
-}
+const me = asyncHandler(async (req, res) => {
+  const usuario = await authService.me(req.usuario.id);
+  return res.json(usuario || null);
+});
 
 module.exports = { login, logout, me };

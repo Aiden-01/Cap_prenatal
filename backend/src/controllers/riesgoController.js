@@ -1,62 +1,39 @@
 const riesgoService = require('../services/riesgoService');
+const { asyncHandler } = require('../middleware/asyncHandler');
 
-function handleError(res, err, fallbackMessage) {
-  if (err.status) return res.status(err.status).json({ error: err.message });
+const obtener = asyncHandler(async (req, res) => {
+  const ficha = await riesgoService.obtenerFichaRiesgo(req.params.pacienteId);
+  return res.json(ficha || null);
+});
 
-  if (err.code === '23505') {
-    return res.status(409).json({ error: 'Esta paciente ya tiene una ficha de riesgo registrada' });
-  }
+const guardar = asyncHandler(async (req, res) => {
+  const ficha = await riesgoService.guardarFichaRiesgo({
+    pacienteId: req.params.pacienteId,
+    body: req.body,
+    req,
+  });
 
-  console.error(err);
-  return res.status(500).json({ error: fallbackMessage });
-}
+  return res.json(ficha);
+});
 
-async function obtener(req, res) {
-  try {
-    const ficha = await riesgoService.obtenerFichaRiesgo(req.params.pacienteId);
-    return res.json(ficha || null);
-  } catch (err) {
-    return handleError(res, err, 'Error al obtener ficha de riesgo');
-  }
-}
+const actualizar = asyncHandler(async (req, res) => {
+  const ficha = await riesgoService.actualizarFichaRiesgo({
+    pacienteId: req.params.pacienteId,
+    body: req.body,
+    req,
+  });
 
-async function guardar(req, res) {
-  try {
-    const ficha = await riesgoService.guardarFichaRiesgo({
-      pacienteId: req.params.pacienteId,
-      body: req.body,
-      req,
-    });
-    return res.json(ficha);
-  } catch (err) {
-    return handleError(res, err, 'Error al guardar ficha de riesgo');
-  }
-}
+  return res.json(ficha);
+});
 
-async function actualizar(req, res) {
-  try {
-    const ficha = await riesgoService.actualizarFichaRiesgo({
-      pacienteId: req.params.pacienteId,
-      body: req.body,
-      req,
-    });
-    return res.json(ficha);
-  } catch (err) {
-    return handleError(res, err, 'Error al actualizar ficha de riesgo');
-  }
-}
+const eliminar = asyncHandler(async (req, res) => {
+  const result = await riesgoService.eliminarFichaRiesgo({
+    pacienteId: req.params.pacienteId,
+    req,
+  });
 
-async function eliminar(req, res) {
-  try {
-    const result = await riesgoService.eliminarFichaRiesgo({
-      pacienteId: req.params.pacienteId,
-      req,
-    });
-    return res.json(result);
-  } catch (err) {
-    return handleError(res, err, 'Error al eliminar ficha de riesgo');
-  }
-}
+  return res.json(result);
+});
 
 module.exports = {
   obtener,

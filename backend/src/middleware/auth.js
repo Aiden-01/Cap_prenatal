@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { AppError } = require('../utils/appError');
 
 const AUTH_COOKIE_NAME = 'cap_prenatal_token';
 const CSRF_COOKIE_NAME = 'cap_prenatal_csrf';
@@ -15,25 +16,25 @@ function readCookie(req, name) {
   return decodeURIComponent(match.slice(name.length + 1));
 }
 
-function authMiddleware(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const bearerToken = authHeader && authHeader.split(' ')[1]; // Bearer <token>
+function authMiddleware(req, _res, next) {
+  const authHeader = req.headers.authorization;
+  const bearerToken = authHeader && authHeader.split(' ')[1];
   const token = bearerToken || readCookie(req, AUTH_COOKIE_NAME);
 
   if (!token) {
-    return res.status(401).json({ error: 'Token requerido' });
+    return next(new AppError(401, 'Token requerido', { code: 'TOKEN_REQUIRED' }));
   }
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.usuario = payload; // { id, username, rol }
-    next();
+    req.usuario = payload;
+    return next();
   } catch {
-    return res.status(401).json({ error: 'Token inválido o expirado' });
+    return next(new AppError(401, 'Token invalido o expirado', { code: 'TOKEN_INVALID' }));
   }
 }
 
-function csrfMiddleware(req, res, next) {
+function csrfMiddleware(req, _res, next) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
     return next();
   }
@@ -46,17 +47,18 @@ function csrfMiddleware(req, res, next) {
   const csrfHeader = req.headers[CSRF_HEADER_NAME];
 
   if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
-    return res.status(403).json({ error: 'Token CSRF invalido' });
+    return next(new AppError(403, 'Token CSRF invalido', { code: 'CSRF_INVALID' }));
   }
 
   return next();
 }
 
-function soloAdmin(req, res, next) {
+function soloAdmin(req, _res, next) {
   if (req.usuario?.rol !== 'admin') {
-    return res.status(403).json({ error: 'Acceso restringido a administradores' });
+    return next(new AppError(403, 'Acceso restringido a administradores', { code: 'ADMIN_ONLY' }));
   }
-  next();
+
+  return next();
 }
 
 module.exports = {

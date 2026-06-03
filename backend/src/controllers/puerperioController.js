@@ -1,76 +1,50 @@
 const puerperioService = require('../services/puerperioService');
+const { asyncHandler } = require('../middleware/asyncHandler');
 
-function handleError(res, err, fallbackMessage) {
-  if (err.status) return res.status(err.status).json({ error: err.message });
+const listarPuerperio = asyncHandler(async (req, res) => {
+  const controles = await puerperioService.listarPuerperio(req.params.pacienteId);
+  return res.json(controles);
+});
 
-  if (err.code === '23505') {
-    return res.status(409).json({ error: 'Ya existe esa atencion de puerperio para esta paciente' });
-  }
+const obtenerPuerperio = asyncHandler(async (req, res) => {
+  const control = await puerperioService.obtenerPuerperio({
+    pacienteId: req.params.pacienteId,
+    id: req.params.id,
+  });
 
-  console.error(err);
-  return res.status(500).json({ error: fallbackMessage });
-}
+  return res.json(control);
+});
 
-async function listarPuerperio(req, res) {
-  try {
-    const controles = await puerperioService.listarPuerperio(req.params.pacienteId);
-    return res.json(controles);
-  } catch (err) {
-    return handleError(res, err, 'Error al listar controles de puerperio');
-  }
-}
+const guardarPuerperio = asyncHandler(async (req, res) => {
+  const control = await puerperioService.guardarPuerperio({
+    pacienteId: req.params.pacienteId,
+    body: req.body,
+    req,
+  });
 
-async function obtenerPuerperio(req, res) {
-  try {
-    const control = await puerperioService.obtenerPuerperio({
-      pacienteId: req.params.pacienteId,
-      id: req.params.id,
-    });
-    return res.json(control);
-  } catch (err) {
-    return handleError(res, err, 'Error al obtener control de puerperio');
-  }
-}
+  return res.status(201).json(control);
+});
 
-async function guardarPuerperio(req, res) {
-  try {
-    const control = await puerperioService.guardarPuerperio({
-      pacienteId: req.params.pacienteId,
-      body: req.body,
-      req,
-    });
-    return res.status(201).json(control);
-  } catch (err) {
-    return handleError(res, err, 'Error al guardar control de puerperio');
-  }
-}
+const actualizarPuerperio = asyncHandler(async (req, res) => {
+  const control = await puerperioService.actualizarPuerperio({
+    pacienteId: req.params.pacienteId,
+    id: req.params.id,
+    body: req.body,
+    req,
+  });
 
-async function actualizarPuerperio(req, res) {
-  try {
-    const control = await puerperioService.actualizarPuerperio({
-      pacienteId: req.params.pacienteId,
-      id: req.params.id,
-      body: req.body,
-      req,
-    });
-    return res.json(control);
-  } catch (err) {
-    return handleError(res, err, 'Error al actualizar control de puerperio');
-  }
-}
+  return res.json(control);
+});
 
-async function eliminarPuerperio(req, res) {
-  try {
-    const result = await puerperioService.eliminarPuerperio({
-      pacienteId: req.params.pacienteId,
-      id: req.params.id,
-      req,
-    });
-    return res.json(result);
-  } catch (err) {
-    return handleError(res, err, 'Error al eliminar control de puerperio');
-  }
-}
+const eliminarPuerperio = asyncHandler(async (req, res) => {
+  const result = await puerperioService.eliminarPuerperio({
+    pacienteId: req.params.pacienteId,
+    id: req.params.id,
+    req,
+  });
+
+  return res.json(result);
+});
 
 module.exports = {
   listarPuerperio,

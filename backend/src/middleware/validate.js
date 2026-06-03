@@ -1,21 +1,16 @@
 const { ZodError } = require('zod');
-
-function formatZodIssue(issue) {
-  return {
-    campo: issue.path.length ? issue.path.join('.') : 'body',
-    mensaje: issue.message,
-  };
-}
+const { AppError } = require('../utils/appError');
+const { formatZodIssue } = require('./errorHandler');
 
 function validate(schema, source) {
   return (req, res, next) => {
     const result = schema.safeParse(req[source] || {});
 
     if (!result.success) {
-      return res.status(400).json({
-        error: 'Datos de entrada invalidos',
-        detalles: result.error.issues.map(formatZodIssue),
-      });
+      return next(new AppError(400, 'Datos de entrada invalidos', {
+        code: 'VALIDATION_ERROR',
+        details: result.error.issues.map(formatZodIssue),
+      }));
     }
 
     return next();
@@ -37,10 +32,10 @@ function validateQuery(schema) {
 function validationErrorHandler(err, _req, res, next) {
   if (!(err instanceof ZodError)) return next(err);
 
-  return res.status(400).json({
-    error: 'Datos de entrada invalidos',
-    detalles: err.issues.map(formatZodIssue),
-  });
+  return next(new AppError(400, 'Datos de entrada invalidos', {
+    code: 'VALIDATION_ERROR',
+    details: err.issues.map(formatZodIssue),
+  }));
 }
 
 module.exports = {

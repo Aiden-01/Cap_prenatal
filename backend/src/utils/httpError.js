@@ -1,11 +1,10 @@
-class HttpError extends Error {
+const { AppError } = require('./appError');
+
+class HttpError extends AppError {
   constructor(status, message, options = {}) {
-    super(message);
+    super(status, message, options);
     this.name = 'HttpError';
-    this.status = status;
-    this.code = options.code;
-    this.details = options.details;
   }
 }
 
-module.exports = { HttpError };
+module.exports = { HttpError, AppError };

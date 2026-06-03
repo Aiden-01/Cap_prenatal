@@ -1,76 +1,50 @@
 const vacunasService = require('../services/vacunasService');
+const { asyncHandler } = require('../middleware/asyncHandler');
 
-function handleError(res, err, fallbackMessage) {
-  if (err.status) return res.status(err.status).json({ error: err.message });
+const listar = asyncHandler(async (req, res) => {
+  const vacunas = await vacunasService.listarVacunas(req.params.pacienteId);
+  return res.json(vacunas);
+});
 
-  if (err.code === '23505') {
-    return res.status(409).json({ error: 'Ya existe una vacuna con esos datos para esta paciente' });
-  }
+const obtener = asyncHandler(async (req, res) => {
+  const vacuna = await vacunasService.obtenerVacuna({
+    pacienteId: req.params.pacienteId,
+    id: req.params.id,
+  });
 
-  console.error(err);
-  return res.status(500).json({ error: fallbackMessage });
-}
+  return res.json(vacuna);
+});
 
-async function listar(req, res) {
-  try {
-    const vacunas = await vacunasService.listarVacunas(req.params.pacienteId);
-    return res.json(vacunas);
-  } catch (err) {
-    return handleError(res, err, 'Error al listar vacunas');
-  }
-}
+const guardar = asyncHandler(async (req, res) => {
+  const vacuna = await vacunasService.guardarVacuna({
+    pacienteId: req.params.pacienteId,
+    body: req.body,
+    req,
+  });
 
-async function obtener(req, res) {
-  try {
-    const vacuna = await vacunasService.obtenerVacuna({
-      pacienteId: req.params.pacienteId,
-      id: req.params.id,
-    });
-    return res.json(vacuna);
-  } catch (err) {
-    return handleError(res, err, 'Error al obtener vacuna');
-  }
-}
+  return res.status(201).json(vacuna);
+});
 
-async function guardar(req, res) {
-  try {
-    const vacuna = await vacunasService.guardarVacuna({
-      pacienteId: req.params.pacienteId,
-      body: req.body,
-      req,
-    });
-    return res.status(201).json(vacuna);
-  } catch (err) {
-    return handleError(res, err, 'Error al guardar vacuna');
-  }
-}
+const actualizar = asyncHandler(async (req, res) => {
+  const vacuna = await vacunasService.actualizarVacuna({
+    pacienteId: req.params.pacienteId,
+    id: req.params.id,
+    body: req.body,
+    req,
+  });
 
-async function actualizar(req, res) {
-  try {
-    const vacuna = await vacunasService.actualizarVacuna({
-      pacienteId: req.params.pacienteId,
-      id: req.params.id,
-      body: req.body,
-      req,
-    });
-    return res.json(vacuna);
-  } catch (err) {
-    return handleError(res, err, 'Error al actualizar vacuna');
-  }
-}
+  return res.json(vacuna);
+});
 
-async function eliminar(req, res) {
-  try {
-    const result = await vacunasService.eliminarVacuna({
-      pacienteId: req.params.pacienteId,
-      id: req.params.id,
-      req,
-    });
-    return res.json(result);
-  } catch (err) {
-    return handleError(res, err, 'Error al eliminar vacuna');
-  }
-}
+const eliminar = asyncHandler(async (req, res) => {
+  const result = await vacunasService.eliminarVacuna({
+    pacienteId: req.params.pacienteId,
+    id: req.params.id,
+    req,
+  });
+
+  return res.json(result);
+});
 
 module.exports = {
   listar,

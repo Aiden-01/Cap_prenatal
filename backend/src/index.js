@@ -10,6 +10,8 @@ const reportesRoutes  = require('./routes/reportes');
 const chatbotRoutes   = require('./routes/chatbot');
 const ocrRoutes       = require('./routes/ocr');
 const { csrfMiddleware } = require('./middleware/auth');
+const { errorHandler } = require('./middleware/errorHandler');
+const { AppError } = require('./utils/appError');
 
 const app = express();
 
@@ -44,7 +46,7 @@ app.use(helmet({
 app.use(cors({
   origin(origin, callback) {
     if (isAllowedDevOrigin(origin)) return callback(null, true);
-    return callback(new Error(`Origen no permitido por CORS: ${origin}`));
+    return callback(new AppError(403, 'Origen no permitido por CORS', { code: 'CORS_FORBIDDEN' }));
   },
   credentials: true,
 }));
@@ -68,15 +70,12 @@ app.get('/api/health', (_, res) => res.json({
 }));
 
 // ── 404 handler ───────────────────────────────────────────────
-app.use((req, res) => {
-  res.status(404).json({ error: `Ruta ${req.method} ${req.path} no encontrada` });
+app.use((req, _res, next) => {
+  next(new AppError(404, `Ruta ${req.method} ${req.path} no encontrada`, { code: 'ROUTE_NOT_FOUND' }));
 });
 
 // ── Error handler global ──────────────────────────────────────
-app.use((err, req, res, _next) => {
-  console.error('Error no manejado:', err);
-  res.status(500).json({ error: 'Error interno del servidor' });
-});
+app.use(errorHandler);
 
 // ── Iniciar servidor ──────────────────────────────────────────
 const PORT = process.env.PORT || 3001;

@@ -1,76 +1,50 @@
 const controlesPrenatalesService = require('../services/controlesPrenatalesService');
+const { asyncHandler } = require('../middleware/asyncHandler');
 
-function handleError(res, err, fallbackMessage) {
-  if (err.status) return res.status(err.status).json({ error: err.message });
+const listar = asyncHandler(async (req, res) => {
+  const controles = await controlesPrenatalesService.listarControles(req.params.pacienteId);
+  return res.json(controles);
+});
 
-  if (err.code === '23505') {
-    return res.status(409).json({ error: 'Ya existe un control con ese numero para esta paciente' });
-  }
+const obtener = asyncHandler(async (req, res) => {
+  const control = await controlesPrenatalesService.obtenerControl({
+    pacienteId: req.params.pacienteId,
+    id: req.params.id,
+  });
 
-  console.error(err);
-  return res.status(500).json({ error: fallbackMessage });
-}
+  return res.json(control);
+});
 
-async function listar(req, res) {
-  try {
-    const controles = await controlesPrenatalesService.listarControles(req.params.pacienteId);
-    return res.json(controles);
-  } catch (err) {
-    return handleError(res, err, 'Error al listar controles');
-  }
-}
+const crear = asyncHandler(async (req, res) => {
+  const control = await controlesPrenatalesService.crearControl({
+    pacienteId: req.params.pacienteId,
+    body: req.body,
+    req,
+  });
 
-async function obtener(req, res) {
-  try {
-    const control = await controlesPrenatalesService.obtenerControl({
-      pacienteId: req.params.pacienteId,
-      id: req.params.id,
-    });
-    return res.json(control);
-  } catch (err) {
-    return handleError(res, err, 'Error al obtener control');
-  }
-}
+  return res.status(201).json(control);
+});
 
-async function crear(req, res) {
-  try {
-    const control = await controlesPrenatalesService.crearControl({
-      pacienteId: req.params.pacienteId,
-      body: req.body,
-      req,
-    });
-    return res.status(201).json(control);
-  } catch (err) {
-    return handleError(res, err, 'Error al guardar control prenatal');
-  }
-}
+const actualizar = asyncHandler(async (req, res) => {
+  const control = await controlesPrenatalesService.actualizarControl({
+    pacienteId: req.params.pacienteId,
+    id: req.params.id,
+    body: req.body,
+    req,
+  });
 
-async function actualizar(req, res) {
-  try {
-    const control = await controlesPrenatalesService.actualizarControl({
-      pacienteId: req.params.pacienteId,
-      id: req.params.id,
-      body: req.body,
-      req,
-    });
-    return res.json(control);
-  } catch (err) {
-    return handleError(res, err, 'Error al actualizar control prenatal');
-  }
-}
+  return res.json(control);
+});
 
-async function eliminar(req, res) {
-  try {
-    const result = await controlesPrenatalesService.eliminarControl({
-      pacienteId: req.params.pacienteId,
-      id: req.params.id,
-      req,
-    });
-    return res.json(result);
-  } catch (err) {
-    return handleError(res, err, 'Error al eliminar control prenatal');
-  }
-}
+const eliminar = asyncHandler(async (req, res) => {
+  const result = await controlesPrenatalesService.eliminarControl({
+    pacienteId: req.params.pacienteId,
+    id: req.params.id,
+    req,
+  });
+
+  return res.json(result);
+});
 
 module.exports = {
   listar,

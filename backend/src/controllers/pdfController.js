@@ -1,4 +1,3 @@
-const pool = require('../db/pool');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -6,7 +5,9 @@ const puppeteer = require('puppeteer');
 const ExcelJS = require('exceljs');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
-const { obtenerEmbarazoVisibleId } = require('../utils/embarazos');
+const pdfService = require('../services/pdfService');
+const { asyncHandler } = require('../middleware/asyncHandler');
+const { AppError } = require('../utils/appError');
 const { generarFichaClinicaPrenatalPdf } = require('../services/fichaClinicaPrenatalPdf');
 
 const execFileAsync = promisify(execFile);
@@ -17,21 +18,11 @@ async function pdfControl(req, res) {
   const { id } = req.params;
 
   try {
-    const { rows } = await pool.query(
-      `SELECT c.*, p.nombres, p.apellidos, p.no_expediente
-       FROM controles_prenatales c
-       JOIN pacientes p ON p.id = c.paciente_id
-       WHERE c.id = $1`,
-      [id]
-    );
+    const c = await pdfService.obtenerControlConPaciente(id);
 
-    if (!rows[0]) {
-      return res.status(404).json({
-        error: 'Control no encontrado'
-      });
+    if (!c) {
+      throw new AppError(404, 'Control no encontrado', { code: 'CONTROL_NOT_FOUND' });
     }
-
-    const c = rows[0];
 
     let html = fs.readFileSync(
       path.join(__dirname, '../templates/control.html'),
@@ -89,10 +80,8 @@ async function pdfControl(req, res) {
     return res.send(Buffer.from(pdf));
 
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({
-      error: 'Error al generar PDF'
-    });
+    if (err.status) throw err;
+    throw new AppError(500, 'Error al generar PDF', { code: 'PDF_GENERATION_ERROR' });
   }
 }
 
@@ -1118,40 +1107,13 @@ async function pdfMspas(req, res) {
   const { pacienteId } = req.params;
 
   try {
-    const embarazoActivoId = await obtenerEmbarazoVisibleId(pacienteId);
-    const [pacienteRes, embarazoRes, controlesRes, puerperioRes, riesgoRes, planPartoRes] = await Promise.all([
-      pool.query('SELECT * FROM pacientes WHERE id = $1', [pacienteId]),
-      pool.query('SELECT * FROM embarazos WHERE id = $1', [embarazoActivoId]),
-      pool.query(
-        'SELECT * FROM controles_prenatales WHERE embarazo_id = $1 ORDER BY numero_control LIMIT 5',
-        [embarazoActivoId]
-      ),
-      pool.query(
-        'SELECT * FROM controles_puerperio WHERE embarazo_id = $1 ORDER BY numero_atencion',
-        [embarazoActivoId]
-      ),
-      pool.query(
-        'SELECT * FROM fichas_riesgo_obstetrico WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
-        [embarazoActivoId]
-      ),
-      pool.query(
-        'SELECT * FROM planes_parto WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
-        [embarazoActivoId]
-      ),
-    ]);
+    const data = await pdfService.obtenerFichaMspasData(pacienteId);
 
-    if (!pacienteRes.rows[0]) {
-      return res.status(404).json({ error: 'Paciente no encontrada' });
+    if (!data.paciente) {
+      throw new AppError(404, 'Paciente no encontrada', { code: 'PATIENT_NOT_FOUND' });
     }
 
-    const pdf = await generarFichaClinicaPrenatalPdf({
-      paciente: pacienteRes.rows[0],
-      embarazo: embarazoRes.rows[0] || null,
-      controles: controlesRes.rows,
-      puerperio: puerperioRes.rows,
-      riesgo: riesgoRes.rows[0] || null,
-      planParto: planPartoRes.rows[0] || null,
-    });
+    const pdf = await generarFichaClinicaPrenatalPdf(data);
 
     res.set({
       'Content-Type': 'application/pdf',
@@ -1159,8 +1121,8 @@ async function pdfMspas(req, res) {
     });
     return res.send(Buffer.from(pdf));
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Error al generar PDF MSPAS' });
+    if (err.status) throw err;
+    throw new AppError(500, 'Error al generar PDF MSPAS', { code: 'MSPAS_PDF_GENERATION_ERROR' });
   }
 }
 
@@ -1168,29 +1130,18 @@ async function pdfRiesgoObstetrico(req, res) {
   const { pacienteId } = req.params;
 
   try {
-    const embarazoActivoId = await obtenerEmbarazoVisibleId(pacienteId);
-    const [pacienteRes, embarazoRes, riesgoRes] = await Promise.all([
-      pool.query('SELECT * FROM pacientes WHERE id = $1', [pacienteId]),
-      pool.query('SELECT * FROM embarazos WHERE id = $1', [embarazoActivoId]),
-      pool.query(
-        'SELECT * FROM fichas_riesgo_obstetrico WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
-        [embarazoActivoId]
-      ),
-    ]);
-
-    const paciente = pacienteRes.rows[0];
-    const riesgo = riesgoRes.rows[0];
+    const { paciente, embarazo, riesgo } = await pdfService.obtenerFichaRiesgoData(pacienteId);
 
     if (!paciente) {
-      return res.status(404).json({ error: 'Paciente no encontrada' });
+      throw new AppError(404, 'Paciente no encontrada', { code: 'PATIENT_NOT_FOUND' });
     }
     if (!riesgo) {
-      return res.status(404).json({ error: 'La paciente no tiene ficha de riesgo registrada' });
+      throw new AppError(404, 'La paciente no tiene ficha de riesgo registrada', { code: 'RISK_FORM_NOT_FOUND' });
     }
 
     const cellMap = buildRiskCellMap({
       paciente,
-      embarazo: embarazoRes.rows[0] || null,
+      embarazo,
       riesgo,
     });
     const templatePath = path.join(__dirname, '../assets/official_forms/riesgo_oficial.xlsx');
@@ -1202,8 +1153,8 @@ async function pdfRiesgoObstetrico(req, res) {
     });
     return res.send(Buffer.from(pdf));
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Error al generar PDF de ficha de riesgo' });
+    if (err.status) throw err;
+    throw new AppError(500, 'Error al generar PDF de ficha de riesgo', { code: 'RISK_PDF_GENERATION_ERROR' });
   }
 }
 
@@ -1211,23 +1162,13 @@ async function pdfPlanParto(req, res) {
   const { pacienteId } = req.params;
 
   try {
-    const embarazoActivoId = await obtenerEmbarazoVisibleId(pacienteId);
-    const [pacienteRes, planRes] = await Promise.all([
-      pool.query('SELECT * FROM pacientes WHERE id = $1', [pacienteId]),
-      pool.query(
-        'SELECT * FROM planes_parto WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
-        [embarazoActivoId]
-      ),
-    ]);
-
-    const paciente = pacienteRes.rows[0];
-    const plan = planRes.rows[0];
+    const { paciente, plan } = await pdfService.obtenerPlanPartoData(pacienteId);
 
     if (!paciente) {
-      return res.status(404).json({ error: 'Paciente no encontrada' });
+      throw new AppError(404, 'Paciente no encontrada', { code: 'PATIENT_NOT_FOUND' });
     }
     if (!plan) {
-      return res.status(404).json({ error: 'La paciente no tiene plan de parto registrado' });
+      throw new AppError(404, 'La paciente no tiene plan de parto registrado', { code: 'BIRTH_PLAN_NOT_FOUND' });
     }
 
     const cellMap = buildPlanPartoCellMap({ paciente, plan });
@@ -1240,14 +1181,14 @@ async function pdfPlanParto(req, res) {
     });
     return res.send(Buffer.from(pdf));
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Error al generar PDF de plan de parto' });
+    if (err.status) throw err;
+    throw new AppError(500, 'Error al generar PDF de plan de parto', { code: 'BIRTH_PLAN_PDF_GENERATION_ERROR' });
   }
 }
 
 module.exports = {
-  pdfControl,
-  pdfMspas,
-  pdfRiesgoObstetrico,
-  pdfPlanParto,
+  pdfControl: asyncHandler(pdfControl),
+  pdfMspas: asyncHandler(pdfMspas),
+  pdfRiesgoObstetrico: asyncHandler(pdfRiesgoObstetrico),
+  pdfPlanParto: asyncHandler(pdfPlanParto),
 };

@@ -19,13 +19,25 @@ Este backend debe crecer por modulos con responsabilidades separadas:
 
 ## Manejo de errores
 
-Para errores de negocio usar `HttpError`:
+Para errores de negocio usar `AppError` o `HttpError` (alias compatible):
 
 ```js
-throw new HttpError(409, 'No hay embarazo activo');
+throw new AppError(409, 'No hay embarazo activo', { code: 'NO_ACTIVE_PREGNANCY' });
 ```
 
-El controller debe convertir `err.status` en respuesta HTTP y dejar errores de base de datos conocidos, como duplicados, con mensajes compatibles con el frontend.
+Los controllers nuevos deben usar `asyncHandler` y dejar que `middleware/errorHandler.js` convierta errores a una respuesta uniforme:
+
+```json
+{
+  "ok": false,
+  "message": "Mensaje claro para el usuario",
+  "code": "CODIGO_DE_ERROR"
+}
+```
+
+En desarrollo el handler puede incluir `debug` para errores 500. En produccion no expone stack trace ni detalles SQL. Los errores de validacion conservan `details` por campo.
+
+Controllers ya migrados a `asyncHandler`: pacientes, controles prenatales, puerperio, plan de parto, vacunas, riesgo, morbilidad, referencias, usuarios, auth, laboratorio, reportes, PDF y chatbot.
 
 ## Modulo de referencia
 
@@ -73,3 +85,18 @@ Para replicarlo en controles prenatales, puerperio, vacunas y reportes, mover pr
 - `controllers/referenciasController.js`
 - `services/referenciasService.js`
 - `repositories/referenciasRepository.js`
+- `controllers/authController.js`
+- `services/authService.js`
+- `repositories/authRepository.js`
+- `controllers/usuariosController.js`
+- `services/usuariosService.js`
+- `repositories/usuariosRepository.js`
+- `controllers/laboratorioController.js`
+- `services/laboratorioService.js`
+- `repositories/laboratorioRepository.js`
+- `controllers/reportesController.js`
+- `services/reportesService.js`
+- `repositories/reportesRepository.js`
+- `controllers/pdfController.js`
+- `services/pdfService.js`
+- `repositories/pdfRepository.js`
