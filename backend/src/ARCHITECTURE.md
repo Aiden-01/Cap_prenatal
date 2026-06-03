@@ -38,3 +38,15 @@ El controller debe convertir `err.status` en respuesta HTTP y dejar errores de b
 - `validations/pacientes.schemas.js`
 
 Para replicarlo en controles prenatales, puerperio, vacunas y reportes, mover primero las consultas SQL al repository, luego las reglas al service, y al final adelgazar el controller.
+
+## Segundo modulo refactorizado
+
+`controles prenatales` ya usa el mismo patron para sus endpoints activos:
+
+- `routes/controles.js`
+- `controllers/controlesPrenatalesController.js`
+- `services/controlesPrenatalesService.js`
+- `repositories/controlesPrenatalesRepository.js`
+- `validations/controles.schemas.js`
+
+Nota: `controllers/controlesController.js` aun conserva plan de parto y puerperio. Esos submodulos deben separarse despues en sus propios services/repositories para evitar un cambio demasiado grande en una sola iteracion.

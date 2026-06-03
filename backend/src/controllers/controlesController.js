@@ -1,10 +1,10 @@
 const pool = require('../db/pool');
 const {
-  obtenerEmbarazoActivoRequeridoId,
   obtenerEmbarazoSeguimientoId,
 } = require('../utils/embarazos');
 const { withGuatemalaTimeFallback } = require('../utils/guatemalaTime');
 const { registrarAuditoria } = require('../utils/auditoria');
+const controlesPrenatalesService = require('../services/controlesPrenatalesService');
 
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
 
@@ -14,40 +14,6 @@ function buildUpdate(data, allowedFields) {
   const valores = campos.map((field) => emptyToNull(data[field]));
   return { campos, sets, valores };
 }
-
-const CONTROL_FIELDS = [
-  'numero_control', 'fecha', 'hora', 'motivo_consulta',
-  'peligro_hemorragia_vaginal', 'peligro_palidez', 'peligro_dolor_cabeza',
-  'peligro_hipertension', 'peligro_dolor_epigastrico',
-  'peligro_trastornos_visuales', 'peligro_fiebre', 'peligro_otro',
-  'edad_gestacional_semanas', 'nombre_acompanante', 'nombre_cargo_atiende',
-  'pa_sistolica', 'pa_diastolica', 'frecuencia_cardiaca', 'frecuencia_respiratoria',
-  'temperatura', 'perimetro_braquial_cm', 'peso_kg', 'talla_cm', 'imc',
-  'examen_bucodental', 'examen_mamas',
-  'altura_uterina_cm', 'fcf', 'movimientos_fetales',
-  'situacion_fetal', 'presentacion_fetal',
-  'sangre_manchado', 'verrugas_herpes_papilomas', 'flujo_vaginal', 'otros_ginecologico',
-  'hematologia_realizada', 'hematologia_resultado',
-  'glicemia_realizada', 'glicemia_resultado',
-  'grupo_rh_realizado', 'grupo_rh_resultado',
-  'orina_realizada', 'orina_bacteriuria', 'orina_proteinuria',
-  'heces_realizada', 'heces_resultado',
-  'vih_realizado', 'vih_resultado', 'vih_resultado_valor',
-  'vdrl_realizado', 'vdrl_resultado', 'vdrl_tratamiento_indicado',
-  'torch_realizado', 'torch_resultado_positivo', 'torch_resultado_valor',
-  'papanicolau_ivaa_realizado', 'papanicolau_ivaa_fecha_toma', 'papanicolau_ivaa_resultado',
-  'hepatitis_b_realizado', 'hepatitis_b_resultado',
-  'otros_lab', 'usg_realizado', 'usg_hallazgos',
-  'sulfato_ferroso', 'sulfato_ferroso_tabletas',
-  'acido_folico', 'acido_folico_tabletas',
-  'suplementacion_hallazgos', 'suplementacion_tratamiento',
-  'orient_plan_emergencia_parto', 'orient_alimentacion_embarazo',
-  'orient_senales_peligro', 'orient_lactancia_materna',
-  'orient_planificacion_familiar', 'orient_importancia_postparto',
-  'orient_vacunacion_nino', 'orient_pre_post_prueba_vih',
-  'orient_importancia_atenciones', 'orient_tratamiento_its_pareja',
-  'orient_otros', 'impresion_clinica', 'tratamiento', 'cita_siguiente',
-];
 
 const PUERPERIO_FIELDS = [
   'numero_atencion', 'fecha', 'hora', 'signos_peligro',
@@ -85,18 +51,12 @@ const PLAN_PARTO_FIELDS = [
 // GET /api/pacientes/:pacienteId/controles
 // ============================================================
 async function listar(req, res) {
-  const { pacienteId } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
-    const { rows } = await pool.query(
-      `SELECT * FROM controles_prenatales
-       WHERE embarazo_id = $1
-       ORDER BY numero_control`,
-      [embarazoId]
-    );
-    return res.json(rows);
+    const controles = await controlesPrenatalesService.listarControles(req.params.pacienteId);
+    return res.json(controles);
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error(err);
     return res.status(500).json({ error: 'Error al listar controles' });
   }
 }
@@ -105,17 +65,15 @@ async function listar(req, res) {
 // GET /api/pacientes/:pacienteId/controles/:id
 // ============================================================
 async function obtener(req, res) {
-  const { pacienteId, id } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
-    const { rows } = await pool.query(
-      'SELECT * FROM controles_prenatales WHERE id = $1 AND embarazo_id = $2',
-      [id, embarazoId]
-    );
-    if (!rows[0]) return res.status(404).json({ error: 'Control no encontrado' });
-    return res.json(rows[0]);
+    const control = await controlesPrenatalesService.obtenerControl({
+      pacienteId: req.params.pacienteId,
+      id: req.params.id,
+    });
+    return res.json(control);
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error(err);
     return res.status(500).json({ error: 'Error al obtener control' });
   }
 }
@@ -124,39 +82,14 @@ async function obtener(req, res) {
 // PUT /api/pacientes/:pacienteId/controles/:id
 // ============================================================
 async function actualizar(req, res) {
-  const { pacienteId, id } = req.params;
-  const { campos, sets, valores } = buildUpdate(
-    withGuatemalaTimeFallback(req.body, { onlyWhenHoraIsPresent: true }),
-    CONTROL_FIELDS
-  );
-
-  if (campos.length === 0) return res.status(400).json({ error: 'Sin campos para actualizar' });
-
   try {
-    const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
-    const before = await pool.query(
-      'SELECT * FROM controles_prenatales WHERE id = $1 AND embarazo_id = $2',
-      [id, embarazoId]
-    );
-    valores.push(id, embarazoId);
-    const { rows } = await pool.query(
-      `UPDATE controles_prenatales SET ${sets}, updated_at = NOW()
-       WHERE id = $${valores.length - 1} AND embarazo_id = $${valores.length}
-       RETURNING *`,
-      valores
-    );
-    if (!rows[0]) return res.status(404).json({ error: 'Control no encontrado' });
-    await registrarAuditoria(req, {
-      accion: 'actualizar',
-      tabla: 'controles_prenatales',
-      registroId: rows[0].id,
-      pacienteId,
-      embarazoId,
-      datosAnteriores: before.rows[0],
-      datosNuevos: rows[0],
-      descripcion: 'Control prenatal actualizado',
+    const control = await controlesPrenatalesService.actualizarControl({
+      pacienteId: req.params.pacienteId,
+      id: req.params.id,
+      body: req.body,
+      req,
     });
-    return res.json(rows[0]);
+    return res.json(control);
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     if (err.code === '23505') {
@@ -171,24 +104,13 @@ async function actualizar(req, res) {
 // DELETE /api/pacientes/:pacienteId/controles/:id
 // ============================================================
 async function eliminar(req, res) {
-  const { pacienteId, id } = req.params;
   try {
-    const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
-    const { rows, rowCount } = await pool.query(
-      'DELETE FROM controles_prenatales WHERE id = $1 AND embarazo_id = $2 RETURNING *',
-      [id, embarazoId]
-    );
-    if (rowCount === 0) return res.status(404).json({ error: 'Control no encontrado' });
-    await registrarAuditoria(req, {
-      accion: 'eliminar',
-      tabla: 'controles_prenatales',
-      registroId: id,
-      pacienteId,
-      embarazoId,
-      datosAnteriores: rows[0],
-      descripcion: 'Control prenatal eliminado',
+    const result = await controlesPrenatalesService.eliminarControl({
+      pacienteId: req.params.pacienteId,
+      id: req.params.id,
+      req,
     });
-    return res.json({ message: 'Control eliminado' });
+    return res.json(result);
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error(err);

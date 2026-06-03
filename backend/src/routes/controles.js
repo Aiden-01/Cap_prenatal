@@ -1,9 +1,9 @@
 const express = require('express');
 const {
-  listar, obtener, crear, actualizar, eliminar,
   obtenerPlanParto, guardarPlanParto,
   listarPuerperio, obtenerPuerperio, guardarPuerperio, actualizarPuerperio, eliminarPuerperio,
 } = require('../controllers/controlesController');
+const controlesPrenatalesController = require('../controllers/controlesPrenatalesController');
 const { validateBody, validateParams } = require('../middleware/validate');
 const { nestedIdParams } = require('../validations/common.schemas');
 const {
@@ -27,10 +27,10 @@ router.put('/puerperio/:id',    validateParams(nestedIdParams), validateBody(pue
 router.delete('/puerperio/:id', validateParams(nestedIdParams), eliminarPuerperio);
 
 // Controles prenatales
-router.get('/',       listar);
-router.post('/',      validateBody(controlCreateSchema), crear);
-router.get('/:id',    validateParams(nestedIdParams), obtener);
-router.put('/:id',    validateParams(nestedIdParams), validateBody(controlUpdateSchema), actualizar);
-router.delete('/:id', validateParams(nestedIdParams), eliminar);
+router.get('/',       controlesPrenatalesController.listar);
+router.post('/',      validateBody(controlCreateSchema), controlesPrenatalesController.crear);
+router.get('/:id',    validateParams(nestedIdParams), controlesPrenatalesController.obtener);
+router.put('/:id',    validateParams(nestedIdParams), validateBody(controlUpdateSchema), controlesPrenatalesController.actualizar);
+router.delete('/:id', validateParams(nestedIdParams), controlesPrenatalesController.eliminar);
 
 module.exports = router;
