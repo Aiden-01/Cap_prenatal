@@ -377,6 +377,32 @@ export default function NuevaPaciente() {
     return mapped;
   };
 
+  const ocrFieldLabels = {
+    no_expediente: "No. expediente",
+    cui: "CUI",
+    nombres: "Nombres",
+    apellidos: "Apellidos",
+    domicilio: "Domicilio",
+    municipio: "Municipio",
+    territorio: "Territorio",
+    sector: "Sector",
+    comunidad: "Comunidad",
+    telefono: "Teléfono",
+    fecha_nacimiento: "Fecha de nacimiento",
+    fur: "FUR",
+    fpp: "FPP",
+  };
+
+  const mapOcrFieldName = (field) => ({
+    establecimiento: "nombre_establecimiento",
+  }[field] || field);
+
+  const applyOcrSuggestion = (field, value) => {
+    const target = mapOcrFieldName(field);
+    if (form[target] !== undefined && form[target] !== null && form[target] !== "") return;
+    set(target, value);
+  };
+
   const handleOcrFile = (file) => {
     setOcrFile(file || null);
     setOcrResult(null);
@@ -412,10 +438,21 @@ export default function NuevaPaciente() {
           "success"
         );
       } else {
-        toast(count ? "OCR encontró texto, pero no datos confiables para aplicar." : "OCR no detectó datos suficientes", "error");
+        const usingLocalOnly = res.data?.ocr_lang === "spa-template";
+        const warning = res.data?.advertencias?.[0];
+        toast(
+          count
+            ? warning || (usingLocalOnly
+              ? "OCR local encontró escritura, pero no fue confiable para aplicarla automáticamente. Revise las sugerencias."
+              : "OCR encontró texto, pero no datos confiables para aplicar.")
+            : "OCR no detectó datos suficientes. Tome la foto con la hoja completa, plana y bien iluminada.",
+          "error"
+        );
       }
     } catch (e) {
-      toast(e.response?.data?.error || "No se pudo procesar la imagen. Puede continuar manualmente.", "error");
+      const detail = e.response?.data?.errores?.[0];
+      const message = e.response?.data?.error || "No se pudo procesar la imagen. Puede continuar manualmente.";
+      toast(detail ? `${message} (${detail})` : message, "error");
     } finally {
       setOcrLoading(false);
     }
@@ -520,6 +557,8 @@ export default function NuevaPaciente() {
 
   const p = { form, set };
   const nombrePaciente = `${form.nombres || ""} ${form.apellidos || ""}`.trim();
+  const ocrReviewSuggestions = Object.entries(ocrResult?.sugerencias_revision || {})
+    .filter(([, value]) => value !== undefined && value !== null && value !== "");
 
   return (
     <div>
@@ -627,6 +666,52 @@ export default function NuevaPaciente() {
                   Los datos detectados deben revisarse antes de registrar la paciente. El OCR no guarda datos automaticamente.
                 </div>
               </div>
+
+              {ocrReviewSuggestions.length > 0 && (
+                <div style={{ padding: "0 1rem 1rem" }}>
+                  <div style={{
+                    border: "1px solid var(--warn)",
+                    borderRadius: 8,
+                    padding: "0.75rem",
+                    background: "var(--warn-lt)",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", color: "var(--warn)", fontWeight: 700, fontSize: "0.82rem", marginBottom: "0.65rem" }}>
+                      <AlertTriangle size={15} />
+                      Sugerencias de OCR local para revisar
+                    </div>
+                    <div style={{ display: "grid", gap: "0.5rem" }}>
+                      {ocrReviewSuggestions.map(([field, value]) => {
+                        const target = mapOcrFieldName(field);
+                        const hasCurrent = form[target] !== undefined && form[target] !== null && form[target] !== "";
+                        return (
+                          <div
+                            key={field}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "minmax(120px, 0.8fr) minmax(0, 1.4fr) auto",
+                              gap: "0.5rem",
+                              alignItems: "center",
+                              fontSize: "0.8rem",
+                            }}
+                          >
+                            <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>{ocrFieldLabels[field] || field}</span>
+                            <span style={{ color: "var(--text)" }}>{String(value)}</span>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              disabled={hasCurrent}
+                              onClick={() => applyOcrSuggestion(field, value)}
+                              style={{ padding: "0.35rem 0.55rem", fontSize: "0.75rem" }}
+                            >
+                              {hasCurrent ? "Con dato" : "Usar"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="form-section">

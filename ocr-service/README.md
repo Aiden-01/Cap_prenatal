@@ -7,7 +7,8 @@ Microservicio local para captura asistida de datos iniciales de una paciente. No
 - Recibe una imagen de un documento fisico.
 - Preprocesa la imagen con OpenCV.
 - Extrae texto con Tesseract via `pytesseract`.
-- Intenta detectar campos basicos: expediente, CUI, nombres, apellidos, edad, FUR y antecedentes obstetricos.
+- Opcionalmente usa Google Cloud Vision con `DOCUMENT_TEXT_DETECTION` si `GOOGLE_VISION_API_KEY` esta configurada.
+- Intenta detectar: expediente, CUI, nombres, apellidos, telefono, fecha de nacimiento, FUR y FPP.
 - Devuelve JSON preliminar para que el frontend lo muestre y el usuario decida si lo aplica al formulario.
 
 ## Instalacion en Ubuntu Server
@@ -51,6 +52,16 @@ Configurar:
 OCR_SERVICE_URL=http://127.0.0.1:5001
 ```
 
+Opcionalmente puede crear un archivo local `ocr-service/.env` para configurar el puerto o la ruta de Tesseract:
+
+```env
+PORT=5001
+TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
+GOOGLE_VISION_API_KEY=
+```
+
+Si se configura `GOOGLE_VISION_API_KEY`, el servicio intenta Google Vision primero y usa Tesseract como respaldo. Recomendado: configurar alertas/cuotas en Google Cloud y mantener el consumo por debajo del free tier mensual.
+
 El frontend debe llamar al backend Node, no al OCR directamente:
 
 ```txt
@@ -67,7 +78,8 @@ POST /api/ocr/nueva-paciente
 
 ## Limitaciones
 
-- OCR puede fallar con fotos oscuras, borrosas, inclinadas o formularios con escritura manual.
-- Las reglas actuales son expresiones regulares simples.
+- OCR puede fallar con fotos oscuras, borrosas o inclinadas.
+- Tesseract local no es confiable para escritura manual; el sistema evita aplicar lecturas dudosas automaticamente.
+- Google Vision puede mejorar la lectura manuscrita, pero requiere configuracion de Google Cloud y control de cuota/costos.
 - La confianza es orientativa, no una validacion clinica.
 - El usuario siempre debe revisar, corregir y confirmar antes de registrar la paciente.

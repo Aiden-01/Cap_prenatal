@@ -107,6 +107,22 @@ Verificar dependencias:
 
 ## 4. Levantar el microservicio
 
+Opcionalmente puede crear un archivo local de configuracion:
+
+```txt
+C:\ruta\cap_prenatal\ocr-service\.env
+```
+
+Ejemplo:
+
+```env
+PORT=5001
+TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
+GOOGLE_VISION_API_KEY=
+```
+
+Para usar Google Cloud Vision, coloque una API key valida en `GOOGLE_VISION_API_KEY`. Si queda vacio, el OCR usa solo Tesseract local.
+
 ```powershell
 cd C:\ruta\cap_prenatal\ocr-service
 .\.venv\Scripts\python.exe app.py
@@ -129,9 +145,13 @@ Respuesta esperada:
 ```json
 {
   "ok": true,
-  "service": "ocr-service"
+  "service": "ocr-service",
+  "ocr_engine": "tesseract-local",
+  "google_vision_enabled": false
 }
 ```
+
+Si Google Vision esta configurado, `ocr_engine` debe mostrar `google-vision+tesseract-local` y `google_vision_enabled` debe ser `true`.
 
 ## 5. Probar OCR manualmente
 
@@ -257,7 +277,7 @@ Y probar:
 
 ### OCR devuelve pocos datos
 
-Es esperado en imagenes de mala calidad. El OCR es ayuda opcional; el usuario siempre debe revisar y completar manualmente.
+El OCR local usa Tesseract. Puede detectar texto impreso y algunos numeros claros, pero no es confiable para escritura manual. Para mejorar manuscritos, configure Google Vision y controle la cuota mensual desde Google Cloud. Si aun con Google Vision devuelve pocos datos, revisar que la foto tenga la hoja completa, plana, bien iluminada y sin cortes en las esquinas.
 
 ## 10. Seguridad
 

@@ -1,5 +1,6 @@
 node_modules
 backend/.env
+ocr-service/.env
 backend/.python-packages/
 backend/mspas_pdf_preview/
 ocr-service/.venv/

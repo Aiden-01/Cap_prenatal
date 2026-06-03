@@ -57,7 +57,8 @@ async function nuevaPaciente(req, res) {
       confianza: {},
       texto_extraido: '',
       requiere_revision: true,
-      error: 'Servicio OCR no disponible. Puede continuar llenando el formulario manualmente.',
+      error: `Servicio OCR no disponible (${serviceUrl}). Verifique que el OCR Python este encendido en el puerto 5001.`,
+      errores: [err.message],
     });
   }
 }
