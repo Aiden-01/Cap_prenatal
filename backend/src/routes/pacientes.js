@@ -11,6 +11,14 @@ const {
 } =
   require('../controllers/pacientesController');
 const { authMiddleware } = require('../middleware/auth');
+const { validateBody, validateParams, validateQuery } = require('../middleware/validate');
+const { pacienteRootIdParam, pacienteIdParam } = require('../validations/common.schemas');
+const {
+  pacienteCreateSchema,
+  pacienteUpdateSchema,
+  pacienteListQuerySchema,
+  embarazoBodySchema,
+} = require('../validations/pacientes.schemas');
 
 // Sub-routers
 const controlesRouter    = require('./controles');
@@ -24,20 +32,20 @@ const router = express.Router();
 router.use(authMiddleware);
 
 // Rutas de pacientes
-router.get('/',                   listar);
-router.post('/',                  crear);
-router.get('/:id',                obtener);
-router.put('/:id',                actualizar);
-router.get('/:id/expediente',     expedienteCompleto);
-router.post('/:id/embarazos',     nuevoEmbarazo);
-router.post('/:id/embarazo/puerperio', pasarAPuerperio);
-router.post('/:id/embarazo/cerrar',    cerrarEmbarazo);
+router.get('/', validateQuery(pacienteListQuerySchema), listar);
+router.post('/', validateBody(pacienteCreateSchema), crear);
+router.get('/:id', validateParams(pacienteRootIdParam), obtener);
+router.put('/:id', validateParams(pacienteRootIdParam), validateBody(pacienteUpdateSchema), actualizar);
+router.get('/:id/expediente', validateParams(pacienteRootIdParam), expedienteCompleto);
+router.post('/:id/embarazos', validateParams(pacienteRootIdParam), validateBody(embarazoBodySchema), nuevoEmbarazo);
+router.post('/:id/embarazo/puerperio', validateParams(pacienteRootIdParam), validateBody(embarazoBodySchema), pasarAPuerperio);
+router.post('/:id/embarazo/cerrar', validateParams(pacienteRootIdParam), validateBody(embarazoBodySchema), cerrarEmbarazo);
 
 // Sub-rutas anidadas bajo /pacientes/:pacienteId/...
-router.use('/:pacienteId/controles',   controlesRouter);
-router.use('/:pacienteId/riesgo',      riesgoRouter);
+router.use('/:pacienteId/controles', validateParams(pacienteIdParam), controlesRouter);
+router.use('/:pacienteId/riesgo', validateParams(pacienteIdParam), riesgoRouter);
 router.use('/:pacienteId/morbilidad',  morbilidadRouter);
-router.use('/:pacienteId/vacunas',     vacunasRouter);
+router.use('/:pacienteId/vacunas', validateParams(pacienteIdParam), vacunasRouter);
 router.use('/:pacienteId/referencias', referenciasRouter);
 router.use('/:pacienteId',             pdfRouter);
 
