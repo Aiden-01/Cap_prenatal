@@ -18,6 +18,8 @@ const STEPS = [
   { label: "Confirmar",       icon: CheckCircle },
 ];
 
+const OCR_ENABLED = false;
+
 // ─── HELPERS DE CAMPO ────────────────────────────────────────
 function Field({ label, required, children }) {
   return (
@@ -613,106 +615,108 @@ export default function NuevaPaciente() {
         {/* ── STEP 0: ESTABLECIMIENTO ── */}
         {step === 0 && (
           <div>
-            <div className="form-section">
-              <div className="form-section-header" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <ScanLine size={16} /> Captura asistida OCR
-              </div>
-              <div className="form-section-body col-2">
-                <div>
-                  <input
-                    ref={ocrInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    style={{ display: "none" }}
-                    onChange={(e) => handleOcrFile(e.target.files?.[0])}
-                  />
+            {OCR_ENABLED && (
+              <div className="form-section">
+                <div className="form-section-header" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <ScanLine size={16} /> Captura asistida OCR
+                </div>
+                <div className="form-section-body col-2">
+                  <div>
+                    <input
+                      ref={ocrInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      style={{ display: "none" }}
+                      onChange={(e) => handleOcrFile(e.target.files?.[0])}
+                    />
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => ocrInputRef.current?.click()}
+                      style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}
+                    >
+                      <UploadCloud size={16} />
+                      Escanear documento
+                    </button>
+                    {ocrFile && (
+                      <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.45rem" }}>
+                        {ocrFile.name}
+                      </div>
+                    )}
+                  </div>
                   <button
                     type="button"
-                    className="btn-secondary"
-                    onClick={() => ocrInputRef.current?.click()}
-                    style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}
+                    className="btn-primary"
+                    onClick={processOcr}
+                    disabled={!ocrFile || ocrLoading}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem" }}
                   >
-                    <UploadCloud size={16} />
-                    Escanear documento
+                    <ScanLine size={16} />
+                    {ocrLoading ? "Procesando..." : "Procesar documento"}
                   </button>
-                  {ocrFile && (
-                    <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.45rem" }}>
-                      {ocrFile.name}
-                    </div>
-                  )}
                 </div>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={processOcr}
-                  disabled={!ocrFile || ocrLoading}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem" }}
-                >
-                  <ScanLine size={16} />
-                  {ocrLoading ? "Procesando..." : "Procesar documento"}
-                </button>
-              </div>
 
-              <div style={{ padding: "0 1rem 1rem" }}>
-                <div style={{
-                  border: "1px solid var(--border)",
-                  borderRadius: 8,
-                  padding: "0.75rem",
-                  background: "var(--surface2)",
-                  color: "var(--text-muted)",
-                  fontSize: "0.82rem",
-                }}>
-                  Los datos detectados deben revisarse antes de registrar la paciente. El OCR no guarda datos automaticamente.
-                </div>
-              </div>
-
-              {ocrReviewSuggestions.length > 0 && (
                 <div style={{ padding: "0 1rem 1rem" }}>
                   <div style={{
-                    border: "1px solid var(--warn)",
+                    border: "1px solid var(--border)",
                     borderRadius: 8,
                     padding: "0.75rem",
-                    background: "var(--warn-lt)",
+                    background: "var(--surface2)",
+                    color: "var(--text-muted)",
+                    fontSize: "0.82rem",
                   }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", color: "var(--warn)", fontWeight: 700, fontSize: "0.82rem", marginBottom: "0.65rem" }}>
-                      <AlertTriangle size={15} />
-                      Sugerencias de OCR local para revisar
-                    </div>
-                    <div style={{ display: "grid", gap: "0.5rem" }}>
-                      {ocrReviewSuggestions.map(([field, value]) => {
-                        const target = mapOcrFieldName(field);
-                        const hasCurrent = form[target] !== undefined && form[target] !== null && form[target] !== "";
-                        return (
-                          <div
-                            key={field}
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: "minmax(120px, 0.8fr) minmax(0, 1.4fr) auto",
-                              gap: "0.5rem",
-                              alignItems: "center",
-                              fontSize: "0.8rem",
-                            }}
-                          >
-                            <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>{ocrFieldLabels[field] || field}</span>
-                            <span style={{ color: "var(--text)" }}>{String(value)}</span>
-                            <button
-                              type="button"
-                              className="btn-secondary"
-                              disabled={hasCurrent}
-                              onClick={() => applyOcrSuggestion(field, value)}
-                              style={{ padding: "0.35rem 0.55rem", fontSize: "0.75rem" }}
-                            >
-                              {hasCurrent ? "Con dato" : "Usar"}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    Los datos detectados deben revisarse antes de registrar la paciente. El OCR no guarda datos automaticamente.
                   </div>
                 </div>
-              )}
-            </div>
+
+                {ocrReviewSuggestions.length > 0 && (
+                  <div style={{ padding: "0 1rem 1rem" }}>
+                    <div style={{
+                      border: "1px solid var(--warn)",
+                      borderRadius: 8,
+                      padding: "0.75rem",
+                      background: "var(--warn-lt)",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", color: "var(--warn)", fontWeight: 700, fontSize: "0.82rem", marginBottom: "0.65rem" }}>
+                        <AlertTriangle size={15} />
+                        Sugerencias de OCR local para revisar
+                      </div>
+                      <div style={{ display: "grid", gap: "0.5rem" }}>
+                        {ocrReviewSuggestions.map(([field, value]) => {
+                          const target = mapOcrFieldName(field);
+                          const hasCurrent = form[target] !== undefined && form[target] !== null && form[target] !== "";
+                          return (
+                            <div
+                              key={field}
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "minmax(120px, 0.8fr) minmax(0, 1.4fr) auto",
+                                gap: "0.5rem",
+                                alignItems: "center",
+                                fontSize: "0.8rem",
+                              }}
+                            >
+                              <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>{ocrFieldLabels[field] || field}</span>
+                              <span style={{ color: "var(--text)" }}>{String(value)}</span>
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                disabled={hasCurrent}
+                                onClick={() => applyOcrSuggestion(field, value)}
+                                style={{ padding: "0.35rem 0.55rem", fontSize: "0.75rem" }}
+                              >
+                                {hasCurrent ? "Con dato" : "Usar"}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="form-section">
               <div className="form-section-header">Datos del Establecimiento</div>
