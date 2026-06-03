@@ -49,4 +49,27 @@ Para replicarlo en controles prenatales, puerperio, vacunas y reportes, mover pr
 - `repositories/controlesPrenatalesRepository.js`
 - `validations/controles.schemas.js`
 
-Nota: `controllers/controlesController.js` aun conserva plan de parto y puerperio. Esos submodulos deben separarse despues en sus propios services/repositories para evitar un cambio demasiado grande en una sola iteracion.
+`controllers/controlesController.js` queda como wrapper de compatibilidad. Las rutas activas usan controllers especificos para controles prenatales, plan de parto y puerperio.
+
+## Modulos siguientes refactorizados
+
+`plan de parto`, `puerperio` y `vacunas` ya siguen el mismo patron:
+
+- `controllers/planPartoController.js`
+- `services/planPartoService.js`
+- `repositories/planPartoRepository.js`
+- `controllers/puerperioController.js`
+- `services/puerperioService.js`
+- `repositories/puerperioRepository.js`
+- `controllers/vacunasController.js`
+- `services/vacunasService.js`
+- `repositories/vacunasRepository.js`
+- `controllers/riesgoController.js`
+- `services/riesgoService.js`
+- `repositories/riesgoRepository.js`
+- `controllers/morbilidadController.js`
+- `services/morbilidadService.js`
+- `repositories/morbilidadRepository.js`
+- `controllers/referenciasController.js`
+- `services/referenciasService.js`
+- `repositories/referenciasRepository.js`

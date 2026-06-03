@@ -105,9 +105,36 @@ const puerperioCreateSchema = z.object({
 
 const puerperioUpdateSchema = z.object(puerperioBase).passthrough();
 
+const planPartoSchema = z.object({
+  fecha: requiredDate,
+  fur: optionalDate,
+  fecha_probable_parto: optionalDate,
+  fecha_nacimiento: optionalDate,
+  fecha_ultima_cesarea: optionalDate,
+  no_embarazos: optionalInt(0, 25),
+  no_partos: optionalInt(0, 25),
+  no_abortos: optionalInt(0, 25),
+  no_hijos_vivos: optionalInt(0, 25),
+  no_hijos_muertos: optionalInt(0, 25),
+  no_cesareas: optionalInt(0, 15),
+  edad_gestacional_semanas: gestationalAge,
+  edad_gestacional_au: gestationalAge,
+  horas_distancia: optionalNumber(0, 72),
+  kms_servicio: optionalNumber(0, 500),
+  ha_tenido_atencion_prenatal: optionalBoolean,
+  casa_materna_cercana: optionalBoolean,
+  usara_casa_materna: optionalBoolean,
+  lleva_dpi_madre: optionalBoolean,
+  lleva_dpi_conyuge: optionalBoolean,
+  lleva_partida_nacimiento: optionalBoolean,
+  cuenta_ahorro: optionalBoolean,
+  comunicado_comite: optionalBoolean,
+}).passthrough();
+
 module.exports = {
   controlCreateSchema,
   controlUpdateSchema,
+  planPartoSchema,
   puerperioCreateSchema,
   puerperioUpdateSchema,
 };

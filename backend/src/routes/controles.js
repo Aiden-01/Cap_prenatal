@@ -1,14 +1,13 @@
 const express = require('express');
-const {
-  obtenerPlanParto, guardarPlanParto,
-  listarPuerperio, obtenerPuerperio, guardarPuerperio, actualizarPuerperio, eliminarPuerperio,
-} = require('../controllers/controlesController');
 const controlesPrenatalesController = require('../controllers/controlesPrenatalesController');
+const planPartoController = require('../controllers/planPartoController');
+const puerperioController = require('../controllers/puerperioController');
 const { validateBody, validateParams } = require('../middleware/validate');
 const { nestedIdParams } = require('../validations/common.schemas');
 const {
   controlCreateSchema,
   controlUpdateSchema,
+  planPartoSchema,
   puerperioCreateSchema,
   puerperioUpdateSchema,
 } = require('../validations/controles.schemas');
@@ -16,15 +15,15 @@ const {
 const router = express.Router({ mergeParams: true });
 
 // Plan de parto (1 por paciente)
-router.get('/plan-parto',  obtenerPlanParto);
-router.post('/plan-parto', guardarPlanParto);
+router.get('/plan-parto',  planPartoController.obtenerPlanParto);
+router.post('/plan-parto', validateBody(planPartoSchema), planPartoController.guardarPlanParto);
 
 // Puerperio (1a y 2a atencion)
-router.get('/puerperio',        listarPuerperio);
-router.post('/puerperio',       validateBody(puerperioCreateSchema), guardarPuerperio);
-router.get('/puerperio/:id',    validateParams(nestedIdParams), obtenerPuerperio);
-router.put('/puerperio/:id',    validateParams(nestedIdParams), validateBody(puerperioUpdateSchema), actualizarPuerperio);
-router.delete('/puerperio/:id', validateParams(nestedIdParams), eliminarPuerperio);
+router.get('/puerperio',        puerperioController.listarPuerperio);
+router.post('/puerperio',       validateBody(puerperioCreateSchema), puerperioController.guardarPuerperio);
+router.get('/puerperio/:id',    validateParams(nestedIdParams), puerperioController.obtenerPuerperio);
+router.put('/puerperio/:id',    validateParams(nestedIdParams), validateBody(puerperioUpdateSchema), puerperioController.actualizarPuerperio);
+router.delete('/puerperio/:id', validateParams(nestedIdParams), puerperioController.eliminarPuerperio);
 
 // Controles prenatales
 router.get('/',       controlesPrenatalesController.listar);

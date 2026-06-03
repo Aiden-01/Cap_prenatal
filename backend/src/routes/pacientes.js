@@ -44,9 +44,9 @@ router.post('/:id/embarazo/cerrar', validateParams(pacienteRootIdParam), validat
 // Sub-rutas anidadas bajo /pacientes/:pacienteId/...
 router.use('/:pacienteId/controles', validateParams(pacienteIdParam), controlesRouter);
 router.use('/:pacienteId/riesgo', validateParams(pacienteIdParam), riesgoRouter);
-router.use('/:pacienteId/morbilidad',  morbilidadRouter);
+router.use('/:pacienteId/morbilidad', validateParams(pacienteIdParam), morbilidadRouter);
 router.use('/:pacienteId/vacunas', validateParams(pacienteIdParam), vacunasRouter);
-router.use('/:pacienteId/referencias', referenciasRouter);
+router.use('/:pacienteId/referencias', validateParams(pacienteIdParam), referenciasRouter);
 router.use('/:pacienteId',             pdfRouter);
 
 module.exports = router;
