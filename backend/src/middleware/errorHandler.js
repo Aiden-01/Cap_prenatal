@@ -13,6 +13,10 @@ function isProduction() {
 }
 
 function uniqueMessage(err) {
+  if (err.constraint === 'ux_embarazo_activo_paciente') {
+    return 'La paciente ya tiene un embarazo activo. Cierre o pase a puerperio el embarazo actual antes de crear otro.';
+  }
+
   if (err.constraint === 'ux_pacientes_cui_unico') {
     return 'Ya existe una paciente registrada con ese CUI';
   }

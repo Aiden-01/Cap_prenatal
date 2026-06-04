@@ -1,7 +1,7 @@
 const controlesRepository = require('../repositories/controlesPrenatalesRepository');
 const { obtenerEmbarazoActivoRequeridoId } = require('../utils/embarazos');
 const { withGuatemalaTimeFallback } = require('../utils/guatemalaTime');
-const { registrarAuditoria } = require('../utils/auditoria');
+const { registrarEvento: registrarAuditoria } = require('./auditService');
 const { HttpError } = require('../utils/httpError');
 
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);

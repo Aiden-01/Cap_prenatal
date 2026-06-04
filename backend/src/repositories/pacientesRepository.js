@@ -88,6 +88,21 @@ async function crearEmbarazoInicial({ pacienteId, fur, fpp, usuarioId }) {
   return rows[0] || null;
 }
 
+async function existeEmbarazoActivo(pacienteId, embarazoIdExcluir = null) {
+  const params = [pacienteId];
+  let where = "paciente_id = $1 AND estado = 'activo'";
+  if (embarazoIdExcluir) {
+    params.push(embarazoIdExcluir);
+    where += ` AND id <> $${params.length}`;
+  }
+
+  const { rowCount } = await pool.query(
+    `SELECT 1 FROM embarazos WHERE ${where} LIMIT 1`,
+    params
+  );
+  return rowCount > 0;
+}
+
 async function obtenerEmbarazoActivoId(pacienteId) {
   const { rows } = await pool.query(
     `SELECT id
@@ -280,6 +295,7 @@ module.exports = {
   insertarPaciente,
   actualizarPaciente,
   crearEmbarazoInicial,
+  existeEmbarazoActivo,
   obtenerEmbarazoActivoId,
   obtenerEmbarazoPorId,
   obtenerEmbarazoVisibleId,

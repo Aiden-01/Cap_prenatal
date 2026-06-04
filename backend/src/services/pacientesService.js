@@ -1,6 +1,11 @@
 const pacientesRepository = require('../repositories/pacientesRepository');
-const { registrarAuditoria } = require('../utils/auditoria');
+const { registrarEvento: registrarAuditoria } = require('./auditService');
 const { HttpError } = require('../utils/httpError');
+
+const ESTADO_EMBARAZO_ACTIVO = 'activo';
+const ESTADO_EMBARAZO_PUERPERIO = 'puerperio';
+const ESTADO_EMBARAZO_CERRADO = 'cerrado';
+const MENSAJE_EMBARAZO_ACTIVO_DUPLICADO = 'La paciente ya tiene un embarazo activo. Cierre o pase a puerperio el embarazo actual antes de crear otro.';
 
 const emptyToNull = (value) => value === '' ? null : value;
 const bool = (value) => value ?? false;
@@ -53,6 +58,15 @@ const normalizeCui = (value) => {
   const clean = emptyToNull(value);
   return clean ? String(clean).trim() : null;
 };
+
+async function validarPuedeActivarEmbarazo(pacienteId, embarazoIdExcluir = null) {
+  const tieneActivo = await pacientesRepository.existeEmbarazoActivo(pacienteId, embarazoIdExcluir);
+  if (tieneActivo) {
+    throw new HttpError(409, MENSAJE_EMBARAZO_ACTIVO_DUPLICADO, {
+      code: 'ACTIVE_PREGNANCY_EXISTS',
+    });
+  }
+}
 
 function buildPacienteInsertData(d, usuarioId) {
   const fpp = fppOrCalculated(d.fur, d.fpp);
@@ -220,6 +234,7 @@ async function crearPaciente({ body, req }) {
 
   const data = buildPacienteInsertData(body, req.usuario.id);
   const paciente = await pacientesRepository.insertarPaciente(data);
+  await validarPuedeActivarEmbarazo(paciente.id);
   const embarazo = await pacientesRepository.crearEmbarazoInicial({
     pacienteId: paciente.id,
     fur: data.fur,
@@ -312,7 +327,10 @@ async function actualizarPaciente({ id, body, req }) {
 
 async function expedienteCompleto(id) {
   let embarazoId = await pacientesRepository.obtenerEmbarazoVisibleId(id);
-  if (!embarazoId) embarazoId = await pacientesRepository.crearEmbarazoDesdePaciente(id);
+  if (!embarazoId) {
+    await validarPuedeActivarEmbarazo(id);
+    embarazoId = await pacientesRepository.crearEmbarazoDesdePaciente(id);
+  }
 
   const expediente = await pacientesRepository.obtenerExpedienteCompleto(id, embarazoId);
   if (!expediente.paciente) throw new HttpError(404, 'Paciente no encontrado');
@@ -325,6 +343,7 @@ async function nuevoEmbarazo({ id, body, req }) {
 
   const fpp = fppOrCalculated(body.fur, body.fpp);
   const cerrados = await pacientesRepository.cerrarEmbarazosEnSeguimiento(id, emptyToNull(body.fecha_cierre));
+  await validarPuedeActivarEmbarazo(id);
   const siguiente = await pacientesRepository.obtenerSiguienteNumeroEmbarazo(id);
   const embarazo = await pacientesRepository.insertarNuevoEmbarazo({
     pacienteId: id,
@@ -428,6 +447,9 @@ async function cerrarEmbarazo({ id, body, req }) {
 }
 
 module.exports = {
+  ESTADO_EMBARAZO_ACTIVO,
+  ESTADO_EMBARAZO_PUERPERIO,
+  ESTADO_EMBARAZO_CERRADO,
   listarPacientes,
   obtenerPaciente,
   crearPaciente,

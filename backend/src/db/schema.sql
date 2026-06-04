@@ -220,6 +220,34 @@ CREATE TABLE IF NOT EXISTS embarazos (
   UNIQUE (paciente_id, numero_embarazo)
 );
 
+UPDATE embarazos
+SET estado = LOWER(BTRIM(estado))
+WHERE estado IS NOT NULL
+  AND estado <> LOWER(BTRIM(estado))
+  AND LOWER(BTRIM(estado)) IN ('activo','puerperio','cerrado');
+
+WITH embarazos_activos_duplicados AS (
+  SELECT id,
+         ROW_NUMBER() OVER (
+           PARTITION BY paciente_id
+           ORDER BY numero_embarazo DESC, id DESC
+         ) AS orden
+  FROM embarazos
+  WHERE estado = 'activo'
+)
+UPDATE embarazos e
+SET estado = 'cerrado',
+    fecha_cierre = COALESCE(e.fecha_cierre, CURRENT_DATE),
+    observaciones = CONCAT_WS(
+      E'\n',
+      NULLIF(e.observaciones, ''),
+      'Cerrado automaticamente por migracion: se conserva solo un embarazo activo por paciente.'
+    ),
+    updated_at = NOW()
+FROM embarazos_activos_duplicados d
+WHERE e.id = d.id
+  AND d.orden > 1;
+
 CREATE UNIQUE INDEX IF NOT EXISTS ux_embarazo_activo_paciente
   ON embarazos(paciente_id)
   WHERE estado = 'activo';
@@ -673,6 +701,9 @@ CREATE TABLE IF NOT EXISTS auditoria_eventos (
   accion            VARCHAR(30) NOT NULL CHECK (
     accion IN ('login','logout','crear','actualizar','eliminar','estado')
   ),
+  modulo            VARCHAR(80),
+  entidad_afectada  VARCHAR(80),
+  id_entidad        TEXT,
   tabla             VARCHAR(80) NOT NULL,
   registro_id       TEXT,
   paciente_id       INTEGER REFERENCES pacientes(id) ON DELETE SET NULL,
@@ -682,14 +713,33 @@ CREATE TABLE IF NOT EXISTS auditoria_eventos (
   ip                VARCHAR(80),
   user_agent        TEXT,
   descripcion       TEXT,
+  fecha_hora        TIMESTAMPTZ DEFAULT NOW(),
   created_at        TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE auditoria_eventos ADD COLUMN IF NOT EXISTS modulo VARCHAR(80);
+ALTER TABLE auditoria_eventos ADD COLUMN IF NOT EXISTS entidad_afectada VARCHAR(80);
+ALTER TABLE auditoria_eventos ADD COLUMN IF NOT EXISTS id_entidad TEXT;
+ALTER TABLE auditoria_eventos ADD COLUMN IF NOT EXISTS fecha_hora TIMESTAMPTZ DEFAULT NOW();
+
+UPDATE auditoria_eventos
+SET modulo = COALESCE(modulo, tabla),
+    entidad_afectada = COALESCE(entidad_afectada, tabla),
+    id_entidad = COALESCE(id_entidad, registro_id),
+    fecha_hora = COALESCE(fecha_hora, created_at, NOW())
+WHERE modulo IS NULL
+   OR entidad_afectada IS NULL
+   OR id_entidad IS NULL
+   OR fecha_hora IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_auditoria_usuario ON auditoria_eventos(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_auditoria_paciente ON auditoria_eventos(paciente_id);
 CREATE INDEX IF NOT EXISTS idx_auditoria_embarazo ON auditoria_eventos(embarazo_id);
 CREATE INDEX IF NOT EXISTS idx_auditoria_tabla_registro ON auditoria_eventos(tabla, registro_id);
 CREATE INDEX IF NOT EXISTS idx_auditoria_created_at ON auditoria_eventos(created_at);
+CREATE INDEX IF NOT EXISTS idx_auditoria_modulo ON auditoria_eventos(modulo);
+CREATE INDEX IF NOT EXISTS idx_auditoria_entidad ON auditoria_eventos(entidad_afectada, id_entidad);
+CREATE INDEX IF NOT EXISTS idx_auditoria_fecha_hora ON auditoria_eventos(fecha_hora);
 
 ALTER TABLE vacunas_paciente ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
 ALTER TABLE controles_prenatales ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
