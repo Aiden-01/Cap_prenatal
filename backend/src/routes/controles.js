@@ -14,7 +14,7 @@ const {
 
 const router = express.Router({ mergeParams: true });
 
-// Plan de parto (1 por paciente)
+// Plan de parto (1 por embarazo activo)
 router.get('/plan-parto',  planPartoController.obtenerPlanParto);
 router.post('/plan-parto', validateBody(planPartoSchema), planPartoController.guardarPlanParto);
 

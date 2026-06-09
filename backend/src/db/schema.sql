@@ -785,6 +785,20 @@ SET embarazo_id = e.id
 FROM embarazos e
 WHERE r.embarazo_id IS NULL AND r.paciente_id = e.paciente_id AND e.estado = 'activo';
 
+WITH planes_parto_duplicados AS (
+  SELECT
+    id,
+    ROW_NUMBER() OVER (
+      PARTITION BY embarazo_id
+      ORDER BY fecha DESC NULLS LAST, updated_at DESC NULLS LAST, id DESC
+    ) AS fila
+  FROM planes_parto
+  WHERE embarazo_id IS NOT NULL
+)
+DELETE FROM planes_parto pp
+USING planes_parto_duplicados d
+WHERE pp.id = d.id AND d.fila > 1;
+
 CREATE INDEX IF NOT EXISTS idx_pacientes_expediente   ON pacientes(no_expediente);
 CREATE INDEX IF NOT EXISTS idx_pacientes_cui          ON pacientes(cui);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_pacientes_cui_unico
@@ -802,6 +816,7 @@ ALTER TABLE controles_prenatales DROP CONSTRAINT IF EXISTS controles_prenatales_
 ALTER TABLE controles_puerperio DROP CONSTRAINT IF EXISTS controles_puerperio_paciente_id_numero_atencion_key;
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_riesgo_embarazo_unico ON fichas_riesgo_obstetrico(embarazo_id);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_plan_parto_embarazo_unico ON planes_parto(embarazo_id);
 CREATE INDEX IF NOT EXISTS idx_riesgo_paciente        ON fichas_riesgo_obstetrico(paciente_id);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_vacunas_embarazo_dosis ON vacunas_paciente(embarazo_id, tipo_vacuna, momento, numero_dosis);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_controles_embarazo_numero ON controles_prenatales(embarazo_id, numero_control);

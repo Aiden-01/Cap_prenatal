@@ -33,6 +33,10 @@ function uniqueMessage(err) {
     return 'Esta paciente ya tiene una ficha de riesgo registrada';
   }
 
+  if (err.constraint === 'ux_plan_parto_embarazo_unico') {
+    return 'Esta paciente ya tiene un plan de parto registrado para este embarazo';
+  }
+
   if (err.constraint === 'ux_vacunas_embarazo_dosis') {
     return 'Ya existe una vacuna con esos datos para esta paciente';
   }

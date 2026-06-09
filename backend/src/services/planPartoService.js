@@ -1,7 +1,6 @@
 const planPartoRepository = require('../repositories/planPartoRepository');
-const { obtenerEmbarazoSeguimientoId } = require('../utils/embarazos');
+const { obtenerEmbarazoActivoId, obtenerEmbarazoActivoRequeridoId } = require('../utils/embarazos');
 const { registrarAuditoria } = require('../utils/auditoria');
-const { HttpError } = require('../utils/httpError');
 
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
 
@@ -33,15 +32,13 @@ function buildData(body, allowedFields) {
 }
 
 async function obtenerPlanParto(pacienteId) {
-  const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
+  const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
+  if (!embarazoId) return null;
   return planPartoRepository.obtenerPorEmbarazo(embarazoId);
 }
 
 async function guardarPlanParto({ pacienteId, body, req }) {
-  const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
-  if (!embarazoId) {
-    throw new HttpError(409, 'No hay embarazo activo o en puerperio para guardar plan de parto');
-  }
+  const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
 
   const existe = await planPartoRepository.obtenerPorEmbarazo(embarazoId);
   const { campos, data } = buildData(body, PLAN_PARTO_FIELDS);
