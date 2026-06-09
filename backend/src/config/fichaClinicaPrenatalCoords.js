@@ -4,7 +4,27 @@ const PAGE = {
 };
 
 const CONTROL_COLUMNS = [62, 169, 276, 383, 490];
-const yn = (x, y, gap = 13) => ({ yes: { x, y }, no: { x: x + gap, y } });
+
+// Helper para pares No/Si. En esta ficha la primera casilla es "No" y la
+// segunda, a la derecha, es "Si". Ajusta x/y sobre la casilla "No"; gap mueve
+// la casilla "Si" horizontalmente.
+const yn = (x, y, gap = 12) => ({ no: { x, y }, yes: { x: x + gap, y } });
+
+// Guia rapida para la zona de ANTECEDENTES de la pagina 1:
+// - Antecedentes familiares:
+//   famTbc, famDiabetes, famHipertension, famPreeclampsia,
+//   famEclampsia, famOtraCondicion
+// - Antecedentes personales, columna izquierda:
+//   antecTbc, antecDiabetes, antecHipertension, antecPreeclampsia,
+//   antecEclampsia, antecOtraCondicion
+// - Antecedentes personales, columna derecha:
+//   cirugiaGenitoUrinaria, infertilidad, antecCardiopatia,
+//   antecNefropatia, antecViolencia, antecVih
+// - Subopciones de diabetes:
+//   antecDiabetesTipo1, antecDiabetesTipo2, antecDiabetesTipoG
+//
+// En el PDF de depuracion las etiquetas aparecen como "campo:yes" o "campo:no".
+// Busca el mismo nombre en page1.yesNo o page1.marks.booleans y mueve su x/y.
 
 const page1 = {
   text: {
@@ -106,15 +126,29 @@ const page1 = {
       emergencia: { x: 557, y: 464 },
     },
     booleans: {
-      antecDiabetesTipo1: { x: 128, y: 442 },
-      antecDiabetesTipo2: { x: 140, y: 442 },
-      antecDiabetesTipoG: { x: 151, y: 442 },
+      // Subopciones bajo "diabetes" en antecedentes personales.
+      antecDiabetesTipo1: { x: 117, y: 432 },
+      antecDiabetesTipo2: { x: 127, y: 432 },
+      antecDiabetesTipoG: { x: 138, y: 432 },
       rnNc: { x: 221, y: 441 },
       rnNormal: { x: 221, y: 451 },
       rnMenor2500: { x: 254, y: 441 },
       rnMayor4000: { x: 254, y: 451 },
       abortosConsecutivos: { x: 330, y: 440 },
       finEmbarazoMenos1Anio: { x: 572, y: 417 },
+      // Vacunas: no | previo embarazo | durante embarazo | postparto/aborto.
+      vacunaTdTdapNo: { x: 76, y: 558 },
+      vacunaTdTdapPrevio: { x: 103, y: 558 },
+      vacunaTdTdapDurante: { x: 137, y: 558 },
+      vacunaTdTdapPostparto: { x: 171, y: 558 },
+      vacunaInfluenzaNo: { x: 76, y: 573 },
+      vacunaInfluenzaPrevio: { x: 103, y: 573 },
+      vacunaInfluenzaDurante: { x: 137, y: 573 },
+      vacunaInfluenzaPostparto: { x: 171, y: 573 },
+      vacunaSprSrNo: { x: 76, y: 589 },
+      vacunaSprSrPrevio: { x: 103, y: 589 },
+      vacunaSprSrDurante: { x: 137, y: 589 },
+      vacunaSprSrPostparto: { x: 171, y: 589 },
     },
   },
   yesNo: {
@@ -125,28 +159,60 @@ const page1 = {
     viveSola: { yes: { x: 251, y: 364 }, no: { x: 236, y: 364 } },
     embarazoPlaneado: { yes: { x: 578, y: 443 }, no: { x: 560, y: 443 } },
     embarazoAbusoSexual: { yes: { x: 259, y: 517 }, no: { x: 272, y: 517 } },
-    famDiabetes: yn(52, 432),
-    famTbc: yn(52, 442),
-    famHipertension: yn(52, 453),
-    famPreeclampsia: yn(52, 465),
-    famEclampsia: yn(52, 477),
-    famOtraCondicion: yn(52, 489),
-    antecDiabetes: yn(119, 432),
-    antecTbc: yn(119, 442),
-    antecHipertension: yn(119, 453),
-    antecPreeclampsia: yn(119, 465),
-    antecEclampsia: yn(119, 477),
-    antecOtraCondicion: yn(119, 489),
-    cirugiaGenitoUrinaria: yn(188, 425),
-    infertilidad: yn(188, 444),
-    antecCardiopatia: yn(188, 456),
-    antecNefropatia: yn(188, 468),
-    antecViolencia: yn(188, 480),
-    antecVih: yn(188, 492),
+
+    // Antecedentes familiares, de arriba hacia abajo en la ficha.
+    famTbc: yn(38, 422),
+    famDiabetes: yn(38, 432),
+    famHipertension: yn(38, 442),
+    famPreeclampsia: yn(38, 452),
+    famEclampsia: yn(38, 463),
+    famOtraCondicion: yn(38, 473),
+
+    // Antecedentes personales, columna izquierda, de arriba hacia abajo.
+    antecTbc: yn(105, 422),
+    antecDiabetes: yn(105, 432),
+    antecHipertension: yn(105, 442),
+    antecPreeclampsia: yn(105, 452),
+    antecEclampsia: yn(105, 463),
+    antecOtraCondicion: yn(105, 473),
+
+    // Antecedentes personales, columna derecha, de arriba hacia abajo.
+    cirugiaGenitoUrinaria: yn(174, 414),
+    infertilidad: yn(174, 424),
+    antecCardiopatia: yn(174, 434),
+    antecNefropatia: yn(174, 444),
+    antecViolencia: yn(174, 454),
+    antecVih: yn(174, 464),
+    //este esta dentro de obstetricos
     antecGemelares: { yes: { x: 254, y: 470 }, no: { x: 242, y: 470 } },
-    egConfiableFur: { yes: { x: 474, y: 532 }, no: { x: 493, y: 532 } },
-    egConfiableUsg: { yes: { x: 474, y: 574 }, no: { x: 493, y: 574 } },
-    tieneFichaRiesgo: { yes: { x: 556, y: 561 }, no: { x: 573, y: 561 } },
+    egConfiableFur: { yes: { x: 470, y: 502 }, no: { x: 481, y: 502 } },
+    egConfiableUsg: { yes: { x: 470, y: 529 }, no: { x: 481, y: 529 } },
+    tieneFichaRiesgo: { yes: { x: 550, y: 519 }, no: { x: 563, y: 519 } },
+
+    // Habitos y violencia por trimestre.
+    fumaActivaT1: yn(73, 503),
+    fumaActivaT2: yn(73, 516),
+    fumaActivaT3: yn(73, 529),
+    fumaPasivaT1: yn(107, 503),
+    fumaPasivaT2: yn(107, 516),
+    fumaPasivaT3: yn(107, 529),
+    drogasT1: yn(141, 503),
+    drogasT2: yn(141, 516),
+    drogasT3: yn(141, 529),
+    alcoholT1: yn(176, 503),
+    alcoholT2: yn(176, 516),
+    alcoholT3: yn(176, 529),
+    violenciaT1: yn(209, 503),
+    violenciaT2: yn(209, 516),
+    violenciaT3: yn(209, 529),
+  },
+  vaccineDates: {
+    previoDosis: { x: 278, y: 557, w: 42, size: 6.4, align: 'center' },
+    previoFecha1: { x: 304, y: 578 },
+    previoFecha2: { x: 304, y: 608 },
+    duranteFecha1: { x: 393, y: 579 },
+    duranteFecha2: { x: 485, y: 579 },
+    duranteFecha3: { x: 576, y: 579 },
   },
   controls: CONTROL_COLUMNS.map((x) => ({
     fecha: { x: x + 3, y: 640 },

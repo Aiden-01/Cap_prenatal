@@ -233,6 +233,73 @@ function drawBooleanMarks(page, font, entries) {
   });
 }
 
+function drawPersonalDiabetesMark(page, font, p, c) {
+  const tipo = p.antec_diabetes_tipo;
+  if (!tipo) {
+    drawMark(page, font, c.yesNo.antecDiabetes.no, 'antecDiabetes:no');
+    return;
+  }
+
+  const cfg = {
+    1: c.marks.booleans.antecDiabetesTipo1,
+    2: c.marks.booleans.antecDiabetesTipo2,
+    G: c.marks.booleans.antecDiabetesTipoG,
+  }[tipo];
+
+  if (cfg) drawMark(page, font, cfg, `antecDiabetesTipo${tipo}`);
+}
+
+function hasVaccine(vacunas, tipoVacuna, momento) {
+  return vacunas.some((v) => v.tipo_vacuna === tipoVacuna && v.momento === momento);
+}
+
+function findVaccine(vacunas, tipoVacuna, momentos, numeroDosis) {
+  const momentosPermitidos = Array.isArray(momentos) ? momentos : [momentos];
+  return vacunas.find((v) => (
+    v.tipo_vacuna === tipoVacuna &&
+    momentosPermitidos.includes(v.momento) &&
+    Number(v.numero_dosis || 1) === numeroDosis
+  ));
+}
+
+function drawVaccineCell(page, font, active, cfg, label) {
+  if (active) drawMark(page, font, cfg, label);
+}
+
+function drawVaccines(page, font, vacunas = [], c) {
+  const rows = [
+    ['td_tdap', 'vacunaTdTdap'],
+    ['influenza', 'vacunaInfluenza'],
+    ['spr_sr', 'vacunaSprSr'],
+  ];
+
+  rows.forEach(([tipo, prefix]) => {
+    const previo = hasVaccine(vacunas, tipo, 'previo_embarazo');
+    const durante = hasVaccine(vacunas, tipo, 'durante_embarazo');
+    const postparto = hasVaccine(vacunas, tipo, 'postparto_aborto');
+    drawVaccineCell(page, font, !previo && !durante && !postparto, c.marks.booleans[`${prefix}No`], `${prefix}No`);
+    drawVaccineCell(page, font, previo, c.marks.booleans[`${prefix}Previo`], `${prefix}Previo`);
+    drawVaccineCell(page, font, durante, c.marks.booleans[`${prefix}Durante`], `${prefix}Durante`);
+    drawVaccineCell(page, font, postparto, c.marks.booleans[`${prefix}Postparto`], `${prefix}Postparto`);
+  });
+
+  const previoVacunas = vacunas
+    .filter((v) => v.momento === 'previo_embarazo')
+    .sort((a, b) => Number(a.numero_dosis || 1) - Number(b.numero_dosis || 1));
+  if (previoVacunas[0]) {
+    drawTextBox(page, font, previoVacunas[0].numero_dosis, c.vaccineDates.previoDosis, 'vacunaPrevio:dosis');
+    drawDate(page, font, previoVacunas[0].fecha_dosis, c.vaccineDates.previoFecha1, 'vacunaPrevio:fecha1');
+  }
+  if (previoVacunas[1]) {
+    drawDate(page, font, previoVacunas[1].fecha_dosis, c.vaccineDates.previoFecha2, 'vacunaPrevio:fecha2');
+  }
+
+  [1, 2, 3].forEach((numeroDosis) => {
+    const vacuna = findVaccine(vacunas, 'td_tdap', ['durante_embarazo', 'postparto_aborto'], numeroDosis);
+    if (vacuna) drawDate(page, font, vacuna.fecha_dosis, c.vaccineDates[`duranteFecha${numeroDosis}`], `vacunaDurante:fecha${numeroDosis}`);
+  });
+}
+
 function drawYesNoMarks(page, font, entries) {
   entries.forEach(([value, cfg, label]) => {
     markYesNo(page, font, value, cfg, label);
@@ -395,7 +462,7 @@ function drawPuerperioSummary({ pdfDoc, font, paciente, embarazo, puerperio = []
   });
 }
 
-function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planParto }) {
+function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planParto, vacunas = [] }) {
   const p = paciente;
   const c = coords.pages[1];
   const c1 = controlAt(controles, 1);
@@ -478,10 +545,9 @@ function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planPart
   markYesNo(page, font, p.eg_confiable_usg, c.yesNo.egConfiableUsg, 'egConfiableUsg');
   markYesNo(page, font, p.tiene_ficha_riesgo, c.yesNo.tieneFichaRiesgo, 'tieneFichaRiesgo');
 
+  drawPersonalDiabetesMark(page, font, p, c);
+
   drawBooleanMarks(page, font, [
-    [p.antec_diabetes_tipo === '1', c.marks.booleans.antecDiabetesTipo1, 'antecDiabetesTipo1'],
-    [p.antec_diabetes_tipo === '2', c.marks.booleans.antecDiabetesTipo2, 'antecDiabetesTipo2'],
-    [p.antec_diabetes_tipo === 'G', c.marks.booleans.antecDiabetesTipoG, 'antecDiabetesTipoG'],
     [p.rn_nc, c.marks.booleans.rnNc, 'rnNc'],
     [p.rn_normal, c.marks.booleans.rnNormal, 'rnNormal'],
     [p.rn_menor_2500g, c.marks.booleans.rnMenor2500, 'rnMenor2500'],
@@ -493,13 +559,15 @@ function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planPart
   drawYesNoMarks(page, font, [
     [p.vive_sola, c.yesNo.viveSola, 'viveSola'],
     [p.embarazo_abuso_sexual, c.yesNo.embarazoAbusoSexual, 'embarazoAbusoSexual'],
+  ]);
+
+  drawYesNoMarks(page, font, [
     [p.fam_diabetes, c.yesNo.famDiabetes, 'famDiabetes'],
     [p.fam_tbc, c.yesNo.famTbc, 'famTbc'],
     [p.fam_hipertension, c.yesNo.famHipertension, 'famHipertension'],
     [p.fam_preeclampsia, c.yesNo.famPreeclampsia, 'famPreeclampsia'],
     [p.fam_eclampsia, c.yesNo.famEclampsia, 'famEclampsia'],
     [p.fam_otra_condicion_medica_grave, c.yesNo.famOtraCondicion, 'famOtraCondicion'],
-    [p.antec_diabetes, c.yesNo.antecDiabetes, 'antecDiabetes'],
     [p.antec_tbc, c.yesNo.antecTbc, 'antecTbc'],
     [p.antec_hipertension, c.yesNo.antecHipertension, 'antecHipertension'],
     [p.antec_preeclampsia, c.yesNo.antecPreeclampsia, 'antecPreeclampsia'],
@@ -512,6 +580,26 @@ function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planPart
     [p.antec_violencia, c.yesNo.antecViolencia, 'antecViolencia'],
     [p.antec_vih_positivo, c.yesNo.antecVih, 'antecVih'],
   ]);
+
+  drawYesNoMarks(page, font, [
+    [p.fuma_activamente_1er_trimestre, c.yesNo.fumaActivaT1, 'fumaActivaT1'],
+    [p.fuma_activamente_2do_trimestre, c.yesNo.fumaActivaT2, 'fumaActivaT2'],
+    [p.fuma_activamente_3er_trimestre, c.yesNo.fumaActivaT3, 'fumaActivaT3'],
+    [p.fuma_pasivamente_1er_trimestre, c.yesNo.fumaPasivaT1, 'fumaPasivaT1'],
+    [p.fuma_pasivamente_2do_trimestre, c.yesNo.fumaPasivaT2, 'fumaPasivaT2'],
+    [p.fuma_pasivamente_3er_trimestre, c.yesNo.fumaPasivaT3, 'fumaPasivaT3'],
+    [p.consume_drogas_1er_trimestre, c.yesNo.drogasT1, 'drogasT1'],
+    [p.consume_drogas_2do_trimestre, c.yesNo.drogasT2, 'drogasT2'],
+    [p.consume_drogas_3er_trimestre, c.yesNo.drogasT3, 'drogasT3'],
+    [p.consume_alcohol_1er_trimestre, c.yesNo.alcoholT1, 'alcoholT1'],
+    [p.consume_alcohol_2do_trimestre, c.yesNo.alcoholT2, 'alcoholT2'],
+    [p.consume_alcohol_3er_trimestre, c.yesNo.alcoholT3, 'alcoholT3'],
+    [p.violencia_1er_trimestre, c.yesNo.violenciaT1, 'violenciaT1'],
+    [p.violencia_2do_trimestre, c.yesNo.violenciaT2, 'violenciaT2'],
+    [p.violencia_3er_trimestre, c.yesNo.violenciaT3, 'violenciaT3'],
+  ]);
+
+  drawVaccines(page, font, vacunas, c);
 
   drawMark(
     page,
@@ -538,6 +626,7 @@ async function generarFichaClinicaPrenatalPdf({
   embarazo,
   controles = [],
   puerperio = [],
+  vacunas = [],
   riesgo = null,
   planParto = null,
 }) {
@@ -557,6 +646,7 @@ async function generarFichaClinicaPrenatalPdf({
     controles,
     riesgo,
     planParto,
+    vacunas,
   });
 
   drawPuerperioSummary({

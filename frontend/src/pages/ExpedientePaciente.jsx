@@ -105,6 +105,14 @@ export default function ExpedientePaciente() {
   );
 
   const p = exp.paciente;
+  const nombreCompleto = `${p.nombres} ${p.apellidos}`.trim();
+  const nombreSizeClass = nombreCompleto.length > 44
+    ? "is-extra-long"
+    : nombreCompleto.length > 32
+      ? "is-long"
+      : nombreCompleto.length > 24
+        ? "is-medium"
+      : "";
   const estadoEmbarazo = exp.embarazo_activo?.estado;
   const puedeRegistrarPrenatal = estadoEmbarazo === "activo";
   const puedeRegistrarPuerperio = estadoEmbarazo === "activo" || estadoEmbarazo === "puerperio";
@@ -139,19 +147,6 @@ export default function ExpedientePaciente() {
       setTab("general");
     } catch (err) {
       toast(err.response?.data?.error || "Error al crear nuevo embarazo", "error");
-    }
-  };
-
-  const pasarAPuerperio = async () => {
-    if (!window.confirm("Esto marcara el embarazo activo como puerperio y lo quitara del seguimiento prenatal del dashboard. ¿Continuar?")) return;
-
-    try {
-      await api.post(`/pacientes/${id}/embarazo/puerperio`);
-      toast("Embarazo marcado en puerperio", "success");
-      cargarExpediente();
-      setTab("puerperio");
-    } catch (err) {
-      toast(err.response?.data?.error || "Error al pasar a puerperio", "error");
     }
   };
 
@@ -298,74 +293,59 @@ export default function ExpedientePaciente() {
   const TABS = [
     { id: "general",    label: "Datos generales",                          icon: FileText     },
     { id: "controles",  label: `Controles (${exp.controles_prenatales?.length ?? 0})`, icon: Activity     },
-    { id: "puerperio",  label: `Puerperio (${exp.controles_puerperio?.length ?? 0})`,  icon: Baby         },
-    { id: "morbilidad", label: `Morbilidad (${exp.morbilidad?.length ?? 0})`,          icon: Plus         },
+    { id: "laboratorio",label: "Laboratorios",                             icon: FlaskConical },
     { id: "riesgo",     label: "Riesgo obstétrico",                        icon: AlertTriangle },
     { id: "plan",       label: "Plan de parto",                            icon: FileText },
+    { id: "morbilidad", label: `Morbilidad (${exp.morbilidad?.length ?? 0})`,          icon: Plus         },
+    { id: "puerperio",  label: `Puerperio (${exp.controles_puerperio?.length ?? 0})`,  icon: Baby         },
     { id: "vacunas",    label: "Vacunas",                                  icon: Syringe      },
-    { id: "laboratorio",label: "Laboratorios",                             icon: FlaskConical },
   ];
 
   return (
     <div>
       {/* ── HEADER ── */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
-        <button className="btn-secondary" onClick={() => navigate("/pacientes")}
-          style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+      <div className="patient-hero">
+        <button className="btn-secondary patient-hero-back" onClick={() => navigate("/pacientes")}>
           <ChevronLeft size={15} /> Volver
         </button>
 
-        <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-            <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--text)" }}>
-              {p.nombres} {p.apellidos}
+        <div className="patient-hero-main">
+          <div className="patient-hero-title-row">
+            <h1 className={`patient-hero-title ${nombreSizeClass}`}>
+              {nombreCompleto}
             </h1>
-            {exp.ficha_riesgo?.tiene_riesgo && (
-              <span className="badge badge-red">⚠ Riesgo obstétrico</span>
-            )}
           </div>
-          <div style={{ display: "flex", gap: "0.75rem", marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
+          <div className="patient-hero-meta">
             <span className="badge badge-blue">Exp: {p.no_expediente}</span>
             {exp.embarazo_activo && (
               <span className={`badge ${badgeEmbarazo}`}>
                 Embarazo {exp.embarazo_activo.numero_embarazo} {exp.embarazo_activo.estado}
               </span>
             )}
-            {p.cui && <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>CUI: {p.cui}</span>}
-            {(exp.embarazo_activo?.fur || p.fur)  && <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>FUR: {fecha(exp.embarazo_activo?.fur || p.fur)}</span>}
-            {(exp.embarazo_activo?.fpp || p.fpp)  && <span style={{ color: "var(--accent)", fontSize: "0.82rem", fontWeight: 600 }}>FPP: {fecha(exp.embarazo_activo?.fpp || p.fpp)}</span>}
+            {p.cui && <span>CUI: {p.cui}</span>}
+            {(exp.embarazo_activo?.fur || p.fur)  && <span>FUR: {fecha(exp.embarazo_activo?.fur || p.fur)}</span>}
+            {(exp.embarazo_activo?.fpp || p.fpp)  && <span className="patient-hero-fpp">FPP: {fecha(exp.embarazo_activo?.fpp || p.fpp)}</span>}
+            {exp.ficha_riesgo?.tiene_riesgo && (
+              <span className="badge badge-red patient-risk-badge">
+                <AlertTriangle size={13} /> Riesgo obstétrico
+              </span>
+            )}
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        <div className="patient-hero-actions">
           {puedeRegistrarPrenatal && (
-            <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}
-              style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}>
               <Plus size={14} /> Control
             </button>
           )}
-          {estadoEmbarazo === "activo" && (
-            <button className="btn-secondary" onClick={pasarAPuerperio}
-              style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-              <Baby size={14} /> Pasar a puerperio
-            </button>
-          )}
-          {(estadoEmbarazo === "activo" || estadoEmbarazo === "puerperio") && (
-            <button className="btn-secondary" onClick={cerrarEmbarazo}
-              style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-              <CheckCircle size={14} /> Cerrar embarazo
-            </button>
-          )}
-          <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/editar`)}
-            style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/editar`)}>
             <Pencil size={14} /> Editar paciente
           </button>
-          <button className="btn-primary" onClick={imprimirFichaMspas} disabled={printing}
-            style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <button className="btn-secondary" onClick={imprimirFichaMspas} disabled={printing}>
             <Printer size={14} /> {printing ? "Generando..." : "Expediente"}
           </button>
-          <button className="btn-secondary" onClick={crearNuevoEmbarazo}
-            style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <button className="btn-create" onClick={crearNuevoEmbarazo}>
             <Plus size={14} /> Nuevo embarazo
           </button>
         </div>
@@ -404,6 +384,11 @@ export default function ExpedientePaciente() {
                     <Row label="Inicio" value={fecha(emb.fecha_inicio)} />
                     {emb.fecha_cierre && <Row label="Cierre" value={fecha(emb.fecha_cierre)} />}
                   </div>
+                  {(emb.estado === "activo" || emb.estado === "puerperio") && (
+                    <button className="btn-critical pregnancy-close-action" onClick={cerrarEmbarazo}>
+                      <CheckCircle size={14} /> Cerrar embarazo
+                    </button>
+                  )}
                 </div>
               ))}
             </Grid>
