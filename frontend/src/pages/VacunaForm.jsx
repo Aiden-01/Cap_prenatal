@@ -18,6 +18,7 @@ function Field({ label, children }) {
 export default function VacunaForm() {
   const { id, vacunaId } = useParams();
   const navigate = useNavigate();
+  const expedientePath = `/pacientes/${id}?tab=vacunas`;
   const toast = useGlobalToast();
   const [form, setForm] = useState(INIT);
   const [loading, setLoading] = useState(false);
@@ -38,7 +39,7 @@ export default function VacunaForm() {
       if (editando) await api.put(`/pacientes/${id}/vacunas/${vacunaId}`, form);
       else await api.post(`/pacientes/${id}/vacunas`, form);
       toast(editando ? "Vacuna actualizada" : "Vacuna registrada", "success");
-      navigate(`/pacientes/${id}`);
+      navigate(expedientePath);
     } catch (err) {
       toast(err.response?.data?.error || "Error al guardar vacuna", "error");
     } finally {
@@ -49,7 +50,7 @@ export default function VacunaForm() {
   return (
     <div>
       <div style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1.5rem" }}>
-        <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}`)}><ChevronLeft size={15} /> Volver</button>
+        <button className="btn-secondary" onClick={() => navigate(expedientePath)}><ChevronLeft size={15} /> Volver</button>
         <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>{editando ? "Editar Vacuna" : "Registrar Vacuna"}</h1>
       </div>
       <form className="card" onSubmit={submit}>

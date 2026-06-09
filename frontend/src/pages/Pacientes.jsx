@@ -1,22 +1,106 @@
-﻿import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, UserPlus } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Search,
+  UserPlus,
+} from "lucide-react";
 import api from "../api/axios";
 
-const LIMITE = 20;
+const PAGE_SIZE_OPTIONS = [10, 25, 50];
+const MS_DAY = 86400000;
+
+function formatDate(value) {
+  return value ? new Date(value).toLocaleDateString("es-GT") : "—";
+}
+
+function titleCase(value) {
+  if (!value) return "Cerrado";
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function getEstadoBadge(estado) {
+  if (estado === "activo") return "badge-green";
+  if (estado === "puerperio") return "badge-blue";
+  return "badge";
+}
+
+function getFppInfo(paciente) {
+  const fppValue = paciente.embarazo_fpp || paciente.fpp;
+  const furValue = paciente.embarazo_fur || paciente.fur;
+  const fpp = fppValue
+    ? new Date(fppValue)
+    : furValue
+      ? new Date(new Date(furValue).getTime() + 280 * MS_DAY)
+      : null;
+
+  if (!fpp) {
+    return {
+      label: "—",
+      color: "var(--text-muted)",
+      title: "Fecha probable de parto: sin dato",
+      urgent: false,
+    };
+  }
+
+  const daysRemaining = Math.ceil((fpp.getTime() - Date.now()) / MS_DAY);
+  const weeksRemaining = Math.max(0, Math.ceil(daysRemaining / 7));
+  const title = `${weeksRemaining} semanas para la fecha probable de parto`;
+
+  if (weeksRemaining < 4) {
+    return {
+      label: formatDate(fpp),
+      color: "var(--danger)",
+      title,
+      urgent: true,
+    };
+  }
+
+  if (weeksRemaining < 8) {
+    return {
+      label: formatDate(fpp),
+      color: "var(--warn)",
+      title,
+      urgent: false,
+    };
+  }
+
+  return {
+    label: formatDate(fpp),
+    color: "var(--text)",
+    title,
+    urgent: false,
+  };
+}
+
+const detailLabelStyle = {
+  display: "block",
+  color: "var(--text-muted)",
+  fontSize: "0.72rem",
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: 0,
+};
 
 export default function Pacientes() {
   const [pacientes, setPacientes] = useState([]);
-  const [total, setTotal]         = useState(0);
-  const [buscar, setBuscar]       = useState("");
-  const [pagina, setPagina]       = useState(1);
-  const [loading, setLoading]     = useState(true);
+  const [total, setTotal] = useState(0);
+  const [buscar, setBuscar] = useState("");
+  const [pagina, setPagina] = useState(1);
+  const [limite, setLimite] = useState(10);
+  const [expandida, setExpandida] = useState(null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     let cancelado = false;
+    setLoading(true);
 
-    api.get("/pacientes", { params: { buscar, pagina, limite: LIMITE } })
+    api.get("/pacientes", { params: { buscar, pagina, limite } })
       .then(({ data }) => {
         if (!cancelado) {
           setPacientes(data.data);
@@ -29,27 +113,36 @@ export default function Pacientes() {
       });
 
     return () => { cancelado = true; };
-  }, [buscar, pagina]);
+  }, [buscar, pagina, limite]);
 
-  const totalPaginas = Math.ceil(total / LIMITE);
+  const totalPaginas = Math.max(1, Math.ceil(total / limite));
+  const inicio = total === 0 ? 0 : (pagina - 1) * limite + 1;
+  const fin = Math.min(pagina * limite, total);
 
   return (
     <div>
-      {/* HEADER */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.75rem", flexWrap: "wrap", gap: "0.75rem" }}>
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "1.75rem",
+        flexWrap: "wrap",
+        gap: "0.75rem",
+      }}>
         <div>
           <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--text)" }}>Pacientes</h1>
           <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 3 }}>
             {total} paciente{total !== 1 ? "s" : ""} registrada{total !== 1 ? "s" : ""}
           </p>
         </div>
-        <button className="btn-primary" onClick={() => navigate("/nuevo")}
+        <button
+          className="btn-primary"
+          onClick={() => navigate("/nuevo")}
           style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
           <UserPlus size={15} /> Nueva paciente
         </button>
       </div>
 
-      {/* BÚSQUEDA */}
       <div className="card" style={{ marginBottom: "1.25rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
         <Search size={16} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
         <input
@@ -61,7 +154,6 @@ export default function Pacientes() {
         />
       </div>
 
-      {/* TABLA */}
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {loading ? (
           <div style={{ padding: "2.5rem", textAlign: "center", color: "var(--text-muted)" }}>Cargando...</div>
@@ -75,38 +167,105 @@ export default function Pacientes() {
               <thead>
                 <tr>
                   <th>No. Expediente</th>
-                  <th>Nombres</th>
-                  <th>Apellidos</th>
-                  <th>Municipio</th>
+                  <th>Paciente</th>
+                  <th>Estado</th>
                   <th>FUR</th>
                   <th>FPP (est.)</th>
-                  <th>Registrada</th>
+                  <th aria-label="Detalle"></th>
                 </tr>
               </thead>
               <tbody>
                 {pacientes.map((p) => {
-                  const fpp = p.fur
-                    ? new Date(new Date(p.fur).getTime() + 280 * 86400000)
-                    : null;
+                  const fppInfo = getFppInfo(p);
+                  const abierta = expandida === p.id;
+                  const estado = p.embarazo_estado || "cerrado";
+
                   return (
-                    <tr key={p.id} style={{ cursor: "pointer" }}
-                      onClick={() => navigate(`/pacientes/${p.id}`)}>
-                      <td>
-                        <span className="badge badge-blue">{p.no_expediente}</span>
-                      </td>
-                      <td style={{ fontWeight: 600 }}>{p.nombres}</td>
-                      <td>{p.apellidos}</td>
-                      <td style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>{p.municipio || "—"}</td>
-                      <td style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                        {p.fur ? new Date(p.fur).toLocaleDateString("es-GT") : "—"}
-                      </td>
-                      <td style={{ color: "var(--accent)", fontWeight: 500, fontSize: "0.85rem" }}>
-                        {fpp ? fpp.toLocaleDateString("es-GT") : "—"}
-                      </td>
-                      <td style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>
-                        {new Date(p.created_at).toLocaleDateString("es-GT")}
-                      </td>
-                    </tr>
+                    <Fragment key={p.id}>
+                      <tr style={{ cursor: "pointer" }} onClick={() => navigate(`/pacientes/${p.id}`)}>
+                        <td>
+                          <span className="badge badge-blue">{p.no_expediente}</span>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+                            <strong style={{ color: "var(--text)", fontSize: "0.92rem" }}>{p.nombres || "—"}</strong>
+                            <span style={{ color: "var(--text-muted)", fontSize: "0.84rem" }}>{p.apellidos || "—"}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
+                            <span className={`badge ${getEstadoBadge(estado)}`}>{titleCase(estado)}</span>
+                            {p.tiene_riesgo && <span className="badge badge-red">Riesgo obstétrico</span>}
+                          </div>
+                        </td>
+                        <td style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                          {formatDate(p.embarazo_fur || p.fur)}
+                        </td>
+                        <td>
+                          <span
+                            title={fppInfo.title}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "0.3rem",
+                              color: fppInfo.color,
+                              fontWeight: 700,
+                              fontSize: "0.82rem",
+                            }}>
+                            {fppInfo.urgent && <AlertTriangle size={13} />}
+                            {fppInfo.label}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            title={abierta ? "Ocultar detalle" : "Mostrar detalle"}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandida(abierta ? null : p.id);
+                            }}
+                            style={{ padding: "0.4rem", minWidth: 34 }}>
+                            {abierta ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                          </button>
+                        </td>
+                      </tr>
+                      {abierta && (
+                        <tr onClick={(e) => e.stopPropagation()}>
+                          <td
+                            colSpan={6}
+                            style={{
+                              background: "var(--card)",
+                              borderTop: "1px solid var(--border)",
+                              cursor: "default",
+                              padding: "0.9rem 1rem",
+                            }}>
+                            <div style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                              gap: "0.9rem",
+                              background: "var(--surface2)",
+                              border: "1px solid var(--border)",
+                              borderRadius: 8,
+                              padding: "0.9rem 1rem",
+                            }}>
+                              <div>
+                                <span style={detailLabelStyle}>Municipio</span>
+                                <strong style={{ color: "var(--text)", fontSize: "0.88rem" }}>{p.municipio || "—"}</strong>
+                              </div>
+                              <div>
+                                <span style={detailLabelStyle}>Registrada</span>
+                                <strong style={{ color: "var(--text)", fontSize: "0.88rem" }}>{formatDate(p.created_at)}</strong>
+                              </div>
+                              <div>
+                                <span style={detailLabelStyle}>Comunidad</span>
+                                <strong style={{ color: "var(--text)", fontSize: "0.88rem" }}>{p.comunidad || "—"}</strong>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -114,18 +273,42 @@ export default function Pacientes() {
           </div>
         )}
 
-        {/* PAGINACIÓN */}
-        {totalPaginas > 1 && (
-          <div style={{ padding: "1rem", display: "flex", gap: "0.5rem", justifyContent: "flex-end", borderTop: "1px solid var(--border)", alignItems: "center" }}>
-            <button className="btn-secondary" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina === 1}>
-              ← Anterior
-            </button>
-            <span style={{ padding: "0.5rem 0.75rem", fontSize: "0.83rem", color: "var(--text-muted)" }}>
-              {pagina} / {totalPaginas}
+        {total > 0 && (
+          <div style={{
+            padding: "1rem",
+            display: "flex",
+            gap: "0.75rem",
+            justifyContent: "space-between",
+            borderTop: "1px solid var(--border)",
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}>
+            <span style={{ fontSize: "0.83rem", color: "var(--text-muted)" }}>
+              Mostrando {inicio}-{fin} de {total} pacientes
             </span>
-            <button className="btn-secondary" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas}>
-              Siguiente →
-            </button>
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+              <select
+                className="input-field"
+                value={limite}
+                onChange={(e) => {
+                  setLimite(Number(e.target.value));
+                  setPagina(1);
+                }}
+                style={{ margin: 0, width: 92, padding: "0.5rem 0.65rem" }}>
+                {PAGE_SIZE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+              <button className="btn-secondary" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina === 1}>
+                <ChevronLeft size={15} /> Anterior
+              </button>
+              <span style={{ padding: "0.5rem 0.75rem", fontSize: "0.83rem", color: "var(--text-muted)" }}>
+                {pagina} / {totalPaginas}
+              </span>
+              <button className="btn-secondary" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas}>
+                Siguiente <ChevronRight size={15} />
+              </button>
+            </div>
           </div>
         )}
       </div>

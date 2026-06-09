@@ -30,6 +30,7 @@ function Field({ label, children }) {
 export default function MorbilidadForm() {
   const { id, morbilidadId } = useParams();
   const navigate = useNavigate();
+  const expedientePath = `/pacientes/${id}?tab=morbilidad`;
   const toast = useGlobalToast();
   const [form, setForm] = useState(initialMorbilidadForm);
   const [loading, setLoading] = useState(false);
@@ -50,7 +51,7 @@ export default function MorbilidadForm() {
       if (editando) await api.put(`/pacientes/${id}/morbilidad/${morbilidadId}`, form);
       else await api.post(`/pacientes/${id}/morbilidad`, form);
       toast(editando ? "Morbilidad actualizada" : "Morbilidad registrada", "success");
-      navigate(`/pacientes/${id}`);
+      navigate(expedientePath);
     } catch (err) {
       toast(err.response?.data?.error || "Error al guardar morbilidad", "error");
     } finally {
@@ -61,7 +62,7 @@ export default function MorbilidadForm() {
   return (
     <div>
       <div style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1.5rem" }}>
-        <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}`)}><ChevronLeft size={15} /> Volver</button>
+        <button className="btn-secondary" onClick={() => navigate(expedientePath)}><ChevronLeft size={15} /> Volver</button>
         <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>{editando ? "Editar Morbilidad" : "Registrar Morbilidad"}</h1>
       </div>
       <form className="card" onSubmit={submit}>

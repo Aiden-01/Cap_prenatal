@@ -202,6 +202,7 @@ function defaultsDesdePaciente(paciente = {}, embarazo = {}) {
 export default function FichaRiesgo() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const expedientePath = `/pacientes/${id}?tab=riesgo`;
   const toast = useGlobalToast();
   const [form, setForm] = useState(INIT);
   const [paciente, setPaciente] = useState(null);
@@ -254,7 +255,7 @@ export default function FichaRiesgo() {
         await api.post(`/pacientes/${id}/riesgo`, form);
       }
       toast(existingRisk ? "Ficha de riesgo actualizada" : "Ficha de riesgo guardada", "success");
-      setTimeout(() => navigate(`/pacientes/${id}`), 600);
+      setTimeout(() => navigate(expedientePath), 600);
     } catch (err) {
       toast(err.response?.data?.error || "Error al guardar ficha de riesgo", "error");
     } finally {
@@ -351,7 +352,7 @@ export default function FichaRiesgo() {
       )}
 
       <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.5rem" }}>
-        <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}`)}>
+        <button className="btn-secondary" onClick={() => navigate(expedientePath)}>
           <ChevronLeft size={15} /> Volver
         </button>
         <div>
@@ -465,7 +466,7 @@ export default function FichaRiesgo() {
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.8rem", marginTop: "1.25rem" }}>
-          <button type="button" className="btn-secondary" onClick={() => navigate(`/pacientes/${id}`)}>
+          <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>
             Cancelar
           </button>
           <button className="btn-primary" disabled={loading}>

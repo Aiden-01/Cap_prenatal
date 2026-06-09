@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import {
@@ -74,10 +74,11 @@ function fecha(d) {
 export default function ExpedientePaciente() {
   const { id }     = useParams();
   const navigate   = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toast      = useGlobalToast();
   const [exp, setExp]       = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab]         = useState("general");
+  const [tab, setTab]         = useState(searchParams.get("tab") || "general");
   const [printing, setPrinting] = useState(false);
 
   const cargarExpediente = () => {
@@ -92,6 +93,15 @@ export default function ExpedientePaciente() {
       .catch(() => toast("Error al cargar expediente", "error"))
       .finally(() => setLoading(false));
   }, [id, toast]);
+
+  useEffect(() => {
+    setTab(searchParams.get("tab") || "general");
+  }, [searchParams]);
+
+  const cambiarTab = (nextTab) => {
+    setTab(nextTab);
+    setSearchParams(nextTab === "general" ? {} : { tab: nextTab }, { replace: true });
+  };
 
   if (loading) return (
     <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
@@ -144,7 +154,7 @@ export default function ExpedientePaciente() {
       await api.post(`/pacientes/${id}/embarazos`, { fur, fpp });
       toast("Nuevo embarazo creado", "success");
       cargarExpediente();
-      setTab("general");
+      cambiarTab("general");
     } catch (err) {
       toast(err.response?.data?.error || "Error al crear nuevo embarazo", "error");
     }
@@ -157,7 +167,7 @@ export default function ExpedientePaciente() {
       await api.post(`/pacientes/${id}/embarazo/cerrar`);
       toast("Embarazo cerrado", "success");
       cargarExpediente();
-      setTab("general");
+      cambiarTab("general");
     } catch (err) {
       toast(err.response?.data?.error || "Error al cerrar embarazo", "error");
     }
@@ -356,7 +366,7 @@ export default function ExpedientePaciente() {
         {TABS.map((t) => {
           const Icon = t.icon;
           return (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`content-tab ${tab === t.id ? "is-active" : ""}`}>
+            <button key={t.id} onClick={() => cambiarTab(t.id)} className={`content-tab ${tab === t.id ? "is-active" : ""}`}>
               <Icon size={13} />{t.label}
             </button>
           );

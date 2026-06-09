@@ -316,6 +316,7 @@ const hasOptionValue = (options, value) => options.some((option) => option.value
 export default function PlanPartoForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const expedientePath = `/pacientes/${id}?tab=plan`;
   const toast = useGlobalToast();
   const [form, setForm] = useState(INIT);
   const [paciente, setPaciente] = useState(null);
@@ -378,7 +379,7 @@ export default function PlanPartoForm() {
         normalizePayload(payload)
       );
       toast(existingPlan ? "Plan de parto actualizado" : "Plan de parto guardado", "success");
-      setTimeout(() => navigate(`/pacientes/${id}`), 600);
+      setTimeout(() => navigate(expedientePath), 600);
     } catch (err) {
       toast(err.response?.data?.error || "Error al guardar plan de parto", "error");
     } finally {
@@ -389,7 +390,7 @@ export default function PlanPartoForm() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.5rem" }}>
-        <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}`)}>
+        <button className="btn-secondary" onClick={() => navigate(expedientePath)}>
           <ChevronLeft size={15} /> Volver
         </button>
         <div>
@@ -521,7 +522,7 @@ export default function PlanPartoForm() {
           </div>
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.8rem", marginTop: "1.25rem" }}>
-            <button type="button" className="btn-secondary" onClick={() => navigate(`/pacientes/${id}`)}>
+            <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>
               Cancelar
             </button>
             <button className="btn-primary" disabled={loading}>

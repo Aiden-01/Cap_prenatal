@@ -62,6 +62,7 @@ function Toggle({ label, name, form, set }) {
 export default function PuerperioForm() {
   const { id, puerperioId } = useParams();
   const navigate = useNavigate();
+  const expedientePath = `/pacientes/${id}?tab=puerperio`;
   const toast = useGlobalToast();
   const [form, setForm] = useState(initialPuerperioForm);
   const [loading, setLoading] = useState(false);
@@ -89,7 +90,7 @@ export default function PuerperioForm() {
       if (editando) await api.put(`/pacientes/${id}/controles/puerperio/${puerperioId}`, form);
       else await api.post(`/pacientes/${id}/controles/puerperio`, form);
       toast(editando ? "Puerperio actualizado" : "Puerperio registrado", "success");
-      navigate(`/pacientes/${id}`);
+      navigate(expedientePath);
     } catch (err) {
       toast(err.response?.data?.error || "Error al guardar puerperio", "error");
     } finally {
@@ -100,7 +101,7 @@ export default function PuerperioForm() {
   return (
     <div>
       <div style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1.5rem" }}>
-        <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}`)}><ChevronLeft size={15} /> Volver</button>
+        <button className="btn-secondary" onClick={() => navigate(expedientePath)}><ChevronLeft size={15} /> Volver</button>
         <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>{editando ? "Editar Puerperio" : "Registrar Puerperio"}</h1>
       </div>
       <form className="card" onSubmit={submit}>

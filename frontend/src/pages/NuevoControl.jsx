@@ -139,6 +139,7 @@ const TABS = [
 export default function NuevoControl() {
   const { id, controlId } = useParams();
   const navigate = useNavigate();
+  const expedientePath = `/pacientes/${id}?tab=controles`;
   const toast    = useGlobalToast();
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -215,7 +216,7 @@ export default function NuevoControl() {
         await api.post(`/pacientes/${id}/controles`, payload);
       }
       toast(editando ? "Control actualizado exitosamente" : "Control registrado exitosamente", "success");
-      setTimeout(() => navigate(`/pacientes/${id}`), 800);
+      setTimeout(() => navigate(expedientePath), 800);
     } catch (err) {
       toast(err.response?.data?.error || "Error al guardar", "error");
     } finally { setLoading(false); }
@@ -225,7 +226,7 @@ export default function NuevoControl() {
     <div>
       {/* HEADER */}
       <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.75rem" }}>
-        <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}`)}>
+        <button className="btn-secondary" onClick={() => navigate(expedientePath)}>
           <ChevronLeft size={15} /> Volver
         </button>
         <div>
@@ -557,7 +558,7 @@ export default function NuevoControl() {
 
         {/* BOTONES */}
         <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end", marginTop: "1.5rem" }}>
-          <button type="button" className="btn-secondary" onClick={() => navigate(`/pacientes/${id}`)}>
+          <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>
             Cancelar
           </button>
           <button type="submit" className="btn-primary" disabled={loading}
