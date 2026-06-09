@@ -2,29 +2,36 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Users, ClipboardList, AlertTriangle,
-  Baby, CalendarClock, Phone
+  Baby, Phone
 } from "lucide-react";
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
 
-// ─── STAT CARD ───────────────────────────────────────────────
 const COLOR_VARIANTS = {
-  primary: { icon: "var(--primary)", bg: "var(--primary-lt)" },
-  accent:  { icon: "var(--accent)",  bg: "var(--accent-lt)"  },
-  danger:  { icon: "var(--danger)",  bg: "var(--danger-lt)"  },
-  warn:    { icon: "var(--warn)",    bg: "var(--warn-lt)"    },
+  primary: "var(--primary)",
+  accent: "var(--accent)",
+  danger: "var(--danger)",
+  warn: "var(--warn)",
+  muted: "var(--text-muted)",
 };
 
+const MS_DAY = 86400000;
+
 function StatCard({ label, value, variant = "primary", Icon, onClick, sublabel }) {
-  const { icon, bg } = COLOR_VARIANTS[variant];
+  const isEmpty = Number(value ?? 0) === 0;
+  const icon = COLOR_VARIANTS[isEmpty ? "muted" : variant];
+
   return (
     <div
       className="card"
       onClick={onClick}
       style={{
-        display: "flex", alignItems: "center", gap: "1.25rem",
+        display: "flex",
+        alignItems: "center",
+        gap: "1.25rem",
         cursor: onClick ? "pointer" : "default",
         transition: "transform 0.15s, box-shadow 0.15s",
+        minWidth: 0,
       }}
       onMouseEnter={(e) => {
         if (onClick) {
@@ -40,42 +47,70 @@ function StatCard({ label, value, variant = "primary", Icon, onClick, sublabel }
       }}
     >
       <div style={{
-        width: 52, height: 52, borderRadius: 10,
-        background: bg, display: "grid", placeItems: "center", flexShrink: 0,
+        width: 52,
+        height: 52,
+        borderRadius: 10,
+        background: "var(--surface2)",
+        border: "1px solid var(--border)",
+        display: "grid",
+        placeItems: "center",
+        flexShrink: 0,
       }}>
         <Icon size={22} style={{ color: icon }} />
       </div>
-      <div>
+      <div style={{ minWidth: 0 }}>
         <div style={{
-          fontSize: "1.75rem", fontFamily: "Syne, sans-serif",
-          fontWeight: 800, color: "var(--text)", lineHeight: 1,
+          fontSize: "1.75rem",
+          fontFamily: "Syne, sans-serif",
+          fontWeight: 800,
+          color: "var(--text)",
+          lineHeight: 1,
         }}>
           {value ?? "—"}
         </div>
         <div style={{ color: "var(--text-muted)", fontSize: "0.82rem", marginTop: 4 }}>
           {label}
         </div>
-        {sublabel && (
-          <div style={{ fontSize: "0.72rem", color: icon, fontWeight: 600, marginTop: 2 }}>
-            {sublabel}
-          </div>
-        )}
+        <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 600, marginTop: 2 }}>
+          {sublabel}
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── BADGE DÍAS RESTANTES ────────────────────────────────────
+function PatientName({ children }) {
+  return (
+    <span
+      title={children || ""}
+      style={{
+        display: "block",
+        maxWidth: 220,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        fontWeight: 500,
+      }}>
+      {children}
+    </span>
+  );
+}
+
 function BadgeDias({ dias }) {
   const urgente = dias <= 7;
   const proximo = dias <= 14;
-  const bg    = urgente ? "var(--danger-lt)"  : proximo ? "var(--warn-lt)"  : "var(--primary-lt)";
-  const color = urgente ? "var(--danger)"     : proximo ? "var(--warn)"     : "var(--primary)";
+  const bg = urgente ? "var(--danger-lt)" : proximo ? "var(--warn-lt)" : "var(--primary-lt)";
+  const color = urgente ? "var(--danger)" : proximo ? "var(--warn)" : "var(--primary)";
   const texto = dias === 0 ? "Hoy" : dias === 1 ? "Mañana" : `${dias} días`;
+
   return (
     <span style={{
-      padding: "0.2rem 0.6rem", borderRadius: 20,
-      background: bg, color, fontSize: "0.75rem", fontWeight: 700,
+      padding: "0.2rem 0.6rem",
+      borderRadius: 20,
+      background: bg,
+      color,
+      fontSize: "0.75rem",
+      fontWeight: 700,
       whiteSpace: "nowrap",
     }}>
       {texto}
@@ -83,14 +118,45 @@ function BadgeDias({ dias }) {
   );
 }
 
-// ─── WRAPPER DE SECCIÓN ──────────────────────────────────────
+function getFppInfo(fppValue) {
+  if (!fppValue) {
+    return { label: "—", color: "var(--text-muted)", title: "Fecha probable de parto: sin dato" };
+  }
+
+  const fpp = new Date(fppValue);
+  const daysRemaining = Math.ceil((fpp.getTime() - Date.now()) / MS_DAY);
+  const weeksRemaining = Math.max(0, Math.ceil(daysRemaining / 7));
+
+  return {
+    label: fpp.toLocaleDateString("es-GT"),
+    color: weeksRemaining < 4
+      ? "var(--danger)"
+      : weeksRemaining < 8
+        ? "var(--warn)"
+        : "var(--text)",
+    title: `${weeksRemaining} semanas para la fecha probable de parto`,
+  };
+}
+
+function FppText({ value }) {
+  const fpp = getFppInfo(value);
+  return (
+    <span title={fpp.title} style={{ color: fpp.color, fontWeight: 600, fontSize: "0.85rem" }}>
+      {fpp.label}
+    </span>
+  );
+}
+
 function SeccionTabla({ titulo, badge, badgeVariant = "blue", vacia, children }) {
   return (
     <div className="card" style={{ padding: 0, overflow: "hidden" }}>
       <div style={{
         padding: "1rem 1.25rem",
-        display: "flex", justifyContent: "space-between",
-        alignItems: "center", flexWrap: "wrap", gap: "0.5rem",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: "0.5rem",
         borderBottom: "1px solid var(--border)",
       }}>
         <h2 style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--text)", margin: 0 }}>
@@ -109,7 +175,6 @@ function SeccionTabla({ titulo, badge, badgeVariant = "blue", vacia, children })
   );
 }
 
-// ─── COMPONENTE PRINCIPAL ────────────────────────────────────
 export default function Dashboard() {
   const [stats,          setStats]          = useState(null);
   const [proximasParir,  setProximasParir]  = useState([]);
@@ -119,7 +184,8 @@ export default function Dashboard() {
   const [tabActiva,      setTabActiva]      = useState("citas");
 
   const { usuario } = useAuth();
-  const navigate    = useNavigate();
+  const navigate = useNavigate();
+  const mesActual = new Date().toLocaleDateString("es-GT", { month: "long" });
 
   useEffect(() => {
     api.get("/reportes/estadisticas")
@@ -163,8 +229,6 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: "grid", gap: "1.5rem" }}>
-
-      {/* HEADER */}
       <div>
         <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--text)" }}>
           Inicio
@@ -178,46 +242,44 @@ export default function Dashboard() {
         <p style={{ color: "var(--text-muted)" }}>Cargando estadísticas...</p>
       ) : (
         <>
-          {/* STAT CARDS */}
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
             gap: "1rem",
           }}>
             <StatCard
               label="Total de pacientes"
               value={stats?.total_pacientes}
-              variant="primary" Icon={Users}
+              variant="primary"
+              Icon={Users}
+              sublabel="embarazos activos registrados"
               onClick={() => navigate("/pacientes")}
             />
             <StatCard
               label="Controles este mes"
               value={stats?.controles_este_mes}
-              variant="accent" Icon={ClipboardList}
+              variant="accent"
+              Icon={ClipboardList}
+              sublabel={`controles registrados en ${mesActual}`}
             />
             <StatCard
               label="Pacientes con riesgo"
               value={stats?.pacientes_con_riesgo}
-              variant="danger" Icon={AlertTriangle}
+              variant="danger"
+              Icon={AlertTriangle}
+              sublabel="requieren seguimiento prioritario"
               onClick={() => { setTabActiva("sincontrol"); }}
             />
             <StatCard
               label="Próximas al Parto"
               value={stats?.proximas_a_parir_count ?? proximasParir.length}
-              variant="warn" Icon={Baby}
+              variant="warn"
+              Icon={Baby}
               sublabel="en los próximos 30 días"
               onClick={() => setTabActiva("parto")}
             />
-            <StatCard
-              label="Sin control reciente"
-              value={stats?.sin_control_count ?? sinControl.length}
-              variant="warn" Icon={CalendarClock}
-              sublabel="más de 4 semanas"
-              onClick={() => setTabActiva("sincontrol")}
-            />
           </div>
 
-          {/* TABS */}
           <div>
             <div className="content-tabs">
               {TABS.map((t) => (
@@ -225,15 +287,17 @@ export default function Dashboard() {
                   {t.label}
                   {t.alert && (
                     <span style={{
-                      width: 7, height: 7, borderRadius: "50%",
-                      background: "var(--danger)", flexShrink: 0,
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: "var(--danger)",
+                      flexShrink: 0,
                     }} />
                   )}
                 </button>
               ))}
             </div>
 
-            {/* TAB: CITAS 7 DÍAS */}
             {tabActiva === "citas" && (
               <SeccionTabla
                 titulo="Citas en los próximos 7 días"
@@ -256,7 +320,7 @@ export default function Dashboard() {
                     {stats?.proximas_citas?.map((c, i) => (
                       <tr key={i} style={{ cursor: "pointer" }}
                         onClick={() => navigate(`/pacientes/${c.id}`)}>
-                        <td style={{ fontWeight: 500 }}>{c.nombre}</td>
+                        <td><PatientName>{c.nombre}</PatientName></td>
                         <td><span className="badge badge-blue">{c.no_expediente}</span></td>
                         <td><span className="badge badge-blue">Control {c.numero_control}</span></td>
                         <td>{fmtFecha(c.cita_siguiente)}</td>
@@ -267,10 +331,9 @@ export default function Dashboard() {
               </SeccionTabla>
             )}
 
-            {/* TAB: PRÓXIMAS AL PARTO */}
             {tabActiva === "parto" && (
               <SeccionTabla
-                titulo="Próximas al Parto — 30 días"
+                titulo="Próximas al Parto - 30 días"
                 badge={`${proximasParir.length} paciente${proximasParir.length !== 1 ? "s" : ""}`}
                 badgeVariant={proximasParir.some((p) => p.dias_restantes <= 7) ? "red" : "yellow"}
                 vacia={
@@ -296,11 +359,9 @@ export default function Dashboard() {
                     {proximasParir.map((p) => (
                       <tr key={p.id} style={{ cursor: "pointer" }}
                         onClick={() => navigate(`/pacientes/${p.id}`)}>
-                        <td style={{ fontWeight: 500 }}>{p.nombre}</td>
+                        <td><PatientName>{p.nombre}</PatientName></td>
                         <td><span className="badge badge-blue">{p.no_expediente}</span></td>
-                        <td style={{ fontWeight: 600, color: "var(--accent)" }}>
-                          {fmtFecha(p.fpp)}
-                        </td>
+                        <td><FppText value={p.fpp} /></td>
                         <td><BadgeDias dias={p.dias_restantes} /></td>
                         <td style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
                           {p.ultimo_control
@@ -319,7 +380,7 @@ export default function Dashboard() {
                         </td>
                         <td>
                           {p.tiene_riesgo
-                            ? <span className="badge badge-red">⚠ Riesgo</span>
+                            ? <span className="badge badge-red">Riesgo</span>
                             : <span className="badge badge-green">OK</span>}
                         </td>
                       </tr>
@@ -329,7 +390,6 @@ export default function Dashboard() {
               </SeccionTabla>
             )}
 
-            {/* TAB: SIN CONTROL RECIENTE */}
             {tabActiva === "sincontrol" && (
               <SeccionTabla
                 titulo="Sin control en las últimas 4 semanas"
@@ -337,7 +397,7 @@ export default function Dashboard() {
                 badgeVariant={sinControl.length > 0 ? "red" : "green"}
                 vacia={
                   loadingAlertas ? "Cargando..."
-                  : !sinControl.length ? "Todas las pacientes tienen controles recientes. ✓"
+                  : !sinControl.length ? "Todas las pacientes tienen controles recientes."
                   : null
                 }
               >
@@ -358,7 +418,7 @@ export default function Dashboard() {
                     {sinControl.map((p) => (
                       <tr key={p.id} style={{ cursor: "pointer" }}
                         onClick={() => navigate(`/pacientes/${p.id}`)}>
-                        <td style={{ fontWeight: 500 }}>{p.nombre}</td>
+                        <td><PatientName>{p.nombre}</PatientName></td>
                         <td><span className="badge badge-blue">{p.no_expediente}</span></td>
                         <td style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
                           {p.ultimo_control_fecha
@@ -367,8 +427,10 @@ export default function Dashboard() {
                         </td>
                         <td>
                           <span style={{
-                            padding: "0.2rem 0.6rem", borderRadius: 20,
-                            fontSize: "0.75rem", fontWeight: 700,
+                            padding: "0.2rem 0.6rem",
+                            borderRadius: 20,
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
                             background: !p.dias_sin_control || p.dias_sin_control > 56
                               ? "var(--danger-lt)" : "var(--warn-lt)",
                             color: !p.dias_sin_control || p.dias_sin_control > 56
@@ -377,9 +439,7 @@ export default function Dashboard() {
                             {p.dias_sin_control ? `${p.dias_sin_control} días` : "Sin controles"}
                           </span>
                         </td>
-                        <td style={{ color: "var(--accent)", fontWeight: 600, fontSize: "0.85rem" }}>
-                          {fmtFecha(p.fpp)}
-                        </td>
+                        <td><FppText value={p.fpp} /></td>
                         <td style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
                           {p.comunidad || "—"}
                         </td>
@@ -392,8 +452,8 @@ export default function Dashboard() {
                         </td>
                         <td>
                           {p.tiene_riesgo
-                            ? <span className="badge badge-red">⚠ Riesgo</span>
-                            : <span className="badge badge-green">OK</span>}
+                            ? <span className="badge badge-red">Riesgo</span>
+                            : <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>—</span>}
                         </td>
                       </tr>
                     ))}
