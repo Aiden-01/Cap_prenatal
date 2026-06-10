@@ -120,18 +120,11 @@ export default function Pacientes() {
   const fin = Math.min(pagina * limite, total);
 
   return (
-    <div>
-      <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: "1.75rem",
-        flexWrap: "wrap",
-        gap: "0.75rem",
-      }}>
+    <div className="patients-page">
+      <div className="patients-header">
         <div>
-          <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--text)" }}>Pacientes</h1>
-          <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 3 }}>
+          <h1>Pacientes</h1>
+          <p>
             {total} paciente{total !== 1 ? "s" : ""} registrada{total !== 1 ? "s" : ""}
           </p>
         </div>
@@ -143,18 +136,17 @@ export default function Pacientes() {
         </button>
       </div>
 
-      <div className="card" style={{ marginBottom: "1.25rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+      <div className="card patients-search-card">
         <Search size={16} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
         <input
           className="input-field"
           placeholder="Buscar por nombre, apellido, No. expediente o CUI..."
           value={buscar}
           onChange={(e) => { setBuscar(e.target.value); setPagina(1); }}
-          style={{ maxWidth: 420, margin: 0 }}
         />
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+      <div className="card patients-table-card">
         {loading ? (
           <div style={{ padding: "2.5rem", textAlign: "center", color: "var(--text-muted)" }}>Cargando...</div>
         ) : pacientes.length === 0 ? (
@@ -234,21 +226,8 @@ export default function Pacientes() {
                         <tr onClick={(e) => e.stopPropagation()}>
                           <td
                             colSpan={6}
-                            style={{
-                              background: "var(--card)",
-                              borderTop: "1px solid var(--border)",
-                              cursor: "default",
-                              padding: "0.9rem 1rem",
-                            }}>
-                            <div style={{
-                              display: "grid",
-                              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                              gap: "0.9rem",
-                              background: "var(--surface2)",
-                              border: "1px solid var(--border)",
-                              borderRadius: 8,
-                              padding: "0.9rem 1rem",
-                            }}>
+                            className="patients-expanded-cell">
+                            <div className="patients-detail-grid">
                               <div>
                                 <span style={detailLabelStyle}>Municipio</span>
                                 <strong style={{ color: "var(--text)", fontSize: "0.88rem" }}>{p.municipio || "—"}</strong>
@@ -274,19 +253,11 @@ export default function Pacientes() {
         )}
 
         {total > 0 && (
-          <div style={{
-            padding: "1rem",
-            display: "flex",
-            gap: "0.75rem",
-            justifyContent: "space-between",
-            borderTop: "1px solid var(--border)",
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}>
+          <div className="patients-footer">
             <span style={{ fontSize: "0.83rem", color: "var(--text-muted)" }}>
               Mostrando {inicio}-{fin} de {total} pacientes
             </span>
-            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+            <div className="patients-footer-actions">
               <select
                 className="input-field"
                 value={limite}

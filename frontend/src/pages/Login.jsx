@@ -35,33 +35,22 @@ export default function Login() {
   ];
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", background: "var(--bg)" }}>
+    <div className="login-page">
 
       {/* ── Panel izquierdo (oculto en móvil) ── */}
       <div className="login-panel-left">
-        {/* Círculos decorativos */}
-        <div style={{ position: "absolute", width: 400, height: 400, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.06)", top: -100, left: -100 }} />
-        <div style={{ position: "absolute", width: 300, height: 300, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.06)", bottom: -50, right: -50 }} />
-        <div style={{ position: "absolute", width: 200, height: 200, borderRadius: "50%", background: "rgba(37,111,143,0.18)", top: "40%", left: "10%" }} />
-
-        <div style={{ position: "relative", textAlign: "center" }}>
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
-            <Heart size={52} color="var(--primary)" fill="var(--primary)" />
+        <div className="login-brand">
+          <div className="login-brand-mark">
+            <Heart size={26} fill="currentColor" />
           </div>
-          <h1 style={{ fontFamily: "Syne", color: "#fff", fontSize: "2rem", fontWeight: 800, lineHeight: 1.2 }}>
-            CAP El Chal
-          </h1>
-          <p style={{ color: "rgba(255,255,255,0.5)", marginTop: "0.75rem", fontSize: "1rem", maxWidth: 280, lineHeight: 1.6 }}>
+          <h1>CAP El Chal</h1>
+          <p>
             Sistema de Gestión de Expedientes Clínicos de Atención Prenatal
           </p>
-          <div style={{ marginTop: "2.5rem", display: "flex", flexDirection: "column", gap: "0.75rem", textAlign: "left" }}>
+          <div className="login-feature-list">
             {features.map((item) => (
-              <div key={item} style={{ display: "flex", alignItems: "center", gap: "0.75rem", color: "rgba(255,255,255,0.65)", fontSize: "0.88rem" }}>
-                <span style={{
-                  width: 20, height: 20, borderRadius: "50%",
-                  background: "var(--accent)", display: "grid",
-                  placeItems: "center", flexShrink: 0,
-                }}>
+              <div key={item} className="login-feature">
+                <span>
                   <Check size={11} color="#fff" strokeWidth={3} />
                 </span>
                 {item}
@@ -78,16 +67,14 @@ export default function Login() {
         <div className="login-mobile-logo">
           <Heart size={32} color="var(--primary)" fill="var(--primary)" />
           <div>
-            <div style={{ fontFamily: "Syne", fontWeight: 800, fontSize: "1.1rem", color: "var(--text)" }}>CAP El Chal</div>
+            <div style={{ fontWeight: 800, fontSize: "1.1rem", color: "var(--text)" }}>CAP El Chal</div>
             <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Expedientes Prenatales</div>
           </div>
         </div>
 
-        <div style={{ marginBottom: "2.5rem" }}>
-          <h2 style={{ fontFamily: "Syne", fontSize: "1.6rem", fontWeight: 800, color: "var(--text)" }}>
-            Iniciar sesión
-          </h2>
-          <p style={{ color: "var(--text-muted)", marginTop: "0.4rem", fontSize: "0.9rem" }}>
+        <div className="login-form-title">
+          <h2>Iniciar sesión</h2>
+          <p>
             Ingresa tus credenciales para continuar
           </p>
         </div>
@@ -108,7 +95,7 @@ export default function Login() {
 
           <div className="form-group">
             <label className="input-label">Contraseña</label>
-            <div style={{ position: "relative" }}>
+            <div className="password-field">
               <input
                 className="input-field"
                 type={showPass ? "text" : "password"}
@@ -121,12 +108,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => setShowPass(!showPass)}
-                style={{
-                  position: "absolute", right: "0.75rem", top: "50%",
-                  transform: "translateY(-50%)", background: "none",
-                  border: "none", cursor: "pointer", color: "var(--text-muted)",
-                  display: "flex", alignItems: "center",
-                }}
+                className="password-toggle"
               >
                 {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -134,11 +116,7 @@ export default function Login() {
           </div>
 
           {error && (
-            <div style={{
-              background: "var(--danger-lt)", border: "1px solid var(--danger)",
-              borderRadius: 8, padding: "0.75rem 1rem",
-              color: "var(--danger)", fontSize: "0.875rem",
-            }}>
+            <div className="login-error">
               {error}
             </div>
           )}
@@ -153,7 +131,7 @@ export default function Login() {
           </button>
         </form>
 
-        <p style={{ marginTop: "2rem", color: "var(--text-muted)", fontSize: "0.78rem", textAlign: "center", lineHeight: 1.6 }}>
+        <p className="login-footnote">
           MINISTERIO DE SALUD PÚBLICA Y ASISTENCIA SOCIAL<br />
           Dirección Departamental de Redes Integradas de Servicios de Salud de Petén, Área Sur Oriente
         </p>

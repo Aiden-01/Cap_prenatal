@@ -41,7 +41,7 @@ export default function Layout() {
 
   return (
     <ToastContext.Provider value={toast}>
-      <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
+      <div className="app-shell" style={{ minHeight: "100vh" }}>
 
         {/* Botón hamburguesa — solo móvil */}
         {isMobile && (
@@ -71,6 +71,7 @@ export default function Layout() {
         />
 
         <main
+          className="app-main"
           style={{
             marginLeft: sidebarWidth,
             padding: isMobile ? "3.5rem 1rem 1.5rem" : "2rem",

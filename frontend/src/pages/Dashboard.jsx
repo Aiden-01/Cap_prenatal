@@ -23,19 +23,19 @@ function StatCard({ label, value, variant = "primary", Icon, onClick, sublabel }
 
   return (
     <div
-      className="card"
+      className="card stat-card"
       onClick={onClick}
       style={{
         display: "flex",
         alignItems: "center",
         gap: "1.25rem",
         cursor: onClick ? "pointer" : "default",
-        transition: "transform 0.15s, box-shadow 0.15s",
+        transition: "transform 0.15s, box-shadow 0.15s, border-color 0.15s",
         minWidth: 0,
       }}
       onMouseEnter={(e) => {
         if (onClick) {
-          e.currentTarget.style.transform = "translateY(-2px)";
+          e.currentTarget.style.transform = "translateY(-1px)";
           e.currentTarget.style.boxShadow = "var(--shadow-md)";
         }
       }}
@@ -47,11 +47,11 @@ function StatCard({ label, value, variant = "primary", Icon, onClick, sublabel }
       }}
     >
       <div style={{
-        width: 52,
-        height: 52,
-        borderRadius: 10,
-        background: "var(--surface2)",
-        border: "1px solid var(--border)",
+        width: 46,
+        height: 46,
+        borderRadius: 8,
+        background: isEmpty ? "var(--surface2)" : "var(--primary-lt)",
+        border: `1px solid ${isEmpty ? "var(--border)" : "color-mix(in srgb, var(--primary) 18%, var(--border))"}`,
         display: "grid",
         placeItems: "center",
         flexShrink: 0,
@@ -60,8 +60,8 @@ function StatCard({ label, value, variant = "primary", Icon, onClick, sublabel }
       </div>
       <div style={{ minWidth: 0 }}>
         <div style={{
-          fontSize: "1.75rem",
-          fontFamily: "Syne, sans-serif",
+          fontSize: "1.65rem",
+          fontFamily: "DM Sans, sans-serif",
           fontWeight: 800,
           color: "var(--text)",
           lineHeight: 1,
@@ -150,16 +150,8 @@ function FppText({ value }) {
 function SeccionTabla({ titulo, badge, badgeVariant = "blue", vacia, children }) {
   return (
     <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-      <div style={{
-        padding: "1rem 1.25rem",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: "0.5rem",
-        borderBottom: "1px solid var(--border)",
-      }}>
-        <h2 style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--text)", margin: 0 }}>
+      <div className="table-card-header">
+        <h2>
           {titulo}
         </h2>
         <span className={`badge badge-${badgeVariant}`}>{badge}</span>
@@ -228,25 +220,22 @@ export default function Dashboard() {
   ];
 
   return (
-    <div style={{ display: "grid", gap: "1.5rem" }}>
-      <div>
-        <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--text)" }}>
-          Inicio
-        </h1>
-        <p style={{ color: "var(--text-muted)", marginTop: 4, fontSize: "0.9rem" }}>
-          Bienvenido/a, {usuario?.nombre_completo}
-        </p>
+    <div className="dashboard-page">
+      <div className="dashboard-heading">
+        <div>
+          <h1>Inicio</h1>
+          <p>Bienvenido/a, {usuario?.nombre_completo}</p>
+        </div>
+        <span className="dashboard-date-chip">
+          Seguimiento de {mesActual}
+        </span>
       </div>
 
       {loading ? (
         <p style={{ color: "var(--text-muted)" }}>Cargando estadísticas...</p>
       ) : (
         <>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "1rem",
-          }}>
+          <div className="stat-grid">
             <StatCard
               label="Total de pacientes"
               value={stats?.total_pacientes}

@@ -138,14 +138,14 @@ export default function Usuarios() {
         onCancelar={() => setAEliminar(null)}
       />
 
-      <div>
+      <div className="record-page">
         <div className="page-header">
           <ShieldCheck size={26} color="var(--primary)" />
           <div>
-            <h1 style={{ fontSize: "1.5rem", fontWeight: 800, lineHeight: 1 }}>
+            <h1>
               Gestion de Usuarios
             </h1>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.82rem", marginTop: 3 }}>
+            <p>
               Administra el acceso al sistema
             </p>
           </div>
@@ -266,9 +266,9 @@ export default function Usuarios() {
 
           {/* ── Formulario nuevo usuario ── */}
           <div className="card">
-            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
+            <div className="record-panel-header">
               <UserPlus size={18} color="var(--primary)" />
-              <h3 style={{ fontFamily: "Syne", fontSize: "1rem", fontWeight: 700 }}>
+              <h3>
                 Nuevo usuario
               </h3>
             </div>

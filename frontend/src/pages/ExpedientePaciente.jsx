@@ -11,11 +11,11 @@ import {
 function Row({ label, value }) {
   if (value === null || value === undefined || value === "") return null;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>
+    <div className="field-readonly">
+      <span className="field-readonly-label">
         {label}
       </span>
-      <span style={{ fontSize: "0.88rem", color: "var(--text)" }}>{String(value)}</span>
+      <span className="field-readonly-value">{String(value)}</span>
     </div>
   );
 }
@@ -23,27 +23,18 @@ function Row({ label, value }) {
 function SiNo({ label, value }) {
   if (value === undefined || value === null) return null;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-      <div style={{
-        width: 15, height: 15, borderRadius: 4,
-        background: value ? "var(--accent)" : "var(--border)",
-        display: "grid", placeItems: "center", flexShrink: 0,
-      }}>
-        {value && <span style={{ color: "#fff", fontSize: "0.58rem", fontWeight: 800 }}>✓</span>}
+    <div className={`boolean-field ${value ? "is-on" : ""}`}>
+      <div className="boolean-check">
+        {value && <span>✓</span>}
       </div>
-      <span style={{ fontSize: "0.82rem", color: value ? "var(--text)" : "var(--text-muted)" }}>{label}</span>
+      <span className="boolean-label">{label}</span>
     </div>
   );
 }
 
-function SecTitle({ children }) {
+function SecTitle({ children, style }) {
   return (
-    <div style={{
-      fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.09em",
-      textTransform: "uppercase", color: "var(--primary)",
-      borderBottom: "1.5px solid var(--primary-lt)",
-      paddingBottom: "0.35rem", marginBottom: "0.85rem",
-    }}>
+    <div className="section-title" style={style}>
       {children}
     </div>
   );
@@ -51,7 +42,7 @@ function SecTitle({ children }) {
 
 function Grid({ cols = 3, children }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: "0.9rem" }}>
+    <div className="readonly-grid" style={{ "--cols": cols }}>
       {children}
     </div>
   );
@@ -59,7 +50,7 @@ function Grid({ cols = 3, children }) {
 
 function GridAuto({ children }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: "0.55rem" }}>
+    <div className="readonly-grid-auto">
       {children}
     </div>
   );
@@ -312,7 +303,7 @@ export default function ExpedientePaciente() {
   ];
 
   return (
-    <div>
+    <div className="record-page">
       {/* ── HEADER ── */}
       <div className="patient-hero">
         <button className="btn-secondary patient-hero-back" onClick={() => navigate("/pacientes")}>
@@ -377,13 +368,13 @@ export default function ExpedientePaciente() {
           TAB: DATOS GENERALES
       ══════════════════════════════════════════ */}
       {tab === "general" && (
-        <div style={{ display: "grid", gap: "1.25rem" }}>
+        <div className="clinical-card-list">
 
           <div className="card">
             <SecTitle>Historial de embarazos</SecTitle>
             <Grid cols={4}>
               {exp.embarazos?.map((emb) => (
-                <div key={emb.id} style={{ padding: "0.6rem", border: "1px solid var(--border)", borderRadius: 8 }}>
+                <div key={emb.id} className="mini-record-card">
                   <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", alignItems: "center" }}>
                     <strong>Embarazo {emb.numero_embarazo}</strong>
                     <span className={emb.estado === "activo" ? "badge badge-green" : "badge badge-blue"}>{emb.estado}</span>
@@ -540,7 +531,7 @@ export default function ExpedientePaciente() {
             </div>
           )}
           {exp.controles_prenatales?.length === 0 ? (
-            <div className="card" style={{ textAlign: "center", padding: "2.5rem", color: "var(--text-muted)" }}>
+            <div className="card empty-state">
               No hay controles registrados.
               {puedeRegistrarPrenatal && <div style={{ marginTop: "1rem" }}>
                 <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}>
@@ -635,7 +626,7 @@ export default function ExpedientePaciente() {
             </div>
           )}
           {exp.controles_puerperio?.length === 0 ? (
-            <div className="card" style={{ textAlign: "center", padding: "2.5rem", color: "var(--text-muted)" }}>
+            <div className="card empty-state">
               No hay atenciones de puerperio registradas.
             </div>
           ) : (
@@ -695,7 +686,7 @@ export default function ExpedientePaciente() {
             </button>
           </div>
           {exp.morbilidad?.length === 0 ? (
-            <div className="card" style={{ textAlign: "center", padding: "2.5rem", color: "var(--text-muted)" }}>
+            <div className="card empty-state">
               No hay consultas intercurrentes registradas.
             </div>
           ) : (
@@ -735,7 +726,7 @@ export default function ExpedientePaciente() {
       {tab === "riesgo" && (
         <div className="card">
           {!exp.ficha_riesgo ? (
-            <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
+            <div className="empty-state">
               No hay ficha de riesgo registrada.
               <div style={{ marginTop: "1rem" }}>
                 <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/riesgo`)}>
@@ -746,7 +737,7 @@ export default function ExpedientePaciente() {
           ) : (
             <>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                <h3 style={{ fontFamily: "Syne", fontSize: "1rem", fontWeight: 700 }}>Ficha de Riesgo Obstétrico</h3>
+                <h3>Ficha de Riesgo Obstétrico</h3>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
                   {exp.ficha_riesgo.tiene_riesgo
                     ? <span className="badge badge-red">⚠ PRESENTA RIESGO</span>
@@ -814,7 +805,7 @@ export default function ExpedientePaciente() {
       {tab === "plan" && (
         <div className="card">
           {!exp.plan_parto ? (
-            <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
+            <div className="empty-state">
               No hay plan de parto registrado.
               <div style={{ marginTop: "1rem" }}>
                 <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/plan-parto`)}>
@@ -825,7 +816,7 @@ export default function ExpedientePaciente() {
           ) : (
             <>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                <h3 style={{ fontFamily: "Syne", fontSize: "1rem", fontWeight: 700 }}>Plan de Parto</h3>
+                <h3>Plan de Parto</h3>
                 <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                   <button className="btn-secondary" onClick={imprimirPlanParto} disabled={printing}>
                     <Printer size={13} /> {printing ? "Generando..." : "Imprimir"}
@@ -930,7 +921,7 @@ export default function ExpedientePaciente() {
             </button>
           </div>
           {!exp.vacunas?.length ? (
-            <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
+            <div className="empty-state">
               No hay vacunas registradas.
             </div>
           ) : (
@@ -986,7 +977,7 @@ export default function ExpedientePaciente() {
             c.hematologia_realizada || c.glicemia_realizada || c.orina_realizada ||
             c.vih_realizado || c.vdrl_realizado || c.hepatitis_b_realizado
           ) ? (
-            <div className="card" style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>
+            <div className="card empty-state">
               No hay resultados de laboratorio registrados.
             </div>
           ) : (
