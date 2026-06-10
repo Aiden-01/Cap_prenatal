@@ -2,7 +2,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, UserPlus, BarChart3,
-  Settings, X, LogOut, Menu, Moon, Sun
+  Settings, X, LogOut, Menu, Moon, Sun, KeyRound
 } from "lucide-react";
 
 const NAV = [
@@ -30,7 +30,7 @@ function getInitialTheme(usuario) {
 
 export default function Sidebar({
   usuario, menuOpen, setMenuOpen, isMobile,
-  onLogout, collapsed, setCollapsed
+  onLogout, onChangePassword, collapsed, setCollapsed
 }) {
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -233,6 +233,29 @@ export default function Sidebar({
           >
             {dark ? <Sun size={18} /> : <Moon size={18} />}
             {!collapsed && (dark ? "Modo claro" : "Modo oscuro")}
+          </button>
+
+          <button
+            onClick={onChangePassword}
+            className="sidebar-footer-action sidebar-password-action"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: collapsed ? "center" : "flex-start",
+              gap: "0.6rem",
+              width: "100%",
+              padding: "0.6rem 0.75rem",
+              marginBottom: "0.4rem",
+              background: "transparent",
+              border: "none",
+              color: "rgba(255,255,255,0.72)",
+              cursor: "pointer",
+              borderRadius: 8,
+              fontSize: "0.9rem",
+            }}
+          >
+            <KeyRound size={18} />
+            {!collapsed && "Cambiar contraseña"}
           </button>
 
           {/* LOGOUT */}

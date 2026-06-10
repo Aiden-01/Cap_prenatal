@@ -128,7 +128,7 @@ export default function ChatbotWidget() {
               </span>
               <div>
                 <strong>Asistente del sistema</strong>
-                <span>Respuestas cerradas y verificables</span>
+                <span>Guía rápida para flujos prenatales</span>
               </div>
             </div>
             <button

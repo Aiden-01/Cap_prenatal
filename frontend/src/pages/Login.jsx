@@ -1,6 +1,20 @@
 ﻿import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heart, Check, Eye, EyeOff } from "lucide-react";
+import {
+  BarChart3,
+  CalendarDays,
+  Check,
+  ClipboardList,
+  Eye,
+  EyeOff,
+  HeartHandshake,
+  LockKeyhole,
+  LogIn,
+  ShieldCheck,
+  TestTube2,
+  UserRound,
+  Users,
+} from "lucide-react";
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
 
@@ -27,11 +41,31 @@ export default function Login() {
   };
 
   const features = [
-    "Registro de pacientes",
-    "Seguimiento prenatal",
-    "Ficha de riesgo obstétrico",
-    "Resultados de laboratorio",
-    "Reportes y estadísticas",
+    {
+      title: "Registro de pacientes",
+      text: "Gestiona la información clínica de forma segura y centralizada.",
+      icon: Users,
+    },
+    {
+      title: "Seguimiento prenatal",
+      text: "Controla citas, controles y evolución del embarazo.",
+      icon: CalendarDays,
+    },
+    {
+      title: "Ficha de riesgo obstétrico",
+      text: "Identifica y da seguimiento a factores de riesgo materno.",
+      icon: ShieldCheck,
+    },
+    {
+      title: "Resultados de laboratorio",
+      text: "Consulta e integra resultados de laboratorio clínico.",
+      icon: TestTube2,
+    },
+    {
+      title: "Reportes y estadísticas",
+      text: "Genera indicadores para la toma de decisiones.",
+      icon: BarChart3,
+    },
   ];
 
   return (
@@ -39,33 +73,97 @@ export default function Login() {
 
       {/* ── Panel izquierdo (oculto en móvil) ── */}
       <div className="login-panel-left">
+        <div className="login-stars" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
         <div className="login-brand">
-          <div className="login-brand-mark">
-            <Heart size={26} fill="currentColor" />
+          <div className="login-brand-row">
+            <div className="login-brand-mark">
+              <HeartHandshake size={38} />
+            </div>
+            <div>
+              <h1>CAP El Chal</h1>
+              <p>
+                Sistema de Gestión de Expedientes Clínicos de Atención Prenatal
+              </p>
+            </div>
           </div>
-          <h1>CAP El Chal</h1>
-          <p>
-            Sistema de Gestión de Expedientes Clínicos de Atención Prenatal
-          </p>
+          <div className="login-brand-rule" />
+
+          <div className="login-dashboard-mock" aria-hidden="true">
+            <div className="login-mock-rail">
+              <span className="is-active" />
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className="login-mock-body">
+              <div className="login-mock-top">
+                <i />
+                <i />
+                <i />
+              </div>
+              <div className="login-mock-stats">
+                <div>
+                  <small>Embarazadas activas</small>
+                  <strong>128</strong>
+                  <span />
+                </div>
+                <div>
+                  <small>Controles este mes</small>
+                  <strong>86</strong>
+                  <span />
+                </div>
+              </div>
+              <div className="login-mock-grid">
+                <div className="login-mock-list">
+                  <small>Próximas citas</small>
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <div className="login-mock-risk">
+                  <small>Riesgo obstétrico</small>
+                  <b>128</b>
+                  <span>Bajo · Moderado · Alto</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="login-feature-list">
-            {features.map((item) => (
-              <div key={item} className="login-feature">
+            {features.map(({ title, text, icon: Icon }) => (
+              <div key={title} className="login-feature">
                 <span>
-                  <Check size={11} color="#fff" strokeWidth={3} />
+                  <Icon size={18} />
                 </span>
-                {item}
+                <div>
+                  <strong>{title}</strong>
+                  <small>{text}</small>
+                </div>
               </div>
             ))}
+          </div>
+
+          <div className="login-security-note">
+            <ShieldCheck size={19} />
+            <div>
+              <strong>Datos seguros. Mejor atención.</strong>
+              <small>Comprometidos con la salud materna.</small>
+            </div>
           </div>
         </div>
       </div>
 
       {/* ── Panel derecho: formulario ── */}
       <div className="login-panel-right">
+        <div className="login-card">
 
         {/* Logo visible solo en móvil */}
         <div className="login-mobile-logo">
-          <Heart size={32} color="var(--primary)" fill="var(--primary)" />
+          <ClipboardList size={32} color="var(--primary)" />
           <div>
             <div style={{ fontWeight: 800, fontSize: "1.1rem", color: "var(--text)" }}>CAP El Chal</div>
             <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Expedientes Prenatales</div>
@@ -73,6 +171,9 @@ export default function Login() {
         </div>
 
         <div className="login-form-title">
+          <div className="login-lock-badge">
+            <LockKeyhole size={26} />
+          </div>
           <h2>Iniciar sesión</h2>
           <p>
             Ingresa tus credenciales para continuar
@@ -82,28 +183,31 @@ export default function Login() {
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           <div className="form-group">
             <label className="input-label">Usuario</label>
-            <input
-              className="input-field"
-              type="text"
-              placeholder="nombre de usuario"
-              value={form.username}
-              onChange={(e) => setForm({ ...form, username: e.target.value })}
-              required
-              autoFocus
-            />
+            <div className="login-icon-input">
+              <UserRound size={17} />
+              <input
+                className="input-field"
+                type="text"
+                placeholder="Ingresa tu usuario"
+                value={form.username}
+                onChange={(e) => setForm({ ...form, username: e.target.value })}
+                required
+                autoFocus
+              />
+            </div>
           </div>
 
           <div className="form-group">
             <label className="input-label">Contraseña</label>
-            <div className="password-field">
+            <div className="password-field login-icon-input">
+              <LockKeyhole size={17} />
               <input
                 className="input-field"
                 type={showPass ? "text" : "password"}
-                placeholder="••••••••"
+                placeholder="Ingresa tu contraseña"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 required
-                style={{ paddingRight: "2.5rem" }}
               />
               <button
                 type="button"
@@ -127,13 +231,21 @@ export default function Login() {
             disabled={loading}
             style={{ marginTop: "0.5rem", justifyContent: "center", padding: "0.8rem" }}
           >
-            {loading ? "Verificando..." : "Ingresar al sistema"}
+            {loading ? "Verificando..." : <><LogIn size={17} /> Ingresar al sistema</>}
           </button>
+
+          <div className="login-restricted">
+            <ShieldCheck size={15} />
+            <span>Acceso restringido · Solo personal autorizado</span>
+          </div>
         </form>
+        </div>
+
+        <div className="login-institutional-separator" />
 
         <p className="login-footnote">
-          MINISTERIO DE SALUD PÚBLICA Y ASISTENCIA SOCIAL<br />
-          Dirección Departamental de Redes Integradas de Servicios de Salud de Petén, Área Sur Oriente
+          <span>MINISTERIO DE SALUD PÚBLICA Y ASISTENCIA SOCIAL</span>
+          <small>Dirección Departamental de Salud de Petén · Área Sur Oriente</small>
         </p>
       </div>
     </div>

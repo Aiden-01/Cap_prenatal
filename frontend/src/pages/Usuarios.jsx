@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import {
   UserPlus, ShieldCheck, ShieldOff, ShieldAlert,
-  User, KeyRound, BadgeCheck, Loader2, CheckCircle2, Trash2
+  User, KeyRound, BadgeCheck, Loader2, CheckCircle2, Trash2, X
 } from "lucide-react";
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
@@ -71,6 +71,7 @@ export default function Usuarios() {
   const [loading, setLoading]           = useState(false);
   const [ultimoCreado, setUltimoCreado] = useState(null);
   const [aEliminar, setAEliminar]       = useState(null); // usuario seleccionado para eliminar
+  const [formOpen, setFormOpen]         = useState(false);
   const toast        = useGlobalToast();
   const { usuario: yo } = useAuth();
 
@@ -149,6 +150,14 @@ export default function Usuarios() {
               Administra el acceso al sistema
             </p>
           </div>
+          <button
+            type="button"
+            className="user-create-minimal"
+            onClick={() => setFormOpen(true)}
+          >
+            <UserPlus size={16} />
+            Nuevo usuario
+          </button>
         </div>
 
         <div
@@ -265,12 +274,30 @@ export default function Usuarios() {
           </div>
 
           {/* ── Formulario nuevo usuario ── */}
-          <div className="card">
-            <div className="record-panel-header">
-              <UserPlus size={18} color="var(--primary)" />
-              <h3>
-                Nuevo usuario
-              </h3>
+          {formOpen && (
+          <div className="user-create-drawer-shell">
+            <button
+              type="button"
+              className="user-create-drawer-backdrop"
+              onClick={() => !loading && setFormOpen(false)}
+              aria-label="Cerrar formulario"
+            />
+
+          <div className="card user-create-drawer">
+            <div className="record-panel-header user-create-drawer-header">
+              <span className="user-create-title">
+                <UserPlus size={18} color="var(--primary)" />
+                <span>Nuevo usuario</span>
+              </span>
+              <button
+                type="button"
+                className="password-modal-close"
+                onClick={() => !loading && setFormOpen(false)}
+                disabled={loading}
+                aria-label="Cerrar"
+              >
+                <X size={18} />
+              </button>
             </div>
 
             {ultimoCreado && (
@@ -350,6 +377,8 @@ export default function Usuarios() {
               </button>
             </form>
           </div>
+          </div>
+          )}
         </div>
       </div>
     </>

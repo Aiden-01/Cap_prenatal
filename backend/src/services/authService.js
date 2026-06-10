@@ -66,8 +66,39 @@ async function me(usuarioId) {
   return authRepository.obtenerUsuarioPorId(usuarioId);
 }
 
+async function changePassword({ usuarioId, currentPassword, newPassword, req }) {
+  const usuario = await authRepository.obtenerCredencialesPorId(usuarioId);
+  if (!usuario) throw new HttpError(404, 'Usuario no encontrado');
+  if (!usuario.activo) throw new HttpError(403, 'Usuario inactivo. Contacte al administrador.');
+
+  const passwordOk = await bcrypt.compare(currentPassword, usuario.password_hash);
+  if (!passwordOk) throw new HttpError(401, 'La contrasena actual no es correcta');
+
+  const samePassword = await bcrypt.compare(newPassword, usuario.password_hash);
+  if (samePassword) throw new HttpError(400, 'La nueva contrasena debe ser diferente a la actual');
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await authRepository.actualizarPassword({ id: usuarioId, passwordHash });
+
+  await registrarAuditoria(req, {
+    accion: 'actualizar',
+    tabla: 'usuarios',
+    registroId: usuarioId,
+    usuarioId,
+    datosNuevos: {
+      id: usuario.id,
+      username: usuario.username,
+      password_cambiado: true,
+    },
+    descripcion: 'Cambio de contrasena del usuario autenticado',
+  });
+
+  return { ok: true };
+}
+
 module.exports = {
   login,
   logout,
   me,
+  changePassword,
 };

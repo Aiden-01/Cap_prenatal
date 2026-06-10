@@ -74,4 +74,14 @@ const me = asyncHandler(async (req, res) => {
   return res.json(usuario || null);
 });
 
-module.exports = { login, logout, me };
+const changePassword = asyncHandler(async (req, res) => {
+  const result = await authService.changePassword({
+    usuarioId: req.usuario.id,
+    currentPassword: req.body.current_password,
+    newPassword: req.body.new_password,
+    req,
+  });
+  return res.json(result);
+});
+
+module.exports = { login, logout, me, changePassword };
