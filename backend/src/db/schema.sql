@@ -767,6 +767,79 @@ FROM comunidades c
 WHERE p.comunidad_id IS NULL
   AND TRIM(LOWER(p.comunidad)) = TRIM(LOWER(c.nombre));
 
+CREATE TABLE IF NOT EXISTS comunidades_aliases (
+  id SERIAL PRIMARY KEY,
+  comunidad_id INTEGER NOT NULL REFERENCES comunidades(id) ON DELETE CASCADE,
+  alias VARCHAR(150) NOT NULL,
+  UNIQUE (comunidad_id, alias)
+);
+
+WITH aliases(nombre, alias) AS (
+  VALUES
+    ('El Chal - Barrio El Paraiso', 'El Paraiso'),
+    ('El Chal - Barrio El Paraiso', 'Barrio El Paraiso'),
+    ('El Chal - Barrio El Paraiso', 'Paraiso'),
+    ('El Chal - Barrio El Milagro', 'El Milagro'),
+    ('El Chal - Barrio El Milagro', 'Barrio El Milagro'),
+    ('El Chal - Barrio San Jose', 'San Jose'),
+    ('El Chal - Barrio San Jose', 'Barrio San Jose'),
+    ('El Chal - Barrio San Carlos', 'San Carlos'),
+    ('El Chal - Barrio San Carlos', 'Barrio San Carlos'),
+    ('Nuevo Paraiso La Machaca', 'Nuevo Paraiso'),
+    ('Nuevo Paraiso La Machaca', 'La Machaca'),
+    ('Nuevo Paraiso La Machaca', 'Paraiso La Machaca'),
+    ('Cooperativa Las Flores', 'Las Flores'),
+    ('Cooperativa La Amistad', 'La Amistad'),
+    ('San Rafael Amatitlan', 'San Rafael'),
+    ('San Rafael Amatitlan', 'San Rafael Amatitlan'),
+    ('Union Bayer', 'Union Bayer'),
+    ('Finca Africa', 'Africa')
+)
+INSERT INTO comunidades_aliases (comunidad_id, alias)
+SELECT c.id, a.alias
+FROM aliases a
+JOIN comunidades c ON c.nombre = a.nombre
+ON CONFLICT (comunidad_id, alias) DO NOTHING;
+
+WITH alias_match AS (
+  SELECT DISTINCT ON (p.id)
+    p.id AS paciente_id,
+    ca.comunidad_id
+  FROM pacientes p
+  JOIN comunidades_aliases ca ON (
+    regexp_replace(
+      translate(LOWER(BTRIM(COALESCE(p.comunidad, ''))), 'áéíóúüñ', 'aeiouun'),
+      '[^a-z0-9]+',
+      '',
+      'g'
+    ) = regexp_replace(
+      translate(LOWER(BTRIM(ca.alias)), 'áéíóúüñ', 'aeiouun'),
+      '[^a-z0-9]+',
+      '',
+      'g'
+    )
+    OR regexp_replace(
+      translate(LOWER(BTRIM(COALESCE(p.comunidad, ''))), 'áéíóúüñ', 'aeiouun'),
+      '[^a-z0-9]+',
+      '',
+      'g'
+    ) LIKE '%' || regexp_replace(
+      translate(LOWER(BTRIM(ca.alias)), 'áéíóúüñ', 'aeiouun'),
+      '[^a-z0-9]+',
+      '',
+      'g'
+    ) || '%'
+  )
+  WHERE p.comunidad_id IS NULL
+    AND COALESCE(BTRIM(p.comunidad), '') <> ''
+  ORDER BY p.id, LENGTH(ca.alias) DESC
+)
+UPDATE pacientes p
+SET comunidad_id = alias_match.comunidad_id
+FROM alias_match
+WHERE p.id = alias_match.paciente_id
+  AND p.comunidad_id IS NULL;
+
 -- ============================================================
 -- ÍNDICES PARA PERFORMANCE
 -- ============================================================

@@ -8,6 +8,17 @@ router.use(authMiddleware);
 
 router.get('/riesgo', asyncHandler(async (_req, res) => {
   const { rows } = await pool.query(`
+    WITH comunidades_base AS (
+      SELECT
+        c.*,
+        regexp_replace(
+          translate(LOWER(BTRIM(c.nombre)), 'áéíóúüñ', 'aeiouun'),
+          '[^a-z0-9]+',
+          '',
+          'g'
+        ) AS nombre_norm
+      FROM comunidades c
+    )
     SELECT
       c.id,
       c.nombre,
@@ -33,8 +44,40 @@ router.get('/riesgo', asyncHandler(async (_req, res) => {
         ),
         '[]'::json
       ) AS pacientes_riesgo
-    FROM comunidades c
-    LEFT JOIN pacientes p ON p.comunidad_id = c.id
+    FROM comunidades_base c
+    LEFT JOIN LATERAL (
+      SELECT DISTINCT p.*
+      FROM pacientes p
+      WHERE p.comunidad_id = c.id
+         OR (
+           p.comunidad_id IS NULL
+           AND COALESCE(BTRIM(p.comunidad), '') <> ''
+           AND (
+             regexp_replace(
+               translate(LOWER(BTRIM(p.comunidad)), 'áéíóúüñ', 'aeiouun'),
+               '[^a-z0-9]+',
+               '',
+               'g'
+             ) = c.nombre_norm
+             OR EXISTS (
+               SELECT 1
+               FROM comunidades_aliases ca
+               WHERE ca.comunidad_id = c.id
+                 AND regexp_replace(
+                   translate(LOWER(BTRIM(p.comunidad)), 'áéíóúüñ', 'aeiouun'),
+                   '[^a-z0-9]+',
+                   '',
+                   'g'
+                 ) LIKE '%' || regexp_replace(
+                   translate(LOWER(BTRIM(ca.alias)), 'áéíóúüñ', 'aeiouun'),
+                   '[^a-z0-9]+',
+                   '',
+                   'g'
+                 ) || '%'
+             )
+           )
+         )
+    ) p ON TRUE
     LEFT JOIN embarazos e ON e.paciente_id = p.id AND e.estado = 'activo'
     LEFT JOIN fichas_riesgo_obstetrico r ON r.embarazo_id = e.id
     GROUP BY c.id, c.nombre, c.territorio, c.sector, c.lat, c.lng

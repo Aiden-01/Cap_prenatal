@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import { MapContainer, Marker, TileLayer } from "react-leaflet";
 import L from "leaflet";
 import { AlertTriangle, Loader2, MapPin, X } from "lucide-react";
 import "leaflet/dist/leaflet.css";
@@ -164,7 +164,7 @@ export default function MapaRiesgo() {
           right: 0;
           width: min(360px, 100vw);
           height: 100vh;
-          z-index: 200;
+          z-index: 1200;
           display: flex;
           flex-direction: column;
           background: var(--card, var(--surface));
@@ -316,15 +316,7 @@ export default function MapaRiesgo() {
               eventHandlers={{
                 click: () => setSelected(comunidad),
               }}
-            >
-              <Popup>
-                <strong>{comunidad.nombre}</strong>
-                <br />
-                Territorio {comunidad.territorio} · Sector {comunidad.sector}
-                <br />
-                {comunidad.total_riesgo} embarazada{Number(comunidad.total_riesgo) === 1 ? "" : "s"} con riesgo
-              </Popup>
-            </Marker>
+            />
           ))}
         </MapContainer>
       </div>
