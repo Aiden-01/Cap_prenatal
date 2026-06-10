@@ -7,6 +7,7 @@ const authRoutes      = require('./routes/auth');
 const usuariosRoutes  = require('./routes/usuarios');
 const pacientesRoutes = require('./routes/pacientes');
 const reportesRoutes  = require('./routes/reportes');
+const mapaRoutes      = require('./routes/mapa');
 const chatbotRoutes   = require('./routes/chatbot');
 const ocrRoutes       = require('./routes/ocr');
 const { csrfMiddleware } = require('./middleware/auth');
@@ -58,6 +59,7 @@ app.use('/api/auth',      authRoutes);
 app.use('/api/usuarios',  usuariosRoutes);
 app.use('/api/pacientes', pacientesRoutes);   // incluye sub-rutas controles/riesgo/morbilidad/vacunas/referencias/pdf
 app.use('/api/reportes',  reportesRoutes);
+app.use('/api/mapa',      mapaRoutes);
 app.use('/api/chatbot',   chatbotRoutes);
 app.use('/api/ocr',       ocrRoutes);
 

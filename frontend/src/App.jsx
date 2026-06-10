@@ -13,6 +13,7 @@ import PuerperioForm from "./pages/PuerperioForm";
 import MorbilidadForm from "./pages/MorbilidadForm";
 import VacunaForm from "./pages/VacunaForm";
 import Reportes from "./pages/Reportes";
+import MapaRiesgo from "./pages/MapaRiesgo";
 import Usuarios from "./pages/Usuarios";
 
 function PrivateRoute({ children, adminOnly = false }) {
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="pacientes/:id/vacunas/:vacunaId/editar" element={<VacunaForm />} />
           <Route path="nuevo" element={<NuevaPaciente />} />
           <Route path="reportes" element={<Reportes />} />
+          <Route path="mapa-riesgo" element={<MapaRiesgo />} />
           <Route path="usuarios" element={<PrivateRoute adminOnly><Usuarios /></PrivateRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" />} />

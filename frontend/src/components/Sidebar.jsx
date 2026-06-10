@@ -2,7 +2,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, UserPlus, BarChart3,
-  Settings, X, LogOut, Menu, Moon, Sun, KeyRound
+  Settings, X, LogOut, Menu, Moon, Sun, KeyRound, MapPin
 } from "lucide-react";
 
 const NAV = [
@@ -10,10 +10,11 @@ const NAV = [
   { label: "Pacientes",  path: "/pacientes", icon: Users,           delay: 50 },
   { label: "Nueva",      path: "/nuevo",     icon: UserPlus,        delay: 100 },
   { label: "Reportes",   path: "/reportes",  icon: BarChart3,       delay: 150 },
+  { label: "Mapa de Riesgo", path: "/mapa-riesgo", icon: MapPin,    delay: 200 },
 ];
 
 const NAV_ADMIN = [
-  { label: "Usuarios", path: "/usuarios", icon: Settings, delay: 200 },
+  { label: "Usuarios", path: "/usuarios", icon: Settings, delay: 250 },
 ];
 
 // Color fijo del sidebar — no depende del tema, siempre oscuro
