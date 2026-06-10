@@ -13,7 +13,7 @@ async function obtenerControlConPaciente(id) {
 }
 
 async function obtenerFichaMspasData({ pacienteId, embarazoId }) {
-  const [pacienteRes, embarazoRes, controlesRes, puerperioRes, riesgoRes, planPartoRes] = await Promise.all([
+  const [pacienteRes, embarazoRes, controlesRes, puerperioRes, riesgoRes, planPartoRes, vacunasRes] = await Promise.all([
     pool.query('SELECT * FROM pacientes WHERE id = $1', [pacienteId]),
     pool.query('SELECT * FROM embarazos WHERE id = $1', [embarazoId]),
     pool.query(
@@ -32,6 +32,10 @@ async function obtenerFichaMspasData({ pacienteId, embarazoId }) {
       'SELECT * FROM planes_parto WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1',
       [embarazoId]
     ),
+    pool.query(
+      'SELECT * FROM vacunas_paciente WHERE embarazo_id = $1 ORDER BY tipo_vacuna, momento, numero_dosis',
+      [embarazoId]
+    ),
   ]);
 
   return {
@@ -41,6 +45,7 @@ async function obtenerFichaMspasData({ pacienteId, embarazoId }) {
     puerperio: puerperioRes.rows,
     riesgo: riesgoRes.rows[0] || null,
     planParto: planPartoRes.rows[0] || null,
+    vacunas: vacunasRes.rows,
   };
 }
 

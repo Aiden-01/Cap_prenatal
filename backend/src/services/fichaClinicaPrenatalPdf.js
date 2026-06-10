@@ -284,10 +284,10 @@ function drawVaccines(page, font, vacunas = [], c) {
   });
 
   const previoVacunas = vacunas
-    .filter((v) => v.momento === 'previo_embarazo')
+    .filter((v) => v.tipo_vacuna === 'td_tdap' && v.momento === 'previo_embarazo')
     .sort((a, b) => Number(a.numero_dosis || 1) - Number(b.numero_dosis || 1));
   if (previoVacunas[0]) {
-    drawTextBox(page, font, previoVacunas[0].numero_dosis, c.vaccineDates.previoDosis, 'vacunaPrevio:dosis');
+    drawTextBox(page, font, previoVacunas[previoVacunas.length - 1].numero_dosis, c.vaccineDates.previoDosis, 'vacunaPrevio:dosis');
     drawDate(page, font, previoVacunas[0].fecha_dosis, c.vaccineDates.previoFecha1, 'vacunaPrevio:fecha1');
   }
   if (previoVacunas[1]) {

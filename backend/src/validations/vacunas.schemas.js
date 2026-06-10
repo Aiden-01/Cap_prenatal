@@ -17,19 +17,29 @@ const momentoVacuna = z.string({ error: 'Campo requerido' })
     'Debe ser previo_embarazo, durante_embarazo o postparto_aborto'
   );
 
+const validateTdTdapDose = (data, ctx) => {
+  if (data.tipo_vacuna === 'td_tdap' && Number(data.numero_dosis ?? 1) > 3) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['numero_dosis'],
+      message: 'Td/Tdap permite maximo 3 dosis',
+    });
+  }
+};
+
 const vacunaSchema = z.object({
   tipo_vacuna: tipoVacuna,
   momento: momentoVacuna,
   numero_dosis: optionalInt(1, 10),
   fecha_dosis: optionalDate,
-}).passthrough();
+}).passthrough().superRefine(validateTdTdapDose);
 
 const vacunaUpdateSchema = z.object({
   tipo_vacuna: tipoVacuna,
   momento: momentoVacuna,
   numero_dosis: requiredInt(1, 10).optional(),
   fecha_dosis: optionalDate,
-}).passthrough();
+}).passthrough().superRefine(validateTdTdapDose);
 
 module.exports = {
   vacunaSchema,
