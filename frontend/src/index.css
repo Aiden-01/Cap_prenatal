@@ -489,10 +489,11 @@ h1, h2, h3, h4 {
 
 .content-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
   border-bottom: 1px solid var(--border);
   margin-bottom: 1.25rem;
-  overflow-x: auto;
+  overflow: visible;
 }
 
 .content-tab {

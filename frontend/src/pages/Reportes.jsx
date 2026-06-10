@@ -7,20 +7,26 @@ import {
   Loader2
 } from "lucide-react";
 import api from "../api/axios";
+import { getGuatemalaDateInputValue } from "../utils/guatemalaTime";
+
+const MODO_PRIMER_CONTROL = "primer_control";
+const MODO_GENERAL = "general";
+
+function getGuatemalaMonthStart() {
+  return `${getGuatemalaDateInputValue().slice(0, 8)}01`;
+}
+
+function formatDateGt(value) {
+  if (!value) return "—";
+  const dateOnly = String(value).split("T")[0];
+  return new Date(`${dateOnly}T00:00:00`).toLocaleDateString("es-GT");
+}
 
 export default function Reportes() {
-  const hoy = new Date();
-  const MODO_PRIMER_CONTROL = "primer_control";
-  const MODO_GENERAL = "general";
-
-  const [desde, setDesde] = useState(
-    new Date(hoy.getFullYear(), hoy.getMonth(), 1)
-      .toISOString()
-      .split("T")[0]
-  );
+  const [desde, setDesde] = useState(getGuatemalaMonthStart);
 
   const [hasta, setHasta] = useState(
-    hoy.toISOString().split("T")[0]
+    getGuatemalaDateInputValue
   );
 
   const [censo, setCenso] = useState(null);
@@ -37,7 +43,7 @@ export default function Reportes() {
     setModoCenso(modo);
 
     try {
-      if (new Date(desde) > new Date(hasta)) {
+      if (desde > hasta) {
         setError("La fecha 'Desde' no puede ser mayor que 'Hasta'.");
         return;
       }
@@ -109,7 +115,7 @@ export default function Reportes() {
     }
   };
 
-  const labelPeriodo = `${new Date(desde + "T00:00:00").toLocaleDateString("es-GT")} — ${new Date(hasta + "T00:00:00").toLocaleDateString("es-GT")}`;
+  const labelPeriodo = `${formatDateGt(desde)} — ${formatDateGt(hasta)}`;
   const esPrimerControl = modoCenso === MODO_PRIMER_CONTROL;
   const tituloCenso = esPrimerControl
     ? "Censo mensual de embarazadas"
@@ -292,8 +298,8 @@ export default function Reportes() {
                       <td>{p.nombre_completo}</td>
                       <td>{p.edad ?? "—"}</td>
                       <td>{p.grupo_etnico ?? "—"}</td>
-                      <td>{p.fur ? new Date(p.fur).toLocaleDateString("es-GT") : "—"}</td>
-                      <td>{(p.fecha_probable_parto || p.fpp) ? new Date(p.fecha_probable_parto || p.fpp).toLocaleDateString("es-GT") : "—"}</td>
+                      <td>{formatDateGt(p.fur)}</td>
+                      <td>{formatDateGt(p.fecha_probable_parto || p.fpp)}</td>
                       <td>{p.semanas_gestacion ?? "—"}</td>
                       <td>{p.no_embarazos ?? "—"}</td>
                       <td>{p.no_partos ?? "—"}</td>

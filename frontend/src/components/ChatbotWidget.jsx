@@ -9,26 +9,42 @@ import {
   X,
 } from "lucide-react";
 import api from "../api/axios";
+import { useAuth } from "../hooks/useAuth";
+
+const ASSISTANT_NAME = "Lia";
+const MIN_RESPONSE_DELAY_MS = 850;
 
 const QUICK_PROMPTS = [
-  "Como registrar una paciente?",
-  "Como agrego un control prenatal?",
-  "Como lleno ficha de riesgo?",
-  "Como registro laboratorios?",
+  "Quiero registrar una paciente",
+  "Necesito agregar un control prenatal",
+  "Ayúdame con ficha de riesgo",
+  "¿Cómo registro laboratorios?",
 ];
 
-const initialMessages = [
-  {
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getFirstName(usuario) {
+  const fullName = usuario?.nombre_completo || usuario?.username || "";
+  return fullName.trim().split(/\s+/)[0] || "";
+}
+
+function buildWelcomeMessage(firstName) {
+  const greeting = firstName ? `¡Hola, ${firstName}!` : "¡Hola!";
+  return {
     id: "welcome",
     from: "bot",
-    text: "Hola. Puedo guiarte paso a paso con pacientes, controles, FPP, riesgo, plan de parto, vacunas, laboratorios, puerperio, morbilidad, reportes y usuarios.",
+    text: `${greeting} Soy ${ASSISTANT_NAME}, tu asistente en el sistema del CAP El Chal 👋\nEstoy aquí para ayudarte con lo que necesites: registrar pacientes, agregar controles, revisar riesgos o resolver dudas del sistema.\n¿En qué te ayudo hoy?`,
     intent: "bienvenida",
-  },
-];
+  };
+}
 
 export default function ChatbotWidget() {
+  const { usuario } = useAuth();
+  const firstName = getFirstName(usuario);
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState(initialMessages);
+  const [messages, setMessages] = useState(() => [buildWelcomeMessage(firstName)]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState({});
@@ -50,6 +66,13 @@ export default function ChatbotWidget() {
     setOpen(true);
     setTimeout(() => inputRef.current?.focus(), 120);
   };
+
+  useEffect(() => {
+    setMessages((current) => {
+      if (current.length !== 1 || current[0]?.id !== "welcome") return current;
+      return [buildWelcomeMessage(firstName)];
+    });
+  }, [firstName]);
 
   useEffect(() => {
     if (!open) return;
@@ -74,7 +97,12 @@ export default function ChatbotWidget() {
     setLoading(true);
 
     try {
+      const startedAt = Date.now();
       const { data } = await api.post("/chatbot/mensaje", { mensaje: cleanText });
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < MIN_RESPONSE_DELAY_MS) {
+        await wait(MIN_RESPONSE_DELAY_MS - elapsed);
+      }
       const botMessage = {
         id: createMessageId("bot"),
         from: "bot",
@@ -127,8 +155,8 @@ export default function ChatbotWidget() {
                 <Bot size={18} />
               </span>
               <div>
-                <strong>Asistente del sistema</strong>
-                <span>Guía rápida para flujos prenatales</span>
+                <strong>{ASSISTANT_NAME}</strong>
+                <span>Tu asistente personal del CAP prenatal</span>
               </div>
             </div>
             <button
@@ -173,7 +201,7 @@ export default function ChatbotWidget() {
                   <i />
                   <i />
                 </span>
-                <span>Buscando respuesta segura...</span>
+                <span>Lia está escribiendo...</span>
               </div>
             )}
             <div ref={messagesEndRef} className="chatbot-scroll-anchor" />
@@ -188,12 +216,12 @@ export default function ChatbotWidget() {
           </div>
 
           <div className="chatbot-feedback">
-            <span>Esto te ayudo?</span>
+            <span>¿Te sirvió?</span>
             <button
               type="button"
               onClick={() => sendFeedback(true)}
               disabled={!lastBotMessage || feedbackSent[lastBotMessage.id]}
-              title="Si ayudo"
+              title="Sí ayudó"
             >
               <ThumbsUp size={15} />
             </button>
@@ -201,7 +229,7 @@ export default function ChatbotWidget() {
               type="button"
               onClick={() => sendFeedback(false)}
               disabled={!lastBotMessage || feedbackSent[lastBotMessage.id]}
-              title="No ayudo"
+              title="No ayudó"
             >
               <ThumbsDown size={15} />
             </button>
@@ -218,7 +246,7 @@ export default function ChatbotWidget() {
               ref={inputRef}
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Escribe tu duda..."
+              placeholder={`Escríbele a ${ASSISTANT_NAME}...`}
               aria-label="Mensaje para el asistente"
             />
             <button type="submit" disabled={loading || !input.trim()} title="Enviar">
