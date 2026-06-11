@@ -18,7 +18,7 @@ const QUICK_PROMPTS = [
   "Quiero registrar una paciente",
   "Necesito agregar un control prenatal",
   "Ayúdame con ficha de riesgo",
-  "¿Cómo registro laboratorios?",
+  "¿Cómo funciona el mapa de riesgo?",
 ];
 
 function wait(ms) {
