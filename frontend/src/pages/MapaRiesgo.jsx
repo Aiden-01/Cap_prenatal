@@ -12,6 +12,12 @@ import api from "../api/axios";
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl });
 
+const EL_CHAL_CENTER = [16.4870, -89.6820];
+const EL_CHAL_BOUNDS = [
+  [16.30, -89.94],
+  [16.70, -89.52],
+];
+
 function createCommunityIcon(totalRiesgo) {
   const hasRisk = Number(totalRiesgo) > 0;
   const background = hasRisk ? "#991b1b" : "rgba(100,116,139,0.72)";
@@ -298,8 +304,12 @@ export default function MapaRiesgo() {
         )}
 
         <MapContainer
-          center={[16.4870, -89.6820]}
+          center={EL_CHAL_CENTER}
           zoom={11}
+          minZoom={10}
+          maxZoom={19}
+          maxBounds={EL_CHAL_BOUNDS}
+          maxBoundsViscosity={1.0}
           scrollWheelZoom
           className="mapa-riesgo-map"
         >
