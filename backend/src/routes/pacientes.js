@@ -5,6 +5,7 @@ const {
   crear,
   actualizar,
   expedienteCompleto,
+  completitudExpediente,
   nuevoEmbarazo,
   pasarAPuerperio,
   cerrarEmbarazo,
@@ -37,6 +38,7 @@ router.post('/', validateBody(pacienteCreateSchema), crear);
 router.get('/:id', validateParams(pacienteRootIdParam), obtener);
 router.put('/:id', validateParams(pacienteRootIdParam), validateBody(pacienteUpdateSchema), actualizar);
 router.get('/:id/expediente', validateParams(pacienteRootIdParam), expedienteCompleto);
+router.get('/:id/completitud', validateParams(pacienteRootIdParam), completitudExpediente);
 router.post('/:id/embarazos', validateParams(pacienteRootIdParam), validateBody(embarazoBodySchema), nuevoEmbarazo);
 router.post('/:id/embarazo/puerperio', validateParams(pacienteRootIdParam), validateBody(embarazoBodySchema), pasarAPuerperio);
 router.post('/:id/embarazo/cerrar', validateParams(pacienteRootIdParam), validateBody(embarazoBodySchema), cerrarEmbarazo);

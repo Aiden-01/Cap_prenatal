@@ -337,6 +337,48 @@ async function expedienteCompleto(id) {
   return expediente;
 }
 
+async function obtenerCompletitudExpediente(pacienteId) {
+  const data = await pacientesRepository.obtenerCompletitudExpediente(pacienteId);
+  if (!data) throw new HttpError(404, 'No hay embarazo activo para calcular completitud');
+
+  const totalControles = Number(data.total_controles || 0);
+  const items = [
+    {
+      label: 'Ficha de riesgo',
+      completado: Boolean(data.tiene_ficha_riesgo),
+      ruta: `/pacientes/${pacienteId}?tab=riesgo`,
+    },
+    {
+      label: 'Controles prenatales',
+      completado: Boolean(data.tiene_controles),
+      detalle: `${totalControles} controles registrados`,
+      ruta: `/pacientes/${pacienteId}?tab=controles`,
+    },
+    {
+      label: 'Vacunas',
+      completado: Boolean(data.tiene_vacunas),
+      ruta: `/pacientes/${pacienteId}?tab=vacunas`,
+    },
+    {
+      label: 'Plan de parto',
+      completado: Boolean(data.tiene_plan_parto),
+      ruta: `/pacientes/${pacienteId}?tab=plan`,
+    },
+    {
+      label: 'Morbilidad',
+      completado: Boolean(data.tiene_morbilidad),
+      ruta: `/pacientes/${pacienteId}?tab=morbilidad`,
+    },
+  ];
+
+  const completados = items.filter((item) => item.completado).length;
+  return {
+    porcentaje: completados * 20,
+    embarazo_id: data.embarazo_id,
+    items,
+  };
+}
+
 async function nuevoEmbarazo({ id, body, req }) {
   const paciente = await pacientesRepository.obtenerPorId(id);
   if (!paciente) throw new HttpError(404, 'Paciente no encontrado');
@@ -455,6 +497,7 @@ module.exports = {
   crearPaciente,
   actualizarPaciente,
   expedienteCompleto,
+  obtenerCompletitudExpediente,
   nuevoEmbarazo,
   pasarAPuerperio,
   cerrarEmbarazo,

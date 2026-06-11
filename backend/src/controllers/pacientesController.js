@@ -36,6 +36,12 @@ const expedienteCompleto = asyncHandler(async (req, res) => {
   return res.json(expediente);
 });
 
+// GET /api/pacientes/:id/completitud
+const completitudExpediente = asyncHandler(async (req, res) => {
+  const completitud = await pacientesService.obtenerCompletitudExpediente(req.params.id);
+  return res.json(completitud);
+});
+
 // POST /api/pacientes/:id/embarazos
 const nuevoEmbarazo = asyncHandler(async (req, res) => {
   const embarazo = await pacientesService.nuevoEmbarazo({
@@ -75,6 +81,7 @@ module.exports = {
   crear,
   actualizar,
   expedienteCompleto,
+  completitudExpediente,
   nuevoEmbarazo,
   pasarAPuerperio,
   cerrarEmbarazo,

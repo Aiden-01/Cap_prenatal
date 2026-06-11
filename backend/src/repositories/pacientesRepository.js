@@ -213,6 +213,32 @@ async function obtenerExpedienteCompleto(pacienteId, embarazoId) {
   };
 }
 
+async function obtenerCompletitudExpediente(pacienteId) {
+  const { rows } = await pool.query(
+    `SELECT
+       e.id AS embarazo_id,
+       EXISTS(SELECT 1 FROM fichas_riesgo_obstetrico r WHERE r.embarazo_id = e.id)
+         AS tiene_ficha_riesgo,
+       EXISTS(SELECT 1 FROM controles_prenatales cp WHERE cp.embarazo_id = e.id)
+         AS tiene_controles,
+       (SELECT COUNT(*) FROM controles_prenatales cp WHERE cp.embarazo_id = e.id)
+         AS total_controles,
+       EXISTS(SELECT 1 FROM vacunas_paciente v WHERE v.embarazo_id = e.id)
+         AS tiene_vacunas,
+       EXISTS(SELECT 1 FROM planes_parto pp WHERE pp.embarazo_id = e.id)
+         AS tiene_plan_parto,
+       EXISTS(SELECT 1 FROM morbilidad_embarazo m WHERE m.embarazo_id = e.id)
+         AS tiene_morbilidad
+     FROM embarazos e
+     WHERE e.paciente_id = $1 AND e.estado = 'activo'
+     ORDER BY e.numero_embarazo DESC
+     LIMIT 1`,
+    [pacienteId]
+  );
+
+  return rows[0] || null;
+}
+
 async function cerrarEmbarazosEnSeguimiento(pacienteId, fechaCierre) {
   const { rows } = await pool.query(
     `UPDATE embarazos
@@ -325,6 +351,7 @@ module.exports = {
   obtenerEmbarazoVisibleId,
   crearEmbarazoDesdePaciente,
   obtenerExpedienteCompleto,
+  obtenerCompletitudExpediente,
   cerrarEmbarazosEnSeguimiento,
   obtenerSiguienteNumeroEmbarazo,
   insertarNuevoEmbarazo,

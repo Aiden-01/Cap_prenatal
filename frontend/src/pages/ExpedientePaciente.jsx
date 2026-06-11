@@ -2,6 +2,8 @@
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
+import SemaforoCompletitud from "../components/SemaforoCompletitud";
+import TimelineControles from "../components/TimelineControles";
 import {
   ChevronLeft, Plus, AlertTriangle, CheckCircle, Pencil, Trash2,
   Syringe, Activity, FlaskConical, Baby, FileText, Printer
@@ -353,8 +355,10 @@ export default function ExpedientePaciente() {
         </div>
       </div>
 
+      <SemaforoCompletitud pacienteId={id} />
+
       {/* ── TABS ── */}
-      <div className="content-tabs" style={{ marginBottom: "1.5rem" }}>
+      <div className="content-tabs" style={{ marginBottom: "1.5rem", marginTop: "1.5rem" }}>
         {TABS.map((t) => {
           const Icon = t.icon;
           return (
@@ -531,86 +535,7 @@ export default function ExpedientePaciente() {
               </button>
             </div>
           )}
-          {exp.controles_prenatales?.length === 0 ? (
-            <div className="card empty-state">
-              No hay controles registrados.
-              {puedeRegistrarPrenatal && <div style={{ marginTop: "1rem" }}>
-                <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}>
-                  + Registrar 1er control
-                </button>
-              </div>}
-            </div>
-          ) : (
-            exp.controles_prenatales.map((ctrl) => (
-              <div className="card" key={ctrl.id}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <span className="badge badge-blue">Control {ctrl.numero_control}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-                    <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
-                      {fecha(ctrl.fecha)}{ctrl.hora ? ` — ${ctrl.hora}` : ""}
-                    </span>
-                    <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/controles/${ctrl.id}/editar`)}>
-                      <Pencil size={13} /> Editar
-                    </button>
-                    <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar este control prenatal?", `/pacientes/${id}/controles/${ctrl.id}`)}>
-                      <Trash2 size={13} /> Eliminar
-                    </button>
-                  </div>
-                </div>
-
-                {/* Signos de peligro */}
-                {(ctrl.peligro_hemorragia_vaginal || ctrl.peligro_palidez || ctrl.peligro_dolor_cabeza ||
-                  ctrl.peligro_hipertension || ctrl.peligro_dolor_epigastrico ||
-                  ctrl.peligro_trastornos_visuales || ctrl.peligro_fiebre || ctrl.peligro_otro) && (
-                  <div style={{ background: "var(--danger-lt)", border: "1px solid var(--danger)", borderRadius: 8, padding: "0.6rem 0.9rem", marginBottom: "0.85rem" }}>
-                    <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--danger)", marginBottom: "0.4rem" }}>⚠ SIGNOS DE PELIGRO</div>
-                    <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                      {ctrl.peligro_hemorragia_vaginal && <span className="badge badge-red">Hemorragia vaginal</span>}
-                      {ctrl.peligro_palidez           && <span className="badge badge-red">Palidez</span>}
-                      {ctrl.peligro_dolor_cabeza      && <span className="badge badge-red">Dolor de cabeza</span>}
-                      {ctrl.peligro_hipertension      && <span className="badge badge-red">Hipertensión</span>}
-                      {ctrl.peligro_dolor_epigastrico && <span className="badge badge-red">Dolor epigástrico</span>}
-                      {ctrl.peligro_trastornos_visuales && <span className="badge badge-red">Trast. visuales</span>}
-                      {ctrl.peligro_fiebre            && <span className="badge badge-red">Fiebre</span>}
-                      {ctrl.peligro_otro && <span className="badge badge-red">{ctrl.peligro_otro}</span>}
-                    </div>
-                  </div>
-                )}
-
-                <Grid cols={4}>
-                  <Row label="P/A" value={ctrl.pa_sistolica ? `${ctrl.pa_sistolica}/${ctrl.pa_diastolica} mmHg` : null} />
-                  <Row label="Temperatura" value={ctrl.temperatura ? `${ctrl.temperatura}°C` : null} />
-                  <Row label="Peso" value={ctrl.peso_kg ? `${ctrl.peso_kg} kg` : null} />
-                  <Row label="Talla" value={ctrl.talla_cm ? `${ctrl.talla_cm} cm` : null} />
-                  <Row label="IMC" value={ctrl.imc} />
-                  <Row label="Perím. braquial" value={ctrl.perimetro_braquial_cm ? `${ctrl.perimetro_braquial_cm} cm` : null} />
-                  <Row label="AU" value={ctrl.altura_uterina_cm ? `${ctrl.altura_uterina_cm} cm` : null} />
-                  <Row label="FCF" value={ctrl.fcf ? `${ctrl.fcf} lpm` : null} />
-                  <Row label="FC" value={ctrl.frecuencia_cardiaca ? `${ctrl.frecuencia_cardiaca} x min` : null} />
-                  <Row label="FR" value={ctrl.frecuencia_respiratoria ? `${ctrl.frecuencia_respiratoria} x min` : null} />
-                  <Row label="Semanas gest." value={ctrl.edad_gestacional_semanas ? `${ctrl.edad_gestacional_semanas} sem` : null} />
-                  <Row label="Cita siguiente" value={fecha(ctrl.cita_siguiente)} />
-                  <Row label="Situación fetal" value={ctrl.situacion_fetal} />
-                  <Row label="Presentación" value={ctrl.presentacion_fetal} />
-                </Grid>
-
-                {ctrl.impresion_clinica && (
-                  <div style={{ marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid var(--border)" }}>
-                    <Row label="Impresión Clínica" value={ctrl.impresion_clinica} />
-                  </div>
-                )}
-                {ctrl.tratamiento && <div style={{ marginTop: "0.5rem" }}><Row label="Tratamiento" value={ctrl.tratamiento} /></div>}
-
-                {/* Suplementación */}
-                {(ctrl.sulfato_ferroso || ctrl.acido_folico) && (
-                  <div style={{ marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid var(--border)", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-                    {ctrl.sulfato_ferroso && <span className="badge badge-green">Sulfato ferroso: {ctrl.sulfato_ferroso_tabletas ?? "—"} tab.</span>}
-                    {ctrl.acido_folico   && <span className="badge badge-green">Ácido fólico: {ctrl.acido_folico_tabletas ?? "—"} tab.</span>}
-                  </div>
-                )}
-              </div>
-            ))
-          )}
+          <TimelineControles pacienteId={id} embarazoId={exp.embarazo_activo?.id} />
         </div>
       )}
 
