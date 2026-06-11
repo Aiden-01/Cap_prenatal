@@ -51,6 +51,7 @@ export default function MapaRiesgo() {
   const navigate = useNavigate();
   const [comunidades, setComunidades] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [riskListOpen, setRiskListOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -77,6 +78,13 @@ export default function MapaRiesgo() {
 
   const totalRiesgo = useMemo(
     () => comunidades.reduce((total, comunidad) => total + Number(comunidad.total_riesgo || 0), 0),
+    [comunidades]
+  );
+
+  const comunidadesConRiesgo = useMemo(
+    () => comunidades
+      .filter((comunidad) => Number(comunidad.total_riesgo || 0) > 0)
+      .sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), "es")),
     [comunidades]
   );
 
@@ -124,6 +132,17 @@ export default function MapaRiesgo() {
           color: var(--text);
           font-weight: 700;
           white-space: nowrap;
+          cursor: pointer;
+        }
+
+        .mapa-riesgo-stat:hover {
+          border-color: color-mix(in srgb, #991b1b 46%, var(--border));
+          background: color-mix(in srgb, #991b1b 18%, var(--surface));
+        }
+
+        .mapa-riesgo-stat:disabled {
+          cursor: default;
+          opacity: 0.75;
         }
 
         .mapa-riesgo-map-shell {
@@ -259,6 +278,94 @@ export default function MapaRiesgo() {
           background: color-mix(in srgb, var(--surface2) 50%, transparent);
         }
 
+        .mapa-riesgo-risk-drawer-shell {
+          position: fixed;
+          inset: 0;
+          z-index: 1150;
+        }
+
+        .mapa-riesgo-risk-drawer-backdrop {
+          position: absolute;
+          inset: 0;
+          border: 0;
+          background: rgba(15,23,42,0.42);
+          cursor: pointer;
+        }
+
+        .mapa-riesgo-risk-drawer {
+          position: absolute;
+          top: 0;
+          right: 0;
+          width: min(360px, 100vw);
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          background: var(--card, var(--surface));
+          border-left: 1px solid var(--card-border, var(--border));
+          box-shadow: -18px 0 42px rgba(15,23,42,0.28);
+          color: var(--text);
+          animation: mapaRiskDrawerIn 0.22s ease both;
+        }
+
+        .mapa-riesgo-risk-drawer-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 0.75rem;
+          padding: 1rem;
+          border-bottom: 1px solid var(--card-border, var(--border));
+        }
+
+        .mapa-riesgo-risk-drawer-header h2 {
+          margin: 0;
+          color: var(--text);
+          font-size: 1rem;
+          letter-spacing: 0;
+        }
+
+        .mapa-riesgo-risk-drawer-header p {
+          margin: 0.25rem 0 0;
+          color: var(--text-muted);
+          font-size: 0.84rem;
+        }
+
+        .mapa-riesgo-risk-drawer-body {
+          flex: 1;
+          overflow-y: auto;
+          padding: 0.85rem;
+        }
+
+        .mapa-riesgo-risk-community {
+          width: 100%;
+          min-height: 42px;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.65rem 0.7rem;
+          margin-bottom: 0.45rem;
+          border: 1px solid var(--card-border, var(--border));
+          border-radius: 8px;
+          background: color-mix(in srgb, #991b1b 8%, var(--surface));
+          color: var(--text);
+          font-size: 0.88rem;
+          text-align: left;
+          cursor: pointer;
+        }
+
+        .mapa-riesgo-risk-community:hover {
+          border-color: color-mix(in srgb, #991b1b 42%, var(--border));
+          background: color-mix(in srgb, #991b1b 14%, var(--surface));
+        }
+
+        .mapa-riesgo-risk-community span {
+          overflow-wrap: anywhere;
+        }
+
+        @keyframes mapaRiskDrawerIn {
+          from { transform: translateX(100%); opacity: 0.85; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+
         .leaflet-container {
           background: var(--surface2);
           font-family: inherit;
@@ -268,6 +375,14 @@ export default function MapaRiesgo() {
           .mapa-riesgo-header {
             align-items: flex-start;
             flex-direction: column;
+          }
+
+          .mapa-riesgo-stat {
+            width: 100%;
+          }
+
+          .mapa-riesgo-stat {
+            justify-content: space-between;
           }
 
           .mapa-riesgo-map-shell,
@@ -282,11 +397,72 @@ export default function MapaRiesgo() {
           <h1>Mapa de Riesgo Obstétrico</h1>
           <p>Comunidades del CAP El Chal con embarazadas de riesgo activo.</p>
         </div>
-        <div className="mapa-riesgo-stat">
+        <button
+          type="button"
+          className="mapa-riesgo-stat"
+          onClick={() => setRiskListOpen(true)}
+          aria-expanded={riskListOpen}
+          aria-controls="mapa-riesgo-comunidades"
+        >
           <AlertTriangle size={17} />
           {totalRiesgo} en riesgo
-        </div>
+        </button>
       </div>
+
+      {riskListOpen && (
+        <div className="mapa-riesgo-risk-drawer-shell">
+          <button
+            type="button"
+            className="mapa-riesgo-risk-drawer-backdrop"
+            onClick={() => setRiskListOpen(false)}
+            aria-label="Cerrar comunidades con riesgo"
+          />
+
+          <aside
+            id="mapa-riesgo-comunidades"
+            className="mapa-riesgo-risk-drawer"
+            aria-label="Comunidades con embarazadas de riesgo"
+          >
+            <div className="mapa-riesgo-risk-drawer-header">
+              <div>
+                <h2>Comunidades con riesgo</h2>
+                <p>{totalRiesgo} embarazadas con riesgo activo</p>
+              </div>
+              <button
+                type="button"
+                className="mapa-riesgo-close"
+                onClick={() => setRiskListOpen(false)}
+                aria-label="Cerrar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mapa-riesgo-risk-drawer-body">
+              {comunidadesConRiesgo.length > 0 ? (
+                comunidadesConRiesgo.map((comunidad) => (
+                  <button
+                    key={comunidad.id}
+                    type="button"
+                    className="mapa-riesgo-risk-community"
+                    onClick={() => {
+                      setSelected(comunidad);
+                      setRiskListOpen(false);
+                    }}
+                  >
+                    <MapPin size={15} />
+                    <span>{comunidad.nombre}</span>
+                  </button>
+                ))
+              ) : (
+                <div className="mapa-riesgo-empty">
+                  Sin comunidades con riesgo
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
 
       <div className="mapa-riesgo-map-shell">
         {loading && (
