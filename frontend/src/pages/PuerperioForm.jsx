@@ -4,6 +4,7 @@ import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
+import { getErrorMessage } from "../utils/errorMessage";
 
 const INIT = {
   numero_atencion: 1,
@@ -92,7 +93,7 @@ export default function PuerperioForm() {
       toast(editando ? "Puerperio actualizado" : "Puerperio registrado", "success");
       navigate(expedientePath);
     } catch (err) {
-      toast(err.response?.data?.error || "Error al guardar puerperio", "error");
+      toast(getErrorMessage(err, "Error al guardar puerperio"), "error");
     } finally {
       setLoading(false);
     }

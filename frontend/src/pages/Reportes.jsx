@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import api from "../api/axios";
 import { getGuatemalaDateInputValue } from "../utils/guatemalaTime";
+import { getErrorMessage } from "../utils/errorMessage";
 
 const MODO_PRIMER_CONTROL = "primer_control";
 const MODO_GENERAL = "general";
@@ -59,7 +60,7 @@ export default function Reportes() {
 
       setCenso(data);
     } catch (err) {
-      setError(err.response?.data?.error || "Error al generar el censo.");
+      setError(getErrorMessage(err, "Error al generar el censo."));
     } finally {
       setLoading(false);
     }

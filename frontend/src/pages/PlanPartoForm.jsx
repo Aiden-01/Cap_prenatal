@@ -5,6 +5,7 @@ import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { getGuatemalaDateInputValue } from "../utils/guatemalaTime";
 import { calculateGestationalWeeks } from "../utils/gestationalAge";
+import { getErrorMessage } from "../utils/errorMessage";
 
 function Field({ label, children }) {
   return (
@@ -381,7 +382,7 @@ export default function PlanPartoForm() {
       toast(existingPlan ? "Plan de parto actualizado" : "Plan de parto guardado", "success");
       setTimeout(() => navigate(expedientePath), 600);
     } catch (err) {
-      toast(err.response?.data?.error || "Error al guardar plan de parto", "error");
+      toast(getErrorMessage(err, "Error al guardar plan de parto"), "error");
     } finally {
       setLoading(false);
     }

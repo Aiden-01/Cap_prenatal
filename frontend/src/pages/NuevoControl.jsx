@@ -5,6 +5,7 @@ import { useGlobalToast } from "../context/ToastContext";
 import { ChevronLeft, Save, Stethoscope, FlaskConical, Pill, BookOpen } from "lucide-react";
 import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
 import { calculateGestationalWeeks } from "../utils/gestationalAge";
+import { getErrorMessage } from "../utils/errorMessage";
 
 // ─── HELPERS ────────────────────────────────────────────────
 function Field({ label, children, col }) {
@@ -218,7 +219,7 @@ export default function NuevoControl() {
       toast(editando ? "Control actualizado exitosamente" : "Control registrado exitosamente", "success");
       setTimeout(() => navigate(expedientePath), 800);
     } catch (err) {
-      toast(err.response?.data?.error || "Error al guardar", "error");
+      toast(getErrorMessage(err, "Error al guardar"), "error");
     } finally { setLoading(false); }
   };
 

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
+import { getErrorMessage } from "../utils/errorMessage";
 
 function Field({ label, children }) {
   return (
@@ -257,7 +258,7 @@ export default function FichaRiesgo() {
       toast(existingRisk ? "Ficha de riesgo actualizada" : "Ficha de riesgo guardada", "success");
       setTimeout(() => navigate(expedientePath), 600);
     } catch (err) {
-      toast(err.response?.data?.error || "Error al guardar ficha de riesgo", "error");
+      toast(getErrorMessage(err, "Error al guardar ficha de riesgo"), "error");
     } finally {
       setLoading(false);
     }

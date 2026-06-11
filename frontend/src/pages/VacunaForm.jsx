@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
+import { getErrorMessage } from "../utils/errorMessage";
 
 const INIT = {
   tipo_vacuna: "td_tdap",
@@ -85,7 +86,7 @@ export default function VacunaForm() {
       toast(editando ? "Vacuna actualizada" : "Vacuna registrada", "success");
       navigate(expedientePath);
     } catch (err) {
-      toast(err.response?.data?.error || "Error al guardar vacuna", "error");
+      toast(getErrorMessage(err, "Error al guardar vacuna"), "error");
     } finally {
       setLoading(false);
     }

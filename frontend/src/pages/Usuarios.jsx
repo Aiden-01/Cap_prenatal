@@ -6,6 +6,7 @@ import {
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
 import { useGlobalToast } from "../context/ToastContext";
+import { getErrorMessage } from "../utils/errorMessage";
 
 const INIT = { nombre_completo: "", username: "", password: "", rol: "personal_salud" };
 
@@ -91,7 +92,7 @@ export default function Usuarios() {
       cargar();
       setTimeout(() => setUltimoCreado(null), 5000);
     } catch (err) {
-      toast(err.response?.data?.error || "Error al crear usuario", "error");
+      toast(getErrorMessage(err, "Error al crear usuario"), "error");
     } finally {
       setLoading(false);
     }
@@ -113,7 +114,7 @@ export default function Usuarios() {
         u.activo ? "info" : "success"
       );
     } catch (err) {
-      toast(err.response?.data?.error || "Error al actualizar usuario", "error");
+      toast(getErrorMessage(err, "Error al actualizar usuario"), "error");
     }
   };
 
@@ -125,7 +126,7 @@ export default function Usuarios() {
       setAEliminar(null);
       cargar();
     } catch (err) {
-      toast(err.response?.data?.error || "Error al eliminar usuario", "error");
+      toast(getErrorMessage(err, "Error al eliminar usuario"), "error");
       setAEliminar(null);
     }
   };

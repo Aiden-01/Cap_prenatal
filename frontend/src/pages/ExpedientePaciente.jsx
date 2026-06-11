@@ -6,6 +6,7 @@ import {
   ChevronLeft, Plus, AlertTriangle, CheckCircle, Pencil, Trash2,
   Syringe, Activity, FlaskConical, Baby, FileText, Printer
 } from "lucide-react";
+import { getErrorMessage } from "../utils/errorMessage";
 
 // ─── HELPERS ────────────────────────────────────────────────
 function Row({ label, value }) {
@@ -130,7 +131,7 @@ export default function ExpedientePaciente() {
       toast("Registro eliminado", "success");
       cargarExpediente();
     } catch (err) {
-      toast(err.response?.data?.error || "Error al eliminar registro", "error");
+      toast(getErrorMessage(err, "Error al eliminar registro"), "error");
     }
   };
 
@@ -147,7 +148,7 @@ export default function ExpedientePaciente() {
       cargarExpediente();
       cambiarTab("general");
     } catch (err) {
-      toast(err.response?.data?.error || "Error al crear nuevo embarazo", "error");
+      toast(getErrorMessage(err, "Error al crear nuevo embarazo"), "error");
     }
   };
 
@@ -160,7 +161,7 @@ export default function ExpedientePaciente() {
       cargarExpediente();
       cambiarTab("general");
     } catch (err) {
-      toast(err.response?.data?.error || "Error al cerrar embarazo", "error");
+      toast(getErrorMessage(err, "Error al cerrar embarazo"), "error");
     }
   };
 
@@ -172,7 +173,7 @@ export default function ExpedientePaciente() {
         toast("Embarazo marcado en puerperio", "success");
         cargarExpediente();
       } catch (err) {
-        toast(err.response?.data?.error || "Error al pasar a puerperio", "error");
+        toast(getErrorMessage(err, "Error al pasar a puerperio"), "error");
         return;
       }
     }
@@ -189,7 +190,8 @@ export default function ExpedientePaciente() {
         const errorText = await res.data.text();
         let message = "Error al generar expediente";
         try {
-          message = JSON.parse(errorText).error || message;
+          const payload = JSON.parse(errorText);
+          message = getErrorMessage({ response: { data: payload } }, message);
         } catch {
           message = errorText || message;
         }
@@ -200,16 +202,15 @@ export default function ExpedientePaciente() {
       window.open(url, "_blank", "noopener,noreferrer");
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (err) {
-      let message = err.message || "Error al generar expediente";
+      let message = getErrorMessage(err, "Error al generar expediente");
       if (err.response?.data instanceof Blob) {
         const errorText = await err.response.data.text();
         try {
-          message = JSON.parse(errorText).error || message;
+          const payload = JSON.parse(errorText);
+          message = getErrorMessage({ response: { data: payload } }, message);
         } catch {
           message = errorText || message;
         }
-      } else if (err.response?.data?.error) {
-        message = err.response.data.error;
       }
       toast(message, "error");
     } finally {
@@ -226,7 +227,8 @@ export default function ExpedientePaciente() {
         const errorText = await res.data.text();
         let message = "Error al generar ficha de riesgo";
         try {
-          message = JSON.parse(errorText).error || message;
+          const payload = JSON.parse(errorText);
+          message = getErrorMessage({ response: { data: payload } }, message);
         } catch {
           message = errorText || message;
         }
@@ -237,16 +239,15 @@ export default function ExpedientePaciente() {
       window.open(url, "_blank", "noopener,noreferrer");
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (err) {
-      let message = err.message || "Error al generar ficha de riesgo";
+      let message = getErrorMessage(err, "Error al generar ficha de riesgo");
       if (err.response?.data instanceof Blob) {
         const errorText = await err.response.data.text();
         try {
-          message = JSON.parse(errorText).error || message;
+          const payload = JSON.parse(errorText);
+          message = getErrorMessage({ response: { data: payload } }, message);
         } catch {
           message = errorText || message;
         }
-      } else if (err.response?.data?.error) {
-        message = err.response.data.error;
       }
       toast(message, "error");
     } finally {
@@ -263,7 +264,8 @@ export default function ExpedientePaciente() {
         const errorText = await res.data.text();
         let message = "Error al generar plan de parto";
         try {
-          message = JSON.parse(errorText).error || message;
+          const payload = JSON.parse(errorText);
+          message = getErrorMessage({ response: { data: payload } }, message);
         } catch {
           message = errorText || message;
         }
@@ -274,16 +276,15 @@ export default function ExpedientePaciente() {
       window.open(url, "_blank", "noopener,noreferrer");
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (err) {
-      let message = err.message || "Error al generar plan de parto";
+      let message = getErrorMessage(err, "Error al generar plan de parto");
       if (err.response?.data instanceof Blob) {
         const errorText = await err.response.data.text();
         try {
-          message = JSON.parse(errorText).error || message;
+          const payload = JSON.parse(errorText);
+          message = getErrorMessage({ response: { data: payload } }, message);
         } catch {
           message = errorText || message;
         }
-      } else if (err.response?.data?.error) {
-        message = err.response.data.error;
       }
       toast(message, "error");
     } finally {

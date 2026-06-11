@@ -4,6 +4,7 @@ import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
+import { getErrorMessage } from "../utils/errorMessage";
 
 const INIT = {
   fecha: getGuatemalaDateInputValue(),
@@ -53,7 +54,7 @@ export default function MorbilidadForm() {
       toast(editando ? "Morbilidad actualizada" : "Morbilidad registrada", "success");
       navigate(expedientePath);
     } catch (err) {
-      toast(err.response?.data?.error || "Error al guardar morbilidad", "error");
+      toast(getErrorMessage(err, "Error al guardar morbilidad"), "error");
     } finally {
       setLoading(false);
     }

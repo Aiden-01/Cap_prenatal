@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
+import { getErrorMessage } from "../utils/errorMessage";
 
 export default function Login() {
   const [form, setForm]       = useState({ username: "", password: "" });
@@ -34,7 +35,7 @@ export default function Login() {
       login(data.usuario);
       navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.error || "Error al iniciar sesión");
+      setError(getErrorMessage(err, "Error al iniciar sesión"));
     } finally {
       setLoading(false);
     }

@@ -8,6 +8,7 @@ import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
 import iconUrl from "leaflet/dist/images/marker-icon.png";
 import shadowUrl from "leaflet/dist/images/marker-shadow.png";
 import api from "../api/axios";
+import { getErrorMessage } from "../utils/errorMessage";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl });
@@ -65,7 +66,7 @@ export default function MapaRiesgo() {
       })
       .catch((err) => {
         if (!alive) return;
-        setError(err.response?.data?.error || "Error al cargar el mapa de riesgo.");
+        setError(getErrorMessage(err, "Error al cargar el mapa de riesgo."));
       })
       .finally(() => {
         if (alive) setLoading(false);

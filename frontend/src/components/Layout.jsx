@@ -8,6 +8,7 @@ import api from "../api/axios";
 import { ToastContext } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
+import { getErrorMessage } from "../utils/errorMessage";
 
 export default function Layout() {
   const { usuario, logout } = useAuth();
@@ -75,10 +76,7 @@ export default function Layout() {
       setPasswordOpen(false);
       resetPasswordForm();
     } catch (err) {
-      const message = err.response?.data?.error
-        || err.response?.data?.details?.[0]?.message
-        || "Error al cambiar contraseña";
-      toast(message, "error");
+      toast(getErrorMessage(err, "Error al cambiar contraseña"), "error");
     } finally {
       setPasswordLoading(false);
     }

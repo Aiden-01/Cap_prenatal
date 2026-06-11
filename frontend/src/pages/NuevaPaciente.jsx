@@ -7,6 +7,7 @@ import {
   Building2, User, Heart, Baby, ShieldAlert, CheckCircle,
   ChevronLeft, ChevronRight, Save, AlertTriangle, UploadCloud, ScanLine
 } from "lucide-react";
+import { getErrorMessage } from "../utils/errorMessage";
 
 // ─── STEPS ──────────────────────────────────────────────────
 const STEPS = [
@@ -453,7 +454,7 @@ export default function NuevaPaciente() {
       }
     } catch (e) {
       const detail = e.response?.data?.errores?.[0];
-      const message = e.response?.data?.error || "No se pudo procesar la imagen. Puede continuar manualmente.";
+      const message = getErrorMessage(e, "No se pudo procesar la imagen. Puede continuar manualmente.");
       toast(detail ? `${message} (${detail})` : message, "error");
     } finally {
       setOcrLoading(false);
@@ -546,7 +547,7 @@ export default function NuevaPaciente() {
       toast(editando ? "Paciente actualizada exitosamente" : "Paciente registrada exitosamente", "success");
       setTimeout(() => navigate(`/pacientes/${editando ? id : data.id}`), 800);
     } catch (e) {
-      const msg = e.response?.data?.error || "Error al guardar";
+      const msg = getErrorMessage(e, "Error al guardar");
       if (msg.toLowerCase().includes("cui")) {
         setCuiError(msg);
         goToCuiField();
