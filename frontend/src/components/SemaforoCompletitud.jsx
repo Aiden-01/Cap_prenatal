@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle, ClipboardList, XCircle } from "lucide-react";
+import { CheckCircle, ChevronDown, ClipboardList, X, XCircle } from "lucide-react";
 import api from "../api/axios";
 import { getErrorMessage } from "../utils/errorMessage";
 
@@ -9,12 +9,98 @@ function getBarColor(porcentaje) {
   return "bg-green-500";
 }
 
-export default function SemaforoCompletitud({ pacienteId }) {
+function getControlesHint(item) {
+  const totalControles = Number(item.total_controles || 0);
+  const minimoControles = Number(item.minimo_controles || 4);
+  const faltantes = Math.max(minimoControles - totalControles, 0);
+
+  if (item.completado) return "";
+  if (totalControles === 0) return `Sin controles registrados. Faltan ${faltantes} para el minimo recomendado`;
+  return `Faltan ${faltantes} controles para completar el minimo recomendado`;
+}
+
+function getMissingLabel(item) {
+  if (item.label !== "Controles prenatales") return item.label;
+
+  const totalControles = Number(item.total_controles || 0);
+  const minimoControles = Number(item.minimo_controles || 4);
+  return `${item.label} (${totalControles}/${minimoControles})`;
+}
+
+function getResumen(items = [], porcentaje) {
+  const faltantes = items.filter((item) => !item.completado);
+
+  if (porcentaje === 100 || faltantes.length === 0) return "Expediente completo";
+  if (faltantes.length === 1) return `Falta: ${getMissingLabel(faltantes[0])}`;
+  return `Faltan ${faltantes.length} secciones`;
+}
+
+function ProgressBar({ porcentaje, height = 6, width = "100%" }) {
+  return (
+    <div
+      style={{
+        width,
+        height,
+        borderRadius: 999,
+        background: "var(--surface2)",
+        border: "1px solid var(--card-border)",
+        overflow: "hidden",
+        flexShrink: 0,
+      }}
+    >
+      <div className={getBarColor(porcentaje)} style={{ width: `${porcentaje}%`, height: "100%", transition: "width 0.25s ease" }} />
+    </div>
+  );
+}
+
+function CompletitudItem({ item }) {
+  const Icon = item.completado ? CheckCircle : XCircle;
+  const esControles = item.label === "Controles prenatales";
+  const controlesHint = esControles ? getControlesHint(item) : "";
+  const mostrarDetalleInline = item.detalle && (!esControles || item.completado);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "0.45rem",
+        padding: "0.55rem 0.65rem",
+        border: "1px solid var(--card-border)",
+        borderRadius: 8,
+        background: "var(--bg)",
+      }}
+    >
+      <Icon size={16} style={{ color: item.completado ? "var(--accent)" : "var(--danger)", marginTop: 1, flexShrink: 0 }} />
+      <span style={{ display: "grid", gap: "0.15rem", color: "var(--text)", fontSize: "0.84rem" }}>
+        <span>
+          {item.label}
+          {mostrarDetalleInline && <span style={{ color: "var(--text-muted)" }}> · {item.detalle}</span>}
+        </span>
+        {controlesHint && (
+          <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", opacity: 0.72 }}>
+            {controlesHint}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+export default function SemaforoCompletitud({ pacienteId, initialData = null }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
+    if (initialData) {
+      setData(initialData);
+      setLoading(false);
+      setError("");
+      return;
+    }
+
     if (!pacienteId) return;
     let mounted = true;
 
@@ -32,58 +118,111 @@ export default function SemaforoCompletitud({ pacienteId }) {
     return () => {
       mounted = false;
     };
-  }, [pacienteId]);
+  }, [pacienteId, initialData]);
 
   const porcentaje = Number(data?.porcentaje || 0);
+  const resumen = loading
+    ? "Calculando completitud..."
+    : error || getResumen(data?.items, porcentaje);
 
   return (
-    <div className="card" style={{ display: "grid", gap: "0.9rem", background: "var(--card)", borderColor: "var(--card-border)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
-        <ClipboardList size={18} style={{ color: "var(--primary)" }} />
-        <h2 style={{ margin: 0, fontSize: "1rem", color: "var(--text)" }}>Completitud del expediente</h2>
+    <>
+      <div
+        className="card"
+        role="button"
+        tabIndex={0}
+        onClick={() => setExpanded(true)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setExpanded(true);
+          }
+        }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.7rem",
+          background: "var(--card)",
+          borderColor: "var(--card-border)",
+          padding: "0.55rem 1rem",
+          cursor: "pointer",
+          minWidth: 0,
+        }}
+      >
+        <ClipboardList size={18} style={{ color: "var(--primary)", flexShrink: 0 }} />
+        <span style={{ color: "var(--text)", fontSize: "0.92rem", fontWeight: 700, whiteSpace: "nowrap" }}>
+          Completitud del expediente
+        </span>
+        <ProgressBar porcentaje={porcentaje} width={120} />
+        <strong style={{ color: "var(--text)", fontSize: "0.9rem", flexShrink: 0 }}>{porcentaje}%</strong>
+        <span
+          style={{
+            color: error ? "var(--danger)" : "var(--text-muted)",
+            fontSize: "0.82rem",
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            flex: 1,
+          }}
+        >
+          {resumen}
+        </span>
+        <ChevronDown size={18} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
       </div>
 
-      {loading && <div style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Calculando completitud...</div>}
-      {!loading && error && <div style={{ color: "var(--danger)", fontSize: "0.9rem" }}>{error}</div>}
-      {!loading && !error && data && (
-        <>
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem", color: "var(--text)" }}>
-              <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>Avance</span>
-              <strong>{porcentaje}%</strong>
-            </div>
-            <div style={{ height: 10, borderRadius: 999, background: "var(--surface2)", border: "1px solid var(--card-border)", overflow: "hidden" }}>
-              <div className={getBarColor(porcentaje)} style={{ width: `${porcentaje}%`, height: "100%", transition: "width 0.25s ease" }} />
-            </div>
-          </div>
+      {expanded && (
+        <div className="user-create-drawer-shell">
+          <button
+            type="button"
+            className="user-create-drawer-backdrop"
+            onClick={() => setExpanded(false)}
+            aria-label="Cerrar completitud"
+          />
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "0.6rem" }}>
-            {data.items?.map((item) => {
-              const Icon = item.completado ? CheckCircle : XCircle;
-              return (
-                <div
-                  key={item.label}
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: "0.45rem",
-                    padding: "0.55rem 0.65rem",
-                    border: "1px solid var(--card-border)",
-                    borderRadius: 8,
-                    background: "var(--bg)",
-                  }}
-                >
-                  <Icon size={16} style={{ color: item.completado ? "var(--accent)" : "var(--danger)", marginTop: 1, flexShrink: 0 }} />
-                  <span style={{ color: "var(--text)", fontSize: "0.84rem" }}>
-                    {item.label}
-                    {item.detalle && <span style={{ color: "var(--text-muted)" }}> · {item.detalle}</span>}
-                  </span>
-                </div>
-              );
-            })}
+          <div className="card user-create-drawer">
+            <div className="record-panel-header user-create-drawer-header">
+              <span className="user-create-title">
+                <ClipboardList size={18} color="var(--primary)" />
+                <span>Completitud del expediente</span>
+              </span>
+              <button
+                type="button"
+                className="password-modal-close"
+                onClick={() => setExpanded(false)}
+                aria-label="Cerrar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gap: "0.9rem" }}>
+              {loading && <div style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Calculando completitud...</div>}
+              {!loading && error && <div style={{ color: "var(--danger)", fontSize: "0.9rem" }}>{error}</div>}
+              {!loading && !error && data && (
+                <>
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem", color: "var(--text)" }}>
+                      <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>Avance</span>
+                      <strong>{porcentaje}%</strong>
+                    </div>
+                    <ProgressBar porcentaje={porcentaje} height={10} />
+                    <div style={{ color: "var(--text-muted)", fontSize: "0.82rem", marginTop: "0.45rem" }}>
+                      {resumen}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.6rem" }}>
+                    {data.items?.map((item) => (
+                      <CompletitudItem key={item.label} item={item} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </>
+        </div>
       )}
-    </div>
+    </>
   );
 }

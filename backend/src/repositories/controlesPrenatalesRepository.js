@@ -4,6 +4,7 @@ async function listarPorEmbarazo(embarazoId) {
   const { rows } = await pool.query(
     `SELECT
        c.*,
+       ROW_NUMBER() OVER (ORDER BY c.fecha ASC, c.id ASC) AS numero_control,
        c.fecha AS fecha_control,
        c.edad_gestacional_semanas AS semana_gestacional,
        c.peso_kg AS peso,
@@ -17,14 +18,24 @@ async function listarPorEmbarazo(embarazoId) {
        c.situacion_fetal AS situacion,
        c.impresion_clinica AS observaciones,
        (
-         COALESCE(c.pa_sistolica, 0) > 140
-         OR COALESCE(c.pa_diastolica, 0) > 90
-         OR NULLIF(BTRIM(COALESCE(c.impresion_clinica, '')), '') IS NOT NULL
+         COALESCE(c.pa_sistolica > 140, FALSE)
+         OR COALESCE(c.pa_sistolica < 90, FALSE)
+         OR COALESCE(c.pa_diastolica > 90, FALSE)
+         OR COALESCE(c.pa_diastolica < 60, FALSE)
+         OR COALESCE(c.fcf < 110, FALSE)
+         OR COALESCE(c.fcf > 160, FALSE)
+         OR COALESCE(c.peligro_hemorragia_vaginal, FALSE)
+         OR COALESCE(c.peligro_palidez, FALSE)
+         OR COALESCE(c.peligro_dolor_cabeza, FALSE)
+         OR COALESCE(c.peligro_hipertension, FALSE)
+         OR COALESCE(c.peligro_dolor_epigastrico, FALSE)
+         OR COALESCE(c.peligro_trastornos_visuales, FALSE)
+         OR COALESCE(c.peligro_fiebre, FALSE)
          OR NULLIF(BTRIM(COALESCE(c.peligro_otro, '')), '') IS NOT NULL
        ) AS tiene_hallazgo
      FROM controles_prenatales c
      WHERE embarazo_id = $1
-     ORDER BY c.fecha DESC, c.numero_control DESC`,
+     ORDER BY c.fecha ASC, c.id ASC`,
     [embarazoId]
   );
   return rows;

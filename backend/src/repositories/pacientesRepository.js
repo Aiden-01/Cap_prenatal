@@ -219,7 +219,7 @@ async function obtenerCompletitudExpediente(pacienteId) {
        e.id AS embarazo_id,
        EXISTS(SELECT 1 FROM fichas_riesgo_obstetrico r WHERE r.embarazo_id = e.id)
          AS tiene_ficha_riesgo,
-       EXISTS(SELECT 1 FROM controles_prenatales cp WHERE cp.embarazo_id = e.id)
+       ((SELECT COUNT(*) FROM controles_prenatales cp WHERE cp.embarazo_id = e.id) >= 4)
          AS tiene_controles,
        (SELECT COUNT(*) FROM controles_prenatales cp WHERE cp.embarazo_id = e.id)
          AS total_controles,

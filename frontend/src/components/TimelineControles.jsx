@@ -17,10 +17,17 @@ function dato(label, value) {
   );
 }
 
+function controlTime(control) {
+  const value = control.fecha_control || control.fecha;
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isNaN(time) ? 0 : time;
+}
+
 function ControlNode({ control, index, pacienteId }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const observaciones = control.observaciones || control.impresion_clinica;
+  const numeroControl = control.numero_control ?? index + 1;
 
   return (
     <div style={{ position: "relative", paddingLeft: "1.75rem", marginBottom: "1.5rem" }}>
@@ -41,7 +48,7 @@ function ControlNode({ control, index, pacienteId }) {
       <div className="card" style={{ background: "var(--card)", borderColor: "var(--card-border)", display: "grid", gap: "0.85rem" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-            <strong style={{ color: "var(--text)" }}>Control #{index + 1}</strong>
+            <strong style={{ color: "var(--text)" }}>Control #{numeroControl}</strong>
             <span style={{ color: "var(--text-muted)", fontSize: "0.84rem" }}>{fecha(control.fecha_control || control.fecha)}</span>
           </div>
           <span className="badge badge-blue">Semana {control.semana_gestacional || control.edad_gestacional_semanas || "—"}</span>
@@ -106,7 +113,12 @@ export default function TimelineControles({ pacienteId }) {
 
     api.get(`/pacientes/${pacienteId}/controles`)
       .then(({ data }) => {
-        if (mounted) setControles(Array.isArray(data) ? data : []);
+        if (mounted) {
+          const controlesOrdenados = Array.isArray(data)
+            ? [...data].sort((a, b) => controlTime(b) - controlTime(a))
+            : [];
+          setControles(controlesOrdenados);
+        }
       })
       .catch((err) => {
         if (mounted) setError(getErrorMessage(err, "Error al cargar controles prenatales"));

@@ -64,6 +64,48 @@ function fecha(d) {
   return new Date(d).toLocaleDateString("es-GT");
 }
 
+function buildCompletitudFromExp(exp, pacienteId) {
+  const totalControles = exp.controles_prenatales?.length ?? 0;
+  const minimoControles = 4;
+  const items = [
+    {
+      label: "Ficha de riesgo",
+      completado: Boolean(exp.ficha_riesgo),
+      ruta: `/pacientes/${pacienteId}?tab=riesgo`,
+    },
+    {
+      label: "Controles prenatales",
+      completado: totalControles >= minimoControles,
+      detalle: `${totalControles} controles registrados`,
+      total_controles: totalControles,
+      minimo_controles: minimoControles,
+      ruta: `/pacientes/${pacienteId}?tab=controles`,
+    },
+    {
+      label: "Vacunas",
+      completado: Boolean(exp.vacunas?.length),
+      ruta: `/pacientes/${pacienteId}?tab=vacunas`,
+    },
+    {
+      label: "Plan de parto",
+      completado: Boolean(exp.plan_parto),
+      ruta: `/pacientes/${pacienteId}?tab=plan`,
+    },
+    {
+      label: "Morbilidad",
+      completado: Boolean(exp.morbilidad?.length),
+      ruta: `/pacientes/${pacienteId}?tab=morbilidad`,
+    },
+  ];
+
+  return {
+    porcentaje: items.filter((item) => item.completado).length * 20,
+    embarazo_id: exp.embarazo_activo?.id,
+    total_controles: totalControles,
+    items,
+  };
+}
+
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────
 export default function ExpedientePaciente() {
   const { id }     = useParams();
@@ -355,7 +397,7 @@ export default function ExpedientePaciente() {
         </div>
       </div>
 
-      <SemaforoCompletitud pacienteId={id} />
+      <SemaforoCompletitud pacienteId={id} initialData={buildCompletitudFromExp(exp, id)} />
 
       {/* ── TABS ── */}
       <div className="content-tabs" style={{ marginBottom: "1.5rem", marginTop: "1.5rem" }}>

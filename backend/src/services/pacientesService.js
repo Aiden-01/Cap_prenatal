@@ -342,6 +342,7 @@ async function obtenerCompletitudExpediente(pacienteId) {
   if (!data) throw new HttpError(404, 'No hay embarazo activo para calcular completitud');
 
   const totalControles = Number(data.total_controles || 0);
+  const minimoControles = 4;
   const items = [
     {
       label: 'Ficha de riesgo',
@@ -352,6 +353,8 @@ async function obtenerCompletitudExpediente(pacienteId) {
       label: 'Controles prenatales',
       completado: Boolean(data.tiene_controles),
       detalle: `${totalControles} controles registrados`,
+      total_controles: totalControles,
+      minimo_controles: minimoControles,
       ruta: `/pacientes/${pacienteId}?tab=controles`,
     },
     {
@@ -375,6 +378,7 @@ async function obtenerCompletitudExpediente(pacienteId) {
   return {
     porcentaje: completados * 20,
     embarazo_id: data.embarazo_id,
+    total_controles: totalControles,
     items,
   };
 }
