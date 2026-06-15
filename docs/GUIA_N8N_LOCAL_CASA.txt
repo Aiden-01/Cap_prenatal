@@ -83,17 +83,11 @@ Ejemplo para entorno local:
   N8N_WEBHOOK_SECRET=change_me_to_a_long_random_webhook_secret
   N8N_WEBHOOK_TIMEOUT_MS=5000
 
-  SMTP_HOST=smtp.gmail.com
-  SMTP_PORT=465
-  SMTP_SECURE=true
-  SMTP_USER=tu_correo@gmail.com
-  SMTP_PASSWORD=TU_CONTRASENA_DE_APLICACION_GOOGLE
-  SMTP_FROM=tu_correo@gmail.com
-
 Importante:
 
   - backend/.env no debe subirse a GitHub.
-  - SMTP_PASSWORD debe ser contrasena de aplicacion, no la contrasena normal de Gmail.
+  - Las credenciales SMTP deben guardarse dentro de las credenciales de n8n.
+  - Para Gmail se debe usar contrasena de aplicacion, no la contrasena normal.
   - Si cambias backend/.env, reinicia backend y n8n.
 
 
@@ -263,13 +257,15 @@ Agregar nodo:
 
 Crear credenciales SMTP.
 
-Para Gmail:
+Para Gmail, crear una credencial SMTP en n8n con:
 
-  Host: smtp.gmail.com
-  Port: 465
-  SSL/TLS: true
-  User: tu_correo@gmail.com
-  Password: contrasena de aplicacion
+  - Servidor SMTP de Gmail.
+  - Puerto seguro 465.
+  - SSL/TLS activado.
+  - Correo emisor.
+  - Contrasena de aplicacion generada en Google.
+
+No guardar esta contrasena dentro del repositorio.
 
 Configuracion del correo:
 

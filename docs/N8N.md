@@ -46,24 +46,11 @@ Para el flujo de citas de manana, la variable indispensable es `AUTOMATION_SECRE
 
 ### Credenciales SMTP locales
 
-Si inicias n8n con `npm run n8n:local`, puedes crear credenciales SMTP usando expresiones con variables de entorno:
+Crear las credenciales SMTP directamente en n8n. Para Gmail se usa el servidor
+SMTP de Gmail, puerto seguro 465, SSL/TLS activo, el correo emisor y una
+contrasena de aplicacion generada en Google.
 
-```txt
-Host: {{$env.SMTP_HOST}}
-Port: {{$env.SMTP_PORT}}
-User: {{$env.SMTP_USER}}
-Password: {{$env.SMTP_PASSWORD}}
-From: {{$env.SMTP_FROM}}
-SSL/TLS: true
-```
-
-Para Gmail:
-
-```txt
-Host: smtp.gmail.com
-Port: 465
-SSL/TLS: true
-```
+No escribir contrasenas SMTP en archivos versionados ni en documentacion.
 
 ### URL del HTTP Request en n8n local
 

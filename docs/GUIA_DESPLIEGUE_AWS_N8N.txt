@@ -123,18 +123,13 @@ Ejemplo:
   N8N_WEBHOOK_SECRET=CAMBIAR_POR_SECRETO_LARGO_WEBHOOK
   N8N_WEBHOOK_TIMEOUT_MS=5000
 
-  SMTP_HOST=smtp.gmail.com
-  SMTP_PORT=465
-  SMTP_SECURE=true
-  SMTP_USER=correo_del_sistema@gmail.com
-  SMTP_PASSWORD=CONTRASENA_DE_APLICACION_GOOGLE
-  SMTP_FROM=correo_del_sistema@gmail.com
-
 Notas:
 
   - No subir backend/.env a GitHub.
   - Usar secretos largos y diferentes.
+  - Las credenciales SMTP deben guardarse en n8n o en un gestor de secretos.
   - Para Gmail, usar contrasena de aplicacion, no la contrasena normal.
+  - No escribir contrasenas SMTP en archivos versionados.
 
 
 6. Configurar n8n en Docker Compose
