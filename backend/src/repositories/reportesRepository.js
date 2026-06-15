@@ -230,6 +230,31 @@ async function obtenerSinControlReciente() {
   return rows;
 }
 
+async function obtenerProximasCitasPorDias(dias = 1) {
+  const { rows } = await pool.query(`
+    SELECT
+      p.id AS paciente_id,
+      e.id AS embarazo_id,
+      p.nombres || ' ' || p.apellidos AS nombre,
+      p.no_expediente,
+      p.telefono,
+      p.comunidad,
+      p.municipio,
+      c.id AS control_id,
+      c.numero_control,
+      c.cita_siguiente,
+      COALESCE(r.tiene_riesgo, FALSE) AS tiene_riesgo
+    FROM controles_prenatales c
+    JOIN embarazos e ON e.id = c.embarazo_id AND e.estado = 'activo'
+    JOIN pacientes p ON p.id = c.paciente_id
+    LEFT JOIN fichas_riesgo_obstetrico r ON r.embarazo_id = e.id
+    WHERE c.cita_siguiente = CURRENT_DATE + ($1::INTEGER * INTERVAL '1 day')
+    ORDER BY c.cita_siguiente ASC, p.apellidos ASC, p.nombres ASC
+  `, [dias]);
+
+  return rows;
+}
+
 module.exports = {
   obtenerRowsCensoGeneral,
   obtenerRowsCensoPrimerControl,
@@ -237,4 +262,5 @@ module.exports = {
   obtenerPacientesConRiesgo,
   obtenerProximasAParir,
   obtenerSinControlReciente,
+  obtenerProximasCitasPorDias,
 };

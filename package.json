@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "n8n:local": "npx n8n"
+  },
   "dependencies": {
     "exceljs": "^4.4.0",
     "react-datepicker": "^9.1.0",

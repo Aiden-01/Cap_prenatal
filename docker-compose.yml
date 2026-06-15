@@ -40,8 +40,28 @@ services:
       COOKIE_SAMESITE: lax
       PDF_EXCEL_ENGINE: libreoffice
       LIBREOFFICE_PATH: /usr/bin/soffice
+      NOTIFICATIONS_ENABLED: "false"
+      N8N_WEBHOOK_URL: http://n8n:5678/webhook/cap-prenatal-alertas
+      N8N_WEBHOOK_SECRET: change_me_to_a_long_random_webhook_secret
+      N8N_WEBHOOK_TIMEOUT_MS: 5000
+      AUTOMATION_SECRET: change_me_to_a_long_random_automation_secret
     ports:
       - "3001:3001"
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: cap-prenatal-n8n
+    restart: unless-stopped
+    environment:
+      GENERIC_TIMEZONE: America/Guatemala
+      TZ: America/Guatemala
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_RUNNERS_ENABLED: "true"
+      WEBHOOK_URL: http://localhost:5678/
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
 
   frontend:
     build:
@@ -57,3 +77,4 @@ services:
 
 volumes:
   postgres_data:
+  n8n_data:
