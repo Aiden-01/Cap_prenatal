@@ -1,0 +1,400 @@
+GUIA PARA CONFIGURAR N8N LOCAL EN OTRA COMPUTADORA
+Proyecto: CAP Prenatal - CAP El Chal
+
+Objetivo
+--------
+Replicar en una computadora de casa el flujo de n8n que envia un correo diario
+con las pacientes que tienen cita prenatal para el dia siguiente.
+
+Flujo final:
+
+  Manual Trigger o Schedule Trigger
+    -> HTTP Request al backend
+    -> IF debe_enviar = true
+    -> Send Email
+
+
+1. Requisitos
+-------------
+
+En la computadora de casa debes tener:
+
+  - Node.js instalado
+  - PostgreSQL o Docker para la base de datos
+  - El proyecto cap_prenatal
+  - Dependencias instaladas en backend y frontend
+  - Un correo Gmail con contrasena de aplicacion
+
+Verificar Node:
+
+  node -v
+  npm -v
+
+
+2. Preparar el proyecto
+-----------------------
+
+Clonar o copiar el proyecto:
+
+  git clone URL_DEL_REPOSITORIO cap_prenatal
+  cd cap_prenatal
+
+Instalar dependencias del backend:
+
+  cd backend
+  npm install
+
+Instalar dependencias del frontend:
+
+  cd ../frontend
+  npm install
+
+Regresar a la raiz:
+
+  cd ..
+
+
+3. Crear backend/.env
+---------------------
+
+Crear archivo:
+
+  backend/.env
+
+Ejemplo para entorno local:
+
+  DB_HOST=localhost
+  DB_PORT=5432
+  DB_NAME=cap_prenatal
+  DB_USER=postgres
+  DB_PASSWORD=TU_PASSWORD_POSTGRES
+
+  JWT_SECRET=cap_el_chal_jwt_secret_local
+  JWT_EXPIRES_IN=8h
+
+  PORT=3001
+  NODE_ENV=development
+  PDF_EXCEL_ENGINE=auto
+  LIBREOFFICE_PATH=/usr/bin/soffice
+
+  AUTOMATION_SECRET=change_me_to_a_long_random_automation_secret
+  NOTIFICATIONS_ENABLED=false
+  N8N_WEBHOOK_URL=http://localhost:5678/webhook/cap-prenatal-alertas
+  N8N_WEBHOOK_SECRET=change_me_to_a_long_random_webhook_secret
+  N8N_WEBHOOK_TIMEOUT_MS=5000
+
+  SMTP_HOST=smtp.gmail.com
+  SMTP_PORT=465
+  SMTP_SECURE=true
+  SMTP_USER=tu_correo@gmail.com
+  SMTP_PASSWORD=TU_CONTRASENA_DE_APLICACION_GOOGLE
+  SMTP_FROM=tu_correo@gmail.com
+
+Importante:
+
+  - backend/.env no debe subirse a GitHub.
+  - SMTP_PASSWORD debe ser contrasena de aplicacion, no la contrasena normal de Gmail.
+  - Si cambias backend/.env, reinicia backend y n8n.
+
+
+4. Preparar la base de datos
+----------------------------
+
+Si usas PostgreSQL local:
+
+  1. Crear base de datos cap_prenatal.
+  2. Verificar usuario y password.
+  3. Ejecutar migraciones:
+
+     cd backend
+     npm run db:migrate
+
+Si usas Docker solo para PostgreSQL:
+
+  docker compose up -d postgres
+
+Luego:
+
+  cd backend
+  npm run db:migrate
+
+
+5. Levantar backend
+-------------------
+
+Desde la carpeta backend:
+
+  npm run dev
+
+Verificar:
+
+  http://localhost:3001/api/health
+
+Debe responder status ok.
+
+
+6. Crear una cita de prueba para manana
+---------------------------------------
+
+Entra al sistema, abre una paciente y crea/edita un control prenatal con:
+
+  cita_siguiente = manana
+
+Esto es necesario para que el endpoint devuelva:
+
+  total > 0
+  debe_enviar = true
+
+
+7. Probar endpoint desde PowerShell
+-----------------------------------
+
+Desde la raiz del proyecto:
+
+  $secret = "change_me_to_a_long_random_automation_secret"
+  Invoke-RestMethod `
+    -Uri "http://localhost:3001/api/automatizaciones/proximas-citas?dias=1" `
+    -Headers @{ "x-cap-prenatal-secret" = $secret } `
+    -Method Get
+
+Respuesta esperada si hay cita:
+
+  total: 1
+  debe_enviar: true
+
+Si responde secreto invalido:
+
+  - Revisar que el header sea x-cap-prenatal-secret.
+  - Revisar que el valor coincida con AUTOMATION_SECRET.
+  - Reiniciar backend.
+
+
+8. Levantar n8n local
+---------------------
+
+Desde la raiz del proyecto:
+
+  npm run n8n:local
+
+Este comando carga variables desde backend/.env y luego inicia n8n.
+
+Abrir:
+
+  http://localhost:5678
+
+Si es primera vez, crear cuenta owner.
+
+Nota:
+
+  Esa cuenta es local. No sincroniza workflows con otras computadoras.
+
+
+9. Crear workflow en n8n
+------------------------
+
+Crear un workflow nuevo.
+
+Nodo 1 para pruebas:
+
+  Manual Trigger
+
+Despues, cuando ya funcione, se cambia por:
+
+  Schedule Trigger
+
+
+10. Nodo HTTP Request
+---------------------
+
+Agregar nodo:
+
+  HTTP Request
+
+Configuracion:
+
+  Method: GET
+  URL: http://localhost:3001/api/automatizaciones/proximas-citas?dias=1
+  Authentication: None
+  Send Headers: ON
+
+Header:
+
+  Name: x-cap-prenatal-secret
+  Value: change_me_to_a_long_random_automation_secret
+
+Tambien puedes usar variable:
+
+  Value: {{$env.AUTOMATION_SECRET}}
+
+Pero para que funcione con variable debes iniciar n8n con:
+
+  npm run n8n:local
+
+Ejecutar el nodo.
+
+Respuesta esperada:
+
+  total = 1
+  debe_enviar = true
+
+
+11. Nodo IF
+-----------
+
+Agregar nodo:
+
+  IF
+
+Condicion:
+
+  Value: {{$json.debe_enviar}}
+  Operation: is true
+
+La rama true continua al correo.
+La rama false no hace nada.
+
+
+12. Nodo Send Email
+-------------------
+
+Agregar nodo:
+
+  Send Email
+
+Crear credenciales SMTP.
+
+Para Gmail:
+
+  Host: smtp.gmail.com
+  Port: 465
+  SSL/TLS: true
+  User: tu_correo@gmail.com
+  Password: contrasena de aplicacion
+
+Configuracion del correo:
+
+  To Email: correo_destino@gmail.com
+  Subject: CAP El Chal - Recordatorio de citas prenatales
+  Email Format: HTML
+
+HTML:
+
+  <p><strong>CAP El Chal - Recordatorio de citas prenatales</strong></p>
+  <p>Se informa que las siguientes pacientes tienen cita prenatal programada para el dia de manana, {{$json.fecha_objetivo}}:</p>
+  {{$json.tabla_html}}
+  <p>Se recomienda verificar asistencia y actualizar el expediente correspondiente.</p>
+
+Ejecutar nodo.
+
+Debe llegar un correo con la tabla de citas.
+
+
+13. Cambiar a ejecucion diaria
+------------------------------
+
+Cuando el flujo ya funcione:
+
+  1. Quitar Manual Trigger.
+  2. Agregar Schedule Trigger.
+  3. Configurar:
+
+     Every day
+     08:00
+
+Flujo final:
+
+  Schedule Trigger
+    -> HTTP Request
+    -> IF
+    -> Send Email
+
+
+14. Exportar workflow
+---------------------
+
+Para guardar el flujo:
+
+  Workflow
+    -> Download / Export
+
+Guardar el archivo .json en un lugar seguro.
+
+Antes de subirlo a GitHub, revisar que no incluya credenciales.
+
+Recomendacion:
+
+  Guardar workflows exportados en una carpeta local no versionada si contienen datos sensibles.
+
+
+15. Errores comunes
+-------------------
+
+Error:
+
+  AUTOMATION_SECRET_MISSING
+
+Solucion:
+
+  - Revisar backend/.env.
+  - Reiniciar backend.
+
+Error:
+
+  AUTOMATION_SECRET_INVALID
+
+Solucion:
+
+  - El header x-cap-prenatal-secret no coincide con AUTOMATION_SECRET.
+  - Copiar exactamente el valor.
+  - No usar comillas.
+
+Error:
+
+  Node does not have any credentials set
+
+Solucion:
+
+  - El nodo Send Email no tiene credenciales SMTP.
+  - Crear credencial SMTP.
+
+Error:
+
+  No llega correo
+
+Solucion:
+
+  - Revisar spam.
+  - Verificar contrasena de aplicacion.
+  - Verificar que el nodo Send Email se ejecute por la rama true.
+  - Verificar que debe_enviar sea true.
+
+Error:
+
+  debe_enviar = false
+
+Solucion:
+
+  - No hay citas para manana.
+  - Crear una cita de prueba para manana.
+  - O probar con dias=0 si hay citas para hoy.
+
+
+16. Notas importantes
+---------------------
+
+El correo de acceso a n8n no sincroniza workflows.
+
+Cada instalacion local de n8n tiene sus propios datos.
+
+Para usar el mismo workflow en varias computadoras:
+
+  - Exportar el workflow como .json.
+  - Importarlo en la otra computadora.
+
+Para centralizarlo:
+
+  - Montar n8n en AWS.
+  - Entrar desde cualquier computadora al mismo dominio.
+
+
+Fin de la guia.
