@@ -1,5 +1,7 @@
 const crypto = require('crypto');
+const path = require('path');
 const express = require('express');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const reportesService = require('../services/reportesService');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { AppError } = require('../utils/appError');

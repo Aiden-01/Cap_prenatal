@@ -18,7 +18,7 @@ Desde la raiz del proyecto:
 npm run n8n:local
 ```
 
-Tambien puedes ejecutarlo directo:
+Ese comando carga variables desde `backend/.env` y luego inicia n8n. Tambien puedes ejecutarlo directo, pero en ese caso n8n no cargara automaticamente las variables SMTP del proyecto:
 
 ```bash
 npx n8n
@@ -43,6 +43,27 @@ N8N_WEBHOOK_TIMEOUT_MS=5000
 ```
 
 Para el flujo de citas de manana, la variable indispensable es `AUTOMATION_SECRET`.
+
+### Credenciales SMTP locales
+
+Si inicias n8n con `npm run n8n:local`, puedes crear credenciales SMTP usando expresiones con variables de entorno:
+
+```txt
+Host: {{$env.SMTP_HOST}}
+Port: {{$env.SMTP_PORT}}
+User: {{$env.SMTP_USER}}
+Password: {{$env.SMTP_PASSWORD}}
+From: {{$env.SMTP_FROM}}
+SSL/TLS: true
+```
+
+Para Gmail:
+
+```txt
+Host: smtp.gmail.com
+Port: 465
+SSL/TLS: true
+```
 
 ### URL del HTTP Request en n8n local
 

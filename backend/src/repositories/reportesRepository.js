@@ -139,7 +139,7 @@ async function obtenerEstadisticasBase() {
       JOIN embarazos e ON e.id = c.embarazo_id AND e.estado = 'activo'
       JOIN pacientes p ON p.id = c.paciente_id
       WHERE c.cita_siguiente BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
-      ORDER BY c.cita_siguiente ASC
+      ORDER BY c.cita_siguiente ASC, p.apellidos ASC, p.nombres ASC
       LIMIT 15
     `),
   ]);
