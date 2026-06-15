@@ -1,0 +1,378 @@
+GUIA DE DESPLIEGUE EN AWS CON N8N
+Proyecto: CAP Prenatal - CAP El Chal
+
+Objetivo
+--------
+Desplegar el sistema en un servidor AWS EC2 usando Docker Compose e incluir n8n
+para automatizar recordatorios diarios de citas prenatales por correo.
+
+
+1. Arquitectura recomendada
+---------------------------
+
+Servidor AWS EC2 Ubuntu:
+
+  - frontend
+  - backend
+  - postgres
+  - n8n
+  - nginx o caddy para HTTPS
+
+Flujo de automatizacion:
+
+  n8n Schedule Trigger diario
+    -> HTTP Request al backend
+    -> IF debe_enviar = true
+    -> Send Email
+
+Subdominios sugeridos:
+
+  app.tudominio.com   -> frontend
+  n8n.tudominio.com   -> panel n8n
+
+El backend puede quedar interno en Docker y no exponerse publicamente.
+
+
+2. Crear servidor en AWS
+------------------------
+
+1. Entrar a AWS Console.
+2. Ir a EC2.
+3. Crear una instancia Ubuntu LTS.
+4. Tipo sugerido para pruebas: t3.small o t3.medium.
+5. Crear o seleccionar una llave SSH.
+6. Security Group:
+
+   Abrir:
+     - 22 SSH, idealmente solo desde tu IP
+     - 80 HTTP
+     - 443 HTTPS
+
+   No exponer publicamente:
+     - 3001 backend
+     - 5432 postgres
+     - 5678 n8n
+
+
+3. Instalar Docker en EC2
+-------------------------
+
+Conectarse por SSH:
+
+  ssh -i tu_llave.pem ubuntu@IP_DEL_SERVIDOR
+
+Actualizar paquetes:
+
+  sudo apt update
+  sudo apt upgrade -y
+
+Instalar Docker:
+
+  sudo apt install -y ca-certificates curl gnupg
+  sudo install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  sudo chmod a+r /etc/apt/keyrings/docker.gpg
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  sudo apt update
+  sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+Permitir usar Docker sin sudo:
+
+  sudo usermod -aG docker ubuntu
+
+Cerrar sesion SSH y volver a entrar.
+
+
+4. Subir el proyecto
+--------------------
+
+Opcion A: clonar desde GitHub:
+
+  git clone URL_DEL_REPOSITORIO cap_prenatal
+  cd cap_prenatal
+
+Opcion B: subir por SCP/SFTP si aun no esta en GitHub.
+
+
+5. Variables de entorno
+-----------------------
+
+Crear archivo backend/.env en el servidor.
+
+Ejemplo:
+
+  DB_HOST=postgres
+  DB_PORT=5432
+  DB_NAME=cap_prenatal
+  DB_USER=postgres
+  DB_PASSWORD=CAMBIAR_PASSWORD_DB
+
+  JWT_SECRET=CAMBIAR_POR_SECRETO_LARGO
+  JWT_EXPIRES_IN=8h
+
+  PORT=3001
+  NODE_ENV=production
+  FRONTEND_URL=https://app.tudominio.com
+
+  PDF_EXCEL_ENGINE=libreoffice
+  LIBREOFFICE_PATH=/usr/bin/soffice
+
+  AUTOMATION_SECRET=CAMBIAR_POR_SECRETO_LARGO_AUTOMATIZACIONES
+  NOTIFICATIONS_ENABLED=false
+  N8N_WEBHOOK_URL=https://n8n.tudominio.com/webhook/cap-prenatal-alertas
+  N8N_WEBHOOK_SECRET=CAMBIAR_POR_SECRETO_LARGO_WEBHOOK
+  N8N_WEBHOOK_TIMEOUT_MS=5000
+
+  SMTP_HOST=smtp.gmail.com
+  SMTP_PORT=465
+  SMTP_SECURE=true
+  SMTP_USER=correo_del_sistema@gmail.com
+  SMTP_PASSWORD=CONTRASENA_DE_APLICACION_GOOGLE
+  SMTP_FROM=correo_del_sistema@gmail.com
+
+Notas:
+
+  - No subir backend/.env a GitHub.
+  - Usar secretos largos y diferentes.
+  - Para Gmail, usar contrasena de aplicacion, no la contrasena normal.
+
+
+6. Configurar n8n en Docker Compose
+-----------------------------------
+
+El docker-compose.yml ya incluye el servicio n8n.
+
+Variables recomendadas para n8n en produccion:
+
+  GENERIC_TIMEZONE=America/Guatemala
+  TZ=America/Guatemala
+  N8N_HOST=n8n.tudominio.com
+  N8N_PROTOCOL=https
+  WEBHOOK_URL=https://n8n.tudominio.com/
+  N8N_ENCRYPTION_KEY=CAMBIAR_POR_CLAVE_LARGA_FIJA
+  N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+  N8N_RUNNERS_ENABLED=true
+
+Importante:
+
+  - N8N_ENCRYPTION_KEY debe mantenerse fija.
+  - Si cambia, n8n puede perder acceso a credenciales guardadas.
+
+
+7. Levantar servicios
+---------------------
+
+Desde la carpeta del proyecto:
+
+  docker compose up -d --build
+
+Ver estado:
+
+  docker compose ps
+
+Ver logs:
+
+  docker compose logs -f backend
+  docker compose logs -f frontend
+  docker compose logs -f n8n
+
+
+8. Migrar base de datos
+-----------------------
+
+Ejecutar migraciones dentro del contenedor backend:
+
+  docker compose exec backend npm run db:migrate
+
+Si hay datos demo:
+
+  docker compose exec backend npm run db:seed
+
+
+9. HTTPS con Nginx o Caddy
+--------------------------
+
+Opcion simple recomendada: Caddy.
+
+Instalar Caddy:
+
+  sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+  sudo apt update
+  sudo apt install caddy
+
+Ejemplo de Caddyfile:
+
+  app.tudominio.com {
+    reverse_proxy localhost:8080
+  }
+
+  n8n.tudominio.com {
+    reverse_proxy localhost:5678
+  }
+
+Recargar Caddy:
+
+  sudo systemctl reload caddy
+
+
+10. Configurar n8n
+------------------
+
+Entrar a:
+
+  https://n8n.tudominio.com
+
+Crear cuenta owner.
+
+Crear workflow:
+
+  1. Schedule Trigger
+     - Cada dia
+     - Hora sugerida: 06:00
+
+  2. HTTP Request
+     - Method: GET
+     - URL si n8n esta en el mismo Docker Compose:
+
+       http://backend:3001/api/automatizaciones/proximas-citas?dias=1
+
+     - Header:
+
+       x-cap-prenatal-secret: VALOR_DE_AUTOMATION_SECRET
+
+  3. IF
+     - Condicion:
+
+       debe_enviar is true
+
+  4. Send Email
+     - To: correo del personal o correo institucional
+     - Subject: CAP El Chal - Recordatorio de citas prenatales
+     - Email Format: HTML
+     - HTML:
+
+       <p><strong>CAP El Chal - Recordatorio de citas prenatales</strong></p>
+       <p>Se informa que las siguientes pacientes tienen cita prenatal programada para el dia de manana, {{$json.fecha_objetivo}}:</p>
+       {{$json.tabla_html}}
+       <p>Se recomienda verificar asistencia y actualizar el expediente correspondiente.</p>
+
+
+11. Prueba del endpoint
+-----------------------
+
+Desde el servidor:
+
+  curl -H "x-cap-prenatal-secret: VALOR_DE_AUTOMATION_SECRET" \
+    "http://localhost:3001/api/automatizaciones/proximas-citas?dias=1"
+
+Respuesta esperada si hay citas:
+
+  {
+    "total": 1,
+    "debe_enviar": true,
+    "mensaje_resumen": "...",
+    "tabla_html": "..."
+  }
+
+Si no hay citas:
+
+  {
+    "total": 0,
+    "debe_enviar": false
+  }
+
+En n8n, si debe_enviar = false, el workflow no debe enviar correo.
+
+
+12. Backups
+-----------
+
+Recomendacion minima:
+
+  - Backup diario de PostgreSQL.
+  - Backup del volumen n8n_data.
+  - Backup del archivo backend/.env en lugar seguro.
+
+Backup manual PostgreSQL:
+
+  docker compose exec postgres pg_dump -U postgres cap_prenatal > backup_cap_prenatal.sql
+
+Restaurar:
+
+  cat backup_cap_prenatal.sql | docker compose exec -T postgres psql -U postgres cap_prenatal
+
+
+13. Seguridad
+-------------
+
+Checklist:
+
+  - No exponer puerto 5432.
+  - No exponer puerto 3001 directamente si no es necesario.
+  - Proteger n8n con usuario fuerte.
+  - Usar HTTPS.
+  - Usar secretos largos.
+  - No subir .env a GitHub.
+  - Revocar contrasenas de aplicacion si se filtran.
+  - En mensajes no incluir datos clinicos sensibles innecesarios.
+
+
+14. Futuro: WhatsApp
+--------------------
+
+La arquitectura queda lista para WhatsApp.
+
+El cambio seria sustituir:
+
+  Send Email
+
+por:
+
+  HTTP Request a WhatsApp Cloud API
+
+o por un nodo/proveedor compatible.
+
+Para WhatsApp oficial se requiere:
+
+  - Meta Business
+  - WhatsApp Business Platform / Cloud API
+  - Numero autorizado
+  - Token
+  - Plantillas aprobadas
+  - Consentimiento de pacientes
+
+Para pruebas y tesis, correo electronico es suficiente para demostrar la automatizacion.
+
+
+15. Comandos utiles
+-------------------
+
+Ver contenedores:
+
+  docker compose ps
+
+Reiniciar backend:
+
+  docker compose restart backend
+
+Reiniciar n8n:
+
+  docker compose restart n8n
+
+Ver logs backend:
+
+  docker compose logs -f backend
+
+Ver logs n8n:
+
+  docker compose logs -f n8n
+
+Actualizar imagenes:
+
+  docker compose pull
+  docker compose up -d --build
+
+
+Fin de la guia.
