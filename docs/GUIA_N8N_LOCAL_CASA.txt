@@ -76,6 +76,8 @@ Ejemplo para entorno local:
   NODE_ENV=development
   PDF_EXCEL_ENGINE=auto
   LIBREOFFICE_PATH=/usr/bin/soffice
+  GENERIC_TIMEZONE=America/Guatemala
+  TZ=America/Guatemala
 
   AUTOMATION_SECRET=change_me_to_a_long_random_automation_secret
   NOTIFICATIONS_ENABLED=false
@@ -296,6 +298,7 @@ Cuando el flujo ya funcione:
 
      Every day
      08:00
+     Timezone: America/Guatemala
 
 Flujo final:
 

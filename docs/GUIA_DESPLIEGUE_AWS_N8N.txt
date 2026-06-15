@@ -113,6 +113,8 @@ Ejemplo:
   PORT=3001
   NODE_ENV=production
   FRONTEND_URL=https://app.tudominio.com
+  GENERIC_TIMEZONE=America/Guatemala
+  TZ=America/Guatemala
 
   PDF_EXCEL_ENGINE=libreoffice
   LIBREOFFICE_PATH=/usr/bin/soffice

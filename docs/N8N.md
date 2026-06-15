@@ -40,9 +40,12 @@ NOTIFICATIONS_ENABLED=false
 N8N_WEBHOOK_URL=http://localhost:5678/webhook/cap-prenatal-alertas
 N8N_WEBHOOK_SECRET=change_me_to_a_long_random_webhook_secret
 N8N_WEBHOOK_TIMEOUT_MS=5000
+GENERIC_TIMEZONE=America/Guatemala
+TZ=America/Guatemala
 ```
 
 Para el flujo de citas de manana, la variable indispensable es `AUTOMATION_SECRET`.
+Para que el horario sea Guatemala, n8n debe iniciar con `GENERIC_TIMEZONE=America/Guatemala` y `TZ=America/Guatemala`. Si ya estaba abierto, cierralo y vuelve a iniciar con `npm run n8n:local`.
 
 ### Credenciales SMTP locales
 
@@ -99,6 +102,7 @@ En produccion cambia `N8N_WEBHOOK_SECRET` y `AUTOMATION_SECRET` por valores larg
 1. Crear un workflow en n8n.
 2. Agregar nodo `Schedule Trigger`.
 3. Programarlo diariamente, por ejemplo 6:00 a. m.
+   Verificar que el timezone del trigger/workflow sea `America/Guatemala`.
 4. Agregar nodo `HTTP Request`.
 5. Metodo: `GET`.
 6. URL segun entorno:

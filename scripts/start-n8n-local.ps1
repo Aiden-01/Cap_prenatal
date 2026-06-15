@@ -25,4 +25,12 @@ if (Test-Path $envPath) {
   }
 }
 
+if (-not $env:GENERIC_TIMEZONE) {
+  $env:GENERIC_TIMEZONE = "America/Guatemala"
+}
+
+if (-not $env:TZ) {
+  $env:TZ = "America/Guatemala"
+}
+
 npx n8n
