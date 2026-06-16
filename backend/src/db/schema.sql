@@ -369,12 +369,12 @@ CREATE TABLE IF NOT EXISTS controles_prenatales (
 
   -- Papanicolau / IVAA
   papanicolau_ivaa_realizado  BOOLEAN DEFAULT FALSE,
-  papanicolau_ivaa_fecha_toma DATE,                   -- Fecha toma de muestra (Carné pág.6)
-  papanicolau_ivaa_resultado  VARCHAR(100),
+  papanicolau_ivaa_fecha_toma DATE,
+  papanicolau_ivaa_resultado  VARCHAR(100),           -- positivo | negativo
 
   -- Hepatitis B
   hepatitis_b_realizado     BOOLEAN DEFAULT FALSE,
-  hepatitis_b_resultado     VARCHAR(50),
+  hepatitis_b_resultado     VARCHAR(50),              -- positivo | negativo
 
   -- Otros laboratorios
   otros_lab                 TEXT,

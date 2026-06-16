@@ -47,6 +47,14 @@ const controlBase = {
     (value) => (value === '' || value === null ? undefined : value),
     z.enum(['positivo', 'negativo']).optional()
   ),
+  papanicolau_ivaa_resultado: z.preprocess(
+    (value) => (value === '' || value === null ? undefined : value),
+    z.enum(['positivo', 'negativo']).optional()
+  ),
+  hepatitis_b_resultado: z.preprocess(
+    (value) => (value === '' || value === null ? undefined : value),
+    z.enum(['positivo', 'negativo']).optional()
+  ),
 };
 
 const controlBooleanFields = [

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
@@ -67,6 +67,16 @@ function LabRow({ label, realizadoKey, resultadoKey, form, set, extra }) {
         </div>
       )}
     </div>
+  );
+}
+
+function ResultadoSelect({ value, onChange }) {
+  return (
+    <select className="input-field" style={{ minWidth: 130 }} value={value ?? ""} onChange={(e) => onChange(e.target.value)}>
+      <option value="">-</option>
+      <option value="positivo">Positivo (+)</option>
+      <option value="negativo">Negativo (-)</option>
+    </select>
   );
 }
 
@@ -158,11 +168,10 @@ export default function NuevoControl() {
       ...control,
       vih_resultado: control.vih_resultado === "no_aplica" ? "" : control.vih_resultado,
       vih_resultado_valor: "",
+      torch_resultado_valor: "",
+      papanicolau_ivaa_fecha_toma: "",
       fecha: control.fecha ? control.fecha.split("T")[0] : INIT.fecha,
       cita_siguiente: control.cita_siguiente ? control.cita_siguiente.split("T")[0] : "",
-      papanicolau_ivaa_fecha_toma: control.papanicolau_ivaa_fecha_toma
-        ? control.papanicolau_ivaa_fecha_toma.split("T")[0]
-        : "",
     });
 
     const controlesRequest = editando
@@ -212,6 +221,8 @@ export default function NuevoControl() {
       ...form,
       edad_gestacional_semanas: edadGestacionalSemanas,
       vih_resultado_valor: "",
+      torch_resultado_valor: "",
+      papanicolau_ivaa_fecha_toma: "",
     };
     try {
       if (editando) {
@@ -402,9 +413,9 @@ export default function NuevoControl() {
                   <Field label="Resultado">
                     <select className="input-field" style={{ minWidth: 130 }} value={form.vih_resultado}
                       onChange={(e) => set("vih_resultado", e.target.value)}>
-                      <option value="">—</option>
+                      <option value="">-</option>
                       <option value="positivo">Positivo (+)</option>
-                      <option value="negativo">Negativo (−)</option>
+                      <option value="negativo">Negativo (-)</option>
                     </select>
                   </Field>
                 </div>
@@ -419,9 +430,9 @@ export default function NuevoControl() {
                   <Field label="Resultado">
                     <select className="input-field" style={{ minWidth: 130 }} value={form.vdrl_resultado}
                       onChange={(e) => set("vdrl_resultado", e.target.value)}>
-                      <option value="">—</option>
+                      <option value="">-</option>
                       <option value="positivo">Positivo (+)</option>
-                      <option value="negativo">Negativo (−)</option>
+                      <option value="negativo">Negativo (-)</option>
                     </select>
                   </Field>
                   {form.vdrl_resultado === "positivo" && (
@@ -436,10 +447,22 @@ export default function NuevoControl() {
               <Toggle label="TORCH" name="torch_realizado" {...p} />
               {form.torch_realizado && (
                 <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
-                  <Toggle label="Resultado positivo (+)" name="torch_resultado_positivo" {...p} />
-                  <Field label="Valor/Detalle">
-                    <input className="input-field" value={form.torch_resultado_valor}
-                      onChange={(e) => set("torch_resultado_valor", e.target.value)} />
+                  <Field label="Resultado">
+                    <select
+                      className="input-field"
+                      style={{ minWidth: 130 }}
+                      value={form.torch_resultado_positivo === true ? "positivo" : form.torch_resultado_positivo === false ? "negativo" : ""}
+                      onChange={(e) =>
+                        set(
+                          "torch_resultado_positivo",
+                          e.target.value === "" ? null : e.target.value === "positivo"
+                        )
+                      }
+                    >
+                      <option value="">-</option>
+                      <option value="positivo">Positivo (+)</option>
+                      <option value="negativo">Negativo (-)</option>
+                    </select>
                   </Field>
                 </div>
               )}
@@ -450,19 +473,24 @@ export default function NuevoControl() {
               <Toggle label="Papanicolau / IVAA" name="papanicolau_ivaa_realizado" {...p} />
               {form.papanicolau_ivaa_realizado && (
                 <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
-                  <Field label="Fecha toma de muestra">
-                    <input className="input-field" type="date" value={form.papanicolau_ivaa_fecha_toma}
-                      onChange={(e) => set("papanicolau_ivaa_fecha_toma", e.target.value)} />
-                  </Field>
                   <Field label="Resultado">
-                    <input className="input-field" value={form.papanicolau_ivaa_resultado}
-                      onChange={(e) => set("papanicolau_ivaa_resultado", e.target.value)} />
+                    <ResultadoSelect value={form.papanicolau_ivaa_resultado} onChange={(value) => set("papanicolau_ivaa_resultado", value)} />
                   </Field>
                 </div>
               )}
             </div>
 
-            <LabRow label="Hepatitis B" realizadoKey="hepatitis_b_realizado" resultadoKey="hepatitis_b_resultado" {...p} />
+            {/* Hepatitis B */}
+            <div style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
+              <Toggle label="Hepatitis B" name="hepatitis_b_realizado" {...p} />
+              {form.hepatitis_b_realizado && (
+                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
+                  <Field label="Resultado">
+                    <ResultadoSelect value={form.hepatitis_b_resultado} onChange={(value) => set("hepatitis_b_resultado", value)} />
+                  </Field>
+                </div>
+              )}
+            </div>
 
             {/* USG */}
             <div style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>

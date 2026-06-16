@@ -1049,7 +1049,7 @@ function buildMspasHtml({ paciente, embarazo, controles }) {
       mark(c.vdrl_realizado === true, x + 8, 634),
       field(c.vdrl_resultado, x + 36, 634, 60, 8, 5.5),
       mark(c.torch_realizado === true, x + 8, 674),
-      field(c.torch_resultado_valor || (c.torch_resultado_positivo ? 'Positivo' : ''), x + 36, 674, 60, 8, 5.2),
+      field(c.torch_resultado_positivo === true ? 'Positivo' : c.torch_resultado_positivo === false ? 'Negativo' : '', x + 36, 674, 60, 8, 5.2),
       mark(c.papanicolau_ivaa_realizado === true, x + 8, 696),
       field(c.papanicolau_ivaa_resultado, x + 36, 696, 60, 8, 5.2),
       mark(c.hepatitis_b_realizado === true, x + 8, 717),
