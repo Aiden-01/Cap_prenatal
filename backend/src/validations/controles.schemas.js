@@ -41,7 +41,7 @@ const controlBase = {
   papanicolau_ivaa_fecha_toma: optionalDate,
   vih_resultado: z.preprocess(
     (value) => (value === '' || value === null ? undefined : value),
-    z.enum(['positivo', 'negativo', 'no_aplica']).optional()
+    z.enum(['positivo', 'negativo']).optional()
   ),
   vdrl_resultado: z.preprocess(
     (value) => (value === '' || value === null ? undefined : value),

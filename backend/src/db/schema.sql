@@ -354,7 +354,7 @@ CREATE TABLE IF NOT EXISTS controles_prenatales (
 
   -- VIH
   vih_realizado             BOOLEAN DEFAULT FALSE,
-  vih_resultado             VARCHAR(20),      -- positivo | negativo | no_aplica
+  vih_resultado             VARCHAR(20),      -- positivo | negativo
   vih_resultado_valor       VARCHAR(50),
 
   -- VDRL/RPR

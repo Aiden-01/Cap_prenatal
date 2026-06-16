@@ -216,9 +216,9 @@ const page1 = {
     duranteFecha3: { x: 518, y: 579 },
   },
   controls: CONTROL_COLUMNS.map((x) => ({
-    fecha: { x: x + 3, y: 640 },
-    hora: { hour: { x: x + 13, y: 667 }, minute: { x: x + 39, y: 667 } },
-    motivo: { x: x + 4, y: 693, w: 96, h: 40, size: 6.2, maxLines: 5 },
+    fecha: { x: x + 20, y: 635, yearOffset: 41 },
+    hora: { hour: { x: x + 36, y: 662 }, minute: { x: x + 60, y: 662 } },
+    motivo: { x: x + 4, y: 680, w: 96, h: 40, size: 6.2, maxLines: 5, lineGap: 7 },
     edadGestacional: { x: x + 5, y: 876, w: 90, size: 6.5 },
     acompanante: { x: x + 5, y: 890, w: 90, size: 6.2 },
     atiende: { x: x + 5, y: 904, w: 90, size: 5.8 },

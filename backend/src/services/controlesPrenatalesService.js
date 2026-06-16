@@ -92,7 +92,7 @@ function buildUpdateData(body) {
   const normalized = {};
 
   for (const field of campos) {
-    normalized[field] = emptyToNull(data[field]);
+    normalized[field] = field === 'vih_resultado_valor' ? null : emptyToNull(data[field]);
   }
 
   return { data: normalized, campos };
@@ -101,6 +101,7 @@ function buildUpdateData(body) {
 function normalizeCreateValue(field, body) {
   if (CONTROL_BOOLEAN_DEFAULT_FALSE.includes(field)) return body[field] ?? false;
   if (CONTROL_NULLABLE_BOOLEAN.includes(field)) return body[field] ?? null;
+  if (field === 'vih_resultado_valor') return null;
   return emptyToNull(body[field]);
 }
 

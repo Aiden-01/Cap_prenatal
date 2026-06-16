@@ -1045,7 +1045,7 @@ function buildMspasHtml({ paciente, embarazo, controles }) {
       mark(c.heces_realizada === true, x + 8, 592),
       field(c.heces_resultado, x + 36, 592, 60, 8, 5.5),
       mark(c.vih_realizado === true, x + 8, 615),
-      field(c.vih_resultado_valor || c.vih_resultado, x + 36, 615, 60, 8, 5.2),
+      field(c.vih_resultado, x + 36, 615, 60, 8, 5.2),
       mark(c.vdrl_realizado === true, x + 8, 634),
       field(c.vdrl_resultado, x + 36, 634, 60, 8, 5.5),
       mark(c.torch_realizado === true, x + 8, 674),

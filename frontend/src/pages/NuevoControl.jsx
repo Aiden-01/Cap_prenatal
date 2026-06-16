@@ -156,6 +156,8 @@ export default function NuevoControl() {
     const parseControl = (control) => ({
       ...initialControlForm(),
       ...control,
+      vih_resultado: control.vih_resultado === "no_aplica" ? "" : control.vih_resultado,
+      vih_resultado_valor: "",
       fecha: control.fecha ? control.fecha.split("T")[0] : INIT.fecha,
       cita_siguiente: control.cita_siguiente ? control.cita_siguiente.split("T")[0] : "",
       papanicolau_ivaa_fecha_toma: control.papanicolau_ivaa_fecha_toma
@@ -209,6 +211,7 @@ export default function NuevoControl() {
     const payload = {
       ...form,
       edad_gestacional_semanas: edadGestacionalSemanas,
+      vih_resultado_valor: "",
     };
     try {
       if (editando) {
@@ -281,7 +284,7 @@ export default function NuevoControl() {
             <Toggle label="Fiebre" name="peligro_fiebre" {...p} />
           </div>
           <div style={{ marginTop: "0.75rem" }}>
-            <Inp label="Otro signo de peligro" name="peligro_otro" form={form} set={set} />
+            <Inp label="Otro signo de peligro" name="peligro_otro" form={form} set={set} placeholder="Especifique..." />
           </div>
         </div>
 
@@ -402,12 +405,7 @@ export default function NuevoControl() {
                       <option value="">—</option>
                       <option value="positivo">Positivo (+)</option>
                       <option value="negativo">Negativo (−)</option>
-                      <option value="no_aplica">No aplica</option>
                     </select>
-                  </Field>
-                  <Field label="Valor/Detalle">
-                    <input className="input-field" value={form.vih_resultado_valor}
-                      onChange={(e) => set("vih_resultado_valor", e.target.value)} />
                   </Field>
                 </div>
               )}

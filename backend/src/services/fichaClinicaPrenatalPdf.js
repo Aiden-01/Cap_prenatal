@@ -143,10 +143,11 @@ function drawTextBox(page, font, value, cfg, label) {
 
   if (cfg.maxLines && cfg.maxLines > 1) {
     const lines = wrapText(text, font, size, width, cfg.maxLines);
+    const lineGap = cfg.lineGap ?? 1.5;
     lines.forEach((line, idx) => {
       page.drawText(line, {
         x,
-        y: y - idx * (size + 1.5),
+        y: y - idx * (size + lineGap),
         size,
         font,
         color: rgb(0.05, 0.05, 0.05),
@@ -172,7 +173,7 @@ function drawTextBox(page, font, value, cfg, label) {
 function drawDate(page, font, value, cfg, label, tiny = false) {
   const parts = dateParts(value);
   const gap = tiny ? 25 : 22;
-  const yearOffset = tiny ? 50 : 43;
+  const yearOffset = cfg.yearOffset ?? (tiny ? 50 : 43);
   const size = tiny ? 5.2 : 5.6;
   const boxes = [
     { value: parts.d, x: cfg.x, w: tiny ? 15 : 16 },
@@ -334,7 +335,7 @@ function drawDebugReferences(page, font) {
     debugPoint(page, cfg.no.x, cfg.no.y, `${label}:no`, font);
   });
   c.controls.forEach((cfg, idx) => {
-    [cfg.fecha.x, cfg.fecha.x + 25, cfg.fecha.x + 50].forEach((x, dateIdx) => {
+    [cfg.fecha.x, cfg.fecha.x + 25, cfg.fecha.x + (cfg.fecha.yearOffset ?? 50)].forEach((x, dateIdx) => {
       debugPoint(page, x, cfg.fecha.y, `c${idx + 1}:fecha:${dateIdx}`, font);
     });
     debugPoint(page, cfg.hora.hour.x, cfg.hora.hour.y, `c${idx + 1}:hour`, font);
@@ -465,8 +466,6 @@ function drawPuerperioSummary({ pdfDoc, font, paciente, embarazo, puerperio = []
 function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planParto, vacunas = [] }) {
   const p = paciente;
   const c = coords.pages[1];
-  const c1 = controlAt(controles, 1);
-  const c2 = controlAt(controles, 2);
   const fur = firstDateValue(
     embarazo?.fur,
     riesgo?.fecha_ultima_regla,
@@ -608,8 +607,8 @@ function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planPart
     'antecGemelares'
   );
 
-  [c1, c2].forEach((control, idx) => {
-    const cfg = c.controls[idx];
+  c.controls.forEach((cfg, idx) => {
+    const control = controlAt(controles, idx + 1);
     drawDate(page, font, control.fecha, cfg.fecha, `control${idx + 1}:fecha`, true);
     drawTime(page, font, control.hora, cfg.hora, `control${idx + 1}:hora`);
     drawTextBox(page, font, control.motivo_consulta, cfg.motivo, `control${idx + 1}:motivo`);
