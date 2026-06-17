@@ -2,6 +2,15 @@ const { z } = require('zod');
 
 const emptyToUndefined = (value) => (value === '' || value === null ? undefined : value);
 
+function todayGuatemalaDate() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Guatemala',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
 const idParam = z.coerce.number({
   invalid_type_error: 'Debe ser un identificador numerico',
 }).int('Debe ser un entero').positive('Debe ser mayor que 0');
@@ -34,6 +43,12 @@ const validDateString = z.string({ error: 'Campo requerido' })
 const dateString = z.preprocess(emptyToUndefined, validDateString);
 const optionalDate = z.preprocess(emptyToUndefined, validDateString.optional());
 const requiredDate = dateString;
+const validPastOrTodayDateString = validDateString.refine(
+  (value) => value <= todayGuatemalaDate(),
+  'No puede ser una fecha futura'
+);
+const optionalPastOrTodayDate = z.preprocess(emptyToUndefined, validPastOrTodayDateString.optional());
+const requiredPastOrTodayDate = z.preprocess(emptyToUndefined, validPastOrTodayDateString);
 
 const validTimeString = z.string({ error: 'Campo requerido' })
   .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, 'Debe usar formato HH:mm o HH:mm:ss');
@@ -89,6 +104,8 @@ module.exports = {
   dateString,
   optionalDate,
   requiredDate,
+  optionalPastOrTodayDate,
+  requiredPastOrTodayDate,
   optionalTime,
   optionalNumber,
   optionalInt,

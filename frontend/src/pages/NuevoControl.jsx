@@ -84,6 +84,71 @@ function ResultadoSelect({ value, onChange, error }) {
   );
 }
 
+const BLOOD_GROUP_OPTIONS = ["O", "A", "B", "AB"];
+
+function parseBloodGroupRh(value = "") {
+  const normalized = String(value || "").trim().toUpperCase();
+  const rh = normalized.endsWith("+") ? "+" : normalized.endsWith("-") ? "-" : "";
+  const group = rh ? normalized.slice(0, -1) : normalized;
+
+  return {
+    group: BLOOD_GROUP_OPTIONS.includes(group) ? group : "",
+    rh,
+  };
+}
+
+function BloodGroupRh({ form, set, errors = {} }) {
+  const error = errors.grupo_rh_resultado;
+  const { group, rh } = parseBloodGroupRh(form.grupo_rh_resultado);
+
+  const updateValue = (nextGroup, nextRh) => {
+    set("grupo_rh_resultado", nextGroup ? `${nextGroup}${nextRh || ""}` : "");
+  };
+
+  return (
+    <Field label="Resultado" error={error}>
+      <div style={{ display: "flex", gap: "0.55rem", flexWrap: "wrap", alignItems: "center" }}>
+        <select
+          className={`input-field ${error ? "input-error" : ""}`}
+          style={{ width: 120, minWidth: 120 }}
+          value={group}
+          onChange={(e) => updateValue(e.target.value, rh)}
+        >
+          <option value="">Grupo</option>
+          {BLOOD_GROUP_OPTIONS.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+
+        <div style={{ display: "flex", gap: "0.35rem", alignItems: "center" }}>
+          <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted)" }}>RH</span>
+          {["+", "-"].map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={`btn-secondary ${rh === option ? "is-active" : ""}`}
+              onClick={() => updateValue(group, rh === option ? "" : option)}
+              style={{
+                width: 38,
+                height: 38,
+                padding: 0,
+                justifyContent: "center",
+                borderColor: rh === option ? "var(--primary)" : "var(--border)",
+                background: rh === option ? "var(--primary-lt)" : "var(--surface)",
+                color: rh === option ? "var(--primary)" : "var(--text)",
+                fontWeight: 800,
+              }}
+              aria-pressed={rh === option}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+    </Field>
+  );
+}
+
 // ─── ESTADO INICIAL ──────────────────────────────────────────
 const INIT = {
   numero_control: 1,
@@ -220,6 +285,7 @@ export default function NuevoControl() {
   const [fur, setFur]         = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
   const editando = Boolean(controlId);
+  const todayInputValue = getGuatemalaDateInputValue();
 
   const set = (k, v) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -366,7 +432,7 @@ export default function NuevoControl() {
                 {[5,6,7,8,9,10].map(n => <option key={n} value={n}>Otro ({n})</option>)}
               </select>
             </Field>
-            <Inp label="Fecha" name="fecha" type="date" {...p} />
+            <Inp label="Fecha" name="fecha" type="date" max={todayInputValue} {...p} />
             <Inp label="Hora" name="hora" type="time" {...p} />
             <Inp label="Semanas de gestación" name="edad_gestacional_semanas" type="number" form={formConEdadGestacional} set={set} errors={fieldErrors} readOnly />
           </div>
@@ -487,7 +553,10 @@ export default function NuevoControl() {
 
             <LabRow label="Hematología" realizadoKey="hematologia_realizada" resultadoKey="hematologia_resultado" {...p} />
             <LabRow label="Glicemia en ayunas" realizadoKey="glicemia_realizada" resultadoKey="glicemia_resultado" {...p} />
-            <LabRow label="Grupo y RH" realizadoKey="grupo_rh_realizado" resultadoKey="grupo_rh_resultado" {...p} />
+            <div className="lab-row">
+              <Toggle label="Grupo y RH" name="grupo_rh_realizado" {...p} />
+              {form.grupo_rh_realizado && <BloodGroupRh {...p} />}
+            </div>
 
             {/* Orina — con bacteriuria y proteinuria */}
             <div style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>

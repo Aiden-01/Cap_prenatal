@@ -10,7 +10,6 @@ const pacientesRoutes = require('./routes/pacientes');
 const reportesRoutes  = require('./routes/reportes');
 const mapaRoutes      = require('./routes/mapa');
 const chatbotRoutes   = require('./routes/chatbot');
-const ocrRoutes       = require('./routes/ocr');
 const automatizacionesRoutes = require('./routes/automatizaciones');
 const { csrfMiddleware } = require('./middleware/auth');
 const { errorHandler } = require('./middleware/errorHandler');
@@ -63,7 +62,6 @@ app.use('/api/pacientes', pacientesRoutes);   // incluye sub-rutas controles/rie
 app.use('/api/reportes',  reportesRoutes);
 app.use('/api/mapa',      mapaRoutes);
 app.use('/api/chatbot',   chatbotRoutes);
-app.use('/api/ocr',       ocrRoutes);
 app.use('/api/automatizaciones', automatizacionesRoutes);
 
 // ── Health check ──────────────────────────────────────────────

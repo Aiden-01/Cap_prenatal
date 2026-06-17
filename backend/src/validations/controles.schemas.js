@@ -2,6 +2,8 @@ const {
   z,
   optionalDate,
   requiredDate,
+  optionalPastOrTodayDate,
+  requiredPastOrTodayDate,
   optionalTime,
   optionalInt,
   optionalNumber,
@@ -20,7 +22,7 @@ const {
 
 const controlBase = {
   numero_control: optionalInt(1, 20),
-  fecha: optionalDate,
+  fecha: optionalPastOrTodayDate,
   hora: optionalTime.optional(),
   motivo_consulta: optionalText(2000),
   edad_gestacional_semanas: gestationalAge,
@@ -80,7 +82,7 @@ for (const field of controlBooleanFields) {
 const controlCreateSchema = z.object({
   ...controlBase,
   numero_control: requiredInt(1, 20),
-  fecha: requiredDate,
+  fecha: requiredPastOrTodayDate,
 }).passthrough();
 
 const controlUpdateSchema = z.object(controlBase).passthrough();

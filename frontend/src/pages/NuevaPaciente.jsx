@@ -6,7 +6,7 @@ import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import {
   Building2, User, Heart, Baby, ShieldAlert, CheckCircle,
-  ChevronLeft, ChevronRight, Save, AlertTriangle, UploadCloud, ScanLine
+  ChevronLeft, ChevronRight, Save
 } from "lucide-react";
 import { getErrorMessage } from "../utils/errorMessage";
 import { useFieldErrors } from "../hooks/useFieldErrors";
@@ -30,8 +30,6 @@ const STEPS = [
   { label: "Confirmar",       icon: CheckCircle },
 ];
 
-const OCR_ENABLED = false;
-
 const FIELD_LABELS = {
   no_expediente: "No. expediente",
   cui: "CUI",
@@ -39,6 +37,7 @@ const FIELD_LABELS = {
   apellidos: "Apellidos",
   fecha_nacimiento: "Fecha de nacimiento",
   edad_manual: "Edad",
+  municipio: "Municipio",
   categoria_servicio: "Categoria",
   nivel_estudios: "Nivel de estudios",
   ultimo_anio_aprobado: "Ultimo anio aprobado",
@@ -70,6 +69,23 @@ function inferPacienteFieldErrors(err) {
   if (code === "DUPLICATE_RESOURCE" && lower.includes("expediente")) return { no_expediente: message };
   return {};
 }
+
+const MUNICIPIOS_PETEN = [
+  { value: "El Chal", label: "El Chal" },
+  { value: "Flores", label: "Flores" },
+  { value: "San José", label: "San José" },
+  { value: "San Benito", label: "San Benito" },
+  { value: "San Andrés", label: "San Andrés" },
+  { value: "La Libertad", label: "La Libertad" },
+  { value: "San Francisco", label: "San Francisco" },
+  { value: "Santa Ana", label: "Santa Ana" },
+  { value: "Dolores", label: "Dolores" },
+  { value: "San Luis", label: "San Luis" },
+  { value: "Sayaxché", label: "Sayaxché" },
+  { value: "Melchor de Mencos", label: "Melchor de Mencos" },
+  { value: "Poptún", label: "Poptún" },
+  { value: "Las Cruces", label: "Las Cruces" },
+];
 
 // ─── HELPERS DE CAMPO ────────────────────────────────────────
 function Field({ label, required, children, name }) {
@@ -271,12 +287,7 @@ export default function NuevaPaciente() {
   const [form, setForm]       = useState(INIT);
   const [cuiError, setCuiError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [ocrLoading, setOcrLoading] = useState(false);
-  const [ocrResult, setOcrResult] = useState(null);
-  const [, setOcrConflicts] = useState([]);
-  const [ocrFile, setOcrFile] = useState(null);
   const cuiInputRef           = useRef(null);
-  const ocrInputRef           = useRef(null);
   const navigate              = useNavigate();
   const toast                 = useGlobalToast();
   const editando              = Boolean(id);
@@ -399,167 +410,6 @@ export default function NuevaPaciente() {
     }));
   };
 
-  const shouldApplyOcrField = (field, confianza = {}) => {
-    const score = confianza[field];
-    return score === undefined || score >= 0.45;
-  };
-
-  const mapOcrFields = (campos = {}, confianza = {}) => {
-    const mapped = {};
-    const aliases = {
-      establecimiento: "nombre_establecimiento",
-      distrito: "distrito",
-      domicilio: "domicilio",
-      municipio: "municipio",
-      territorio: "territorio",
-      sector: "sector",
-      comunidad: "comunidad",
-      telefono: "telefono",
-    };
-    const directFields = [
-      "no_expediente", "cui", "nombres", "apellidos",
-      "fecha_nacimiento", "fur", "fpp",
-    ];
-
-    directFields.forEach((field) => {
-      if (shouldApplyOcrField(field, confianza) && campos[field] !== undefined && campos[field] !== null && campos[field] !== "") {
-        mapped[field] = campos[field];
-      }
-    });
-
-    Object.entries(aliases).forEach(([from, to]) => {
-      if (shouldApplyOcrField(from, confianza) && campos[from] !== undefined && campos[from] !== null && campos[from] !== "") {
-        mapped[to] = campos[from];
-      }
-    });
-
-    if (mapped.fecha_nacimiento) {
-      const edad = calcularEdad(mapped.fecha_nacimiento);
-      mapped.edad_manual = edad.anios;
-      mapped.edad_calculada = edad.texto;
-      mapped.rango_edad = clasificarEdad(edad.anios);
-    }
-
-    return mapped;
-  };
-
-  const ocrFieldLabels = {
-    no_expediente: "No. expediente",
-    cui: "CUI",
-    nombres: "Nombres",
-    apellidos: "Apellidos",
-    domicilio: "Domicilio",
-    municipio: "Municipio",
-    territorio: "Territorio",
-    sector: "Sector",
-    comunidad: "Comunidad",
-    telefono: "Teléfono",
-    fecha_nacimiento: "Fecha de nacimiento",
-    fur: "FUR",
-    fpp: "FPP",
-  };
-
-  const mapOcrFieldName = (field) => ({
-    establecimiento: "nombre_establecimiento",
-  }[field] || field);
-
-  const applyOcrSuggestion = (field, value) => {
-    const target = mapOcrFieldName(field);
-    if (form[target] !== undefined && form[target] !== null && form[target] !== "") return;
-    set(target, value);
-  };
-
-  const handleOcrFile = (file) => {
-    setOcrFile(file || null);
-    setOcrResult(null);
-    setOcrConflicts([]);
-    if (file) toast("Documento cargado correctamente", "success");
-  };
-
-  const processOcr = async () => {
-    if (!ocrFile) {
-      toast("Seleccione una imagen para procesar", "error");
-      return;
-    }
-
-    setOcrLoading(true);
-    setOcrConflicts([]);
-    try {
-      const data = new FormData();
-      data.append("documento", ocrFile);
-
-      const res = await api.post("/ocr/nueva-paciente", data, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      setOcrResult(res.data);
-      const count = Object.keys(res.data?.campos_detectados || {}).length;
-      const { applied, conflicts } = applyOcrData(res.data);
-      if (applied) {
-        setStep(0);
-        toast(
-          conflicts.length
-            ? `OCR aplicó ${applied} campo(s). Algunos ya tenían datos y no se sobrescribieron.`
-            : `OCR aplicó ${applied} campo(s). Revisa cada página antes de registrar.`,
-          "success"
-        );
-      } else {
-        const usingLocalOnly = res.data?.ocr_lang === "spa-template";
-        const warning = res.data?.advertencias?.[0];
-        toast(
-          count
-            ? warning || (usingLocalOnly
-              ? "OCR local encontró escritura, pero no fue confiable para aplicarla automáticamente. Revise las sugerencias."
-              : "OCR encontró texto, pero no datos confiables para aplicar.")
-            : "OCR no detectó datos suficientes. Tome la foto con la hoja completa, plana y bien iluminada.",
-          "error"
-        );
-      }
-    } catch (e) {
-      const detail = e.response?.data?.errores?.[0];
-      const message = getErrorMessage(e, "No se pudo procesar la imagen. Puede continuar manualmente.");
-      toast(detail ? `${message} (${detail})` : message, "error");
-    } finally {
-      setOcrLoading(false);
-    }
-  };
-
-  const applyOcrData = (result = ocrResult) => {
-    const campos = mapOcrFields(result?.campos_detectados || {}, result?.confianza || {});
-    const conflicts = [];
-    const updates = [];
-
-    Object.entries(campos).forEach(([key, value]) => {
-      if (value === undefined || value === null || value === "") return;
-      const current = form[key];
-      const hasCurrent = current !== undefined && current !== null && current !== "";
-
-      if (hasCurrent && String(current) !== String(value)) {
-        conflicts.push({ campo: key, actual: current, detectado: value });
-        return;
-      }
-
-      updates.push([key, value]);
-    });
-
-    setForm((f) => {
-      const nextForm = { ...f };
-
-      updates.forEach(([key, value]) => {
-        nextForm[key] = value;
-      });
-
-      if (!nextForm.fpp && nextForm.fur) {
-        nextForm.fpp = calcularFppDesdeFur(nextForm.fur);
-      }
-
-      return nextForm;
-    });
-
-    setOcrConflicts(conflicts);
-    return { applied: updates.length, conflicts };
-  };
-
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
@@ -640,8 +490,6 @@ export default function NuevaPaciente() {
 
   const p = { form, set };
   const nombrePaciente = `${form.nombres || ""} ${form.apellidos || ""}`.trim();
-  const ocrReviewSuggestions = Object.entries(ocrResult?.sugerencias_revision || {})
-    .filter(([, value]) => value !== undefined && value !== null && value !== "");
 
   return (
     <div>
@@ -703,109 +551,6 @@ export default function NuevaPaciente() {
         {/* ── STEP 0: ESTABLECIMIENTO ── */}
         {step === 0 && (
           <div>
-            {OCR_ENABLED && (
-              <div className="form-section">
-                <div className="form-section-header" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <ScanLine size={16} /> Captura asistida OCR
-                </div>
-                <div className="form-section-body col-2">
-                  <div>
-                    <input
-                      ref={ocrInputRef}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      style={{ display: "none" }}
-                      onChange={(e) => handleOcrFile(e.target.files?.[0])}
-                    />
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => ocrInputRef.current?.click()}
-                      style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}
-                    >
-                      <UploadCloud size={16} />
-                      Escanear documento
-                    </button>
-                    {ocrFile && (
-                      <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.45rem" }}>
-                        {ocrFile.name}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={processOcr}
-                    disabled={!ocrFile || ocrLoading}
-                    style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem" }}
-                  >
-                    <ScanLine size={16} />
-                    {ocrLoading ? "Procesando..." : "Procesar documento"}
-                  </button>
-                </div>
-
-                <div style={{ padding: "0 1rem 1rem" }}>
-                  <div style={{
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    padding: "0.75rem",
-                    background: "var(--surface2)",
-                    color: "var(--text-muted)",
-                    fontSize: "0.82rem",
-                  }}>
-                    Los datos detectados deben revisarse antes de registrar la paciente. El OCR no guarda datos automaticamente.
-                  </div>
-                </div>
-
-                {ocrReviewSuggestions.length > 0 && (
-                  <div style={{ padding: "0 1rem 1rem" }}>
-                    <div style={{
-                      border: "1px solid var(--warn)",
-                      borderRadius: 8,
-                      padding: "0.75rem",
-                      background: "var(--warn-lt)",
-                    }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", color: "var(--warn)", fontWeight: 700, fontSize: "0.82rem", marginBottom: "0.65rem" }}>
-                        <AlertTriangle size={15} />
-                        Sugerencias de OCR local para revisar
-                      </div>
-                      <div style={{ display: "grid", gap: "0.5rem" }}>
-                        {ocrReviewSuggestions.map(([field, value]) => {
-                          const target = mapOcrFieldName(field);
-                          const hasCurrent = form[target] !== undefined && form[target] !== null && form[target] !== "";
-                          return (
-                            <div
-                              key={field}
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns: "minmax(120px, 0.8fr) minmax(0, 1.4fr) auto",
-                                gap: "0.5rem",
-                                alignItems: "center",
-                                fontSize: "0.8rem",
-                              }}
-                            >
-                              <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>{ocrFieldLabels[field] || field}</span>
-                              <span style={{ color: "var(--text)" }}>{String(value)}</span>
-                              <button
-                                type="button"
-                                className="btn-secondary"
-                                disabled={hasCurrent}
-                                onClick={() => applyOcrSuggestion(field, value)}
-                                style={{ padding: "0.35rem 0.55rem", fontSize: "0.75rem" }}
-                              >
-                                {hasCurrent ? "Con dato" : "Usar"}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
             <div className="form-section">
               <div className="form-section-header">Datos del Establecimiento</div>
               <div className="form-section-body col-2">
@@ -897,7 +642,7 @@ export default function NuevaPaciente() {
                   ]}
                 />
                 <Input label="Domicilio" name="domicilio" form={form} set={set} />
-                <Input label="Municipio" name="municipio" form={form} set={set} />
+                <Select label="Municipio" name="municipio" form={form} set={set} options={MUNICIPIOS_PETEN} />
                 <Select label="Territorio" name="territorio" form={form} set={set}
                   options={["1", "2", "3", "4"]}
                 />
