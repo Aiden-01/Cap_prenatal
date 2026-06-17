@@ -1,5 +1,6 @@
 ﻿import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { createContext, useContext } from "react";
 import { useEffect } from "react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
@@ -8,6 +9,16 @@ import {
   ChevronLeft, ChevronRight, Save, AlertTriangle, UploadCloud, ScanLine
 } from "lucide-react";
 import { getErrorMessage } from "../utils/errorMessage";
+import { useFieldErrors } from "../hooks/useFieldErrors";
+
+const FormErrorContext = createContext({
+  fieldError: () => "",
+  inputClass: () => "input-field",
+});
+
+function useFormErrorUi() {
+  return useContext(FormErrorContext);
+}
 
 // ─── STEPS ──────────────────────────────────────────────────
 const STEPS = [
@@ -21,23 +32,67 @@ const STEPS = [
 
 const OCR_ENABLED = false;
 
+const FIELD_LABELS = {
+  no_expediente: "No. expediente",
+  cui: "CUI",
+  nombres: "Nombres",
+  apellidos: "Apellidos",
+  fecha_nacimiento: "Fecha de nacimiento",
+  edad_manual: "Edad",
+  categoria_servicio: "Categoria",
+  nivel_estudios: "Nivel de estudios",
+  ultimo_anio_aprobado: "Ultimo anio aprobado",
+  estado_civil: "Estado civil",
+  pueblo: "Pueblo",
+  fur: "FUR",
+  fpp: "FPP",
+  gestas_previas: "Gestas previas",
+  abortos: "Abortos",
+  partos: "Partos",
+  partos_vaginales: "Partos vaginales",
+  cesareas: "Cesareas",
+  nacidos_vivos: "Nacidos vivos",
+  nacidos_muertos: "Nacidos muertos",
+  hijos_viven: "Hijos que viven",
+  muertos_antes_1sem: "Muertos antes 1a semana",
+  muertos_despues_1sem: "Muertos despues 1a semana",
+  fin_embarazo_anterior: "Fecha fin embarazo anterior",
+  antec_diabetes_tipo: "Diabetes",
+  antec_emb_ectopico_num: "Embarazo ectopico",
+};
+
+function inferPacienteFieldErrors(err) {
+  const code = err?.response?.data?.code;
+  const message = getErrorMessage(err, "");
+  const lower = message.toLowerCase();
+
+  if (code === "DUPLICATE_RESOURCE" && lower.includes("cui")) return { cui: message };
+  if (code === "DUPLICATE_RESOURCE" && lower.includes("expediente")) return { no_expediente: message };
+  return {};
+}
+
 // ─── HELPERS DE CAMPO ────────────────────────────────────────
-function Field({ label, required, children }) {
+function Field({ label, required, children, name }) {
+  const { fieldError } = useFormErrorUi();
+  const error = name ? fieldError(name) : "";
   return (
     <div className="form-group">
       <label className="input-label">
         {label}{required && <span style={{ color: "var(--danger)", marginLeft: 2 }}>*</span>}
       </label>
       {children}
+      {error && <div className="field-error-text">{error}</div>}
     </div>
   );
 }
 
 function Input({ label, name, type = "text", required, form, set, inputRef, ...rest }) {
+  const { inputClass } = useFormErrorUi();
   return (
-    <Field label={label} required={required}>
+    <Field label={label} required={required} name={name}>
       <input
-        className="input-field"
+        className={inputClass(name)}
+        name={name}
         type={type}
         ref={inputRef}
         value={form[name] ?? ""}
@@ -49,9 +104,10 @@ function Input({ label, name, type = "text", required, form, set, inputRef, ...r
 }
 
 function Select({ label, name, options, required, form, set }) {
+  const { inputClass } = useFormErrorUi();
   return (
-    <Field label={label} required={required}>
-      <select className="input-field" value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)}>
+    <Field label={label} required={required} name={name}>
+      <select className={inputClass(name)} name={name} value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)}>
         <option value="">— Seleccionar —</option>
         {options.map((o) => (
           <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>
@@ -217,17 +273,18 @@ export default function NuevaPaciente() {
   const [loading, setLoading] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrResult, setOcrResult] = useState(null);
-  const [ocrConflicts, setOcrConflicts] = useState([]);
+  const [, setOcrConflicts] = useState([]);
   const [ocrFile, setOcrFile] = useState(null);
   const cuiInputRef           = useRef(null);
   const ocrInputRef           = useRef(null);
   const navigate              = useNavigate();
   const toast                 = useGlobalToast();
   const editando              = Boolean(id);
+  const fieldErrors           = useFieldErrors(FIELD_LABELS, inferPacienteFieldErrors);
 
   const set = (k, v) => {
     if (k === "cui") setCuiError("");
-    setForm((f) => ({ ...f, [k]: v }));
+    fieldErrors.setFormValue(setForm, k, v);
   };
   const cuiIncompleto = form.cui && !/^\d{13}$/.test(form.cui);
   const goToCuiField = () => {
@@ -304,6 +361,8 @@ export default function NuevaPaciente() {
 
   const handleFechaNacimiento = (val) => {
     const edad = calcularEdad(val);
+    fieldErrors.clearFieldError("fecha_nacimiento");
+    fieldErrors.clearFieldError("edad_manual");
     setForm((f) => ({
       ...f,
       fecha_nacimiento: val,
@@ -318,6 +377,8 @@ export default function NuevaPaciente() {
     const fecha = fechaDesdeEdad(edad);
     const edadCalculada = calcularEdad(fecha);
 
+    fieldErrors.clearFieldError("edad_manual");
+    fieldErrors.clearFieldError("fecha_nacimiento");
     setForm((f) => ({
       ...f,
       edad_manual: edad,
@@ -329,6 +390,8 @@ export default function NuevaPaciente() {
 
   // FPP automática al ingresar FUR
   const handleFUR = (val) => {
+    fieldErrors.clearFieldError("fur");
+    fieldErrors.clearFieldError("fpp");
     setForm((f) => ({
       ...f,
       fur: val,
@@ -502,16 +565,28 @@ export default function NuevaPaciente() {
 
   const handleSubmit = async () => {
     if (!form.no_expediente || !form.nombres || !form.apellidos) {
+      const details = [
+        !form.no_expediente && { campo: "no_expediente", mensaje: "Campo requerido" },
+        !form.nombres && { campo: "nombres", mensaje: "Campo requerido" },
+        !form.apellidos && { campo: "apellidos", mensaje: "Campo requerido" },
+      ].filter(Boolean);
+      fieldErrors.setErrorsFromResponse({ response: { data: { details } } }, "Campos requeridos");
+      setStep(!form.no_expediente ? 0 : 1);
       toast("No. expediente, nombres y apellidos son requeridos", "error");
       return;
     }
     if (cuiIncompleto) {
       setCuiError("El CUI debe tener exactamente 13 dígitos.");
+      fieldErrors.setErrorsFromResponse(
+        { response: { data: { details: [{ campo: "cui", mensaje: "El CUI debe tener exactamente 13 digitos" }] } } },
+        "CUI invalido"
+      );
       goToCuiField();
       toast("El CUI debe tener exactamente 13 dígitos", "error");
       return;
     }
     setLoading(true);
+    fieldErrors.clearFieldErrors();
     try {
       const payload = {
         ...form,
@@ -547,10 +622,15 @@ export default function NuevaPaciente() {
       toast(editando ? "Paciente actualizada exitosamente" : "Paciente registrada exitosamente", "success");
       setTimeout(() => navigate(`/pacientes/${editando ? id : data.id}`), 800);
     } catch (e) {
-      const msg = getErrorMessage(e, "Error al guardar");
+      const result = fieldErrors.setErrorsFromResponse(e, "Error al guardar");
+      const msg = result.message;
       if (msg.toLowerCase().includes("cui")) {
         setCuiError(msg);
         goToCuiField();
+      } else if (result.firstField === "no_expediente" || result.firstField === "cui") {
+        setStep(0);
+      } else if (result.firstField === "nombres" || result.firstField === "apellidos") {
+        setStep(1);
       }
       toast(msg, "error");
     } finally {
@@ -613,6 +693,13 @@ export default function NuevaPaciente() {
 
       {/* FORM CARD */}
       <div className="card" style={{ padding: "1.75rem" }}>
+        <FormErrorContext.Provider value={fieldErrors}>
+        {fieldErrors.summary.length > 0 && (
+          <div className="error-box" style={{ marginBottom: "1rem" }}>
+            <strong>Revisa estos datos:</strong>{" "}
+            {fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" | ")}
+          </div>
+        )}
         {/* ── STEP 0: ESTABLECIMIENTO ── */}
         {step === 0 && (
           <div>
@@ -785,9 +872,10 @@ export default function NuevaPaciente() {
                     onChange={(e) => handleFechaNacimiento(e.target.value)}
                   />
                 </Field>
-                <Field label="Edad">
+                <Field label="Edad" name="edad_manual">
                   <input
-                    className="input-field"
+                    className={fieldErrors.inputClass("edad_manual")}
+                    name="edad_manual"
                     type="number"
                     min="0"
                     max="120"
@@ -843,9 +931,10 @@ export default function NuevaPaciente() {
                     { value: "separada",  label: "Separada" },
                   ]}
                 />
-                <Field label="¿Vive sola?">
+                <Field label="¿Vive sola?" name="vive_sola">
                   <select
-                    className="input-field"
+                    className={fieldErrors.inputClass("vive_sola")}
+                    name="vive_sola"
                     value={form.vive_sola === "" ? "" : String(form.vive_sola)}
                     onChange={(e) => set("vive_sola", e.target.value === "true")}
                   >
@@ -903,8 +992,8 @@ export default function NuevaPaciente() {
             <div className="form-section">
               <div className="form-section-header">Gestación Actual</div>
               <div className="form-section-body col-2">
-                <Field label="FUR (Fecha Última Regla)" required>
-                  <input className="input-field" type="date" value={form.fur}
+                <Field label="FUR (Fecha Última Regla)" required name="fur">
+                  <input className={fieldErrors.inputClass("fur")} name="fur" type="date" value={form.fur}
                     onChange={(e) => handleFUR(e.target.value)} />
                 </Field>
                 <Input label="FPP (Fecha Probable de Parto)" name="fpp" type="date" form={form} set={set} />
@@ -1166,6 +1255,7 @@ export default function NuevaPaciente() {
             </button>
           )}
         </div>
+        </FormErrorContext.Provider>
       </div>
     </div>
   );

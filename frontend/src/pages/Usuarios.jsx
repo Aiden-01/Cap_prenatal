@@ -7,8 +7,25 @@ import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
 import { useGlobalToast } from "../context/ToastContext";
 import { getErrorMessage } from "../utils/errorMessage";
+import { useFieldErrors } from "../hooks/useFieldErrors";
 
 const INIT = { nombre_completo: "", username: "", password: "", rol: "personal_salud" };
+
+const FIELD_LABELS = {
+  nombre_completo: "Nombre completo",
+  username: "Usuario",
+  password: "Contrasena",
+  rol: "Rol",
+};
+
+function inferUsuarioFieldErrors(err) {
+  const code = err?.response?.data?.code;
+  const message = getErrorMessage(err, "");
+  if (code === "DUPLICATE_RESOURCE" && message.toLowerCase().includes("usuario")) {
+    return { username: message };
+  }
+  return {};
+}
 
 function SuccessBanner({ nombre }) {
   return (
@@ -73,6 +90,7 @@ export default function Usuarios() {
   const [ultimoCreado, setUltimoCreado] = useState(null);
   const [aEliminar, setAEliminar]       = useState(null); // usuario seleccionado para eliminar
   const [formOpen, setFormOpen]         = useState(false);
+  const fieldErrors = useFieldErrors(FIELD_LABELS, inferUsuarioFieldErrors);
   const toast        = useGlobalToast();
   const { usuario: yo } = useAuth();
 
@@ -85,6 +103,7 @@ export default function Usuarios() {
     e.preventDefault();
     setLoading(true);
     setUltimoCreado(null);
+    fieldErrors.clearFieldErrors();
     try {
       await api.post("/usuarios", form);
       setUltimoCreado(form.nombre_completo);
@@ -92,7 +111,7 @@ export default function Usuarios() {
       cargar();
       setTimeout(() => setUltimoCreado(null), 5000);
     } catch (err) {
-      toast(getErrorMessage(err, "Error al crear usuario"), "error");
+      toast(fieldErrors.setErrorsFromResponse(err, "Error al crear usuario").message, "error");
     } finally {
       setLoading(false);
     }
@@ -308,19 +327,27 @@ export default function Usuarios() {
             )}
 
             <form onSubmit={handleCrear} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              {fieldErrors.summary.length > 0 && (
+                <div className="error-box">
+                  <strong>Revisa estos datos:</strong>{" "}
+                  {fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" | ")}
+                </div>
+              )}
               <div className="form-group">
                 <label className="input-label">Nombre completo</label>
                 <div className="icon-input">
                   <User size={15} />
                   <input
-                    className="input-field"
+                    className={fieldErrors.inputClass("nombre_completo")}
+                    name="nombre_completo"
                     type="text"
                     placeholder="Nombre completo"
                     value={form.nombre_completo}
-                    onChange={(e) => setForm({ ...form, nombre_completo: e.target.value })}
+                    onChange={(e) => fieldErrors.setFormValue(setForm, "nombre_completo", e.target.value)}
                     required
                   />
                 </div>
+                {fieldErrors.fieldError("nombre_completo") && <div className="field-error-text">{fieldErrors.fieldError("nombre_completo")}</div>}
               </div>
 
               <div className="form-group">
@@ -328,14 +355,16 @@ export default function Usuarios() {
                 <div className="icon-input">
                   <BadgeCheck size={15} />
                   <input
-                    className="input-field"
+                    className={fieldErrors.inputClass("username")}
+                    name="username"
                     type="text"
                     placeholder="nombre_usuario"
                     value={form.username}
-                    onChange={(e) => setForm({ ...form, username: e.target.value })}
+                    onChange={(e) => fieldErrors.setFormValue(setForm, "username", e.target.value)}
                     required
                   />
                 </div>
+                {fieldErrors.fieldError("username") && <div className="field-error-text">{fieldErrors.fieldError("username")}</div>}
               </div>
 
               <div className="form-group">
@@ -343,26 +372,30 @@ export default function Usuarios() {
                 <div className="icon-input">
                   <KeyRound size={15} />
                   <input
-                    className="input-field"
+                    className={fieldErrors.inputClass("password")}
+                    name="password"
                     type="password"
                     placeholder="••••••••"
                     value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    onChange={(e) => fieldErrors.setFormValue(setForm, "password", e.target.value)}
                     required
                   />
                 </div>
+                {fieldErrors.fieldError("password") && <div className="field-error-text">{fieldErrors.fieldError("password")}</div>}
               </div>
 
               <div className="form-group">
                 <label className="input-label">Rol</label>
                 <select
-                  className="input-field"
+                  className={fieldErrors.inputClass("rol")}
+                  name="rol"
                   value={form.rol}
-                  onChange={(e) => setForm({ ...form, rol: e.target.value })}
+                  onChange={(e) => fieldErrors.setFormValue(setForm, "rol", e.target.value)}
                 >
                   <option value="personal_salud">Personal de salud</option>
                   <option value="admin">Administrador</option>
                 </select>
+                {fieldErrors.fieldError("rol") && <div className="field-error-text">{fieldErrors.fieldError("rol")}</div>}
               </div>
 
               <button

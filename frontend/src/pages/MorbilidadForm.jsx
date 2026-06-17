@@ -4,7 +4,7 @@ import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
-import { getErrorMessage } from "../utils/errorMessage";
+import { useFieldErrors } from "../hooks/useFieldErrors";
 
 const INIT = {
   fecha: getGuatemalaDateInputValue(),
@@ -24,8 +24,20 @@ const initialMorbilidadForm = () => ({
   hora: getGuatemalaTimeInputValue(),
 });
 
-function Field({ label, children }) {
-  return <div className="form-group"><label className="input-label">{label}</label>{children}</div>;
+const FIELD_LABELS = {
+  fecha: "Fecha",
+  hora: "Hora",
+  motivo_consulta: "Motivo de consulta",
+  historia_enfermedad_actual: "Historia enfermedad actual",
+  revision_por_sistemas: "Revision por sistemas",
+  examen_fisico: "Examen fisico",
+  impresion_clinica: "Impresion clinica",
+  tratamiento_referencia: "Tratamiento / Referencia",
+  nombre_cargo_atiende: "Nombre / cargo atiende",
+};
+
+function Field({ label, children, error }) {
+  return <div className="form-group"><label className="input-label">{label}</label>{children}{error && <div className="field-error-text">{error}</div>}</div>;
 }
 
 export default function MorbilidadForm() {
@@ -35,8 +47,9 @@ export default function MorbilidadForm() {
   const toast = useGlobalToast();
   const [form, setForm] = useState(initialMorbilidadForm);
   const [loading, setLoading] = useState(false);
+  const fieldErrors = useFieldErrors(FIELD_LABELS);
   const editando = Boolean(morbilidadId);
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k, v) => fieldErrors.setFormValue(setForm, k, v);
 
   useEffect(() => {
     if (!editando) return;
@@ -48,13 +61,14 @@ export default function MorbilidadForm() {
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    fieldErrors.clearFieldErrors();
     try {
       if (editando) await api.put(`/pacientes/${id}/morbilidad/${morbilidadId}`, form);
       else await api.post(`/pacientes/${id}/morbilidad`, form);
       toast(editando ? "Morbilidad actualizada" : "Morbilidad registrada", "success");
       navigate(expedientePath);
     } catch (err) {
-      toast(getErrorMessage(err, "Error al guardar morbilidad"), "error");
+      toast(fieldErrors.setErrorsFromResponse(err, "Error al guardar morbilidad").message, "error");
     } finally {
       setLoading(false);
     }
@@ -67,10 +81,16 @@ export default function MorbilidadForm() {
         <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>{editando ? "Editar Morbilidad" : "Registrar Morbilidad"}</h1>
       </div>
       <form className="card" onSubmit={submit}>
+        {fieldErrors.summary.length > 0 && (
+          <div className="error-box" style={{ marginBottom: "1rem" }}>
+            <strong>Revisa estos datos:</strong>{" "}
+            {fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" | ")}
+          </div>
+        )}
         <div className="form-section-body col-3">
-          <Field label="Fecha"><input className="input-field" type="date" value={form.fecha} onChange={(e) => set("fecha", e.target.value)} /></Field>
-          <Field label="Hora"><input className="input-field" type="time" value={form.hora ?? ""} onChange={(e) => set("hora", e.target.value)} /></Field>
-          <Field label="Motivo de consulta"><input className="input-field" value={form.motivo_consulta ?? ""} onChange={(e) => set("motivo_consulta", e.target.value)} /></Field>
+          <Field label="Fecha" error={fieldErrors.fieldError("fecha")}><input className={fieldErrors.inputClass("fecha")} type="date" value={form.fecha} onChange={(e) => set("fecha", e.target.value)} /></Field>
+          <Field label="Hora" error={fieldErrors.fieldError("hora")}><input className={fieldErrors.inputClass("hora")} type="time" value={form.hora ?? ""} onChange={(e) => set("hora", e.target.value)} /></Field>
+          <Field label="Motivo de consulta" error={fieldErrors.fieldError("motivo_consulta")}><input className={fieldErrors.inputClass("motivo_consulta")} value={form.motivo_consulta ?? ""} onChange={(e) => set("motivo_consulta", e.target.value)} /></Field>
         </div>
         <div className="form-section-body col-2">
           {[
@@ -81,8 +101,8 @@ export default function MorbilidadForm() {
             ["tratamiento_referencia", "Tratamiento / Referencia"],
             ["nombre_cargo_atiende", "Nombre / cargo atiende"],
           ].map(([name, label]) => (
-            <Field key={name} label={label}>
-              <textarea className="input-field" rows={2} value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)} />
+            <Field key={name} label={label} error={fieldErrors.fieldError(name)}>
+              <textarea className={fieldErrors.inputClass(name)} rows={2} value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)} />
             </Field>
           ))}
         </div>

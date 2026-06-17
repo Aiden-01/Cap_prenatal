@@ -1,26 +1,40 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { getGuatemalaDateInputValue } from "../utils/guatemalaTime";
 import { calculateGestationalWeeks } from "../utils/gestationalAge";
-import { getErrorMessage } from "../utils/errorMessage";
+import { useFieldErrors } from "../hooks/useFieldErrors";
 
-function Field({ label, children }) {
+const FormErrorContext = createContext({
+  fieldError: () => "",
+  inputClass: () => "input-field",
+});
+
+function useFormErrorUi() {
+  return useContext(FormErrorContext);
+}
+
+function Field({ label, children, name }) {
+  const { fieldError } = useFormErrorUi();
+  const error = name ? fieldError(name) : "";
   return (
     <div className="form-group">
       <label className="input-label">{label}</label>
       {children}
+      {error && <div className="field-error-text">{error}</div>}
     </div>
   );
 }
 
 function Input({ label, name, form, set, type = "text", placeholder = "", ...rest }) {
+  const { inputClass } = useFormErrorUi();
   return (
-    <Field label={label}>
+    <Field label={label} name={name}>
       <input
-        className="input-field"
+        className={inputClass(name)}
+        name={name}
         type={type}
         placeholder={placeholder}
         value={form[name] ?? ""}
@@ -34,9 +48,10 @@ function Input({ label, name, form, set, type = "text", placeholder = "", ...res
 }
 
 function Select({ label, name, form, set, options }) {
+  const { inputClass } = useFormErrorUi();
   return (
-    <Field label={label}>
-      <select className="input-field" value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)}>
+    <Field label={label} name={name}>
+      <select className={inputClass(name)} name={name} value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)}>
         <option value="">Seleccionar...</option>
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
@@ -314,6 +329,24 @@ const responsableOptions = [
 
 const hasOptionValue = (options, value) => options.some((option) => option.value === value);
 
+const FIELD_LABELS = {
+  fecha: "Fecha",
+  fecha_nacimiento: "Fecha de nacimiento",
+  fur: "FUR",
+  fecha_probable_parto: "FPP",
+  fecha_ultima_cesarea: "Fecha ultima cesarea",
+  no_embarazos: "No. embarazos",
+  no_partos: "No. partos",
+  no_abortos: "No. abortos",
+  no_hijos_vivos: "No. hijos vivos",
+  no_hijos_muertos: "No. hijos muertos",
+  no_cesareas: "No. cesareas",
+  edad_gestacional_semanas: "Edad gestacional por UR",
+  edad_gestacional_au: "Edad gestacional por AU",
+  horas_distancia: "Horas de distancia",
+  kms_servicio: "Kilometros al servicio",
+};
+
 export default function PlanPartoForm() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -324,8 +357,9 @@ export default function PlanPartoForm() {
   const [existingPlan, setExistingPlan] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [loading, setLoading] = useState(false);
+  const fieldErrors = useFieldErrors(FIELD_LABELS);
 
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k, v) => fieldErrors.setFormValue(setForm, k, v);
   const p = { form, set };
 
   useEffect(() => {
@@ -368,6 +402,7 @@ export default function PlanPartoForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    fieldErrors.clearFieldErrors();
     const payload = {
       ...form,
       edad_gestacional_semanas: edadGestacionalSemanas,
@@ -382,7 +417,7 @@ export default function PlanPartoForm() {
       toast(existingPlan ? "Plan de parto actualizado" : "Plan de parto guardado", "success");
       setTimeout(() => navigate(expedientePath), 600);
     } catch (err) {
-      toast(getErrorMessage(err, "Error al guardar plan de parto"), "error");
+      toast(fieldErrors.setErrorsFromResponse(err, "Error al guardar plan de parto").message, "error");
     } finally {
       setLoading(false);
     }
@@ -419,6 +454,13 @@ export default function PlanPartoForm() {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="card">
+          <FormErrorContext.Provider value={fieldErrors}>
+          {fieldErrors.summary.length > 0 && (
+            <div className="error-box" style={{ marginBottom: "1rem" }}>
+              <strong>Revisa estos datos:</strong>{" "}
+              {fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" | ")}
+            </div>
+          )}
           <div className="form-section">
             <div className="form-section-header">Datos generales</div>
             <div className="form-section-body col-4">
@@ -530,6 +572,7 @@ export default function PlanPartoForm() {
               <Save size={15} /> {loading ? "Guardando..." : existingPlan ? "Guardar cambios" : "Guardar plan"}
             </button>
           </div>
+          </FormErrorContext.Provider>
         </form>
       )}
     </div>

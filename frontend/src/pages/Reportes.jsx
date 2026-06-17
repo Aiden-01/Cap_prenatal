@@ -36,16 +36,38 @@ export default function Reportes() {
   const [downloading, setDownloading] = useState(false);
   const [descargado, setDescargado] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const setFechaDesde = (value) => {
+    setDesde(value);
+    setFieldErrors((errors) => {
+      const next = { ...errors };
+      delete next.desde;
+      return next;
+    });
+  };
+
+  const setFechaHasta = (value) => {
+    setHasta(value);
+    setFieldErrors((errors) => {
+      const next = { ...errors };
+      delete next.hasta;
+      return next;
+    });
+  };
 
   const cargar = async (modo = MODO_PRIMER_CONTROL) => {
     setLoading(true);
     setError("");
+    setFieldErrors({});
     setCenso(null);
     setModoCenso(modo);
 
     try {
       if (desde > hasta) {
-        setError("La fecha 'Desde' no puede ser mayor que 'Hasta'.");
+        const message = "La fecha 'Desde' no puede ser mayor que 'Hasta'.";
+        setFieldErrors({ desde: message, hasta: message });
+        setError(message);
         return;
       }
 
@@ -184,20 +206,24 @@ export default function Reportes() {
             <label className="input-label">Desde</label>
             <input
               type="date"
-              className="input-field"
+              className={`input-field ${fieldErrors.desde ? "input-error" : ""}`}
+              name="desde"
               value={desde}
-              onChange={(e) => setDesde(e.target.value)}
+              onChange={(e) => setFechaDesde(e.target.value)}
             />
+            {fieldErrors.desde && <div className="field-error-text">{fieldErrors.desde}</div>}
           </div>
 
           <div className="form-group">
             <label className="input-label">Hasta</label>
             <input
               type="date"
-              className="input-field"
+              className={`input-field ${fieldErrors.hasta ? "input-error" : ""}`}
+              name="hasta"
               value={hasta}
-              onChange={(e) => setHasta(e.target.value)}
+              onChange={(e) => setFechaHasta(e.target.value)}
             />
+            {fieldErrors.hasta && <div className="field-error-text">{fieldErrors.hasta}</div>}
           </div>
 
           <button

@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import {
   BarChart3,
   CalendarDays,
-  Check,
   ClipboardList,
   Eye,
   EyeOff,
@@ -18,23 +17,42 @@ import {
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessage";
+import { useFieldErrors } from "../hooks/useFieldErrors";
+
+const FIELD_LABELS = {
+  username: "Usuario",
+  password: "Contraseña",
+};
 
 export default function Login() {
   const [form, setForm]       = useState({ username: "", password: "" });
   const [error, setError]     = useState("");
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+  const fieldErrors = useFieldErrors(FIELD_LABELS);
   const { login }  = useAuth();
   const navigate   = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(""); setLoading(true);
+    setError("");
+    fieldErrors.clearFieldErrors();
+    setLoading(true);
     try {
       const { data } = await api.post("/auth/login", form);
       login(data.usuario);
       navigate("/dashboard");
     } catch (err) {
+      const parsed = fieldErrors.setErrorsFromResponse(err, "Error al iniciar sesión");
+      if (!Object.keys(parsed.errors).length) {
+        fieldErrors.setErrorsFromResponse(
+          { response: { data: { details: [
+            { campo: "username", mensaje: "Revisa tu usuario" },
+            { campo: "password", mensaje: "Revisa tu contraseña" },
+          ] } } },
+          "Error al iniciar sesión"
+        );
+      }
       setError(getErrorMessage(err, "Error al iniciar sesión"));
     } finally {
       setLoading(false);
@@ -187,15 +205,17 @@ export default function Login() {
             <div className="login-icon-input">
               <UserRound size={17} />
               <input
-                className="input-field"
+                className={fieldErrors.inputClass("username")}
+                name="username"
                 type="text"
                 placeholder="Ingresa tu usuario"
                 value={form.username}
-                onChange={(e) => setForm({ ...form, username: e.target.value })}
+                onChange={(e) => fieldErrors.setFormValue(setForm, "username", e.target.value)}
                 required
                 autoFocus
               />
             </div>
+            {fieldErrors.fieldError("username") && <div className="field-error-text">{fieldErrors.fieldError("username")}</div>}
           </div>
 
           <div className="form-group">
@@ -203,11 +223,12 @@ export default function Login() {
             <div className="password-field login-icon-input">
               <LockKeyhole size={17} />
               <input
-                className="input-field"
+                className={fieldErrors.inputClass("password")}
+                name="password"
                 type={showPass ? "text" : "password"}
                 placeholder="Ingresa tu contraseña"
                 value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                onChange={(e) => fieldErrors.setFormValue(setForm, "password", e.target.value)}
                 required
               />
               <button
@@ -218,6 +239,7 @@ export default function Login() {
                 {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {fieldErrors.fieldError("password") && <div className="field-error-text">{fieldErrors.fieldError("password")}</div>}
           </div>
 
           {error && (

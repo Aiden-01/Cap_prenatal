@@ -8,7 +8,13 @@ import api from "../api/axios";
 import { ToastContext } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
-import { getErrorMessage } from "../utils/errorMessage";
+import { useFieldErrors } from "../hooks/useFieldErrors";
+
+const PASSWORD_FIELD_LABELS = {
+  current_password: "Contraseña actual",
+  new_password: "Nueva contraseña",
+  confirm_password: "Confirmar nueva contraseña",
+};
 
 export default function Layout() {
   const { usuario, logout } = useAuth();
@@ -25,6 +31,7 @@ export default function Layout() {
     new_password: "",
     confirm_password: "",
   });
+  const passwordFieldErrors = useFieldErrors(PASSWORD_FIELD_LABELS);
 
   useEffect(() => {
     const handleResize = () => {
@@ -46,6 +53,7 @@ export default function Layout() {
 
   const resetPasswordForm = () => {
     setShowPasswords(false);
+    passwordFieldErrors.clearFieldErrors();
     setPasswordForm({
       current_password: "",
       new_password: "",
@@ -63,11 +71,16 @@ export default function Layout() {
     event.preventDefault();
 
     if (passwordForm.new_password !== passwordForm.confirm_password) {
+      passwordFieldErrors.setErrorsFromResponse(
+        { response: { data: { details: [{ campo: "confirm_password", mensaje: "La confirmación no coincide con la nueva contraseña." }] } } },
+        "Confirmación inválida"
+      );
       toast("La confirmación no coincide con la nueva contraseña", "error");
       return;
     }
 
     setPasswordLoading(true);
+    passwordFieldErrors.clearFieldErrors();
     try {
       await api.post("/auth/cambiar-password", passwordForm, {
         skipAuthRedirect: true,
@@ -76,7 +89,7 @@ export default function Layout() {
       setPasswordOpen(false);
       resetPasswordForm();
     } catch (err) {
-      toast(getErrorMessage(err, "Error al cambiar contraseña"), "error");
+      toast(passwordFieldErrors.setErrorsFromResponse(err, "Error al cambiar contraseña").message, "error");
     } finally {
       setPasswordLoading(false);
     }
@@ -165,40 +178,49 @@ export default function Layout() {
                 <div className="form-group">
                   <label className="input-label">Contraseña actual</label>
                   <input
-                    className="input-field"
+                    className={passwordFieldErrors.inputClass("current_password")}
+                    name="current_password"
                     type={showPasswords ? "text" : "password"}
                     value={passwordForm.current_password}
-                    onChange={(e) => setPasswordForm((prev) => ({ ...prev, current_password: e.target.value }))}
+                    onChange={(e) => passwordFieldErrors.setFormValue(setPasswordForm, "current_password", e.target.value)}
                     required
                     autoFocus
                   />
+                  {passwordFieldErrors.fieldError("current_password") && (
+                    <span className="field-error-text">{passwordFieldErrors.fieldError("current_password")}</span>
+                  )}
                 </div>
 
                 <div className="form-group">
                   <label className="input-label">Nueva contraseña</label>
                   <input
-                    className="input-field"
+                    className={passwordFieldErrors.inputClass("new_password")}
+                    name="new_password"
                     type={showPasswords ? "text" : "password"}
                     value={passwordForm.new_password}
-                    onChange={(e) => setPasswordForm((prev) => ({ ...prev, new_password: e.target.value }))}
+                    onChange={(e) => passwordFieldErrors.setFormValue(setPasswordForm, "new_password", e.target.value)}
                     minLength={6}
                     required
                   />
+                  {passwordFieldErrors.fieldError("new_password") && (
+                    <span className="field-error-text">{passwordFieldErrors.fieldError("new_password")}</span>
+                  )}
                 </div>
 
                 <div className="form-group">
                   <label className="input-label">Confirmar nueva contraseña</label>
                   <input
-                    className={`input-field ${passwordMismatch ? "input-error" : ""}`}
+                    className={`input-field ${(passwordMismatch || passwordFieldErrors.fieldError("confirm_password")) ? "input-error" : ""}`}
+                    name="confirm_password"
                     type={showPasswords ? "text" : "password"}
                     value={passwordForm.confirm_password}
-                    onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirm_password: e.target.value }))}
+                    onChange={(e) => passwordFieldErrors.setFormValue(setPasswordForm, "confirm_password", e.target.value)}
                     minLength={6}
                     required
                   />
-                  {passwordMismatch && (
+                  {(passwordMismatch || passwordFieldErrors.fieldError("confirm_password")) && (
                     <span className="field-error-text">
-                      La confirmación no coincide con la nueva contraseña.
+                      {passwordFieldErrors.fieldError("confirm_password") || "La confirmación no coincide con la nueva contraseña."}
                     </span>
                   )}
                 </div>

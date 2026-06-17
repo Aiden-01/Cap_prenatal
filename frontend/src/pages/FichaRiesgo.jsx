@@ -1,24 +1,37 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
-import { getErrorMessage } from "../utils/errorMessage";
+import { useFieldErrors } from "../hooks/useFieldErrors";
 
-function Field({ label, children }) {
+const FormErrorContext = createContext({
+  fieldError: () => "",
+  inputClass: () => "input-field",
+});
+
+function useFormErrorUi() {
+  return useContext(FormErrorContext);
+}
+
+function Field({ label, children, name }) {
+  const { fieldError } = useFormErrorUi();
+  const error = name ? fieldError(name) : "";
   return (
     <div className="form-group">
       <label className="input-label">{label}</label>
       {children}
+      {error && <div className="field-error-text">{error}</div>}
     </div>
   );
 }
 
 function Input({ label, name, form, set, type = "text", ...rest }) {
+  const { inputClass } = useFormErrorUi();
   return (
-    <Field label={label}>
+    <Field label={label} name={name}>
       <input
-        className="input-field"
+        className={inputClass(name)}
         name={name}
         type={type}
         value={form[name] ?? ""}
@@ -30,9 +43,10 @@ function Input({ label, name, form, set, type = "text", ...rest }) {
 }
 
 function Select({ label, name, options, form, set }) {
+  const { inputClass } = useFormErrorUi();
   return (
-    <Field label={label}>
-      <select className="input-field" value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)}>
+    <Field label={label} name={name}>
+      <select className={inputClass(name)} name={name} value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)}>
         <option value="">— Seleccionar —</option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
@@ -135,6 +149,23 @@ const RISK_FIELDS = [
   "otra_enfermedad_severa",
 ];
 
+const FIELD_LABELS = {
+  fecha: "Fecha",
+  distancia_servicio_km: "Distancia al servicio",
+  tiempo_horas: "Tiempo al servicio",
+  fecha_ultima_regla: "FUR",
+  fecha_probable_parto: "FPP",
+  edad_esposo: "Edad del esposo o conviviente",
+  no_embarazos: "No. de embarazos",
+  no_partos: "No. de partos",
+  no_cesareas: "No. de cesareas",
+  no_abortos: "No. de abortos",
+  no_hijos_vivos: "No. de hijos vivos",
+  no_hijos_muertos: "No. de hijos muertos",
+  edad_embarazo_semanas: "Edad de embarazo",
+  referida_a: "Referida a",
+};
+
 function toDateInput(value) {
   return value ? value.split("T")[0] : "";
 }
@@ -211,8 +242,9 @@ export default function FichaRiesgo() {
   const [loadingData, setLoadingData] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showReferralAlert, setShowReferralAlert] = useState(false);
+  const fieldErrors = useFieldErrors(FIELD_LABELS);
 
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k, v) => fieldErrors.setFormValue(setForm, k, v);
   const p = { form, set };
   const edadPaciente = paciente ? calcularEdadAnios(paciente.fecha_nacimiento) : null;
   const hasRiskFeatures = RISK_FIELDS.some((field) => Boolean(form[field]));
@@ -249,6 +281,7 @@ export default function FichaRiesgo() {
 
   const saveFicha = async () => {
     setLoading(true);
+    fieldErrors.clearFieldErrors();
     try {
       if (existingRisk) {
         await api.put(`/pacientes/${id}/riesgo`, form);
@@ -258,7 +291,7 @@ export default function FichaRiesgo() {
       toast(existingRisk ? "Ficha de riesgo actualizada" : "Ficha de riesgo guardada", "success");
       setTimeout(() => navigate(expedientePath), 600);
     } catch (err) {
-      toast(getErrorMessage(err, "Error al guardar ficha de riesgo"), "error");
+      toast(fieldErrors.setErrorsFromResponse(err, "Error al guardar ficha de riesgo").message, "error");
     } finally {
       setLoading(false);
     }
@@ -267,6 +300,10 @@ export default function FichaRiesgo() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (hasRiskFeatures && referralMissing) {
+      fieldErrors.setErrorsFromResponse(
+        { response: { data: { details: [{ campo: "referida_a", mensaje: "Debe indicar a donde fue referida o confirmar que no aplica" }] } } },
+        "Referencia pendiente"
+      );
       setShowReferralAlert(true);
       return;
     }
@@ -386,6 +423,13 @@ export default function FichaRiesgo() {
         </div>
       ) : (
       <form onSubmit={handleSubmit} className="card">
+        <FormErrorContext.Provider value={fieldErrors}>
+        {fieldErrors.summary.length > 0 && (
+          <div className="error-box" style={{ marginBottom: "1rem" }}>
+            <strong>Revisa estos datos:</strong>{" "}
+            {fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" | ")}
+          </div>
+        )}
         <div className="form-section">
           <div className="form-section-header">Datos generales</div>
           <div className="form-section-body col-4">
@@ -474,6 +518,7 @@ export default function FichaRiesgo() {
             <Save size={15} /> {loading ? "Guardando..." : existingRisk ? "Guardar cambios" : "Guardar ficha"}
           </button>
         </div>
+        </FormErrorContext.Provider>
       </form>
       )}
     </div>
