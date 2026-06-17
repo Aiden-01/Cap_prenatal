@@ -33,4 +33,29 @@ if (-not $env:TZ) {
   $env:TZ = "America/Guatemala"
 }
 
+if (-not $env:N8N_DIAGNOSTICS_ENABLED) {
+  $env:N8N_DIAGNOSTICS_ENABLED = "false"
+}
+
+if (-not $env:N8N_VERSION_NOTIFICATIONS_ENABLED) {
+  $env:N8N_VERSION_NOTIFICATIONS_ENABLED = "false"
+}
+
+if (-not $env:N8N_VERSION_NOTIFICATIONS_WHATS_NEW_ENABLED) {
+  $env:N8N_VERSION_NOTIFICATIONS_WHATS_NEW_ENABLED = "false"
+}
+
+if (-not $env:N8N_USER_FOLDER) {
+  $n8nUserFolder = Join-Path $PSScriptRoot "..\.n8n-local"
+  New-Item -ItemType Directory -Force -Path $n8nUserFolder | Out-Null
+  $env:N8N_USER_FOLDER = $n8nUserFolder
+}
+
+$localN8nBin = Join-Path $PSScriptRoot "..\node_modules\n8n\bin\n8n"
+
+if (Test-Path $localN8nBin) {
+  node $localN8nBin
+  exit $LASTEXITCODE
+}
+
 npx n8n

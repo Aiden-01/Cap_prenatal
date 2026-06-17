@@ -5,23 +5,25 @@ import { useGlobalToast } from "../context/ToastContext";
 import { ChevronLeft, Save, Stethoscope, FlaskConical, Pill, BookOpen } from "lucide-react";
 import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
 import { calculateGestationalWeeks } from "../utils/gestationalAge";
-import { getErrorMessage } from "../utils/errorMessage";
+import { getErrorMessage, getFieldErrors } from "../utils/errorMessage";
 
 // ─── HELPERS ────────────────────────────────────────────────
-function Field({ label, children, col }) {
+function Field({ label, children, col, error }) {
   return (
     <div className="form-group" style={col ? { gridColumn: `span ${col}` } : {}}>
       <label className="input-label">{label}</label>
       {children}
+      {error && <div className="field-error-text">{error}</div>}
     </div>
   );
 }
 
-function Inp({ label, name, type = "text", form, set, col, ...rest }) {
+function Inp({ label, name, type = "text", form, set, col, errors = {}, ...rest }) {
+  const error = errors[name];
   return (
-    <Field label={label} col={col}>
+    <Field label={label} col={col} error={error}>
       <input
-        className="input-field"
+        className={`input-field ${error ? "input-error" : ""}`}
         type={type}
         value={form[name] ?? ""}
         onChange={(e) =>
@@ -50,29 +52,31 @@ function Toggle({ label, name, form, set }) {
   );
 }
 
-function LabRow({ label, realizadoKey, resultadoKey, form, set, extra }) {
+function LabRow({ label, realizadoKey, resultadoKey, form, set, errors = {}, extra }) {
+  const error = errors[resultadoKey];
   return (
     <div className="lab-row">
       <Toggle label={label} name={realizadoKey} form={form} set={set} />
       {form[realizadoKey] && (
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
           <input
-            className="input-field"
+            className={`input-field ${error ? "input-error" : ""}`}
             style={{ flex: 1, minWidth: 120 }}
             placeholder="Resultado"
             value={form[resultadoKey] ?? ""}
             onChange={(e) => set(resultadoKey, e.target.value)}
           />
           {extra}
+          {error && <div className="field-error-text" style={{ flexBasis: "100%" }}>{error}</div>}
         </div>
       )}
     </div>
   );
 }
 
-function ResultadoSelect({ value, onChange }) {
+function ResultadoSelect({ value, onChange, error }) {
   return (
-    <select className="input-field" style={{ minWidth: 130 }} value={value ?? ""} onChange={(e) => onChange(e.target.value)}>
+    <select className={`input-field ${error ? "input-error" : ""}`} style={{ minWidth: 130 }} value={value ?? ""} onChange={(e) => onChange(e.target.value)}>
       <option value="">-</option>
       <option value="positivo">Positivo (+)</option>
       <option value="negativo">Negativo (-)</option>
@@ -146,6 +150,63 @@ const TABS = [
   { id: "orientaciones", label: "Orientaciones", icon: BookOpen     },
 ];
 
+const CONTROL_FIELD_LABELS = {
+  numero_control: "No. Control",
+  fecha: "Fecha",
+  hora: "Hora",
+  edad_gestacional_semanas: "Semanas de gestación",
+  pa_sistolica: "P/A Sistólica",
+  pa_diastolica: "P/A Diastólica",
+  frecuencia_cardiaca: "FC (x min)",
+  frecuencia_respiratoria: "FR (x min)",
+  temperatura: "Temperatura",
+  perimetro_braquial_cm: "Perímetro braquial",
+  peso_kg: "Peso",
+  talla_cm: "Talla",
+  imc: "IMC",
+  altura_uterina_cm: "Altura uterina",
+  fcf: "FCF",
+  cita_siguiente: "Cita siguiente",
+  vih_resultado: "Resultado VIH",
+  vdrl_resultado: "Resultado VDRL / RPR",
+  papanicolau_ivaa_resultado: "Resultado Papanicolau / IVAA",
+  hepatitis_b_resultado: "Resultado Hepatitis B",
+  sulfato_ferroso_tabletas: "Tabletas de sulfato ferroso",
+  acido_folico_tabletas: "Tabletas de ácido fólico",
+};
+
+const CONTROL_TAB_BY_FIELD = {
+  pa_sistolica: "general",
+  pa_diastolica: "general",
+  frecuencia_cardiaca: "general",
+  frecuencia_respiratoria: "general",
+  temperatura: "general",
+  perimetro_braquial_cm: "general",
+  peso_kg: "general",
+  talla_cm: "general",
+  imc: "general",
+  altura_uterina_cm: "general",
+  fcf: "general",
+  cita_siguiente: "general",
+  vih_resultado: "laboratorio",
+  vdrl_resultado: "laboratorio",
+  papanicolau_ivaa_resultado: "laboratorio",
+  hepatitis_b_resultado: "laboratorio",
+  sulfato_ferroso_tabletas: "suplementacion",
+  acido_folico_tabletas: "suplementacion",
+};
+
+function inferControlFieldErrors(err) {
+  const code = err?.response?.data?.code;
+  const message = getErrorMessage(err, "");
+
+  if (code === "DUPLICATE_RESOURCE" && message.toLowerCase().includes("control")) {
+    return { numero_control: message };
+  }
+
+  return {};
+}
+
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────
 export default function NuevoControl() {
   const { id, controlId } = useParams();
@@ -157,10 +218,26 @@ export default function NuevoControl() {
   const [tab, setTab]         = useState("general");
   const [form, setForm]       = useState(initialControlForm);
   const [fur, setFur]         = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const editando = Boolean(controlId);
 
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const p   = { form, set };
+  const set = (k, v) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    setFieldErrors((errors) => {
+      if (!errors[k]) return errors;
+      const next = { ...errors };
+      delete next[k];
+      return next;
+    });
+  };
+  const inputClass = (name) => `input-field ${fieldErrors[name] ? "input-error" : ""}`;
+  const fieldError = (name) => fieldErrors[name];
+  const p = { form, set, errors: fieldErrors };
+  const visibleFieldErrors = Object.entries(fieldErrors).map(([field, message]) => ({
+    field,
+    label: CONTROL_FIELD_LABELS[field] || field,
+    message,
+  }));
 
   useEffect(() => {
     const parseControl = (control) => ({
@@ -217,6 +294,7 @@ export default function NuevoControl() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setFieldErrors({});
     const payload = {
       ...form,
       edad_gestacional_semanas: edadGestacionalSemanas,
@@ -233,7 +311,20 @@ export default function NuevoControl() {
       toast(editando ? "Control actualizado exitosamente" : "Control registrado exitosamente", "success");
       setTimeout(() => navigate(expedientePath), 800);
     } catch (err) {
-      toast(getErrorMessage(err, "Error al guardar"), "error");
+      const parsedFieldErrors = getFieldErrors(err);
+      const nextFieldErrors = Object.keys(parsedFieldErrors).length
+        ? parsedFieldErrors
+        : inferControlFieldErrors(err);
+      const firstErrorField = Object.keys(nextFieldErrors)[0];
+      setFieldErrors(nextFieldErrors);
+      if (firstErrorField && CONTROL_TAB_BY_FIELD[firstErrorField]) {
+        setTab(CONTROL_TAB_BY_FIELD[firstErrorField]);
+      }
+      const fieldLabel = CONTROL_FIELD_LABELS[firstErrorField];
+      toast(
+        fieldLabel ? `${fieldLabel}: ${nextFieldErrors[firstErrorField]}` : getErrorMessage(err, "Error al guardar"),
+        "error"
+      );
     } finally { setLoading(false); }
   };
 
@@ -258,25 +349,31 @@ export default function NuevoControl() {
         </div>
       ) : (
       <form onSubmit={handleSubmit}>
+        {visibleFieldErrors.length > 0 && (
+          <div className="error-box" style={{ marginBottom: "1rem" }}>
+            <strong>Revisa estos datos:</strong>{" "}
+            {visibleFieldErrors.map((error) => `${error.label}: ${error.message}`).join(" | ")}
+          </div>
+        )}
 
         {/* DATOS BÁSICOS DEL CONTROL — siempre visibles */}
         <div className="card" style={{ marginBottom: "1.25rem" }}>
           <div className="form-section-body col-4">
-            <Field label="No. Control">
-              <select className="input-field" value={form.numero_control}
+            <Field label="No. Control" error={fieldError("numero_control")}>
+              <select className={inputClass("numero_control")} value={form.numero_control}
                 onChange={(e) => set("numero_control", Number(e.target.value))}>
                 {[1,2,3,4].map(n => <option key={n} value={n}>{n}° Control</option>)}
                 {[5,6,7,8,9,10].map(n => <option key={n} value={n}>Otro ({n})</option>)}
               </select>
             </Field>
-            <Inp label="Fecha" name="fecha" type="date" form={form} set={set} />
-            <Inp label="Hora" name="hora" type="time" form={form} set={set} />
-            <Inp label="Semanas de gestación" name="edad_gestacional_semanas" type="number" form={formConEdadGestacional} set={set} readOnly />
+            <Inp label="Fecha" name="fecha" type="date" {...p} />
+            <Inp label="Hora" name="hora" type="time" {...p} />
+            <Inp label="Semanas de gestación" name="edad_gestacional_semanas" type="number" form={formConEdadGestacional} set={set} errors={fieldErrors} readOnly />
           </div>
           <div className="form-section-body col-2" style={{ marginTop: "0.5rem" }}>
-            <Inp label="Motivo de consulta" name="motivo_consulta" form={form} set={set} />
-            <Inp label="Nombre del acompañante" name="nombre_acompanante" form={form} set={set} />
-            <Inp label="Nombre y cargo de quien atiende" name="nombre_cargo_atiende" form={form} set={set} col={2} />
+            <Inp label="Motivo de consulta" name="motivo_consulta" {...p} />
+            <Inp label="Nombre del acompañante" name="nombre_acompanante" {...p} />
+            <Inp label="Nombre y cargo de quien atiende" name="nombre_cargo_atiende" {...p} col={2} />
           </div>
         </div>
 
@@ -295,7 +392,7 @@ export default function NuevoControl() {
             <Toggle label="Fiebre" name="peligro_fiebre" {...p} />
           </div>
           <div style={{ marginTop: "0.75rem" }}>
-            <Inp label="Otro signo de peligro" name="peligro_otro" form={form} set={set} placeholder="Especifique..." />
+            <Inp label="Otro signo de peligro" name="peligro_otro" {...p} placeholder="Especifique..." />
           </div>
         </div>
 
@@ -317,21 +414,21 @@ export default function NuevoControl() {
             <div className="form-section">
               <div className="form-section-header">Examen Físico</div>
               <div className="form-section-body col-4">
-                <Inp label="P/A Sistólica" name="pa_sistolica" type="number" form={form} set={set} />
-                <Inp label="P/A Diastólica" name="pa_diastolica" type="number" form={form} set={set} />
-                <Inp label="FC (x min)" name="frecuencia_cardiaca" type="number" form={form} set={set} />
-                <Inp label="FR (x min)" name="frecuencia_respiratoria" type="number" form={form} set={set} />
-                <Inp label="Temperatura (°C)" name="temperatura" type="number" form={form} set={set} />
-                <Inp label="Perímetro braquial (cm)" name="perimetro_braquial_cm" type="number" form={form} set={set} />
-                <Field label="Peso (kg)">
-                  <input className="input-field" type="number" value={form.peso_kg ?? ""}
+                <Inp label="P/A Sistólica" name="pa_sistolica" type="number" {...p} />
+                <Inp label="P/A Diastólica" name="pa_diastolica" type="number" {...p} />
+                <Inp label="FC (x min)" name="frecuencia_cardiaca" type="number" {...p} />
+                <Inp label="FR (x min)" name="frecuencia_respiratoria" type="number" {...p} />
+                <Inp label="Temperatura (°C)" name="temperatura" type="number" {...p} />
+                <Inp label="Perímetro braquial (cm)" name="perimetro_braquial_cm" type="number" {...p} />
+                <Field label="Peso (kg)" error={fieldError("peso_kg")}>
+                  <input className={inputClass("peso_kg")} type="number" value={form.peso_kg ?? ""}
                     onChange={(e) => handlePeso(e.target.value === "" ? "" : Number(e.target.value))} />
                 </Field>
-                <Field label="Talla (cm)">
-                  <input className="input-field" type="number" value={form.talla_cm ?? ""}
+                <Field label="Talla (cm)" error={fieldError("talla_cm")}>
+                  <input className={inputClass("talla_cm")} type="number" value={form.talla_cm ?? ""}
                     onChange={(e) => handleTalla(e.target.value === "" ? "" : Number(e.target.value))} />
                 </Field>
-                <Inp label="IMC" name="imc" type="number" form={form} set={set} />
+                <Inp label="IMC" name="imc" type="number" {...p} />
               </div>
               <div style={{ display: "flex", gap: "0.6rem", padding: "0 1rem 1rem", flexWrap: "wrap" }}>
                 <Toggle label="Examen bucodental (Si)" name="examen_bucodental" {...p} />
@@ -342,10 +439,10 @@ export default function NuevoControl() {
             <div className="form-section">
               <div className="form-section-header">Examen Obstétrico</div>
               <div className="form-section-body col-4">
-                <Inp label="Altura uterina (cm)" name="altura_uterina_cm" type="number" form={form} set={set} />
-                <Inp label="FCF (lpm)" name="fcf" type="number" form={form} set={set} />
-                <Inp label="Situación fetal" name="situacion_fetal" form={form} set={set} />
-                <Inp label="Presentación fetal" name="presentacion_fetal" form={form} set={set} />
+                <Inp label="Altura uterina (cm)" name="altura_uterina_cm" type="number" {...p} />
+                <Inp label="FCF (lpm)" name="fcf" type="number" {...p} />
+                <Inp label="Situación fetal" name="situacion_fetal" {...p} />
+                <Inp label="Presentación fetal" name="presentacion_fetal" {...p} />
               </div>
               <div style={{ padding: "0 1rem 1rem" }}>
                 <Toggle label="Movimientos fetales" name="movimientos_fetales" {...p} />
@@ -360,22 +457,22 @@ export default function NuevoControl() {
                 <Toggle label="Flujo vaginal" name="flujo_vaginal" {...p} />
               </div>
               <div style={{ padding: "0 1rem 1rem" }}>
-                <Inp label="Otros hallazgos ginecológicos" name="otros_ginecologico" form={form} set={set} />
+                <Inp label="Otros hallazgos ginecológicos" name="otros_ginecologico" {...p} />
               </div>
             </div>
 
             <div className="form-section">
               <div className="form-section-header">Impresión Clínica / Tratamiento</div>
               <div className="form-section-body col-2">
-                <Field label="Impresión clínica" col={2}>
-                  <textarea className="input-field" rows={2} value={form.impresion_clinica}
+                <Field label="Impresión clínica" col={2} error={fieldError("impresion_clinica")}>
+                  <textarea className={inputClass("impresion_clinica")} rows={2} value={form.impresion_clinica}
                     onChange={(e) => set("impresion_clinica", e.target.value)} />
                 </Field>
-                <Field label="Tratamiento" col={2}>
-                  <textarea className="input-field" rows={2} value={form.tratamiento}
+                <Field label="Tratamiento" col={2} error={fieldError("tratamiento")}>
+                  <textarea className={inputClass("tratamiento")} rows={2} value={form.tratamiento}
                     onChange={(e) => set("tratamiento", e.target.value)} />
                 </Field>
-                <Inp label="Cita siguiente" name="cita_siguiente" type="date" form={form} set={set} />
+                <Inp label="Cita siguiente" name="cita_siguiente" type="date" {...p} />
               </div>
             </div>
           </div>
@@ -410,8 +507,8 @@ export default function NuevoControl() {
               <Toggle label="VIH" name="vih_realizado" {...p} />
               {form.vih_realizado && (
                 <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
-                  <Field label="Resultado">
-                    <select className="input-field" style={{ minWidth: 130 }} value={form.vih_resultado}
+                  <Field label="Resultado" error={fieldError("vih_resultado")}>
+                    <select className={inputClass("vih_resultado")} style={{ minWidth: 130 }} value={form.vih_resultado}
                       onChange={(e) => set("vih_resultado", e.target.value)}>
                       <option value="">-</option>
                       <option value="positivo">Positivo (+)</option>
@@ -427,8 +524,8 @@ export default function NuevoControl() {
               <Toggle label="VDRL / RPR" name="vdrl_realizado" {...p} />
               {form.vdrl_realizado && (
                 <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-                  <Field label="Resultado">
-                    <select className="input-field" style={{ minWidth: 130 }} value={form.vdrl_resultado}
+                  <Field label="Resultado" error={fieldError("vdrl_resultado")}>
+                    <select className={inputClass("vdrl_resultado")} style={{ minWidth: 130 }} value={form.vdrl_resultado}
                       onChange={(e) => set("vdrl_resultado", e.target.value)}>
                       <option value="">-</option>
                       <option value="positivo">Positivo (+)</option>
@@ -447,9 +544,9 @@ export default function NuevoControl() {
               <Toggle label="TORCH" name="torch_realizado" {...p} />
               {form.torch_realizado && (
                 <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
-                  <Field label="Resultado">
+                  <Field label="Resultado" error={fieldError("torch_resultado_positivo")}>
                     <select
-                      className="input-field"
+                      className={inputClass("torch_resultado_positivo")}
                       style={{ minWidth: 130 }}
                       value={form.torch_resultado_positivo === true ? "positivo" : form.torch_resultado_positivo === false ? "negativo" : ""}
                       onChange={(e) =>
@@ -473,8 +570,12 @@ export default function NuevoControl() {
               <Toggle label="Papanicolau / IVAA" name="papanicolau_ivaa_realizado" {...p} />
               {form.papanicolau_ivaa_realizado && (
                 <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
-                  <Field label="Resultado">
-                    <ResultadoSelect value={form.papanicolau_ivaa_resultado} onChange={(value) => set("papanicolau_ivaa_resultado", value)} />
+                  <Field label="Resultado" error={fieldError("papanicolau_ivaa_resultado")}>
+                    <ResultadoSelect
+                      value={form.papanicolau_ivaa_resultado}
+                      onChange={(value) => set("papanicolau_ivaa_resultado", value)}
+                      error={fieldError("papanicolau_ivaa_resultado")}
+                    />
                   </Field>
                 </div>
               )}
@@ -485,8 +586,12 @@ export default function NuevoControl() {
               <Toggle label="Hepatitis B" name="hepatitis_b_realizado" {...p} />
               {form.hepatitis_b_realizado && (
                 <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
-                  <Field label="Resultado">
-                    <ResultadoSelect value={form.hepatitis_b_resultado} onChange={(value) => set("hepatitis_b_resultado", value)} />
+                  <Field label="Resultado" error={fieldError("hepatitis_b_resultado")}>
+                    <ResultadoSelect
+                      value={form.hepatitis_b_resultado}
+                      onChange={(value) => set("hepatitis_b_resultado", value)}
+                      error={fieldError("hepatitis_b_resultado")}
+                    />
                   </Field>
                 </div>
               )}
@@ -497,8 +602,8 @@ export default function NuevoControl() {
               <Toggle label="USG (Ultrasonido)" name="usg_realizado" {...p} />
               {form.usg_realizado && (
                 <div style={{ marginTop: "0.5rem" }}>
-                  <Field label="Hallazgos de USG">
-                    <textarea className="input-field" rows={2} value={form.usg_hallazgos}
+                  <Field label="Hallazgos de USG" error={fieldError("usg_hallazgos")}>
+                    <textarea className={inputClass("usg_hallazgos")} rows={2} value={form.usg_hallazgos}
                       onChange={(e) => set("usg_hallazgos", e.target.value)} />
                   </Field>
                 </div>
@@ -506,8 +611,8 @@ export default function NuevoControl() {
             </div>
 
             <div style={{ marginTop: "1rem" }}>
-              <Field label="Otros laboratorios">
-                <textarea className="input-field" rows={2} value={form.otros_lab}
+              <Field label="Otros laboratorios" error={fieldError("otros_lab")}>
+                <textarea className={inputClass("otros_lab")} rows={2} value={form.otros_lab}
                   onChange={(e) => set("otros_lab", e.target.value)}
                   placeholder="Gota gruesa (malaria), Tamizaje Chagas, etc." />
               </Field>
@@ -525,7 +630,7 @@ export default function NuevoControl() {
                   <Toggle label="Sulfato Ferroso" name="sulfato_ferroso" {...p} />
                   {form.sulfato_ferroso && (
                     <div style={{ marginTop: "0.6rem" }}>
-                      <Inp label="No. de tabletas" name="sulfato_ferroso_tabletas" type="number" form={form} set={set} />
+                      <Inp label="No. de tabletas" name="sulfato_ferroso_tabletas" type="number" {...p} />
                     </div>
                   )}
                 </div>
@@ -533,7 +638,7 @@ export default function NuevoControl() {
                   <Toggle label="Ácido Fólico" name="acido_folico" {...p} />
                   {form.acido_folico && (
                     <div style={{ marginTop: "0.6rem" }}>
-                      <Inp label="No. de tabletas" name="acido_folico_tabletas" type="number" form={form} set={set} />
+                      <Inp label="No. de tabletas" name="acido_folico_tabletas" type="number" {...p} />
                     </div>
                   )}
                 </div>
@@ -543,12 +648,12 @@ export default function NuevoControl() {
             <div className="form-section">
               <div className="form-section-header">Hallazgos y Tratamiento</div>
               <div className="form-section-body col-2">
-                <Field label="Hallazgos" col={2}>
-                  <textarea className="input-field" rows={2} value={form.suplementacion_hallazgos}
+                <Field label="Hallazgos" col={2} error={fieldError("suplementacion_hallazgos")}>
+                  <textarea className={inputClass("suplementacion_hallazgos")} rows={2} value={form.suplementacion_hallazgos}
                     onChange={(e) => set("suplementacion_hallazgos", e.target.value)} />
                 </Field>
-                <Field label="Tratamiento" col={2}>
-                  <textarea className="input-field" rows={2} value={form.suplementacion_tratamiento}
+                <Field label="Tratamiento" col={2} error={fieldError("suplementacion_tratamiento")}>
+                  <textarea className={inputClass("suplementacion_tratamiento")} rows={2} value={form.suplementacion_tratamiento}
                     onChange={(e) => set("suplementacion_tratamiento", e.target.value)} />
                 </Field>
               </div>
@@ -575,8 +680,8 @@ export default function NuevoControl() {
               <Toggle label="Importancia de tratamiento de ITS a cónyuge/pareja" name="orient_tratamiento_its_pareja" {...p} />
             </div>
             <div style={{ marginTop: "1rem" }}>
-              <Field label="Otras orientaciones">
-                <input className="input-field" value={form.orient_otros}
+              <Field label="Otras orientaciones" error={fieldError("orient_otros")}>
+                <input className={inputClass("orient_otros")} value={form.orient_otros}
                   onChange={(e) => set("orient_otros", e.target.value)} />
               </Field>
             </div>
