@@ -907,6 +907,49 @@ CREATE INDEX IF NOT EXISTS idx_auditoria_fecha_usuario ON auditoria_eventos(fech
 CREATE INDEX IF NOT EXISTS idx_auditoria_fecha_paciente ON auditoria_eventos(fecha_hora DESC, paciente_id);
 CREATE INDEX IF NOT EXISTS idx_auditoria_accion_fecha ON auditoria_eventos(accion, fecha_hora DESC);
 
+-- ============================================================
+-- CAMPOS MINIMOS DE CONTROL - MODELO HIBRIDO DE AUDITORIA
+-- ============================================================
+
+ALTER TABLE usuarios
+  ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
+ALTER TABLE pacientes
+  ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
+ALTER TABLE embarazos
+  ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
+ALTER TABLE controles_prenatales
+  ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
+ALTER TABLE controles_puerperio
+  ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
+ALTER TABLE morbilidad_embarazo
+  ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
+ALTER TABLE fichas_riesgo_obstetrico
+  ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
+ALTER TABLE planes_parto
+  ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
+ALTER TABLE referencias_efectuadas
+  ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
+ALTER TABLE vacunas_paciente
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
+UPDATE vacunas_paciente
+SET updated_at = created_at
+WHERE updated_at IS NULL;
+
+ALTER TABLE vacunas_paciente
+  ALTER COLUMN updated_at SET DEFAULT NOW();
+
 ALTER TABLE vacunas_paciente ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
 ALTER TABLE controles_prenatales ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
 ALTER TABLE morbilidad_embarazo ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
