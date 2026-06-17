@@ -1,6 +1,9 @@
 {
   "scripts": {
-    "n8n:local": "powershell -ExecutionPolicy Bypass -File ./scripts/start-n8n-local.ps1"
+    "n8n:local": "powershell -ExecutionPolicy Bypass -File ./scripts/start-n8n-local.ps1",
+    "db:migrate-bi": "npm --prefix backend run db:migrate-bi",
+    "db:seed-bi": "npm --prefix backend run db:seed-bi",
+    "test:vistas-bi": "npm --prefix backend run test:vistas-bi"
   },
   "dependencies": {
     "exceljs": "^4.4.0",

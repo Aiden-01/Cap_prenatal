@@ -7,9 +7,12 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "db:migrate": "node src/db/migrate.js",
+    "db:migrate-bi": "node src/db/migrateBiViews.js",
     "db:seed": "node src/db/seed.js",
     "test:embarazo-activo": "node src/db/manualValidacionEmbarazoActivo.js",
-    "db:seed-demo-patients": "node src/db/seedDemoPatients.js"
+    "db:seed-demo-patients": "node src/db/seedDemoPatients.js",
+    "db:seed-bi": "node src/db/seedBiDemo.js",
+    "test:vistas-bi": "node src/db/testVistasBi.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
