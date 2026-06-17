@@ -14,6 +14,7 @@ async function crearUsuario({ body, req }) {
     username: body.username,
     passwordHash: hash,
     rol: body.rol,
+    createdBy: req.usuario?.id || null,
   });
 
   await registrarAuditoria(req, {
@@ -59,6 +60,7 @@ async function actualizarUsuario({ id, body, req }) {
     activo: body.activo,
     rol: body.rol,
     passwordHash,
+    updatedBy: req.usuario.id,
   });
 
   await registrarAuditoria(req, {

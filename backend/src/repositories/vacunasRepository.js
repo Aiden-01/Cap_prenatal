@@ -30,12 +30,13 @@ async function obtenerPorDosis({ embarazoId, tipoVacuna, momento, numeroDosis })
 async function upsert(data) {
   const { rows } = await pool.query(
     `INSERT INTO vacunas_paciente (
-      paciente_id, embarazo_id, tipo_vacuna, momento, numero_dosis, fecha_dosis, registrado_por
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7)
+      paciente_id, embarazo_id, tipo_vacuna, momento, numero_dosis, fecha_dosis, registrado_por, updated_by
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
     ON CONFLICT (embarazo_id, tipo_vacuna, momento, numero_dosis)
     DO UPDATE SET
       fecha_dosis = EXCLUDED.fecha_dosis,
-      registrado_por = EXCLUDED.registrado_por
+      updated_at = NOW(),
+      updated_by = EXCLUDED.updated_by
     RETURNING *`,
     [
       data.paciente_id,
@@ -45,6 +46,7 @@ async function upsert(data) {
       data.numero_dosis,
       data.fecha_dosis,
       data.registrado_por,
+      data.updated_by,
     ]
   );
   return rows[0];
@@ -53,7 +55,8 @@ async function upsert(data) {
 async function actualizar({ id, embarazoId, data }) {
   const { rows } = await pool.query(
     `UPDATE vacunas_paciente SET
-      tipo_vacuna=$1, momento=$2, numero_dosis=$3, fecha_dosis=$4, registrado_por=$5
+      tipo_vacuna=$1, momento=$2, numero_dosis=$3, fecha_dosis=$4,
+      updated_at=NOW(), updated_by=$5
      WHERE id=$6 AND embarazo_id=$7
      RETURNING *`,
     [
@@ -61,7 +64,7 @@ async function actualizar({ id, embarazoId, data }) {
       data.momento,
       data.numero_dosis,
       data.fecha_dosis,
-      data.registrado_por,
+      data.updated_by,
       id,
       embarazoId,
     ]

@@ -34,13 +34,13 @@ async function obtenerCredencialesPorId(id) {
   return rows[0] || null;
 }
 
-async function actualizarPassword({ id, passwordHash }) {
+async function actualizarPassword({ id, passwordHash, updatedBy = null }) {
   const { rows } = await pool.query(
     `UPDATE usuarios
-     SET password_hash = $1, updated_at = NOW()
-     WHERE id = $2
+     SET password_hash = $1, updated_at = NOW(), updated_by = $2
+     WHERE id = $3
      RETURNING id, nombre_completo, username`,
-    [passwordHash, id]
+    [passwordHash, updatedBy, id]
   );
   return rows[0] || null;
 }

@@ -42,6 +42,7 @@ async function guardarVacuna({ pacienteId, body, req }) {
     numero_dosis: numeroDosis,
     fecha_dosis: emptyToNull(body.fecha_dosis),
     registrado_por: req.usuario.id,
+    updated_by: req.usuario.id,
   });
 
   await registrarAuditoria(req, {
@@ -69,7 +70,7 @@ async function actualizarVacuna({ pacienteId, id, body, req }) {
       momento: body.momento,
       numero_dosis: emptyToNull(body.numero_dosis) ?? 1,
       fecha_dosis: emptyToNull(body.fecha_dosis),
-      registrado_por: req.usuario.id,
+      updated_by: req.usuario.id,
     },
   });
 

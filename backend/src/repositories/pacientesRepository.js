@@ -88,13 +88,13 @@ async function insertarPaciente(data) {
   return rows[0];
 }
 
-async function actualizarPaciente(id, data, campos) {
+async function actualizarPaciente(id, data, campos, updatedBy = null) {
   const sets = campos.map((c, i) => `${c} = $${i + 1}`).join(', ');
   const valores = campos.map((campo) => data[campo]);
-  valores.push(id);
+  valores.push(updatedBy, id);
 
   const { rows, rowCount } = await pool.query(
-    `UPDATE pacientes SET ${sets}, updated_at = NOW()
+    `UPDATE pacientes SET ${sets}, updated_at = NOW(), updated_by = $${valores.length - 1}
      WHERE id = $${valores.length}
      RETURNING *`,
     valores
@@ -239,13 +239,14 @@ async function obtenerCompletitudExpediente(pacienteId) {
   return rows[0] || null;
 }
 
-async function cerrarEmbarazosEnSeguimiento(pacienteId, fechaCierre) {
+async function cerrarEmbarazosEnSeguimiento(pacienteId, fechaCierre, updatedBy = null) {
   const { rows } = await pool.query(
     `UPDATE embarazos
-     SET estado = 'cerrado', fecha_cierre = COALESCE($2, CURRENT_DATE), updated_at = NOW()
+     SET estado = 'cerrado', fecha_cierre = COALESCE($2, CURRENT_DATE),
+         updated_at = NOW(), updated_by = $3
      WHERE paciente_id = $1 AND estado IN ('activo', 'puerperio')
      RETURNING *`,
-    [pacienteId, fechaCierre]
+    [pacienteId, fechaCierre, updatedBy]
   );
   return rows;
 }
@@ -268,12 +269,14 @@ async function insertarNuevoEmbarazo({ pacienteId, numeroEmbarazo, fur, fpp, obs
   return rows[0];
 }
 
-async function sincronizarPacienteConEmbarazo({ pacienteId, fur, fpp }) {
+async function sincronizarPacienteConEmbarazo({ pacienteId, fur, fpp, updatedBy = null }) {
   const { rows } = await pool.query(
-    `UPDATE pacientes SET fur = $2, fpp = $3, tiene_ficha_riesgo = FALSE, updated_at = NOW()
+    `UPDATE pacientes
+     SET fur = $2, fpp = $3, tiene_ficha_riesgo = FALSE,
+         updated_at = NOW(), updated_by = $4
      WHERE id = $1
      RETURNING *`,
-    [pacienteId, fur, fpp]
+    [pacienteId, fur, fpp, updatedBy]
   );
   return rows[0] || null;
 }
@@ -288,16 +291,17 @@ async function obtenerUltimoEmbarazoActivo(pacienteId) {
   return rows[0] || null;
 }
 
-async function pasarEmbarazoAPuerperio({ pacienteId, fechaCierre, observaciones }) {
+async function pasarEmbarazoAPuerperio({ pacienteId, fechaCierre, observaciones, updatedBy = null }) {
   const { rows } = await pool.query(
     `UPDATE embarazos
      SET estado = 'puerperio',
          fecha_cierre = COALESCE($2, fecha_cierre, CURRENT_DATE),
          observaciones = COALESCE($3, observaciones),
-         updated_at = NOW()
+         updated_at = NOW(),
+         updated_by = $4
      WHERE paciente_id = $1 AND estado = 'activo'
      RETURNING *`,
-    [pacienteId, fechaCierre, observaciones]
+    [pacienteId, fechaCierre, observaciones, updatedBy]
   );
   return rows[0] || null;
 }
@@ -312,27 +316,29 @@ async function obtenerUltimoEmbarazoEnSeguimiento(pacienteId) {
   return rows[0] || null;
 }
 
-async function cerrarEmbarazoEnSeguimiento({ pacienteId, fechaCierre, observaciones }) {
+async function cerrarEmbarazoEnSeguimiento({ pacienteId, fechaCierre, observaciones, updatedBy = null }) {
   const { rows } = await pool.query(
     `UPDATE embarazos
      SET estado = 'cerrado',
          fecha_cierre = COALESCE($2, fecha_cierre, CURRENT_DATE),
          observaciones = COALESCE($3, observaciones),
-         updated_at = NOW()
+         updated_at = NOW(),
+         updated_by = $4
      WHERE paciente_id = $1 AND estado IN ('activo', 'puerperio')
      RETURNING *`,
-    [pacienteId, fechaCierre, observaciones]
+    [pacienteId, fechaCierre, observaciones, updatedBy]
   );
   return rows[0] || null;
 }
 
-async function actualizarEmbarazoFechas({ embarazoId, fur, fpp }) {
+async function actualizarEmbarazoFechas({ embarazoId, fur, fpp, updatedBy = null }) {
   const { rows } = await pool.query(
     `UPDATE embarazos
-     SET fur = COALESCE($2, fur), fpp = COALESCE($3, fpp), updated_at = NOW()
+     SET fur = COALESCE($2, fur), fpp = COALESCE($3, fpp),
+         updated_at = NOW(), updated_by = $4
      WHERE id = $1
      RETURNING *`,
-    [embarazoId, fur, fpp]
+    [embarazoId, fur, fpp, updatedBy]
   );
   return rows[0] || null;
 }

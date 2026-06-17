@@ -284,7 +284,12 @@ async function actualizarPaciente({ id, body, req }) {
   }
 
   const before = await pacientesRepository.obtenerPorId(id);
-  const { paciente, rowCount } = await pacientesRepository.actualizarPaciente(id, data, campos);
+  const { paciente, rowCount } = await pacientesRepository.actualizarPaciente(
+    id,
+    data,
+    campos,
+    req.usuario.id
+  );
   if (rowCount === 0) throw new HttpError(404, 'Paciente no encontrado');
 
   await registrarAuditoria(req, {
@@ -305,6 +310,7 @@ async function actualizarPaciente({ id, body, req }) {
         embarazoId,
         fur: emptyToNull(data.fur),
         fpp: emptyToNull(data.fpp),
+        updatedBy: req.usuario.id,
       });
 
       if (embarazo) {
@@ -388,7 +394,11 @@ async function nuevoEmbarazo({ id, body, req }) {
   if (!paciente) throw new HttpError(404, 'Paciente no encontrado');
 
   const fpp = fppOrCalculated(body.fur, body.fpp);
-  const cerrados = await pacientesRepository.cerrarEmbarazosEnSeguimiento(id, emptyToNull(body.fecha_cierre));
+  const cerrados = await pacientesRepository.cerrarEmbarazosEnSeguimiento(
+    id,
+    emptyToNull(body.fecha_cierre),
+    req.usuario.id
+  );
   await validarPuedeActivarEmbarazo(id);
   const siguiente = await pacientesRepository.obtenerSiguienteNumeroEmbarazo(id);
   const embarazo = await pacientesRepository.insertarNuevoEmbarazo({
@@ -403,6 +413,7 @@ async function nuevoEmbarazo({ id, body, req }) {
     pacienteId: id,
     fur: emptyToNull(body.fur),
     fpp,
+    updatedBy: req.usuario.id,
   });
 
   for (const cerrado of cerrados) {
@@ -446,6 +457,7 @@ async function pasarAPuerperio({ id, body, req }) {
     pacienteId: id,
     fechaCierre: emptyToNull(body.fecha_parto || body.fecha_cierre),
     observaciones: emptyToNull(body.observaciones),
+    updatedBy: req.usuario.id,
   });
 
   if (!embarazo) {
@@ -472,6 +484,7 @@ async function cerrarEmbarazo({ id, body, req }) {
     pacienteId: id,
     fechaCierre: emptyToNull(body.fecha_cierre),
     observaciones: emptyToNull(body.observaciones),
+    updatedBy: req.usuario.id,
   });
 
   if (!embarazo) {

@@ -116,7 +116,11 @@ async function changePassword({ usuarioId, currentPassword, newPassword, req }) 
   if (samePassword) throw new HttpError(400, 'La nueva contrasena debe ser diferente a la actual');
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  await authRepository.actualizarPassword({ id: usuarioId, passwordHash });
+  await authRepository.actualizarPassword({
+    id: usuarioId,
+    passwordHash,
+    updatedBy: usuarioId,
+  });
 
   await registrarAuditoria(req, {
     accion: 'actualizar',
