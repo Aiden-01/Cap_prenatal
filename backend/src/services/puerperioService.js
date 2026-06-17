@@ -48,6 +48,7 @@ function buildCreateData({ pacienteId, embarazoId, body, usuarioId }) {
   }
 
   data.registrado_por = usuarioId;
+  data.updated_by = usuarioId;
   return data;
 }
 
@@ -79,6 +80,7 @@ async function guardarPuerperio({ pacienteId, body, req }) {
   const embarazoActualizado = await puerperioRepository.marcarEmbarazoEnPuerperio({
     embarazoId,
     fechaCierre: dataWithTime.fecha,
+    updatedBy: req.usuario.id,
   });
   const before = await puerperioRepository.obtenerPorNumeroYEmbarazo(
     embarazoId,
@@ -126,7 +128,13 @@ async function actualizarPuerperio({ pacienteId, id, body, req }) {
   if (campos.length === 0) throw new HttpError(400, 'Sin campos para actualizar');
 
   const before = await puerperioRepository.obtenerPorIdYEmbarazo(id, embarazoId);
-  const control = await puerperioRepository.actualizar({ id, embarazoId, data, campos });
+  const control = await puerperioRepository.actualizar({
+    id,
+    embarazoId,
+    data,
+    campos,
+    updatedBy: req.usuario.id,
+  });
 
   if (!control) throw new HttpError(404, 'Control de puerperio no encontrado');
 

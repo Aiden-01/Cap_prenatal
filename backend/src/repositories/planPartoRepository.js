@@ -8,13 +8,13 @@ async function obtenerPorEmbarazo(embarazoId) {
   return rows[0] || null;
 }
 
-async function actualizar({ id, data, campos }) {
+async function actualizar({ id, data, campos, updatedBy = null }) {
   const sets = campos.map((field, index) => `${field} = $${index + 1}`).join(', ');
   const valores = campos.map((field) => data[field]);
-  valores.push(id);
+  valores.push(updatedBy, id);
 
   const { rows } = await pool.query(
-    `UPDATE planes_parto SET ${sets}, updated_at = NOW()
+    `UPDATE planes_parto SET ${sets}, updated_at = NOW(), updated_by = $${valores.length - 1}
      WHERE id = $${valores.length}
      RETURNING *`,
     valores

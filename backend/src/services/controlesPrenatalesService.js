@@ -118,6 +118,7 @@ function buildCreateData({ pacienteId, embarazoId, body, usuarioId }) {
   }
 
   data.registrado_por = usuarioId;
+  data.updated_by = usuarioId;
   return data;
 }
 
@@ -169,7 +170,13 @@ async function actualizarControl({ pacienteId, id, body, req }) {
 
   const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
   const before = await controlesRepository.obtenerPorIdYEmbarazo(id, embarazoId);
-  const control = await controlesRepository.actualizar({ id, embarazoId, data, campos });
+  const control = await controlesRepository.actualizar({
+    id,
+    embarazoId,
+    data,
+    campos,
+    updatedBy: req.usuario.id,
+  });
 
   if (!control) throw new HttpError(404, 'Control no encontrado');
 

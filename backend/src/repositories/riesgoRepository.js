@@ -23,13 +23,13 @@ async function insertar(data) {
   return rows[0];
 }
 
-async function actualizarPorEmbarazo({ embarazoId, data, campos }) {
+async function actualizarPorEmbarazo({ embarazoId, data, campos, updatedBy = null }) {
   const sets = campos.map((field, index) => `${field}=$${index + 2}`).join(', ');
-  const valores = [embarazoId, ...campos.map((field) => data[field])];
+  const valores = [embarazoId, ...campos.map((field) => data[field]), updatedBy];
 
   const { rows } = await pool.query(
     `UPDATE fichas_riesgo_obstetrico SET
-       ${sets}, updated_at=NOW()
+       ${sets}, updated_at=NOW(), updated_by=$${valores.length}
      WHERE embarazo_id=$1
      RETURNING *, tiene_riesgo`,
     valores

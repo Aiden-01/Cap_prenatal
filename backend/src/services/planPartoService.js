@@ -45,13 +45,19 @@ async function guardarPlanParto({ pacienteId, body, req }) {
   let plan;
 
   if (existe) {
-    plan = await planPartoRepository.actualizar({ id: existe.id, data, campos });
+    plan = await planPartoRepository.actualizar({
+      id: existe.id,
+      data,
+      campos,
+      updatedBy: req.usuario.id,
+    });
   } else {
     plan = await planPartoRepository.insertar({
       ...data,
       paciente_id: pacienteId,
       embarazo_id: embarazoId,
       registrado_por: req.usuario.id,
+      updated_by: req.usuario.id,
     });
   }
 

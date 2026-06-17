@@ -32,13 +32,13 @@ async function insertar(data) {
   return rows[0];
 }
 
-async function actualizar({ id, embarazoId, data, campos }) {
+async function actualizar({ id, embarazoId, data, campos, updatedBy = null }) {
   const sets = campos.map((field, index) => `${field} = $${index + 1}`).join(', ');
   const valores = campos.map((field) => data[field]);
-  valores.push(id, embarazoId);
+  valores.push(updatedBy, id, embarazoId);
 
   const { rows, rowCount } = await pool.query(
-    `UPDATE morbilidad_embarazo SET ${sets}, updated_at = NOW()
+    `UPDATE morbilidad_embarazo SET ${sets}, updated_at = NOW(), updated_by = $${valores.length - 2}
      WHERE id = $${valores.length - 1} AND embarazo_id = $${valores.length}
      RETURNING *`,
     valores

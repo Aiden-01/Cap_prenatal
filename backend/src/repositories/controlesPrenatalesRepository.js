@@ -57,13 +57,13 @@ async function obtenerPorNumeroYEmbarazo(embarazoId, numeroControl) {
   return rows[0] || null;
 }
 
-async function actualizar({ id, embarazoId, data, campos }) {
+async function actualizar({ id, embarazoId, data, campos, updatedBy = null }) {
   const sets = campos.map((field, index) => `${field} = $${index + 1}`).join(', ');
   const valores = campos.map((field) => data[field]);
-  valores.push(id, embarazoId);
+  valores.push(updatedBy, id, embarazoId);
 
   const { rows } = await pool.query(
-    `UPDATE controles_prenatales SET ${sets}, updated_at = NOW()
+    `UPDATE controles_prenatales SET ${sets}, updated_at = NOW(), updated_by = $${valores.length - 2}
      WHERE id = $${valores.length - 1} AND embarazo_id = $${valores.length}
      RETURNING *`,
     valores
@@ -94,7 +94,8 @@ async function upsert({ data, updateFields }) {
      VALUES (${placeholders})
      ON CONFLICT (embarazo_id, numero_control) DO UPDATE SET
         ${updateSet},
-        updated_at = NOW()
+        updated_at = NOW(),
+        updated_by = EXCLUDED.updated_by
      RETURNING *`,
     valores
   );

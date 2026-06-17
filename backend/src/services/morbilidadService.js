@@ -41,6 +41,7 @@ function buildCreateData({ pacienteId, embarazoId, body, usuarioId }) {
     tratamiento_referencia: emptyToNull(dataWithTime.tratamiento_referencia),
     nombre_cargo_atiende: emptyToNull(dataWithTime.nombre_cargo_atiende),
     registrado_por: usuarioId,
+    updated_by: usuarioId,
   };
 }
 
@@ -92,7 +93,13 @@ async function actualizarMorbilidad({ pacienteId, id, body, req }) {
   if (campos.length === 0) throw new HttpError(400, 'Sin campos para actualizar');
 
   const before = await morbilidadRepository.obtenerPorIdYEmbarazo(id, embarazoId);
-  const { registro, rowCount } = await morbilidadRepository.actualizar({ id, embarazoId, data, campos });
+  const { registro, rowCount } = await morbilidadRepository.actualizar({
+    id,
+    embarazoId,
+    data,
+    campos,
+    updatedBy: req.usuario.id,
+  });
 
   if (rowCount === 0) throw new HttpError(404, 'Registro no encontrado');
 

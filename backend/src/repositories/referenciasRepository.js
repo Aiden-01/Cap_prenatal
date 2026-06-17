@@ -21,8 +21,8 @@ async function obtenerPorIdYPaciente(id, pacienteId) {
 async function insertar(data) {
   const { rows } = await pool.query(
     `INSERT INTO referencias_efectuadas (
-      paciente_id, fecha, lugar_referencia, diagnostico, registrado_por
-    ) VALUES ($1,$2,$3,$4,$5)
+      paciente_id, fecha, lugar_referencia, diagnostico, registrado_por, updated_by
+    ) VALUES ($1,$2,$3,$4,$5,$6)
     RETURNING *`,
     [
       data.paciente_id,
@@ -30,18 +30,19 @@ async function insertar(data) {
       data.lugar_referencia,
       data.diagnostico,
       data.registrado_por,
+      data.updated_by,
     ]
   );
   return rows[0];
 }
 
-async function actualizar({ id, pacienteId, data, campos }) {
+async function actualizar({ id, pacienteId, data, campos, updatedBy = null }) {
   const sets = campos.map((field, index) => `${field} = $${index + 1}`).join(', ');
   const valores = campos.map((field) => data[field]);
-  valores.push(id, pacienteId);
+  valores.push(updatedBy, id, pacienteId);
 
   const { rows, rowCount } = await pool.query(
-    `UPDATE referencias_efectuadas SET ${sets}, updated_at = NOW()
+    `UPDATE referencias_efectuadas SET ${sets}, updated_at = NOW(), updated_by = $${valores.length - 2}
      WHERE id = $${valores.length - 1} AND paciente_id = $${valores.length}
      RETURNING *`,
     valores

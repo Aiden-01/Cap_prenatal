@@ -23,6 +23,7 @@ async function guardarReferencia({ pacienteId, body, req }) {
     lugar_referencia: body.lugar_referencia,
     diagnostico: emptyToNull(body.diagnostico),
     registrado_por: req.usuario.id,
+    updated_by: req.usuario.id,
   });
 
   await registrarAuditoria(req, {
@@ -42,7 +43,13 @@ async function actualizarReferencia({ pacienteId, id, body, req }) {
   if (campos.length === 0) throw new HttpError(400, 'Sin campos para actualizar');
 
   const before = await referenciasRepository.obtenerPorIdYPaciente(id, pacienteId);
-  const { referencia, rowCount } = await referenciasRepository.actualizar({ id, pacienteId, data, campos });
+  const { referencia, rowCount } = await referenciasRepository.actualizar({
+    id,
+    pacienteId,
+    data,
+    campos,
+    updatedBy: req.usuario.id,
+  });
 
   if (rowCount === 0) throw new HttpError(404, 'Referencia no encontrada');
 

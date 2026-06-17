@@ -29,15 +29,16 @@ async function obtenerEmbarazoPorId(id) {
   return rows[0] || null;
 }
 
-async function marcarEmbarazoEnPuerperio({ embarazoId, fechaCierre }) {
+async function marcarEmbarazoEnPuerperio({ embarazoId, fechaCierre, updatedBy = null }) {
   const { rows } = await pool.query(
     `UPDATE embarazos
      SET estado = 'puerperio',
          fecha_cierre = COALESCE(fecha_cierre, $2),
-         updated_at = NOW()
+         updated_at = NOW(),
+         updated_by = $3
      WHERE id = $1 AND estado = 'activo'
      RETURNING *`,
-    [embarazoId, fechaCierre]
+    [embarazoId, fechaCierre, updatedBy]
   );
   return rows[0] || null;
 }
@@ -55,7 +56,8 @@ async function upsert({ data, updateFields }) {
      VALUES (${placeholders})
      ON CONFLICT (embarazo_id, numero_atencion) DO UPDATE SET
         ${updateSet},
-        updated_at = NOW()
+        updated_at = NOW(),
+        updated_by = EXCLUDED.updated_by
      RETURNING *`,
     valores
   );
@@ -63,13 +65,13 @@ async function upsert({ data, updateFields }) {
   return rows[0];
 }
 
-async function actualizar({ id, embarazoId, data, campos }) {
+async function actualizar({ id, embarazoId, data, campos, updatedBy = null }) {
   const sets = campos.map((field, index) => `${field} = $${index + 1}`).join(', ');
   const valores = campos.map((field) => data[field]);
-  valores.push(id, embarazoId);
+  valores.push(updatedBy, id, embarazoId);
 
   const { rows } = await pool.query(
-    `UPDATE controles_puerperio SET ${sets}, updated_at = NOW()
+    `UPDATE controles_puerperio SET ${sets}, updated_at = NOW(), updated_by = $${valores.length - 2}
      WHERE id = $${valores.length - 1} AND embarazo_id = $${valores.length}
      RETURNING *`,
     valores

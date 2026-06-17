@@ -110,6 +110,7 @@ async function guardarFichaRiesgo({ pacienteId, body, req }) {
     embarazo_id: embarazoId,
     ...buildRiesgoData(body),
     registrado_por: req.usuario.id,
+    updated_by: req.usuario.id,
   });
 
   await registrarAuditoria(req, {
@@ -140,6 +141,7 @@ async function actualizarFichaRiesgo({ pacienteId, body, req }) {
     embarazoId,
     data,
     campos: RIESGO_FIELDS,
+    updatedBy: req.usuario.id,
   });
 
   if (!ficha) throw new HttpError(404, 'Ficha de riesgo no encontrada');
