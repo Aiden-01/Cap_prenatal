@@ -848,7 +848,11 @@ CREATE TABLE IF NOT EXISTS auditoria_eventos (
   id                BIGSERIAL PRIMARY KEY,
   usuario_id        INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
   accion            VARCHAR(30) NOT NULL CHECK (
-    accion IN ('login','logout','crear','actualizar','eliminar','estado')
+    accion IN (
+      'login','logout','login_fallido','login_usuario_inactivo',
+      'crear','actualizar','eliminar','estado',
+      'consultar','generar_pdf','exportar'
+    )
   ),
   modulo            VARCHAR(80),
   entidad_afectada  VARCHAR(80),
@@ -871,6 +875,16 @@ ALTER TABLE auditoria_eventos ADD COLUMN IF NOT EXISTS entidad_afectada VARCHAR(
 ALTER TABLE auditoria_eventos ADD COLUMN IF NOT EXISTS id_entidad TEXT;
 ALTER TABLE auditoria_eventos ADD COLUMN IF NOT EXISTS fecha_hora TIMESTAMPTZ DEFAULT NOW();
 
+ALTER TABLE auditoria_eventos DROP CONSTRAINT IF EXISTS auditoria_eventos_accion_check;
+ALTER TABLE auditoria_eventos ADD CONSTRAINT auditoria_eventos_accion_check
+  CHECK (
+    accion IN (
+      'login','logout','login_fallido','login_usuario_inactivo',
+      'crear','actualizar','eliminar','estado',
+      'consultar','generar_pdf','exportar'
+    )
+  );
+
 UPDATE auditoria_eventos
 SET modulo = COALESCE(modulo, tabla),
     entidad_afectada = COALESCE(entidad_afectada, tabla),
@@ -889,6 +903,9 @@ CREATE INDEX IF NOT EXISTS idx_auditoria_created_at ON auditoria_eventos(created
 CREATE INDEX IF NOT EXISTS idx_auditoria_modulo ON auditoria_eventos(modulo);
 CREATE INDEX IF NOT EXISTS idx_auditoria_entidad ON auditoria_eventos(entidad_afectada, id_entidad);
 CREATE INDEX IF NOT EXISTS idx_auditoria_fecha_hora ON auditoria_eventos(fecha_hora);
+CREATE INDEX IF NOT EXISTS idx_auditoria_fecha_usuario ON auditoria_eventos(fecha_hora DESC, usuario_id);
+CREATE INDEX IF NOT EXISTS idx_auditoria_fecha_paciente ON auditoria_eventos(fecha_hora DESC, paciente_id);
+CREATE INDEX IF NOT EXISTS idx_auditoria_accion_fecha ON auditoria_eventos(accion, fecha_hora DESC);
 
 ALTER TABLE vacunas_paciente ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;
 ALTER TABLE controles_prenatales ADD COLUMN IF NOT EXISTS embarazo_id INTEGER REFERENCES embarazos(id) ON DELETE CASCADE;

@@ -5,6 +5,22 @@ const authRepository = require('../repositories/authRepository');
 const { registrarAuditoria } = require('../utils/auditoria');
 const { HttpError } = require('../utils/httpError');
 
+async function auditarLoginFallido(req, { username, usuario = null, accion = 'login_fallido', motivo }) {
+  await registrarAuditoria(req, {
+    accion,
+    tabla: 'usuarios',
+    registroId: usuario?.id || null,
+    usuarioId: usuario?.id || null,
+    datosNuevos: {
+      username_intentado: username,
+      motivo,
+    },
+    descripcion: accion === 'login_usuario_inactivo'
+      ? 'Intento de inicio de sesion con usuario inactivo'
+      : 'Intento de inicio de sesion fallido',
+  });
+}
+
 async function login({ username, password, req }) {
   if (!process.env.JWT_SECRET) {
     console.error('JWT_SECRET no configurado');
@@ -12,11 +28,33 @@ async function login({ username, password, req }) {
   }
 
   const usuario = await authRepository.obtenerUsuarioPorUsername(username);
-  if (!usuario) throw new HttpError(401, 'Credenciales incorrectas');
-  if (!usuario.activo) throw new HttpError(403, 'Usuario inactivo. Contacte al administrador.');
+  if (!usuario) {
+    await auditarLoginFallido(req, {
+      username,
+      motivo: 'usuario_no_encontrado_o_password_incorrecto',
+    });
+    throw new HttpError(401, 'Credenciales incorrectas');
+  }
+
+  if (!usuario.activo) {
+    await auditarLoginFallido(req, {
+      username,
+      usuario,
+      accion: 'login_usuario_inactivo',
+      motivo: 'usuario_inactivo',
+    });
+    throw new HttpError(401, 'Credenciales incorrectas');
+  }
 
   const passwordOk = await bcrypt.compare(password, usuario.password_hash);
-  if (!passwordOk) throw new HttpError(401, 'Credenciales incorrectas');
+  if (!passwordOk) {
+    await auditarLoginFallido(req, {
+      username,
+      usuario,
+      motivo: 'usuario_no_encontrado_o_password_incorrecto',
+    });
+    throw new HttpError(401, 'Credenciales incorrectas');
+  }
 
   const token = jwt.sign(
     { id: usuario.id, username: usuario.username, rol: usuario.rol },

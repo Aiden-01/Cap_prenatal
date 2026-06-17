@@ -1,6 +1,7 @@
 const reportesService = require('../services/reportesService');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { AppError } = require('../utils/appError');
+const { registrarAuditoria } = require('../utils/auditoria');
 
 function requirePeriodo(req, message = 'Parametros desde y hasta son requeridos (YYYY-MM-DD)') {
   const { desde, hasta } = req.query;
@@ -36,12 +37,32 @@ const censoMensualPrimerControl = asyncHandler(async (req, res) => {
 const exportarCensoExcel = asyncHandler(async (req, res) => {
   const periodo = requirePeriodo(req, 'Parametros requeridos');
   const workbook = await reportesService.workbookCensoGeneral(periodo);
+  await registrarAuditoria(req, {
+    accion: 'exportar',
+    tabla: 'reportes',
+    datosNuevos: {
+      tipo_reporte: 'censo_general',
+      formato: 'xlsx',
+      filtros: periodo,
+    },
+    descripcion: 'Exportacion de censo general en Excel',
+  });
   return writeWorkbook(res, workbook, `censo_${periodo.desde}_${periodo.hasta}.xlsx`);
 });
 
 const exportarCensoPrimerControlExcel = asyncHandler(async (req, res) => {
   const periodo = requirePeriodo(req, 'Parametros requeridos');
   const workbook = await reportesService.workbookCensoPrimerControl(periodo);
+  await registrarAuditoria(req, {
+    accion: 'exportar',
+    tabla: 'reportes',
+    datosNuevos: {
+      tipo_reporte: 'censo_primer_control',
+      formato: 'xlsx',
+      filtros: periodo,
+    },
+    descripcion: 'Exportacion de censo de primer control en Excel',
+  });
   return writeWorkbook(
     res,
     workbook,

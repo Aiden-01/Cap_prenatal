@@ -7,7 +7,7 @@ La politica actual es no bloquear la operacion clinica si falla la escritura de 
 ## Campos principales
 
 - `usuario_id`: usuario autenticado que ejecuta la accion.
-- `accion`: `crear`, `actualizar`, `eliminar`, `estado`, `login` o `logout`.
+- `accion`: `crear`, `actualizar`, `eliminar`, `estado`, `login`, `logout`, `login_fallido`, `login_usuario_inactivo`, `consultar`, `generar_pdf` o `exportar`.
 - `modulo`: area funcional, por ejemplo `pacientes` o `controles_prenatales`.
 - `entidad_afectada`: tabla o entidad de negocio afectada.
 - `id_entidad`: identificador del registro afectado.
@@ -16,6 +16,16 @@ La politica actual es no bloquear la operacion clinica si falla la escritura de 
 - `user_agent`: cliente usado para la solicitud.
 - `datos_anteriores`: snapshot previo cuando aplica.
 - `datos_nuevos`: snapshot resultante cuando aplica.
+
+## Acciones nuevas de trazabilidad
+
+- `login_fallido`: intento de inicio de sesion con usuario inexistente o contrasena incorrecta. No debe guardar contrasenas, hashes ni tokens.
+- `login_usuario_inactivo`: intento de inicio de sesion de una cuenta existente pero inactiva. La respuesta al cliente no debe revelar detalles internos de la cuenta.
+- `consultar`: lectura de informacion sensible, reservada para endpoints que requieran trazabilidad de consulta.
+- `generar_pdf`: generacion exitosa de documentos PDF, por ejemplo ficha MSPAS prenatal, control prenatal, riesgo obstetrico o plan de parto.
+- `exportar`: exportacion exitosa de reportes, por ejemplo censos en Excel.
+
+Los eventos de documentos y reportes deben guardar metadatos minimos, como tipo de documento, tipo de reporte, formato y filtros. No deben copiar snapshots clinicos completos.
 
 ## Ejemplos
 

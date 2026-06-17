@@ -8,6 +8,7 @@ const { promisify } = require('util');
 const pdfService = require('../services/pdfService');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { AppError } = require('../utils/appError');
+const { registrarAuditoria } = require('../utils/auditoria');
 const { generarFichaClinicaPrenatalPdf } = require('../services/fichaClinicaPrenatalPdf');
 
 const execFileAsync = promisify(execFile);
@@ -71,6 +72,19 @@ async function pdfControl(req, res) {
     });
 
     await browser.close();
+
+    await registrarAuditoria(req, {
+      accion: 'generar_pdf',
+      tabla: 'documentos',
+      registroId: id,
+      pacienteId: c.paciente_id || req.params.pacienteId || null,
+      embarazoId: c.embarazo_id || null,
+      datosNuevos: {
+        tipo_documento: 'control_prenatal',
+        control_id: id,
+      },
+      descripcion: 'PDF de control prenatal generado',
+    });
 
     res.set({
       'Content-Type': 'application/pdf',
@@ -1115,6 +1129,18 @@ async function pdfMspas(req, res) {
 
     const pdf = await generarFichaClinicaPrenatalPdf(data);
 
+    await registrarAuditoria(req, {
+      accion: 'generar_pdf',
+      tabla: 'documentos',
+      registroId: pacienteId,
+      pacienteId,
+      embarazoId: data.embarazo?.id || null,
+      datosNuevos: {
+        tipo_documento: 'ficha_mspas_prenatal',
+      },
+      descripcion: 'PDF MSPAS prenatal generado',
+    });
+
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename="ficha-prenatal.pdf"',
@@ -1147,6 +1173,19 @@ async function pdfRiesgoObstetrico(req, res) {
     const templatePath = path.join(__dirname, '../assets/official_forms/riesgo_oficial.xlsx');
     const pdf = await exportExcelTemplateToPdf(templatePath, cellMap, `ficha-riesgo-${pacienteId}.pdf`);
 
+    await registrarAuditoria(req, {
+      accion: 'generar_pdf',
+      tabla: 'documentos',
+      registroId: riesgo.id,
+      pacienteId,
+      embarazoId: embarazo?.id || riesgo.embarazo_id || null,
+      datosNuevos: {
+        tipo_documento: 'riesgo_obstetrico',
+        ficha_riesgo_id: riesgo.id,
+      },
+      descripcion: 'PDF de ficha de riesgo obstetrico generado',
+    });
+
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename=ficha-riesgo-${pacienteId}.pdf`,
@@ -1174,6 +1213,19 @@ async function pdfPlanParto(req, res) {
     const cellMap = buildPlanPartoCellMap({ paciente, plan });
     const templatePath = path.join(__dirname, '../assets/official_forms/plan_parto_oficial.xlsx');
     const pdf = await exportExcelTemplateToPdf(templatePath, cellMap, `plan-parto-${pacienteId}.pdf`);
+
+    await registrarAuditoria(req, {
+      accion: 'generar_pdf',
+      tabla: 'documentos',
+      registroId: plan.id,
+      pacienteId,
+      embarazoId: plan.embarazo_id || null,
+      datosNuevos: {
+        tipo_documento: 'plan_parto',
+        plan_parto_id: plan.id,
+      },
+      descripcion: 'PDF de plan de parto generado',
+    });
 
     res.set({
       'Content-Type': 'application/pdf',
