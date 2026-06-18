@@ -36,10 +36,6 @@ Si backend corre fuera de Docker, configura estas variables en `backend/.env` o 
 
 ```env
 AUTOMATION_SECRET=change_me_to_a_long_random_automation_secret
-NOTIFICATIONS_ENABLED=false
-N8N_WEBHOOK_URL=http://localhost:5678/webhook/cap-prenatal-alertas
-N8N_WEBHOOK_SECRET=change_me_to_a_long_random_webhook_secret
-N8N_WEBHOOK_TIMEOUT_MS=5000
 GENERIC_TIMEZONE=America/Guatemala
 TZ=America/Guatemala
 ```
@@ -85,17 +81,13 @@ http://localhost:5678
 
 ## Variables del backend
 
-Por seguridad, las notificaciones por evento vienen apagadas por defecto. El endpoint de automatizaciones usa un secreto compartido entre backend y n8n.
+El endpoint de automatizaciones usa un secreto compartido entre backend y n8n.
 
 ```env
-NOTIFICATIONS_ENABLED=true
-N8N_WEBHOOK_URL=http://n8n:5678/webhook/cap-prenatal-alertas
-N8N_WEBHOOK_SECRET=change_me_to_a_long_random_webhook_secret
-N8N_WEBHOOK_TIMEOUT_MS=5000
 AUTOMATION_SECRET=change_me_to_a_long_random_automation_secret
 ```
 
-En produccion cambia `N8N_WEBHOOK_SECRET` y `AUTOMATION_SECRET` por valores largos y privados.
+En produccion cambia `AUTOMATION_SECRET` por un valor largo y privado.
 
 ## Workflow recomendado: citas de manana
 
@@ -170,25 +162,3 @@ Respuesta del endpoint:
 }
 ```
 
-## Workflow opcional: riesgo detectado
-
-Cuando se registra o actualiza una ficha con riesgo obstetrico activo, el backend envia:
-
-```json
-{
-  "event": "riesgo_obstetrico.detectado",
-  "source": "cap-prenatal",
-  "occurred_at": "2026-06-15T00:00:00.000Z",
-  "payload": {
-    "accion": "crear",
-    "paciente_id": 1,
-    "embarazo_id": 1,
-    "ficha_id": 1,
-    "tiene_riesgo": true,
-    "referida_a": "Hospital",
-    "fecha": "2026-06-15"
-  }
-}
-```
-
-La integracion esta disenada para no romper el guardado clinico si n8n no responde. El backend registra una advertencia y continua.

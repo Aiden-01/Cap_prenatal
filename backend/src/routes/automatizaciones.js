@@ -17,7 +17,7 @@ function safeEqual(a, b) {
 }
 
 function automationSecretMiddleware(req, _res, next) {
-  const expected = process.env.AUTOMATION_SECRET || process.env.N8N_WEBHOOK_SECRET;
+  const expected = process.env.AUTOMATION_SECRET;
   const received = req.headers['x-cap-prenatal-secret'];
 
   if (!expected) {

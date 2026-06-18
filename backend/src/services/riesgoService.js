@@ -2,7 +2,6 @@ const riesgoRepository = require('../repositories/riesgoRepository');
 const { obtenerEmbarazoActivoId, obtenerEmbarazoActivoRequeridoId } = require('../utils/embarazos');
 const { registrarAuditoria } = require('../utils/auditoria');
 const { HttpError } = require('../utils/httpError');
-const n8nNotifier = require('./n8nNotifier');
 
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
 const boolOrFalse = (value) => value ?? false;
@@ -69,29 +68,6 @@ function buildRiesgoData(body) {
   return data;
 }
 
-function buildRiesgoEventPayload({ accion, pacienteId, embarazoId, ficha }) {
-  return {
-    accion,
-    paciente_id: pacienteId,
-    embarazo_id: embarazoId,
-    ficha_id: ficha.id,
-    tiene_riesgo: ficha.tiene_riesgo,
-    referida_a: ficha.referida_a,
-    fecha: ficha.fecha,
-  };
-}
-
-async function notifyRiesgoDetectado({ accion, pacienteId, embarazoId, ficha }) {
-  if (!ficha?.tiene_riesgo) return;
-
-  await n8nNotifier.sendEvent('riesgo_obstetrico.detectado', buildRiesgoEventPayload({
-    accion,
-    pacienteId,
-    embarazoId,
-    ficha,
-  }));
-}
-
 async function obtenerFichaRiesgo(pacienteId) {
   const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
   if (!embarazoId) return null;
@@ -123,13 +99,6 @@ async function guardarFichaRiesgo({ pacienteId, body, req }) {
     descripcion: 'Ficha de riesgo registrada',
   });
 
-  await notifyRiesgoDetectado({
-    accion: 'crear',
-    pacienteId,
-    embarazoId,
-    ficha,
-  });
-
   return ficha;
 }
 
@@ -156,17 +125,6 @@ async function actualizarFichaRiesgo({ pacienteId, body, req }) {
     datosNuevos: ficha,
     descripcion: 'Ficha de riesgo actualizada',
   });
-
-  const riesgoNuevo = Boolean(ficha.tiene_riesgo);
-  const riesgoAnterior = Boolean(before?.tiene_riesgo);
-  if (riesgoNuevo && !riesgoAnterior) {
-    await notifyRiesgoDetectado({
-      accion: 'actualizar',
-      pacienteId,
-      embarazoId,
-      ficha,
-    });
-  }
 
   return ficha;
 }

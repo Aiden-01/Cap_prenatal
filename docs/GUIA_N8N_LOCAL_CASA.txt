@@ -80,10 +80,6 @@ Ejemplo para entorno local:
   TZ=America/Guatemala
 
   AUTOMATION_SECRET=change_me_to_a_long_random_automation_secret
-  NOTIFICATIONS_ENABLED=false
-  N8N_WEBHOOK_URL=http://localhost:5678/webhook/cap-prenatal-alertas
-  N8N_WEBHOOK_SECRET=change_me_to_a_long_random_webhook_secret
-  N8N_WEBHOOK_TIMEOUT_MS=5000
 
 Importante:
 
