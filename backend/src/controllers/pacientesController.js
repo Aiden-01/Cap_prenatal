@@ -1,5 +1,6 @@
 const pacientesService = require('../services/pacientesService');
 const { asyncHandler } = require('../middleware/asyncHandler');
+const { ocultarDatosVih } = require('../utils/datosSensibles');
 
 // GET /api/pacientes?buscar=xxx&pagina=1&limite=20
 const listar = asyncHandler(async (req, res) => {
@@ -10,7 +11,7 @@ const listar = asyncHandler(async (req, res) => {
 // GET /api/pacientes/:id
 const obtener = asyncHandler(async (req, res) => {
   const paciente = await pacientesService.obtenerPaciente(req.params.id);
-  return res.json(paciente);
+  return res.json(ocultarDatosVih(paciente, req.usuario.permisos));
 });
 
 // POST /api/pacientes
@@ -33,7 +34,7 @@ const actualizar = asyncHandler(async (req, res) => {
 // GET /api/pacientes/:id/expediente
 const expedienteCompleto = asyncHandler(async (req, res) => {
   const expediente = await pacientesService.expedienteCompleto(req.params.id);
-  return res.json(expediente);
+  return res.json(ocultarDatosVih(expediente, req.usuario.permisos));
 });
 
 // GET /api/pacientes/:id/completitud

@@ -61,11 +61,22 @@ function soloAdmin(req, _res, next) {
   return next();
 }
 
+function permitirRoles(...roles) {
+  return (req, _res, next) => {
+    if (!roles.includes(req.usuario?.rol)) {
+      return next(new AppError(403, 'Acceso restringido', { code: 'ROL_REQUERIDO' }));
+    }
+
+    return next();
+  };
+}
+
 module.exports = {
   AUTH_COOKIE_NAME,
   CSRF_COOKIE_NAME,
   authMiddleware,
   csrfMiddleware,
+  permitirRoles,
   readCookie,
   soloAdmin,
 };

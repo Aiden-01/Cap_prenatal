@@ -1,12 +1,14 @@
 const express = require('express');
 const pool = require('../db/pool');
 const { authMiddleware } = require('../middleware/auth');
+const { cargarPermisos, verificarPermiso } = require('../middleware/permisos');
 const { asyncHandler } = require('../middleware/asyncHandler');
 
 const router = express.Router();
 router.use(authMiddleware);
+router.use(cargarPermisos);
 
-router.get('/riesgo', asyncHandler(async (_req, res) => {
+router.get('/riesgo', verificarPermiso('mapa_riesgo.ver'), asyncHandler(async (_req, res) => {
   const { rows } = await pool.query(`
     WITH comunidades_base AS (
       SELECT

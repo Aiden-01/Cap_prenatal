@@ -2,6 +2,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
+import { useAuth } from "../hooks/useAuth";
 import { ChevronLeft, Save, Stethoscope, FlaskConical, Pill, BookOpen } from "lucide-react";
 import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
 import { calculateGestationalWeeks } from "../utils/gestationalAge";
@@ -261,6 +262,20 @@ const CONTROL_TAB_BY_FIELD = {
   acido_folico_tabletas: "suplementacion",
 };
 
+function toDateInputValue(value, fallback = "") {
+  if (!value) return fallback;
+  const dateOnly = String(value).split("T")[0];
+  const date = new Date(`${dateOnly}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? fallback : dateOnly;
+}
+
+function normalizeControlForForm(control) {
+  const initial = initialControlForm();
+  return Object.fromEntries(
+    Object.entries(control || {}).map(([key, value]) => [key, value ?? initial[key] ?? ""])
+  );
+}
+
 function inferControlFieldErrors(err) {
   const code = err?.response?.data?.code;
   const message = getErrorMessage(err, "");
@@ -278,6 +293,9 @@ export default function NuevoControl() {
   const navigate = useNavigate();
   const expedientePath = `/pacientes/${id}?tab=controles`;
   const toast    = useGlobalToast();
+  const { usuario } = useAuth();
+  const puedeVerVih = usuario?.permisos?.includes("controles.ver_vih");
+  const puedeCapturarVih = !controlId || puedeVerVih;
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [tab, setTab]         = useState("general");
@@ -306,16 +324,19 @@ export default function NuevoControl() {
   }));
 
   useEffect(() => {
-    const parseControl = (control) => ({
+    const parseControl = (control) => {
+      const normalized = normalizeControlForForm(control);
+      return ({
       ...initialControlForm(),
-      ...control,
-      vih_resultado: control.vih_resultado === "no_aplica" ? "" : control.vih_resultado,
-      vih_resultado_valor: "",
+      ...normalized,
+      vih_resultado: control.vih_resultado === "no_aplica" ? "" : control.vih_resultado ?? "",
+      vih_resultado_valor: control.vih_resultado_valor ?? "",
       torch_resultado_valor: "",
       papanicolau_ivaa_fecha_toma: "",
-      fecha: control.fecha ? control.fecha.split("T")[0] : INIT.fecha,
-      cita_siguiente: control.cita_siguiente ? control.cita_siguiente.split("T")[0] : "",
+      fecha: toDateInputValue(control.fecha, INIT.fecha),
+      cita_siguiente: toDateInputValue(control.cita_siguiente),
     });
+    };
 
     const controlesRequest = editando
       ? api.get(`/pacientes/${id}/controles/${controlId}`)
@@ -364,10 +385,14 @@ export default function NuevoControl() {
     const payload = {
       ...form,
       edad_gestacional_semanas: edadGestacionalSemanas,
-      vih_resultado_valor: "",
       torch_resultado_valor: "",
       papanicolau_ivaa_fecha_toma: "",
     };
+    if (editando && !puedeVerVih) {
+      delete payload.vih_realizado;
+      delete payload.vih_resultado;
+      delete payload.vih_resultado_valor;
+    }
     try {
       if (editando) {
         await api.put(`/pacientes/${id}/controles/${controlId}`, payload);
@@ -571,22 +596,24 @@ export default function NuevoControl() {
 
             <LabRow label="Heces" realizadoKey="heces_realizada" resultadoKey="heces_resultado" {...p} />
 
-            {/* VIH */}
-            <div style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
-              <Toggle label="VIH" name="vih_realizado" {...p} />
-              {form.vih_realizado && (
-                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
-                  <Field label="Resultado" error={fieldError("vih_resultado")}>
-                    <select className={inputClass("vih_resultado")} style={{ minWidth: 130 }} value={form.vih_resultado}
-                      onChange={(e) => set("vih_resultado", e.target.value)}>
-                      <option value="">-</option>
-                      <option value="positivo">Positivo (+)</option>
-                      <option value="negativo">Negativo (-)</option>
-                    </select>
-                  </Field>
-                </div>
-              )}
-            </div>
+            {puedeCapturarVih && (
+              <div style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
+                <Toggle label="VIH" name="vih_realizado" {...p} />
+                {form.vih_realizado && (
+                  <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
+                    <Field label="Resultado" error={fieldError("vih_resultado")}>
+                      <select className={inputClass("vih_resultado")} style={{ minWidth: 130 }} value={form.vih_resultado}
+                        onChange={(e) => set("vih_resultado", e.target.value)}>
+                        <option value="">-</option>
+                        <option value="positivo">Positivo (+)</option>
+                        <option value="negativo">Negativo (-)</option>
+                      </select>
+                    </Field>
+                    <Inp label="Valor / nota" name="vih_resultado_valor" {...p} />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* VDRL/RPR */}
             <div style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>

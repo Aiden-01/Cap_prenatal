@@ -1,10 +1,17 @@
 const pool = require('../db/pool');
 
-async function listar() {
+async function listar({ actorRol } = {}) {
+  const params = [];
+  const where = actorRol === 'admin'
+    ? "WHERE r.nombre <> 'director'"
+    : '';
   const { rows } = await pool.query(
     `SELECT u.id, u.nombre_completo, u.username, u.activo, r.nombre AS rol,
             u.created_at, u.updated_at, u.created_by, u.updated_by
-     FROM usuarios u JOIN roles r ON r.id = u.rol_id ORDER BY u.id`
+     FROM usuarios u JOIN roles r ON r.id = u.rol_id
+     ${where}
+     ORDER BY u.id`,
+    params
   );
   return rows;
 }
@@ -13,7 +20,8 @@ async function crear({ nombreCompleto, username, passwordHash, rol, createdBy = 
   const { rows } = await pool.query(
     `INSERT INTO usuarios (nombre_completo, username, password_hash, rol_id, created_by)
      VALUES ($1, $2, $3, (SELECT id FROM roles WHERE nombre = $4), $5)
-     RETURNING id, nombre_completo, username, activo, created_at, updated_at, created_by, updated_by`,
+     RETURNING id, nombre_completo, username, activo, created_at, updated_at, created_by, updated_by,
+       (SELECT nombre FROM roles WHERE nombre = $4) AS rol`,
     [nombreCompleto, username, passwordHash, rol, createdBy]
   );
   return rows[0];
@@ -30,11 +38,26 @@ async function obtenerPorId(id) {
   return rows[0] || null;
 }
 
+async function obtenerVisibleParaActor({ id, actorRol }) {
+  const usuario = await obtenerPorId(id);
+  if (actorRol === 'admin' && usuario?.rol === 'director') return null;
+  return usuario;
+}
+
 async function contarAdminsActivos() {
   const { rows } = await pool.query(
     `SELECT COUNT(*) FROM usuarios u
      JOIN roles r ON r.id = u.rol_id
      WHERE r.nombre = 'admin' AND u.activo = TRUE`
+  );
+  return parseInt(rows[0].count, 10);
+}
+
+async function contarDirectoresActivos() {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*) FROM usuarios u
+     JOIN roles r ON r.id = u.rol_id
+     WHERE r.nombre = 'director' AND u.activo = TRUE`
   );
   return parseInt(rows[0].count, 10);
 }
@@ -45,7 +68,8 @@ async function actualizar({ id, nombreCompleto, activo, rol, passwordHash, updat
       `UPDATE usuarios SET nombre_completo=$1, activo=$2,
        rol_id=(SELECT id FROM roles WHERE nombre=$3),
        password_hash=$4, updated_at=NOW(), updated_by=$5 WHERE id=$6
-       RETURNING id, nombre_completo, username, activo, created_at, updated_at, created_by, updated_by`,
+       RETURNING id, nombre_completo, username, activo, created_at, updated_at, created_by, updated_by,
+         (SELECT nombre FROM roles WHERE nombre = $3) AS rol`,
       [nombreCompleto, activo, rol, passwordHash, updatedBy, id]
     );
     return rows[0] || null;
@@ -55,7 +79,8 @@ async function actualizar({ id, nombreCompleto, activo, rol, passwordHash, updat
     `UPDATE usuarios SET nombre_completo=$1, activo=$2,
      rol_id=(SELECT id FROM roles WHERE nombre=$3),
      updated_at=NOW(), updated_by=$4 WHERE id=$5
-     RETURNING id, nombre_completo, username, activo, created_at, updated_at, created_by, updated_by`,
+     RETURNING id, nombre_completo, username, activo, created_at, updated_at, created_by, updated_by,
+       (SELECT nombre FROM roles WHERE nombre = $3) AS rol`,
     [nombreCompleto, activo, rol, updatedBy, id]
   );
   return rows[0] || null;
@@ -69,7 +94,9 @@ module.exports = {
   listar,
   crear,
   obtenerPorId,
+  obtenerVisibleParaActor,
   contarAdminsActivos,
+  contarDirectoresActivos,
   actualizar,
   eliminar,
 };

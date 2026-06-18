@@ -3,6 +3,7 @@ const { obtenerEmbarazoActivoRequeridoId } = require('../utils/embarazos');
 const { withGuatemalaTimeFallback } = require('../utils/guatemalaTime');
 const { registrarEvento: registrarAuditoria } = require('./auditService');
 const { HttpError } = require('../utils/httpError');
+const { filtrarCamposVih, VIH_FIELDS, puedeVerVih } = require('../utils/datosSensibles');
 
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
 
@@ -92,7 +93,7 @@ function buildUpdateData(body) {
   const normalized = {};
 
   for (const field of campos) {
-    normalized[field] = ['vih_resultado_valor', 'torch_resultado_valor', 'papanicolau_ivaa_fecha_toma'].includes(field)
+    normalized[field] = ['torch_resultado_valor', 'papanicolau_ivaa_fecha_toma'].includes(field)
       ? null
       : emptyToNull(data[field]);
   }
@@ -103,7 +104,7 @@ function buildUpdateData(body) {
 function normalizeCreateValue(field, body) {
   if (CONTROL_BOOLEAN_DEFAULT_FALSE.includes(field)) return body[field] ?? false;
   if (CONTROL_NULLABLE_BOOLEAN.includes(field)) return body[field] ?? null;
-  if (['vih_resultado_valor', 'torch_resultado_valor', 'papanicolau_ivaa_fecha_toma'].includes(field)) return null;
+  if (['torch_resultado_valor', 'papanicolau_ivaa_fecha_toma'].includes(field)) return null;
   return emptyToNull(body[field]);
 }
 
@@ -147,7 +148,10 @@ async function crearControl({ pacienteId, body, req }) {
     body: dataWithTime,
     usuarioId: req.usuario.id,
   });
-  const updateFields = CONTROL_FIELDS.filter((field) => field !== 'numero_control');
+  const updateFields = CONTROL_FIELDS.filter((field) =>
+    field !== 'numero_control' &&
+    (puedeVerVih(req.usuario.permisos) || !VIH_FIELDS.has(field))
+  );
   const control = await controlesRepository.upsert({ data, updateFields });
 
   await registrarAuditoria(req, {
@@ -165,7 +169,8 @@ async function crearControl({ pacienteId, body, req }) {
 }
 
 async function actualizarControl({ pacienteId, id, body, req }) {
-  const { data, campos } = buildUpdateData(body);
+  const bodyPermitido = filtrarCamposVih(body, req.usuario.permisos);
+  const { data, campos } = buildUpdateData(bodyPermitido);
   if (campos.length === 0) throw new HttpError(400, 'Sin campos para actualizar');
 
   const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);

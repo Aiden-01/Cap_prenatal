@@ -1,6 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import api from "../api/axios";
 
 const AUTH_CHANGE_EVENT = "cap-auth-change";
+const REFRESH_THROTTLE_MS = 1000;
+
+let sharedRefreshPromise = null;
+let lastRefreshAt = 0;
 
 function readUsuario() {
   try {
@@ -16,9 +21,47 @@ function notifyAuthChange() {
 
 export function useAuth() {
   const [usuario, setUsuario] = useState(readUsuario);
+  const isRefreshingRef = useRef(false);
+
+  const refreshUsuario = useCallback(async ({ force = false } = {}) => {
+    if (!readUsuario()) return null;
+
+    const now = Date.now();
+    if (!force && now - lastRefreshAt < REFRESH_THROTTLE_MS) {
+      return readUsuario();
+    }
+
+    if (isRefreshingRef.current) return sharedRefreshPromise;
+    if (sharedRefreshPromise) return sharedRefreshPromise;
+
+    isRefreshingRef.current = true;
+    sharedRefreshPromise = api.get("/auth/me", { skipAuthRedirect: true })
+      .then(({ data }) => {
+        lastRefreshAt = Date.now();
+        if (!data) return null;
+
+        localStorage.setItem("usuario", JSON.stringify(data));
+        setUsuario(data);
+        notifyAuthChange();
+        return data;
+      })
+      .catch(() => null)
+      .finally(() => {
+        isRefreshingRef.current = false;
+        sharedRefreshPromise = null;
+      });
+
+    return sharedRefreshPromise;
+  }, []);
 
   useEffect(() => {
-    const syncUsuario = () => setUsuario(readUsuario());
+    const syncUsuario = () => {
+      const currentUsuario = readUsuario();
+      setUsuario(currentUsuario);
+      if (!currentUsuario) {
+        lastRefreshAt = 0;
+      }
+    };
 
     window.addEventListener(AUTH_CHANGE_EVENT, syncUsuario);
     window.addEventListener("storage", syncUsuario);
@@ -27,6 +70,23 @@ export function useAuth() {
       window.removeEventListener("storage", syncUsuario);
     };
   }, []);
+
+  useEffect(() => {
+    if (!readUsuario()) return undefined;
+
+    refreshUsuario({ force: true });
+
+    const handleFocus = () => {
+      if (readUsuario()) {
+        refreshUsuario();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [refreshUsuario]);
 
   const login = (user) => {
     localStorage.removeItem("token");
@@ -39,8 +99,15 @@ export function useAuth() {
     localStorage.removeItem("token");
     localStorage.removeItem("usuario");
     setUsuario(null);
+    lastRefreshAt = 0;
     notifyAuthChange();
   };
 
-  return { usuario, login, logout, isAdmin: usuario?.rol === "admin" };
+  return {
+    usuario,
+    login,
+    logout,
+    refreshUsuario,
+    isAdmin: usuario?.rol === "admin" || usuario?.rol === "director",
+  };
 }

@@ -15,7 +15,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE IF NOT EXISTS roles (
   id          SERIAL PRIMARY KEY,
-  nombre      VARCHAR(50) UNIQUE NOT NULL, -- 'admin' | 'personal_salud'
+  nombre      VARCHAR(50) UNIQUE NOT NULL, -- 'director' | 'admin' | 'personal_salud'
   descripcion TEXT
 );
 
@@ -28,6 +28,22 @@ CREATE TABLE IF NOT EXISTS usuarios (
   activo          BOOLEAN DEFAULT TRUE,
   created_at      TIMESTAMPTZ DEFAULT NOW(),
   updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS permisos (
+  id          SERIAL PRIMARY KEY,
+  codigo      VARCHAR(80) UNIQUE NOT NULL,
+  descripcion VARCHAR(255) NOT NULL,
+  categoria   VARCHAR(50) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS usuario_permisos (
+  id              SERIAL PRIMARY KEY,
+  usuario_id      INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  permiso_id      INTEGER NOT NULL REFERENCES permisos(id) ON DELETE CASCADE,
+  otorgado_por    INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  fecha_otorgado  TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(usuario_id, permiso_id)
 );
 
 -- ============================================================

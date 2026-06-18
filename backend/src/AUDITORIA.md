@@ -27,6 +27,22 @@ La politica actual es no bloquear la operacion clinica si falla la escritura de 
 
 Los eventos de documentos y reportes deben guardar metadatos minimos, como tipo de documento, tipo de reporte, formato y filtros. No deben copiar snapshots clinicos completos.
 
+## Criterio funcional para PDF institucional
+
+El permiso `controles.ver_vih` aplica a la interfaz web, endpoints JSON y escrituras del sistema. Como excepcion funcional, los PDF institucionales MSPAS/CAP conservan los marcadores del formato clinico solicitado, incluyendo resultados de tamizaje VIH cuando el formato los requiere.
+
+Ese dato representa tamizaje o registro inicial del control prenatal, no diagnostico confirmado de VIH. La confirmacion y seguimiento se realizan por otro procedimiento fuera del alcance actual del sistema. Por este motivo, la generacion del PDF institucional no se bloquea por falta de `controles.ver_vih` ni se eliminan automaticamente sus marcadores VIH del formato.
+
+## Criterio funcional para captura VIH en controles
+
+El permiso `controles.crear` permite registrar la captura inicial de VIH al crear un control prenatal nuevo, aunque el usuario no tenga `controles.ver_vih`. La respuesta JSON para ese usuario debe seguir saneada y no devolver `vih_realizado`, `vih_resultado` ni `vih_resultado_valor`.
+
+El permiso `controles.ver_vih` se reserva para visualizar resultados VIH ya registrados y para editar o corregir campos VIH en controles existentes. En `PUT` y en `POST` con upsert sobre un control existente, si el usuario no tiene `controles.ver_vih`, los campos VIH recibidos se ignoran sin sobrescribir los valores existentes.
+
+## Credenciales iniciales de seed
+
+El usuario `director` creado por `db/seed.js` con contrasena `Director2024*` es una credencial temporal de desarrollo y primer arranque. Debe cambiarse antes de usar el sistema en produccion.
+
 ## Ejemplos
 
 Crear paciente:

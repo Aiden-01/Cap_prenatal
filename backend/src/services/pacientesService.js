@@ -1,6 +1,7 @@
 const pacientesRepository = require('../repositories/pacientesRepository');
 const { registrarEvento: registrarAuditoria } = require('./auditService');
 const { HttpError } = require('../utils/httpError');
+const { filtrarCamposVih } = require('../utils/datosSensibles');
 
 const ESTADO_EMBARAZO_ACTIVO = 'activo';
 const ESTADO_EMBARAZO_PUERPERIO = 'puerperio';
@@ -227,12 +228,13 @@ async function obtenerPaciente(id) {
 }
 
 async function crearPaciente({ body, req }) {
-  const cui = normalizeCui(body.cui);
+  const bodyPermitido = filtrarCamposVih(body, req.usuario.permisos);
+  const cui = normalizeCui(bodyPermitido.cui);
   if (await pacientesRepository.existeCui(cui)) {
     throw new HttpError(409, 'Ya existe una paciente registrada con ese CUI');
   }
 
-  const data = buildPacienteInsertData(body, req.usuario.id);
+  const data = buildPacienteInsertData(bodyPermitido, req.usuario.id);
   const paciente = await pacientesRepository.insertarPaciente(data);
   await validarPuedeActivarEmbarazo(paciente.id);
   const embarazo = await pacientesRepository.crearEmbarazoInicial({
@@ -273,7 +275,8 @@ async function crearPaciente({ body, req }) {
 }
 
 async function actualizarPaciente({ id, body, req }) {
-  const { data, campos } = buildPacienteUpdateData(body);
+  const bodyPermitido = filtrarCamposVih(body, req.usuario.permisos);
+  const { data, campos } = buildPacienteUpdateData(bodyPermitido);
   if (campos.length === 0) throw new HttpError(400, 'Sin campos para actualizar');
 
   if (

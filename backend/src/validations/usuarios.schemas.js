@@ -4,7 +4,7 @@ const {
   requiredText,
 } = require('./common.schemas');
 
-const rolSchema = z.enum(['admin', 'personal_salud'], {
+const rolSchema = z.enum(['director', 'admin', 'personal_salud'], {
   error: 'Rol invalido',
 });
 

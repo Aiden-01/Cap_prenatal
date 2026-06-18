@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import {
   UserPlus, ShieldCheck, ShieldOff, ShieldAlert,
-  User, KeyRound, BadgeCheck, Loader2, CheckCircle2, Trash2, X
+  User, KeyRound, BadgeCheck, Loader2, CheckCircle2, Trash2, X, LockKeyhole, AlertTriangle
 } from "lucide-react";
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
@@ -83,6 +83,124 @@ function ModalEliminar({ usuario, onConfirmar, onCancelar }) {
   );
 }
 
+function rolLabel(rol) {
+  if (rol === "director") return "Director";
+  if (rol === "admin") return "Admin";
+  return "Personal salud";
+}
+
+function rolBadge(rol) {
+  if (rol === "director") return "badge-orange";
+  if (rol === "admin") return "badge-blue";
+  return "badge-green";
+}
+
+function ModalPermisos({
+  usuario,
+  catalogo,
+  seleccionados,
+  loading,
+  saving,
+  onToggle,
+  onGuardar,
+  onCancelar,
+}) {
+  if (!usuario) return null;
+  const grupos = catalogo.reduce((acc, permiso) => {
+    if (!acc[permiso.categoria]) acc[permiso.categoria] = [];
+    acc[permiso.categoria].push(permiso);
+    return acc;
+  }, {});
+
+  return (
+    <div className="modal-backdrop">
+      <div className="card modal-card" style={{ maxWidth: 720 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", alignItems: "flex-start", marginBottom: "1rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: "var(--primary-lt)", display: "grid", placeItems: "center", flexShrink: 0,
+            }}>
+              <ShieldCheck size={18} color="var(--primary)" />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "1rem" }}>Gestionar permisos</div>
+              <div style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                {usuario.nombre_completo}
+              </div>
+            </div>
+          </div>
+          <button type="button" className="password-modal-close" onClick={onCancelar} disabled={saving} aria-label="Cerrar">
+            <X size={18} />
+          </button>
+        </div>
+
+        {loading ? (
+          <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-muted)" }}>
+            Cargando permisos...
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: "0.9rem", maxHeight: "58vh", overflowY: "auto", paddingRight: "0.25rem" }}>
+            {Object.entries(grupos).map(([categoria, permisos]) => (
+              <div key={categoria} style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+                <div className="card-titlebar" style={{ borderBottom: "1px solid var(--border)" }}>
+                  <strong style={{ textTransform: "capitalize" }}>{categoria.replace("_", " ")}</strong>
+                </div>
+                <div style={{ display: "grid", gap: "0.45rem", padding: "0.75rem" }}>
+                  {permisos.map((permiso) => {
+                    const sensible = permiso.codigo === "controles.ver_vih";
+                    return (
+                      <label
+                        key={permiso.codigo}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: "0.65rem",
+                          padding: "0.65rem",
+                          borderRadius: 8,
+                          border: sensible ? "1px solid var(--warn)" : "1px solid var(--border)",
+                          background: sensible ? "var(--warn-lt)" : "var(--surface)",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={seleccionados.includes(permiso.codigo)}
+                          onChange={() => onToggle(permiso.codigo)}
+                          style={{ marginTop: 3 }}
+                        />
+                        <span style={{ display: "grid", gap: 2 }}>
+                          <span style={{ display: "flex", gap: "0.4rem", alignItems: "center", fontWeight: 700, color: sensible ? "var(--warn)" : "var(--text)" }}>
+                            {sensible && <LockKeyhole size={14} />}
+                            {permiso.codigo}
+                          </span>
+                          <span style={{ fontSize: "0.8rem", color: sensible ? "var(--warn)" : "var(--text-muted)" }}>
+                            {permiso.descripcion}
+                            {sensible ? " - habilita visibilidad de datos VIH." : ""}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="action-row" style={{ marginTop: "1.25rem" }}>
+          <button className="btn-secondary" onClick={onCancelar} disabled={saving}>
+            Cancelar
+          </button>
+          <button className="btn-primary" onClick={onGuardar} disabled={loading || saving}>
+            {saving ? <><Loader2 className="spin" size={14} /> Guardando...</> : <><ShieldCheck size={14} /> Guardar permisos</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Usuarios() {
   const [usuarios, setUsuarios]         = useState([]);
   const [form, setForm]                 = useState(INIT);
@@ -90,9 +208,15 @@ export default function Usuarios() {
   const [ultimoCreado, setUltimoCreado] = useState(null);
   const [aEliminar, setAEliminar]       = useState(null); // usuario seleccionado para eliminar
   const [formOpen, setFormOpen]         = useState(false);
+  const [permisosUsuario, setPermisosUsuario] = useState(null);
+  const [catalogoPermisos, setCatalogoPermisos] = useState([]);
+  const [permisosSeleccionados, setPermisosSeleccionados] = useState([]);
+  const [permisosLoading, setPermisosLoading] = useState(false);
+  const [permisosSaving, setPermisosSaving] = useState(false);
   const fieldErrors = useFieldErrors(FIELD_LABELS, inferUsuarioFieldErrors);
   const toast        = useGlobalToast();
-  const { usuario: yo } = useAuth();
+  const { usuario: yo, refreshUsuario } = useAuth();
+  const esDirector = yo?.rol === "director";
 
   const cargar = () =>
     api.get("/usuarios").then(({ data }) => setUsuarios(data)).catch(console.error);
@@ -150,6 +274,50 @@ export default function Usuarios() {
     }
   };
 
+  const abrirPermisos = async (usuario) => {
+    setPermisosUsuario(usuario);
+    setPermisosLoading(true);
+    setPermisosSeleccionados([]);
+    try {
+      const [{ data: catalogo }, { data: actuales }] = await Promise.all([
+        api.get("/permisos"),
+        api.get(`/usuarios/${usuario.id}/permisos`),
+      ]);
+      setCatalogoPermisos(catalogo);
+      setPermisosSeleccionados(actuales.map((permiso) => permiso.codigo));
+    } catch (err) {
+      toast(getErrorMessage(err, "Error al cargar permisos"), "error");
+      setPermisosUsuario(null);
+    } finally {
+      setPermisosLoading(false);
+    }
+  };
+
+  const togglePermiso = (codigo) => {
+    setPermisosSeleccionados((actuales) =>
+      actuales.includes(codigo)
+        ? actuales.filter((item) => item !== codigo)
+        : [...actuales, codigo]
+    );
+  };
+
+  const guardarPermisos = async () => {
+    if (!permisosUsuario) return;
+    setPermisosSaving(true);
+    try {
+      await api.put(`/usuarios/${permisosUsuario.id}/permisos`, { permisos: permisosSeleccionados });
+      toast("Permisos actualizados", "success");
+      if (permisosUsuario.id === yo?.id) {
+        await refreshUsuario();
+      }
+      setPermisosUsuario(null);
+    } catch (err) {
+      toast(getErrorMessage(err, "Error al guardar permisos"), "error");
+    } finally {
+      setPermisosSaving(false);
+    }
+  };
+
   return (
     <>
       {/* Modal confirmacion eliminar */}
@@ -157,6 +325,16 @@ export default function Usuarios() {
         usuario={aEliminar}
         onConfirmar={confirmarEliminar}
         onCancelar={() => setAEliminar(null)}
+      />
+      <ModalPermisos
+        usuario={permisosUsuario}
+        catalogo={catalogoPermisos}
+        seleccionados={permisosSeleccionados}
+        loading={permisosLoading}
+        saving={permisosSaving}
+        onToggle={togglePermiso}
+        onGuardar={guardarPermisos}
+        onCancelar={() => !permisosSaving && setPermisosUsuario(null)}
       />
 
       <div className="record-page">
@@ -232,8 +410,8 @@ export default function Usuarios() {
                           {u.username}
                         </td>
                         <td>
-                          <span className={`badge ${u.rol === "admin" ? "badge-blue" : "badge-green"}`}>
-                            {u.rol === "admin" ? "Admin" : "Personal salud"}
+                          <span className={`badge ${rolBadge(u.rol)}`}>
+                            {rolLabel(u.rol)}
                           </span>
                         </td>
                         <td>
@@ -271,6 +449,16 @@ export default function Usuarios() {
                               <Trash2 size={13} />
                               Eliminar
                             </button>
+                            {esDirector && (
+                              <button
+                                className="btn-secondary btn-compact"
+                                onClick={() => abrirPermisos(u)}
+                                title="Gestionar permisos"
+                              >
+                                <ShieldCheck size={13} />
+                                Permisos
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -394,7 +582,13 @@ export default function Usuarios() {
                 >
                   <option value="personal_salud">Personal de salud</option>
                   <option value="admin">Administrador</option>
+                  {esDirector && <option value="director">Director</option>}
                 </select>
+                {!esDirector && (
+                  <div style={{ display: "flex", gap: "0.35rem", alignItems: "center", color: "var(--text-muted)", fontSize: "0.75rem", marginTop: 4 }}>
+                    <AlertTriangle size={12} /> Solo un director puede crear usuarios director.
+                  </div>
+                )}
                 {fieldErrors.fieldError("rol") && <div className="field-error-text">{fieldErrors.fieldError("rol")}</div>}
               </div>
 

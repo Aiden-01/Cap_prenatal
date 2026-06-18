@@ -61,7 +61,9 @@ function GridAuto({ children }) {
 
 function fecha(d) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("es-GT");
+  const dateOnly = String(d).split("T")[0];
+  const date = new Date(`${dateOnly}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? "Sin fecha" : date.toLocaleDateString("es-GT");
 }
 
 function buildCompletitudFromExp(exp, pacienteId) {

@@ -1,9 +1,10 @@
 const riesgoService = require('../services/riesgoService');
 const { asyncHandler } = require('../middleware/asyncHandler');
+const { ocultarDatosVih } = require('../utils/datosSensibles');
 
 const obtener = asyncHandler(async (req, res) => {
   const ficha = await riesgoService.obtenerFichaRiesgo(req.params.pacienteId);
-  return res.json(ficha || null);
+  return res.json(ocultarDatosVih(ficha || null, req.usuario.permisos));
 });
 
 const guardar = asyncHandler(async (req, res) => {
@@ -13,7 +14,7 @@ const guardar = asyncHandler(async (req, res) => {
     req,
   });
 
-  return res.json(ficha);
+  return res.json(ocultarDatosVih(ficha, req.usuario.permisos));
 });
 
 const actualizar = asyncHandler(async (req, res) => {
@@ -23,7 +24,7 @@ const actualizar = asyncHandler(async (req, res) => {
     req,
   });
 
-  return res.json(ficha);
+  return res.json(ocultarDatosVih(ficha, req.usuario.permisos));
 });
 
 const eliminar = asyncHandler(async (req, res) => {

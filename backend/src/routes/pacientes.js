@@ -12,6 +12,7 @@ const {
 } =
   require('../controllers/pacientesController');
 const { authMiddleware } = require('../middleware/auth');
+const { cargarPermisos, verificarPermiso } = require('../middleware/permisos');
 const { validateBody, validateParams, validateQuery } = require('../middleware/validate');
 const { pacienteRootIdParam, pacienteIdParam } = require('../validations/common.schemas');
 const {
@@ -31,17 +32,18 @@ const pdfRouter          = require('./pdf');
 
 const router = express.Router();
 router.use(authMiddleware);
+router.use(cargarPermisos);
 
 // Rutas de pacientes
-router.get('/', validateQuery(pacienteListQuerySchema), listar);
-router.post('/', validateBody(pacienteCreateSchema), crear);
-router.get('/:id', validateParams(pacienteRootIdParam), obtener);
-router.put('/:id', validateParams(pacienteRootIdParam), validateBody(pacienteUpdateSchema), actualizar);
-router.get('/:id/expediente', validateParams(pacienteRootIdParam), expedienteCompleto);
-router.get('/:id/completitud', validateParams(pacienteRootIdParam), completitudExpediente);
-router.post('/:id/embarazos', validateParams(pacienteRootIdParam), validateBody(embarazoBodySchema), nuevoEmbarazo);
-router.post('/:id/embarazo/puerperio', validateParams(pacienteRootIdParam), validateBody(embarazoBodySchema), pasarAPuerperio);
-router.post('/:id/embarazo/cerrar', validateParams(pacienteRootIdParam), validateBody(embarazoBodySchema), cerrarEmbarazo);
+router.get('/', verificarPermiso('pacientes.ver'), validateQuery(pacienteListQuerySchema), listar);
+router.post('/', verificarPermiso('pacientes.crear'), validateBody(pacienteCreateSchema), crear);
+router.get('/:id', verificarPermiso('pacientes.ver'), validateParams(pacienteRootIdParam), obtener);
+router.put('/:id', verificarPermiso('pacientes.editar'), validateParams(pacienteRootIdParam), validateBody(pacienteUpdateSchema), actualizar);
+router.get('/:id/expediente', verificarPermiso('pacientes.ver'), validateParams(pacienteRootIdParam), expedienteCompleto);
+router.get('/:id/completitud', verificarPermiso('pacientes.ver'), validateParams(pacienteRootIdParam), completitudExpediente);
+router.post('/:id/embarazos', verificarPermiso('pacientes.editar'), validateParams(pacienteRootIdParam), validateBody(embarazoBodySchema), nuevoEmbarazo);
+router.post('/:id/embarazo/puerperio', verificarPermiso('pacientes.editar'), validateParams(pacienteRootIdParam), validateBody(embarazoBodySchema), pasarAPuerperio);
+router.post('/:id/embarazo/cerrar', verificarPermiso('pacientes.editar'), validateParams(pacienteRootIdParam), validateBody(embarazoBodySchema), cerrarEmbarazo);
 
 // Sub-rutas anidadas bajo /pacientes/:pacienteId/...
 router.use('/:pacienteId/controles', validateParams(pacienteIdParam), controlesRouter);

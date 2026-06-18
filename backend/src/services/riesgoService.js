@@ -2,6 +2,7 @@ const riesgoRepository = require('../repositories/riesgoRepository');
 const { obtenerEmbarazoActivoId, obtenerEmbarazoActivoRequeridoId } = require('../utils/embarazos');
 const { registrarAuditoria } = require('../utils/auditoria');
 const { HttpError } = require('../utils/httpError');
+const { filtrarCamposVih, VIH_FIELDS } = require('../utils/datosSensibles');
 
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
 const boolOrFalse = (value) => value ?? false;
@@ -60,12 +61,19 @@ function normalizeField(field, body) {
   return emptyToNull(body[field]);
 }
 
-function buildRiesgoData(body) {
+function buildRiesgoData(body, fields = RIESGO_FIELDS) {
   const data = {};
-  for (const field of RIESGO_FIELDS) {
+  for (const field of fields) {
     data[field] = normalizeField(field, body);
   }
   return data;
+}
+
+function riesgoFieldsPermitidos(permisos = []) {
+  const puedeVerVih = permisos.includes('controles.ver_vih');
+  return puedeVerVih
+    ? RIESGO_FIELDS
+    : RIESGO_FIELDS.filter((field) => !VIH_FIELDS.has(field));
 }
 
 async function obtenerFichaRiesgo(pacienteId) {
@@ -75,6 +83,8 @@ async function obtenerFichaRiesgo(pacienteId) {
 }
 
 async function guardarFichaRiesgo({ pacienteId, body, req }) {
+  const fields = riesgoFieldsPermitidos(req.usuario.permisos);
+  const bodyPermitido = filtrarCamposVih(body, req.usuario.permisos);
   const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
   const existe = await riesgoRepository.obtenerPorEmbarazo(embarazoId);
   if (existe) {
@@ -84,7 +94,7 @@ async function guardarFichaRiesgo({ pacienteId, body, req }) {
   const ficha = await riesgoRepository.insertar({
     paciente_id: pacienteId,
     embarazo_id: embarazoId,
-    ...buildRiesgoData(body),
+    ...buildRiesgoData(bodyPermitido, fields),
     registrado_por: req.usuario.id,
     updated_by: req.usuario.id,
   });
@@ -103,13 +113,15 @@ async function guardarFichaRiesgo({ pacienteId, body, req }) {
 }
 
 async function actualizarFichaRiesgo({ pacienteId, body, req }) {
+  const fields = riesgoFieldsPermitidos(req.usuario.permisos);
+  const bodyPermitido = filtrarCamposVih(body, req.usuario.permisos);
   const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
   const before = await riesgoRepository.obtenerPorEmbarazo(embarazoId);
-  const data = buildRiesgoData(body);
+  const data = buildRiesgoData(bodyPermitido, fields);
   const ficha = await riesgoRepository.actualizarPorEmbarazo({
     embarazoId,
     data,
-    campos: RIESGO_FIELDS,
+    campos: fields,
     updatedBy: req.usuario.id,
   });
 

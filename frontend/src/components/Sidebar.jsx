@@ -87,7 +87,7 @@ export default function Sidebar({
     window.setTimeout(() => setThemeSwitching(false), 520);
   };
 
-  const items = usuario?.rol === "admin"
+  const items = usuario?.rol === "admin" || usuario?.rol === "director"
     ? [...NAV, ...NAV_ADMIN]
     : NAV;
 

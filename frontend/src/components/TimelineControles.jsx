@@ -5,7 +5,10 @@ import api from "../api/axios";
 import { getErrorMessage } from "../utils/errorMessage";
 
 function fecha(value) {
-  return value ? new Date(value).toLocaleDateString("es-GT") : "—";
+  if (!value) return "—";
+  const dateOnly = String(value).split("T")[0];
+  const date = new Date(`${dateOnly}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? "Sin fecha" : date.toLocaleDateString("es-GT");
 }
 
 function dato(label, value) {
@@ -19,7 +22,9 @@ function dato(label, value) {
 
 function controlTime(control) {
   const value = control.fecha_control || control.fecha;
-  const time = value ? new Date(value).getTime() : 0;
+  if (!value) return 0;
+  const dateOnly = String(value).split("T")[0];
+  const time = new Date(`${dateOnly}T00:00:00`).getTime();
   return Number.isNaN(time) ? 0 : time;
 }
 
@@ -58,7 +63,7 @@ function ControlNode({ control, index, pacienteId }) {
           {dato("Peso", control.peso ? `${control.peso} kg` : control.peso_kg ? `${control.peso_kg} kg` : null)}
           {dato("PA", control.presion_arterial)}
           {dato("FCF", control.frecuencia_cardiaca_fetal || control.fcf)}
-          {dato("Presentación", control.presentacion || control.presentacion_fetal)}
+          {dato("Presentacion", control.presentacion || control.presentacion_fetal)}
         </div>
 
         {control.tiene_hallazgo && (
@@ -75,12 +80,12 @@ function ControlNode({ control, index, pacienteId }) {
 
         {open && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.75rem", borderTop: "1px solid var(--card-border)", paddingTop: "0.85rem" }}>
-            {dato("Situación", control.situacion || control.situacion_fetal)}
+            {dato("Situacion", control.situacion || control.situacion_fetal)}
             {dato("Motivo", control.motivo_consulta)}
             {dato("Altura uterina", control.altura_uterina_cm ? `${control.altura_uterina_cm} cm` : null)}
             {dato("Temperatura", control.temperatura ? `${control.temperatura} °C` : null)}
             {dato("Tratamiento", control.tratamiento)}
-            {dato("Próxima cita", fecha(control.cita_siguiente))}
+            {dato("Proxima cita", fecha(control.cita_siguiente))}
           </div>
         )}
 
@@ -108,7 +113,7 @@ export default function TimelineControles({ pacienteId }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!pacienteId) return;
+    if (!pacienteId) return undefined;
     let mounted = true;
 
     api.get(`/pacientes/${pacienteId}/controles`)
@@ -144,7 +149,7 @@ export default function TimelineControles({ pacienteId }) {
     return (
       <div className="card empty-state" style={{ display: "grid", justifyItems: "center", gap: "0.85rem" }}>
         <ClipboardList size={28} style={{ color: "var(--primary)" }} />
-        <span>Sin controles registrados aún</span>
+        <span>Sin controles registrados aun</span>
         <button className="btn-primary" onClick={() => navigate(`/pacientes/${pacienteId}/controles/nuevo`)}>
           Registrar primer control
         </button>

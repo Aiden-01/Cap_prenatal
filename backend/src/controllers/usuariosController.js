@@ -1,8 +1,8 @@
 const usuariosService = require('../services/usuariosService');
 const { asyncHandler } = require('../middleware/asyncHandler');
 
-const listar = asyncHandler(async (_req, res) => {
-  const usuarios = await usuariosService.listarUsuarios();
+const listar = asyncHandler(async (req, res) => {
+  const usuarios = await usuariosService.listarUsuarios(req);
   return res.json(usuarios);
 });
 

@@ -1,9 +1,10 @@
 const controlesPrenatalesService = require('../services/controlesPrenatalesService');
 const { asyncHandler } = require('../middleware/asyncHandler');
+const { ocultarDatosVih } = require('../utils/datosSensibles');
 
 const listar = asyncHandler(async (req, res) => {
   const controles = await controlesPrenatalesService.listarControles(req.params.pacienteId);
-  return res.json(controles);
+  return res.json(ocultarDatosVih(controles, req.usuario.permisos));
 });
 
 const obtener = asyncHandler(async (req, res) => {
@@ -12,7 +13,7 @@ const obtener = asyncHandler(async (req, res) => {
     id: req.params.id,
   });
 
-  return res.json(control);
+  return res.json(ocultarDatosVih(control, req.usuario.permisos));
 });
 
 const crear = asyncHandler(async (req, res) => {
@@ -22,7 +23,7 @@ const crear = asyncHandler(async (req, res) => {
     req,
   });
 
-  return res.status(201).json(control);
+  return res.status(201).json(ocultarDatosVih(control, req.usuario.permisos));
 });
 
 const actualizar = asyncHandler(async (req, res) => {
@@ -33,7 +34,7 @@ const actualizar = asyncHandler(async (req, res) => {
     req,
   });
 
-  return res.json(control);
+  return res.json(ocultarDatosVih(control, req.usuario.permisos));
 });
 
 const eliminar = asyncHandler(async (req, res) => {

@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const authRepository = require('../repositories/authRepository');
+const permisosRepository = require('../repositories/permisosRepository');
 const { registrarAuditoria } = require('../utils/auditoria');
 const { HttpError } = require('../utils/httpError');
 
@@ -76,6 +77,8 @@ async function login({ username, password, req }) {
     descripcion: 'Inicio de sesion exitoso',
   });
 
+  const permisos = await permisosRepository.listarCodigosPorUsuario(usuario.id);
+
   return {
     token,
     csrfToken,
@@ -84,6 +87,7 @@ async function login({ username, password, req }) {
       nombre_completo: usuario.nombre_completo,
       username: usuario.username,
       rol: usuario.rol,
+      permisos,
     },
   };
 }
@@ -101,7 +105,10 @@ async function logout(req) {
 }
 
 async function me(usuarioId) {
-  return authRepository.obtenerUsuarioPorId(usuarioId);
+  const usuario = await authRepository.obtenerUsuarioPorId(usuarioId);
+  if (!usuario) return null;
+  usuario.permisos = await permisosRepository.listarCodigosPorUsuario(usuarioId);
+  return usuario;
 }
 
 async function changePassword({ usuarioId, currentPassword, newPassword, req }) {
