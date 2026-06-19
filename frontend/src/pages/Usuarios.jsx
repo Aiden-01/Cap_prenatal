@@ -1,7 +1,8 @@
 ﻿import { useEffect, useState } from "react";
 import {
   UserPlus, ShieldCheck, ShieldOff, ShieldAlert,
-  User, KeyRound, BadgeCheck, Loader2, CheckCircle2, Trash2, X, LockKeyhole, AlertTriangle
+  User, KeyRound, BadgeCheck, Loader2, CheckCircle2, Trash2, X, LockKeyhole, AlertTriangle,
+  Stethoscope, Users, BarChart3, Info, PlusCircle, Pencil, Eye, FileDown, MapPinned
 } from "lucide-react";
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
@@ -10,6 +11,107 @@ import { getErrorMessage } from "../utils/errorMessage";
 import { useFieldErrors } from "../hooks/useFieldErrors";
 
 const INIT = { nombre_completo: "", username: "", password: "", rol: "personal_salud" };
+
+const PERMISSION_UI = {
+  "controles.crear": {
+    label: "Crear controles prenatales",
+    description: "Permite registrar nuevos controles prenatales.",
+    section: "clinica",
+    Icon: PlusCircle,
+  },
+  "controles.editar": {
+    label: "Editar controles prenatales",
+    description: "Permite modificar información general de controles ya registrados.",
+    section: "clinica",
+    Icon: Pencil,
+  },
+  "controles.ver_vih": {
+    label: "Ver y gestionar resultados VIH",
+    description: "Permite ver y modificar resultados VIH ya registrados. Asignar solo a personal autorizado.",
+    section: "sensibles",
+    Icon: LockKeyhole,
+    sensitive: true,
+  },
+  "pacientes.crear": {
+    label: "Crear pacientes",
+    description: "Permite registrar nuevos pacientes en el sistema.",
+    section: "pacientes",
+    Icon: PlusCircle,
+  },
+  "pacientes.ver": {
+    label: "Ver pacientes",
+    description: "Permite consultar información de pacientes.",
+    section: "pacientes",
+    Icon: Eye,
+  },
+  "pacientes.editar": {
+    label: "Editar pacientes",
+    description: "Permite actualizar información de pacientes existentes.",
+    section: "pacientes",
+    Icon: Pencil,
+  },
+  "pacientes.eliminar": {
+    label: "Eliminar pacientes",
+    description: "Permite eliminar registros de pacientes.",
+    section: "pacientes",
+    Icon: Trash2,
+  },
+  "mapa_riesgo.ver": {
+    label: "Ver mapa de riesgo",
+    description: "Permite consultar el mapa de riesgo obstétrico.",
+    section: "reportes",
+    Icon: MapPinned,
+  },
+  "reportes.ver": {
+    label: "Ver reportes",
+    description: "Permite visualizar reportes del sistema.",
+    section: "reportes",
+    Icon: BarChart3,
+  },
+  "reportes.exportar": {
+    label: "Exportar reportes",
+    description: "Permite exportar reportes para impresión o análisis.",
+    section: "reportes",
+    Icon: FileDown,
+  },
+};
+
+const PERMISSION_SECTIONS = [
+  {
+    id: "clinica",
+    title: "Atención clínica",
+    description: "Acciones relacionadas con controles prenatales.",
+    Icon: Stethoscope,
+  },
+  {
+    id: "pacientes",
+    title: "Pacientes",
+    description: "Consulta y mantenimiento de expedientes.",
+    Icon: Users,
+  },
+  {
+    id: "reportes",
+    title: "Reportes y análisis",
+    description: "Herramientas para seguimiento y toma de decisiones.",
+    Icon: BarChart3,
+  },
+  {
+    id: "sensibles",
+    title: "Datos sensibles",
+    description: "Accesos restringidos que requieren autorización.",
+    Icon: ShieldAlert,
+    sensitive: true,
+  },
+];
+
+function getPermissionUi(permiso) {
+  return PERMISSION_UI[permiso.codigo] || {
+    label: permiso.descripcion || permiso.codigo,
+    description: "Permite realizar esta acción dentro del sistema.",
+    section: permiso.categoria || "otros",
+    Icon: ShieldCheck,
+  };
+}
 
 const FIELD_LABELS = {
   nombre_completo: "Nombre completo",
@@ -107,27 +209,37 @@ function ModalPermisos({
 }) {
   if (!usuario) return null;
   const grupos = catalogo.reduce((acc, permiso) => {
-    if (!acc[permiso.categoria]) acc[permiso.categoria] = [];
-    acc[permiso.categoria].push(permiso);
+    const ui = getPermissionUi(permiso);
+    if (!acc[ui.section]) acc[ui.section] = [];
+    acc[ui.section].push({ ...permiso, ui });
     return acc;
   }, {});
+  const sections = [
+    ...PERMISSION_SECTIONS,
+    ...Object.keys(grupos)
+      .filter((id) => !PERMISSION_SECTIONS.some((section) => section.id === id))
+      .map((id) => ({
+        id,
+        title: id.replace("_", " "),
+        description: "Permisos adicionales del sistema.",
+        Icon: ShieldCheck,
+      })),
+  ].filter((section) => grupos[section.id]?.length);
+  const selectedCount = seleccionados.length;
 
   return (
     <div className="modal-backdrop">
-      <div className="card modal-card" style={{ maxWidth: 720 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", alignItems: "flex-start", marginBottom: "1rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 10,
-              background: "var(--primary-lt)", display: "grid", placeItems: "center", flexShrink: 0,
-            }}>
-              <ShieldCheck size={18} color="var(--primary)" />
+      <div className="card modal-card permissions-modal">
+        <div className="permissions-modal-header">
+          <div className="permissions-modal-titlebar">
+            <div className="permissions-modal-icon">
+              <ShieldCheck size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: "1rem" }}>Gestionar permisos</div>
-              <div style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
+              <h2>Permisos del usuario</h2>
+              <p>
                 {usuario.nombre_completo}
-              </div>
+              </p>
             </div>
           </div>
           <button type="button" className="password-modal-close" onClick={onCancelar} disabled={saving} aria-label="Cerrar">
@@ -135,66 +247,91 @@ function ModalPermisos({
           </button>
         </div>
 
+        <div className="permissions-modal-guidance">
+          <Info size={15} />
+          <span>Selecciona solo las acciones necesarias. Los permisos sensibles deben asignarse únicamente a personal autorizado.</span>
+        </div>
+
         {loading ? (
-          <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-muted)" }}>
+          <div className="permissions-loading">
+            <Loader2 className="spin" size={18} />
             Cargando permisos...
           </div>
         ) : (
-          <div style={{ display: "grid", gap: "0.9rem", maxHeight: "58vh", overflowY: "auto", paddingRight: "0.25rem" }}>
-            {Object.entries(grupos).map(([categoria, permisos]) => (
-              <div key={categoria} style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
-                <div className="card-titlebar" style={{ borderBottom: "1px solid var(--border)" }}>
-                  <strong style={{ textTransform: "capitalize" }}>{categoria.replace("_", " ")}</strong>
+          <div className="permissions-modal-body">
+            {sections.map((section) => {
+              const SectionIcon = section.Icon;
+              return (
+              <section
+                key={section.id}
+                className={`permission-section ${section.sensitive ? "is-sensitive" : ""}`}
+              >
+                <div className="permission-section-header">
+                  <span className="permission-section-icon">
+                    <SectionIcon size={16} />
+                  </span>
+                  <div>
+                    <h3>{section.title}</h3>
+                    <p>{section.description}</p>
+                  </div>
+                  <span className="permission-section-count">
+                    {grupos[section.id].filter((permiso) => seleccionados.includes(permiso.codigo)).length}/{grupos[section.id].length}
+                  </span>
                 </div>
-                <div style={{ display: "grid", gap: "0.45rem", padding: "0.75rem" }}>
-                  {permisos.map((permiso) => {
-                    const sensible = permiso.codigo === "controles.ver_vih";
+                <div className="permission-list">
+                  {grupos[section.id].map((permiso) => {
+                    const { ui } = permiso;
+                    const Icon = ui.Icon;
+                    const checked = seleccionados.includes(permiso.codigo);
                     return (
                       <label
                         key={permiso.codigo}
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: "0.65rem",
-                          padding: "0.65rem",
-                          borderRadius: 8,
-                          border: sensible ? "1px solid var(--warn)" : "1px solid var(--border)",
-                          background: sensible ? "var(--warn-lt)" : "var(--surface)",
-                          cursor: "pointer",
-                        }}
+                        className={`permission-row ${checked ? "is-checked" : ""} ${ui.sensitive ? "is-sensitive" : ""}`}
+                        title={`Código técnico: ${permiso.codigo}`}
                       >
                         <input
                           type="checkbox"
-                          checked={seleccionados.includes(permiso.codigo)}
+                          checked={checked}
                           onChange={() => onToggle(permiso.codigo)}
-                          style={{ marginTop: 3 }}
                         />
-                        <span style={{ display: "grid", gap: 2 }}>
-                          <span style={{ display: "flex", gap: "0.4rem", alignItems: "center", fontWeight: 700, color: sensible ? "var(--warn)" : "var(--text)" }}>
-                            {sensible && <LockKeyhole size={14} />}
-                            {permiso.codigo}
+                        <span className="permission-row-check" aria-hidden="true">
+                          {checked && <CheckCircle2 size={13} />}
+                        </span>
+                        <span className="permission-row-icon">
+                          <Icon size={15} />
+                        </span>
+                        <span className="permission-row-copy">
+                          <span className="permission-row-title">
+                            {ui.label}
+                            {ui.sensitive && <span className="permission-sensitive-badge">Acceso restringido</span>}
                           </span>
-                          <span style={{ fontSize: "0.8rem", color: sensible ? "var(--warn)" : "var(--text-muted)" }}>
-                            {permiso.descripcion}
-                            {sensible ? " - habilita visibilidad de datos VIH." : ""}
+                          <span className="permission-row-description">
+                            {ui.description}
+                          </span>
+                          <span className="permission-row-code">
+                            {permiso.codigo}
                           </span>
                         </span>
                       </label>
                     );
                   })}
                 </div>
-              </div>
-            ))}
+              </section>
+              );
+            })}
           </div>
         )}
 
-        <div className="action-row" style={{ marginTop: "1.25rem" }}>
+        <div className="permissions-modal-footer">
+          <span>{selectedCount} permisos seleccionados. Los cambios se aplican inmediatamente.</span>
+          <div className="permissions-modal-actions">
           <button className="btn-secondary" onClick={onCancelar} disabled={saving}>
             Cancelar
           </button>
           <button className="btn-primary" onClick={onGuardar} disabled={loading || saving}>
-            {saving ? <><Loader2 className="spin" size={14} /> Guardando...</> : <><ShieldCheck size={14} /> Guardar permisos</>}
+            {saving ? <><Loader2 className="spin" size={14} /> Guardando...</> : <><ShieldCheck size={14} /> Guardar cambios</>}
           </button>
+          </div>
         </div>
       </div>
     </div>
