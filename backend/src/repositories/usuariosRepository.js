@@ -1,5 +1,37 @@
 const pool = require('../db/pool');
 
+const USUARIO_TIENE_HISTORIAL_SQL = `(
+  EXISTS (SELECT 1 FROM pacientes p WHERE p.registrado_por = u.id OR p.updated_by = u.id)
+  OR EXISTS (SELECT 1 FROM embarazos e WHERE e.registrado_por = u.id OR e.updated_by = u.id)
+  OR EXISTS (SELECT 1 FROM vacunas_paciente v WHERE v.registrado_por = u.id OR v.updated_by = u.id)
+  OR EXISTS (SELECT 1 FROM controles_prenatales c WHERE c.registrado_por = u.id OR c.updated_by = u.id)
+  OR EXISTS (SELECT 1 FROM controles_puerperio cp WHERE cp.registrado_por = u.id OR cp.updated_by = u.id)
+  OR EXISTS (SELECT 1 FROM morbilidad_embarazo m WHERE m.registrado_por = u.id OR m.updated_by = u.id)
+  OR EXISTS (SELECT 1 FROM fichas_riesgo_obstetrico f WHERE f.registrado_por = u.id OR f.updated_by = u.id)
+  OR EXISTS (SELECT 1 FROM planes_parto pp WHERE pp.registrado_por = u.id OR pp.updated_by = u.id)
+  OR EXISTS (SELECT 1 FROM referencias_efectuadas re WHERE re.registrado_por = u.id OR re.updated_by = u.id)
+  OR EXISTS (
+    SELECT 1 FROM auditoria_eventos ae
+    WHERE ae.usuario_id = u.id
+      AND (
+        ae.tabla IN (
+          'pacientes',
+          'embarazos',
+          'vacunas_paciente',
+          'controles_prenatales',
+          'controles_puerperio',
+          'morbilidad_embarazo',
+          'fichas_riesgo_obstetrico',
+          'planes_parto',
+          'referencias_efectuadas',
+          'reportes',
+          'documentos'
+        )
+        OR ae.accion IN ('exportar', 'generar_pdf')
+      )
+  )
+)`;
+
 async function listar({ actorRol } = {}) {
   const params = [];
   const where = actorRol === 'admin'
@@ -7,7 +39,9 @@ async function listar({ actorRol } = {}) {
     : '';
   const { rows } = await pool.query(
     `SELECT u.id, u.nombre_completo, u.username, u.activo, r.nombre AS rol,
-            u.created_at, u.updated_at, u.created_by, u.updated_by
+            u.created_at, u.updated_at, u.created_by, u.updated_by,
+            ${USUARIO_TIENE_HISTORIAL_SQL} AS tiene_registros,
+            NOT ${USUARIO_TIENE_HISTORIAL_SQL} AS puede_eliminarse
      FROM usuarios u JOIN roles r ON r.id = u.rol_id
      ${where}
      ORDER BY u.id`,
@@ -30,7 +64,9 @@ async function crear({ nombreCompleto, username, passwordHash, rol, createdBy = 
 async function obtenerPorId(id) {
   const { rows } = await pool.query(
     `SELECT u.id, u.nombre_completo, u.username, u.activo, r.nombre AS rol,
-            u.created_at, u.updated_at, u.created_by, u.updated_by
+            u.created_at, u.updated_at, u.created_by, u.updated_by,
+            ${USUARIO_TIENE_HISTORIAL_SQL} AS tiene_registros,
+            NOT ${USUARIO_TIENE_HISTORIAL_SQL} AS puede_eliminarse
      FROM usuarios u JOIN roles r ON r.id = u.rol_id
      WHERE u.id = $1`,
     [id]

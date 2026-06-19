@@ -146,6 +146,12 @@ async function eliminarUsuario({ id, req }) {
     }
   }
 
+  if (target.tiene_registros || target.puede_eliminarse === false) {
+    throw new HttpError(409, 'No se puede eliminar este usuario porque tiene historial clinico o de auditoria. Desactivalo para conservar la trazabilidad.', {
+      code: 'USUARIO_PROTEGIDO_HISTORIAL',
+    });
+  }
+
   await usuariosRepository.eliminar(id);
   await registrarAuditoria(req, {
     accion: 'eliminar',

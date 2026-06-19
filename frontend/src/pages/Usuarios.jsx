@@ -1,8 +1,8 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import {
   UserPlus, ShieldCheck, ShieldOff, ShieldAlert,
   User, KeyRound, BadgeCheck, Loader2, CheckCircle2, Trash2, X, LockKeyhole, AlertTriangle,
-  Stethoscope, Users, BarChart3, Info, PlusCircle, Pencil, Eye, FileDown, MapPinned
+  Stethoscope, Users, BarChart3, Info, PlusCircle, Pencil, Eye, FileDown, MapPinned, Search
 } from "lucide-react";
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
@@ -197,6 +197,19 @@ function rolBadge(rol) {
   return "badge-green";
 }
 
+const ESTADO_FILTROS = [
+  { value: "activos", label: "Activos" },
+  { value: "inactivos", label: "Inactivos" },
+  { value: "todos", label: "Todos" },
+];
+
+const ROL_FILTROS = [
+  { value: "todos", label: "Todos" },
+  { value: "admin", label: "Admin" },
+  { value: "director", label: "Director" },
+  { value: "personal_salud", label: "Personal salud" },
+];
+
 function ModalPermisos({
   usuario,
   catalogo,
@@ -350,6 +363,9 @@ export default function Usuarios() {
   const [permisosSeleccionados, setPermisosSeleccionados] = useState([]);
   const [permisosLoading, setPermisosLoading] = useState(false);
   const [permisosSaving, setPermisosSaving] = useState(false);
+  const [filtroEstado, setFiltroEstado] = useState("activos");
+  const [filtroRol, setFiltroRol] = useState("todos");
+  const [busqueda, setBusqueda] = useState("");
   const fieldErrors = useFieldErrors(FIELD_LABELS, inferUsuarioFieldErrors);
   const toast        = useGlobalToast();
   const { usuario: yo, refreshUsuario } = useAuth();
@@ -359,6 +375,25 @@ export default function Usuarios() {
     api.get("/usuarios").then(({ data }) => setUsuarios(data)).catch(console.error);
 
   useEffect(() => { cargar(); }, []);
+
+  const usuariosFiltrados = useMemo(() => {
+    const termino = busqueda.trim().toLowerCase();
+
+    return usuarios.filter((u) => {
+      const coincideEstado = filtroEstado === "todos"
+        || (filtroEstado === "activos" && u.activo)
+        || (filtroEstado === "inactivos" && !u.activo);
+      const coincideRol = filtroRol === "todos" || u.rol === filtroRol;
+      const coincideBusqueda = !termino
+        || u.nombre_completo?.toLowerCase().includes(termino)
+        || u.username?.toLowerCase().includes(termino);
+
+      return coincideEstado && coincideRol && coincideBusqueda;
+    });
+  }, [usuarios, filtroEstado, filtroRol, busqueda]);
+
+  const conteoActivos = usuarios.filter((u) => u.activo).length;
+  const conteoInactivos = usuarios.length - conteoActivos;
 
   const handleCrear = async (e) => {
     e.preventDefault();
@@ -379,8 +414,8 @@ export default function Usuarios() {
   };
 
   const toggleActivo = async (u) => {
-    if (u.id === yo?.id) {
-      toast("No puedes desactivar tu propia cuenta", "error");
+    if (String(u.id) === String(yo?.id)) {
+      toast("No puedes modificar tu propia cuenta", "error");
       return;
     }
     try {
@@ -390,7 +425,7 @@ export default function Usuarios() {
       toast(
         u.activo
           ? `${u.nombre_completo} desactivado`
-          : `${u.nombre_completo} activado`,
+          : `${u.nombre_completo} reactivado`,
         u.activo ? "info" : "success"
       );
     } catch (err) {
@@ -400,6 +435,11 @@ export default function Usuarios() {
 
   const confirmarEliminar = async () => {
     if (!aEliminar) return;
+    if (!aEliminar.puede_eliminarse) {
+      toast("Este usuario esta protegido por historial. Desactivalo en lugar de eliminarlo.", "error");
+      setAEliminar(null);
+      return;
+    }
     try {
       await api.delete(`/usuarios/${aEliminar.id}`);
       toast(`${aEliminar.nombre_completo} eliminado del sistema`, "info");
@@ -506,8 +546,50 @@ export default function Usuarios() {
                 Usuarios registrados
               </strong>
               <span className="badge badge-blue" style={{ marginLeft: "auto" }}>
-                {usuarios.length}
+                {usuariosFiltrados.length}
               </span>
+            </div>
+
+            <div className="usuarios-toolbar">
+              <div className="usuarios-tabs" role="tablist" aria-label="Filtro por estado">
+                {ESTADO_FILTROS.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    className={`usuarios-tab ${filtroEstado === item.value ? "is-active" : ""}`}
+                    onClick={() => setFiltroEstado(item.value)}
+                  >
+                    {item.label}
+                    <span>
+                      {item.value === "activos" ? conteoActivos : item.value === "inactivos" ? conteoInactivos : usuarios.length}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="usuarios-filters">
+                <div className="usuarios-search">
+                  <Search size={15} />
+                  <input
+                    type="search"
+                    placeholder="Buscar nombre o usuario"
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                  />
+                </div>
+                <select
+                  className="usuarios-role-filter"
+                  value={filtroRol}
+                  onChange={(e) => setFiltroRol(e.target.value)}
+                  aria-label="Filtrar por rol"
+                >
+                  {ROL_FILTROS.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="tabla-wrapper">
@@ -518,14 +600,21 @@ export default function Usuarios() {
                     <th>Usuario</th>
                     <th>Rol</th>
                     <th>Estado</th>
+                    <th>Historial</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {usuarios.map((u) => {
-                    const esSelf = u.id === yo?.id;
+                  {usuariosFiltrados.map((u) => {
+                    const esSelf = String(u.id) === String(yo?.id);
+                    const protegido = !u.puede_eliminarse;
+                    const eliminarTitle = esSelf
+                      ? "No puedes eliminar tu propia cuenta"
+                      : protegido
+                        ? "No puede eliminarse porque tiene historial clinico o de auditoria. Desactivalo para conservar trazabilidad."
+                        : "Eliminar usuario";
                     return (
-                      <tr key={u.id} style={{ opacity: u.activo ? 1 : 0.6 }}>
+                      <tr key={u.id} className={!u.activo ? "usuario-row-inactivo" : ""}>
                         <td>
                           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
                             <div className="avatar-token">
@@ -562,26 +651,36 @@ export default function Usuarios() {
                           }
                         </td>
                         <td>
+                          {u.puede_eliminarse
+                            ? <span className="badge badge-blue" title="No tiene registros clinicos ni auditoria asociada">
+                                <CheckCircle2 size={11} /> Puede eliminarse
+                              </span>
+                            : <span className="badge badge-orange" title="Tiene registros clinicos o de auditoria asociados">
+                                <LockKeyhole size={11} /> Protegido por historial
+                              </span>
+                          }
+                        </td>
+                        <td>
                           <div className="table-actions">
                             {/* Activar / Desactivar */}
                             <button
-                              className="btn-secondary btn-compact"
+                              className={`btn-secondary btn-compact ${!u.activo ? "btn-reactivar" : ""}`}
                               onClick={() => toggleActivo(u)}
                               disabled={esSelf}
                               title={esSelf ? "No puedes modificar tu propia cuenta" : ""}
                             >
                               {u.activo
                                 ? <><ShieldOff size={13} /> Desactivar</>
-                                : <><ShieldAlert size={13} /> Activar</>
+                                : <><ShieldAlert size={13} /> Reactivar</>
                               }
                             </button>
 
                             {/* Eliminar */}
                             <button
                               className="btn-soft-danger"
-                              onClick={() => !esSelf && setAEliminar(u)}
-                              disabled={esSelf}
-                              title={esSelf ? "No puedes eliminar tu propia cuenta" : "Eliminar usuario"}
+                              onClick={() => !esSelf && !protegido && setAEliminar(u)}
+                              disabled={esSelf || protegido}
+                              title={eliminarTitle}
                             >
                               <Trash2 size={13} />
                               Eliminar
@@ -602,14 +701,14 @@ export default function Usuarios() {
                     );
                   })}
 
-                  {usuarios.length === 0 && (
+                  {usuariosFiltrados.length === 0 && (
                     <tr>
-                      <td colSpan={5} style={{
+                      <td colSpan={6} style={{
                         textAlign: "center",
                         color: "var(--text-muted)",
                         padding: "2rem",
                       }}>
-                        No hay usuarios registrados
+                        No hay usuarios con los filtros seleccionados
                       </td>
                     </tr>
                   )}
