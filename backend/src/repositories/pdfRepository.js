@@ -1,12 +1,13 @@
 const pool = require('../db/pool');
 
-async function obtenerControlConPaciente(id) {
+async function obtenerControlConPaciente({ id, pacienteId, embarazoId = null }) {
   const { rows } = await pool.query(
     `SELECT c.*, p.nombres, p.apellidos, p.no_expediente
      FROM controles_prenatales c
      JOIN pacientes p ON p.id = c.paciente_id
-     WHERE c.id = $1`,
-    [id]
+     WHERE c.id = $1 AND c.paciente_id = $2
+       AND ($3::integer IS NULL OR c.embarazo_id = $3)`,
+    [id, pacienteId, embarazoId]
   );
 
   return rows[0] || null;

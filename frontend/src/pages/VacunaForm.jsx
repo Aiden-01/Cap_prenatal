@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
@@ -42,11 +42,14 @@ const stopNumberWheel = (event) => {
 export default function VacunaForm() {
   const { id, vacunaId } = useParams();
   const navigate = useNavigate();
-  const expedientePath = `/pacientes/${id}?tab=vacunas`;
+  const [searchParams] = useSearchParams();
+  const embarazoId = searchParams.get("embarazo_id") || "";
+  const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=vacunas`;
   const toast = useGlobalToast();
   const [form, setForm] = useState(INIT);
   const [tdTdapFechas, setTdTdapFechas] = useState(INIT_TD_TDAP_FECHAS);
   const [loading, setLoading] = useState(false);
+  const [historialVacunas, setHistorialVacunas] = useState([]);
   const fieldErrors = useFieldErrors(FIELD_LABELS, inferVacunaFieldErrors);
   const editando = Boolean(vacunaId);
   const isTdTdapBatch = !editando && form.tipo_vacuna === "td_tdap";
@@ -79,19 +82,57 @@ export default function VacunaForm() {
   };
 
   useEffect(() => {
-    if (!editando) return;
-    api.get(`/pacientes/${id}/vacunas/${vacunaId}`)
-      .then(({ data }) => setForm({ ...INIT, ...data, fecha_dosis: data.fecha_dosis ? data.fecha_dosis.split("T")[0] : "" }))
+    if (!embarazoId) {
+      toast("Selecciona un embarazo antes de registrar vacunas", "error");
+      navigate(`/pacientes/${id}?tab=vacunas`, { replace: true });
+      return;
+    }
+    const vacunaRequest = editando
+      ? api.get(`/pacientes/${id}/vacunas/${vacunaId}`, { params: { embarazo_id: embarazoId } })
+      : Promise.resolve({ data: null });
+    Promise.all([
+      vacunaRequest,
+      api.get(`/pacientes/${id}/expediente`, { params: { embarazo_id: embarazoId } }),
+    ])
+      .then(([{ data }, { data: expediente }]) => {
+        if (expediente?.is_read_only) {
+          toast("El embarazo esta cerrado y es de solo lectura", "error");
+          navigate(expedientePath, { replace: true });
+          return;
+        }
+        if (editando) setForm({ ...INIT, ...data, fecha_dosis: data.fecha_dosis ? data.fecha_dosis.split("T")[0] : "" });
+      })
       .catch(() => toast("Error al cargar vacuna", "error"));
-  }, [id, vacunaId, editando, toast]);
+  }, [id, vacunaId, editando, embarazoId, expedientePath, navigate, toast]);
+
+  useEffect(() => {
+    if (editando) return;
+    api.get(`/pacientes/${id}/vacunas/antecedentes`)
+      .then(({ data }) => setHistorialVacunas(Array.isArray(data) ? data : []))
+      .catch(() => setHistorialVacunas([]));
+  }, [id, editando]);
 
   const submit = async (e) => {
     e.preventDefault();
+    if (!editando) {
+      const fechas = form.tipo_vacuna === "td_tdap"
+        ? Array.from({ length: Math.max(1, Math.min(Number(form.numero_dosis || 1), 3)) }, (_, index) => ({
+            numero_dosis: index + 1,
+            fecha_dosis: tdTdapFechas[index + 1] || "",
+          }))
+        : [{ numero_dosis: Number(form.numero_dosis), fecha_dosis: form.fecha_dosis || "" }];
+      const existeSimilar = fechas.some((dosis) => historialVacunas.some((vacuna) =>
+        vacuna.tipo_vacuna === form.tipo_vacuna &&
+        Number(vacuna.numero_dosis) === Number(dosis.numero_dosis) &&
+        String(vacuna.fecha_dosis || "").split("T")[0] === dosis.fecha_dosis
+      ));
+      if (existeSimilar && !window.confirm("Ya existe un antecedente con el mismo tipo, dosis y fecha. ¿Deseas registrarlo de todas formas?")) return;
+    }
     setLoading(true);
     fieldErrors.clearFieldErrors();
     try {
       if (editando) {
-        await api.put(`/pacientes/${id}/vacunas/${vacunaId}`, form);
+        await api.put(`/pacientes/${id}/vacunas/${vacunaId}`, form, { params: { embarazo_id: embarazoId } });
       } else if (form.tipo_vacuna === "td_tdap") {
         const totalDosis = Math.max(1, Math.min(Number(form.numero_dosis || 1), 3));
         await Promise.all(Array.from({ length: totalDosis }, (_, index) => {
@@ -100,10 +141,10 @@ export default function VacunaForm() {
             ...form,
             numero_dosis: numeroDosis,
             fecha_dosis: tdTdapFechas[numeroDosis] || "",
-          });
+          }, { params: { embarazo_id: embarazoId } });
         }));
       } else {
-        await api.post(`/pacientes/${id}/vacunas`, form);
+        await api.post(`/pacientes/${id}/vacunas`, form, { params: { embarazo_id: embarazoId } });
       }
       toast(editando ? "Vacuna actualizada" : "Vacuna registrada", "success");
       navigate(expedientePath);

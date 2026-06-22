@@ -3,13 +3,17 @@ const { asyncHandler } = require('../middleware/asyncHandler');
 const { ocultarDatosVih } = require('../utils/datosSensibles');
 
 const obtener = asyncHandler(async (req, res) => {
-  const ficha = await riesgoService.obtenerFichaRiesgo(req.params.pacienteId);
+  const ficha = await riesgoService.obtenerFichaRiesgo(
+    req.params.pacienteId,
+    req.query.embarazo_id || null
+  );
   return res.json(ocultarDatosVih(ficha || null, req.usuario.permisos));
 });
 
 const guardar = asyncHandler(async (req, res) => {
   const ficha = await riesgoService.guardarFichaRiesgo({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     body: req.body,
     req,
   });
@@ -20,6 +24,7 @@ const guardar = asyncHandler(async (req, res) => {
 const actualizar = asyncHandler(async (req, res) => {
   const ficha = await riesgoService.actualizarFichaRiesgo({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     body: req.body,
     req,
   });
@@ -30,6 +35,7 @@ const actualizar = asyncHandler(async (req, res) => {
 const eliminar = asyncHandler(async (req, res) => {
   const result = await riesgoService.eliminarFichaRiesgo({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     req,
   });
 

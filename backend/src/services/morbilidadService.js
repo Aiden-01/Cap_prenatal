@@ -1,5 +1,9 @@
 const morbilidadRepository = require('../repositories/morbilidadRepository');
-const { obtenerEmbarazoSeguimientoId } = require('../utils/embarazos');
+const {
+  requerirEmbarazoId,
+  resolverEmbarazoParaLectura,
+  validarEmbarazoEditable,
+} = require('../utils/embarazos');
 const { withGuatemalaTimeFallback } = require('../utils/guatemalaTime');
 const { registrarAuditoria } = require('../utils/auditoria');
 const { HttpError } = require('../utils/httpError');
@@ -45,34 +49,34 @@ function buildCreateData({ pacienteId, embarazoId, body, usuarioId }) {
   };
 }
 
-async function getEmbarazoSeguimientoOrConflict(pacienteId) {
-  const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
-  if (!embarazoId) {
-    throw new HttpError(409, 'No hay embarazo activo o en puerperio para guardar morbilidad');
-  }
-  return embarazoId;
+async function listarMorbilidad(pacienteId, embarazoIdSolicitado = null) {
+  const embarazo = await resolverEmbarazoParaLectura({ pacienteId, embarazoId: embarazoIdSolicitado });
+  return embarazo ? morbilidadRepository.listarPorEmbarazo(embarazo.id) : [];
 }
 
-async function listarMorbilidad(pacienteId) {
-  const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
-  return morbilidadRepository.listarPorEmbarazo(embarazoId);
-}
-
-async function obtenerMorbilidad({ pacienteId, id }) {
-  const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
-  const registro = await morbilidadRepository.obtenerPorIdYEmbarazo(id, embarazoId);
+async function obtenerMorbilidad({ pacienteId, embarazoId = null, id }) {
+  const registro = await morbilidadRepository.obtenerPorId(id);
   if (!registro) throw new HttpError(404, 'Registro no encontrado');
+  await resolverEmbarazoParaLectura({ pacienteId, embarazoId: registro.embarazo_id });
+  if (embarazoId && String(registro.embarazo_id) !== String(embarazoId)) {
+    throw new HttpError(404, 'Registro no encontrado en el embarazo seleccionado');
+  }
   return registro;
 }
 
-async function guardarMorbilidad({ pacienteId, body, req }) {
-  const embarazoId = await getEmbarazoSeguimientoOrConflict(pacienteId);
+async function guardarMorbilidad({ pacienteId, embarazoId, body, req }) {
+  requerirEmbarazoId(embarazoId);
+  await validarEmbarazoEditable({ pacienteId, embarazoId });
   const registro = await morbilidadRepository.insertar(buildCreateData({
     pacienteId,
     embarazoId,
     body,
     usuarioId: req.usuario.id,
   }));
+  if (!registro) {
+    await validarEmbarazoEditable({ pacienteId, embarazoId });
+    throw new HttpError(409, 'No fue posible guardar la morbilidad');
+  }
 
   await registrarAuditoria(req, {
     accion: 'crear',
@@ -87,21 +91,30 @@ async function guardarMorbilidad({ pacienteId, body, req }) {
   return registro;
 }
 
-async function actualizarMorbilidad({ pacienteId, id, body, req }) {
-  const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
+async function actualizarMorbilidad({ pacienteId, embarazoId, id, body, req }) {
+  requerirEmbarazoId(embarazoId);
   const { campos, data } = buildUpdateData(body);
   if (campos.length === 0) throw new HttpError(400, 'Sin campos para actualizar');
 
-  const before = await morbilidadRepository.obtenerPorIdYEmbarazo(id, embarazoId);
+  const before = await morbilidadRepository.obtenerPorId(id);
+  if (!before) throw new HttpError(404, 'Registro no encontrado');
+  if (String(before.embarazo_id) !== String(embarazoId)) {
+    throw new HttpError(404, 'Registro no encontrado en el embarazo seleccionado');
+  }
+  await validarEmbarazoEditable({ pacienteId, embarazoId });
   const { registro, rowCount } = await morbilidadRepository.actualizar({
     id,
     embarazoId,
     data,
     campos,
     updatedBy: req.usuario.id,
+    pacienteId,
   });
 
-  if (rowCount === 0) throw new HttpError(404, 'Registro no encontrado');
+  if (rowCount === 0) {
+    await validarEmbarazoEditable({ pacienteId, embarazoId });
+    throw new HttpError(404, 'Registro no encontrado');
+  }
 
   await registrarAuditoria(req, {
     accion: 'actualizar',
@@ -117,11 +130,20 @@ async function actualizarMorbilidad({ pacienteId, id, body, req }) {
   return { message: 'Registro actualizado' };
 }
 
-async function eliminarMorbilidad({ pacienteId, id, req }) {
-  const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
-  const { registro, rowCount } = await morbilidadRepository.eliminar({ id, embarazoId });
+async function eliminarMorbilidad({ pacienteId, embarazoId, id, req }) {
+  requerirEmbarazoId(embarazoId);
+  const before = await morbilidadRepository.obtenerPorId(id);
+  if (!before) throw new HttpError(404, 'Registro no encontrado');
+  if (String(before.embarazo_id) !== String(embarazoId)) {
+    throw new HttpError(404, 'Registro no encontrado en el embarazo seleccionado');
+  }
+  await validarEmbarazoEditable({ pacienteId, embarazoId });
+  const { registro, rowCount } = await morbilidadRepository.eliminar({ id, embarazoId, pacienteId });
 
-  if (rowCount === 0) throw new HttpError(404, 'Registro no encontrado');
+  if (rowCount === 0) {
+    await validarEmbarazoEditable({ pacienteId, embarazoId });
+    throw new HttpError(404, 'Registro no encontrado');
+  }
 
   await registrarAuditoria(req, {
     accion: 'eliminar',

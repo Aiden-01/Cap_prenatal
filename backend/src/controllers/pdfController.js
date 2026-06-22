@@ -19,7 +19,11 @@ async function pdfControl(req, res) {
   const { id } = req.params;
 
   try {
-    const c = await pdfService.obtenerControlConPaciente(id);
+    const c = await pdfService.obtenerControlConPaciente({
+      id,
+      pacienteId: req.params.pacienteId,
+      embarazoId: req.query.embarazo_id || null,
+    });
 
     if (!c) {
       throw new AppError(404, 'Control no encontrado', { code: 'CONTROL_NOT_FOUND' });
@@ -1121,7 +1125,7 @@ async function pdfMspas(req, res) {
   const { pacienteId } = req.params;
 
   try {
-    const data = await pdfService.obtenerFichaMspasData(pacienteId);
+    const data = await pdfService.obtenerFichaMspasData(pacienteId, req.query.embarazo_id || null);
 
     if (!data.paciente) {
       throw new AppError(404, 'Paciente no encontrada', { code: 'PATIENT_NOT_FOUND' });
@@ -1156,7 +1160,10 @@ async function pdfRiesgoObstetrico(req, res) {
   const { pacienteId } = req.params;
 
   try {
-    const { paciente, embarazo, riesgo } = await pdfService.obtenerFichaRiesgoData(pacienteId);
+    const { paciente, embarazo, riesgo } = await pdfService.obtenerFichaRiesgoData(
+      pacienteId,
+      req.query.embarazo_id || null
+    );
 
     if (!paciente) {
       throw new AppError(404, 'Paciente no encontrada', { code: 'PATIENT_NOT_FOUND' });
@@ -1201,7 +1208,10 @@ async function pdfPlanParto(req, res) {
   const { pacienteId } = req.params;
 
   try {
-    const { paciente, plan } = await pdfService.obtenerPlanPartoData(pacienteId);
+    const { paciente, plan } = await pdfService.obtenerPlanPartoData(
+      pacienteId,
+      req.query.embarazo_id || null
+    );
 
     if (!paciente) {
       throw new AppError(404, 'Paciente no encontrada', { code: 'PATIENT_NOT_FOUND' });

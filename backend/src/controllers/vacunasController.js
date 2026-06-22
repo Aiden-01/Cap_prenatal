@@ -2,13 +2,25 @@ const vacunasService = require('../services/vacunasService');
 const { asyncHandler } = require('../middleware/asyncHandler');
 
 const listar = asyncHandler(async (req, res) => {
-  const vacunas = await vacunasService.listarVacunas(req.params.pacienteId);
+  const vacunas = await vacunasService.listarVacunas(
+    req.params.pacienteId,
+    req.query.embarazo_id || null
+  );
+  return res.json(vacunas);
+});
+
+const antecedentes = asyncHandler(async (req, res) => {
+  const vacunas = await vacunasService.listarAntecedentes({
+    pacienteId: req.params.pacienteId,
+    excluirEmbarazoId: req.query.excluir_embarazo_id || null,
+  });
   return res.json(vacunas);
 });
 
 const obtener = asyncHandler(async (req, res) => {
   const vacuna = await vacunasService.obtenerVacuna({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     id: req.params.id,
   });
 
@@ -18,6 +30,7 @@ const obtener = asyncHandler(async (req, res) => {
 const guardar = asyncHandler(async (req, res) => {
   const vacuna = await vacunasService.guardarVacuna({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     body: req.body,
     req,
   });
@@ -28,6 +41,7 @@ const guardar = asyncHandler(async (req, res) => {
 const actualizar = asyncHandler(async (req, res) => {
   const vacuna = await vacunasService.actualizarVacuna({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     id: req.params.id,
     body: req.body,
     req,
@@ -39,6 +53,7 @@ const actualizar = asyncHandler(async (req, res) => {
 const eliminar = asyncHandler(async (req, res) => {
   const result = await vacunasService.eliminarVacuna({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     id: req.params.id,
     req,
   });
@@ -48,6 +63,7 @@ const eliminar = asyncHandler(async (req, res) => {
 
 module.exports = {
   listar,
+  antecedentes,
   obtener,
   guardar,
   actualizar,

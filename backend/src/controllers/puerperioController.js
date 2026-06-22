@@ -2,13 +2,17 @@ const puerperioService = require('../services/puerperioService');
 const { asyncHandler } = require('../middleware/asyncHandler');
 
 const listarPuerperio = asyncHandler(async (req, res) => {
-  const controles = await puerperioService.listarPuerperio(req.params.pacienteId);
+  const controles = await puerperioService.listarPuerperio(
+    req.params.pacienteId,
+    req.query.embarazo_id || null
+  );
   return res.json(controles);
 });
 
 const obtenerPuerperio = asyncHandler(async (req, res) => {
   const control = await puerperioService.obtenerPuerperio({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     id: req.params.id,
   });
 
@@ -18,6 +22,7 @@ const obtenerPuerperio = asyncHandler(async (req, res) => {
 const guardarPuerperio = asyncHandler(async (req, res) => {
   const control = await puerperioService.guardarPuerperio({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     body: req.body,
     req,
   });
@@ -28,6 +33,7 @@ const guardarPuerperio = asyncHandler(async (req, res) => {
 const actualizarPuerperio = asyncHandler(async (req, res) => {
   const control = await puerperioService.actualizarPuerperio({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     id: req.params.id,
     body: req.body,
     req,
@@ -39,6 +45,7 @@ const actualizarPuerperio = asyncHandler(async (req, res) => {
 const eliminarPuerperio = asyncHandler(async (req, res) => {
   const result = await puerperioService.eliminarPuerperio({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     id: req.params.id,
     req,
   });

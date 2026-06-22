@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
@@ -87,7 +87,9 @@ function Toggle({ label, name, form, set }) {
 export default function PuerperioForm() {
   const { id, puerperioId } = useParams();
   const navigate = useNavigate();
-  const expedientePath = `/pacientes/${id}?tab=puerperio`;
+  const [searchParams] = useSearchParams();
+  const embarazoId = searchParams.get("embarazo_id") || "";
+  const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=puerperio`;
   const toast = useGlobalToast();
   const [form, setForm] = useState(initialPuerperioForm);
   const [loading, setLoading] = useState(false);
@@ -97,10 +99,20 @@ export default function PuerperioForm() {
   const p = { form, set, errors: fieldErrors.fieldErrors, inputClass: fieldErrors.inputClass };
 
   useEffect(() => {
+    if (!embarazoId) {
+      toast("Selecciona un embarazo antes de registrar puerperio", "error");
+      navigate(`/pacientes/${id}?tab=puerperio`, { replace: true });
+      return;
+    }
     const request = editando
-      ? api.get(`/pacientes/${id}/controles/puerperio/${puerperioId}`)
-      : api.get(`/pacientes/${id}/controles/puerperio`);
-    request.then(({ data }) => {
+      ? api.get(`/pacientes/${id}/controles/puerperio/${puerperioId}`, { params: { embarazo_id: embarazoId } })
+      : api.get(`/pacientes/${id}/controles/puerperio`, { params: { embarazo_id: embarazoId } });
+    Promise.all([request, api.get(`/pacientes/${id}/expediente`, { params: { embarazo_id: embarazoId } })]).then(([{ data }, { data: expediente }]) => {
+      if (expediente?.is_read_only) {
+        toast("El embarazo esta cerrado y es de solo lectura", "error");
+        navigate(expedientePath, { replace: true });
+        return;
+      }
       if (editando) {
         setForm({ ...initialPuerperioForm(), ...data, fecha: data.fecha ? data.fecha.split("T")[0] : INIT.fecha });
       } else {
@@ -108,15 +120,15 @@ export default function PuerperioForm() {
         setForm((f) => ({ ...f, numero_atencion: siguiente }));
       }
     }).catch(() => toast("Error al cargar puerperio", "error"));
-  }, [id, puerperioId, editando, toast]);
+  }, [id, puerperioId, editando, embarazoId, expedientePath, navigate, toast]);
 
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
     fieldErrors.clearFieldErrors();
     try {
-      if (editando) await api.put(`/pacientes/${id}/controles/puerperio/${puerperioId}`, form);
-      else await api.post(`/pacientes/${id}/controles/puerperio`, form);
+      if (editando) await api.put(`/pacientes/${id}/controles/puerperio/${puerperioId}`, form, { params: { embarazo_id: embarazoId } });
+      else await api.post(`/pacientes/${id}/controles/puerperio`, form, { params: { embarazo_id: embarazoId } });
       toast(editando ? "Puerperio actualizado" : "Puerperio registrado", "success");
       navigate(expedientePath);
     } catch (err) {

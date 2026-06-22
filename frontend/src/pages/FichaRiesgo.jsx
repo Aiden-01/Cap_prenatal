@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
@@ -234,7 +234,9 @@ function defaultsDesdePaciente(paciente = {}, embarazo = {}) {
 export default function FichaRiesgo() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const expedientePath = `/pacientes/${id}?tab=riesgo`;
+  const [searchParams] = useSearchParams();
+  const embarazoId = searchParams.get("embarazo_id") || "";
+  const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=riesgo`;
   const toast = useGlobalToast();
   const [form, setForm] = useState(INIT);
   const [paciente, setPaciente] = useState(null);
@@ -251,10 +253,20 @@ export default function FichaRiesgo() {
   const referralMissing = !String(form.referida_a || "").trim();
 
   useEffect(() => {
-    api.get(`/pacientes/${id}/expediente`)
+    if (!embarazoId) {
+      toast("Selecciona un embarazo antes de editar riesgo", "error");
+      navigate(`/pacientes/${id}?tab=riesgo`, { replace: true });
+      return;
+    }
+    api.get(`/pacientes/${id}/expediente`, { params: { embarazo_id: embarazoId } })
       .then(({ data }) => {
+        if (data?.is_read_only) {
+          toast("El embarazo esta cerrado y es de solo lectura", "error");
+          navigate(expedientePath, { replace: true });
+          return;
+        }
         const pacienteData = data?.paciente;
-        const embarazoData = data?.embarazo_activo;
+        const embarazoData = data?.embarazo_seleccionado;
         const ficha = data?.ficha_riesgo;
         setPaciente(pacienteData || null);
         setExistingRisk(Boolean(ficha));
@@ -277,16 +289,16 @@ export default function FichaRiesgo() {
       })
       .catch(() => toast("Error al cargar datos de la paciente", "error"))
       .finally(() => setLoadingData(false));
-  }, [id, toast]);
+  }, [id, embarazoId, expedientePath, navigate, toast]);
 
   const saveFicha = async () => {
     setLoading(true);
     fieldErrors.clearFieldErrors();
     try {
       if (existingRisk) {
-        await api.put(`/pacientes/${id}/riesgo`, form);
+        await api.put(`/pacientes/${id}/riesgo`, form, { params: { embarazo_id: embarazoId } });
       } else {
-        await api.post(`/pacientes/${id}/riesgo`, form);
+        await api.post(`/pacientes/${id}/riesgo`, form, { params: { embarazo_id: embarazoId } });
       }
       toast(existingRisk ? "Ficha de riesgo actualizada" : "Ficha de riesgo guardada", "success");
       setTimeout(() => navigate(expedientePath), 600);

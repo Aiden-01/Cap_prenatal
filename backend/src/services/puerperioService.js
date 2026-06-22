@@ -1,5 +1,9 @@
 const puerperioRepository = require('../repositories/puerperioRepository');
-const { obtenerEmbarazoSeguimientoId } = require('../utils/embarazos');
+const {
+  requerirEmbarazoId,
+  resolverEmbarazoParaLectura,
+  validarEmbarazoEditable,
+} = require('../utils/embarazos');
 const { withGuatemalaTimeFallback } = require('../utils/guatemalaTime');
 const { registrarAuditoria } = require('../utils/auditoria');
 const { HttpError } = require('../utils/httpError');
@@ -52,40 +56,25 @@ function buildCreateData({ pacienteId, embarazoId, body, usuarioId }) {
   return data;
 }
 
-async function getEmbarazoSeguimientoOrConflict(pacienteId, message) {
-  const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
-  if (!embarazoId) throw new HttpError(409, message);
-  return embarazoId;
+async function listarPuerperio(pacienteId, embarazoIdSolicitado = null) {
+  const embarazo = await resolverEmbarazoParaLectura({ pacienteId, embarazoId: embarazoIdSolicitado });
+  return embarazo ? puerperioRepository.listarPorEmbarazo(embarazo.id) : [];
 }
 
-async function listarPuerperio(pacienteId) {
-  const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
-  return puerperioRepository.listarPorEmbarazo(embarazoId);
-}
-
-async function obtenerPuerperio({ pacienteId, id }) {
-  const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
-  const control = await puerperioRepository.obtenerPorIdYEmbarazo(id, embarazoId);
+async function obtenerPuerperio({ pacienteId, embarazoId = null, id }) {
+  const control = await puerperioRepository.obtenerPorId(id);
   if (!control) throw new HttpError(404, 'Control de puerperio no encontrado');
+  await resolverEmbarazoParaLectura({ pacienteId, embarazoId: control.embarazo_id });
+  if (embarazoId && String(control.embarazo_id) !== String(embarazoId)) {
+    throw new HttpError(404, 'Control de puerperio no encontrado en el embarazo seleccionado');
+  }
   return control;
 }
 
-async function guardarPuerperio({ pacienteId, body, req }) {
+async function guardarPuerperio({ pacienteId, embarazoId, body, req }) {
   const dataWithTime = withGuatemalaTimeFallback(body);
-  const embarazoId = await getEmbarazoSeguimientoOrConflict(
-    pacienteId,
-    'No hay embarazo activo o en puerperio para registrar puerperio'
-  );
-  const embarazoBefore = await puerperioRepository.obtenerEmbarazoPorId(embarazoId);
-  const embarazoActualizado = await puerperioRepository.marcarEmbarazoEnPuerperio({
-    embarazoId,
-    fechaCierre: dataWithTime.fecha,
-    updatedBy: req.usuario.id,
-  });
-  const before = await puerperioRepository.obtenerPorNumeroYEmbarazo(
-    embarazoId,
-    dataWithTime.numero_atencion
-  );
+  requerirEmbarazoId(embarazoId);
+  await validarEmbarazoEditable({ pacienteId, embarazoId });
   const data = buildCreateData({
     pacienteId,
     embarazoId,
@@ -93,7 +82,50 @@ async function guardarPuerperio({ pacienteId, body, req }) {
     usuarioId: req.usuario.id,
   });
   const updateFields = PUERPERIO_FIELDS.filter((field) => field !== 'numero_atencion');
-  const control = await puerperioRepository.upsert({ data, updateFields });
+  const {
+    embarazoBefore,
+    embarazoActualizado,
+    before,
+    control,
+  } = await puerperioRepository.enTransaccion(async (client) => {
+    const embarazoBloqueado = await puerperioRepository.obtenerEmbarazoParaActualizar(
+      { embarazoId, pacienteId },
+      client
+    );
+    if (!embarazoBloqueado) {
+      throw new HttpError(404, 'Embarazo no encontrado para esta paciente', {
+        code: 'PREGNANCY_NOT_FOUND',
+      });
+    }
+    if (!['activo', 'puerperio'].includes(embarazoBloqueado.estado)) {
+      throw new HttpError(409, 'El embarazo esta cerrado y su expediente es de solo lectura', {
+        code: 'PREGNANCY_READ_ONLY',
+      });
+    }
+
+    const embarazoCambiado = await puerperioRepository.marcarEmbarazoEnPuerperio({
+      embarazoId,
+      pacienteId,
+      fechaCierre: dataWithTime.fecha,
+      updatedBy: req.usuario.id,
+    }, client);
+    const controlBefore = await puerperioRepository.obtenerPorNumeroYEmbarazo(
+      embarazoId,
+      dataWithTime.numero_atencion,
+      client
+    );
+    const controlGuardado = await puerperioRepository.upsert({ data, updateFields }, client);
+    if (!controlGuardado) {
+      throw new HttpError(409, 'No fue posible guardar el control de puerperio');
+    }
+
+    return {
+      embarazoBefore: embarazoBloqueado,
+      embarazoActualizado: embarazoCambiado,
+      before: controlBefore,
+      control: controlGuardado,
+    };
+  });
 
   if (embarazoActualizado) {
     await registrarAuditoria(req, {
@@ -122,21 +154,30 @@ async function guardarPuerperio({ pacienteId, body, req }) {
   return control;
 }
 
-async function actualizarPuerperio({ pacienteId, id, body, req }) {
-  const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
+async function actualizarPuerperio({ pacienteId, embarazoId, id, body, req }) {
+  requerirEmbarazoId(embarazoId);
   const { campos, data } = buildUpdateData(body);
   if (campos.length === 0) throw new HttpError(400, 'Sin campos para actualizar');
 
-  const before = await puerperioRepository.obtenerPorIdYEmbarazo(id, embarazoId);
+  const before = await puerperioRepository.obtenerPorId(id);
+  if (!before) throw new HttpError(404, 'Control de puerperio no encontrado');
+  if (String(before.embarazo_id) !== String(embarazoId)) {
+    throw new HttpError(404, 'Control de puerperio no encontrado en el embarazo seleccionado');
+  }
+  await validarEmbarazoEditable({ pacienteId, embarazoId });
   const control = await puerperioRepository.actualizar({
     id,
     embarazoId,
     data,
     campos,
     updatedBy: req.usuario.id,
+    pacienteId,
   });
 
-  if (!control) throw new HttpError(404, 'Control de puerperio no encontrado');
+  if (!control) {
+    await validarEmbarazoEditable({ pacienteId, embarazoId });
+    throw new HttpError(404, 'Control de puerperio no encontrado');
+  }
 
   await registrarAuditoria(req, {
     accion: 'actualizar',
@@ -152,11 +193,20 @@ async function actualizarPuerperio({ pacienteId, id, body, req }) {
   return control;
 }
 
-async function eliminarPuerperio({ pacienteId, id, req }) {
-  const embarazoId = await obtenerEmbarazoSeguimientoId(pacienteId);
-  const { control, rowCount } = await puerperioRepository.eliminar({ id, embarazoId });
+async function eliminarPuerperio({ pacienteId, embarazoId, id, req }) {
+  requerirEmbarazoId(embarazoId);
+  const before = await puerperioRepository.obtenerPorId(id);
+  if (!before) throw new HttpError(404, 'Control de puerperio no encontrado');
+  if (String(before.embarazo_id) !== String(embarazoId)) {
+    throw new HttpError(404, 'Control de puerperio no encontrado en el embarazo seleccionado');
+  }
+  await validarEmbarazoEditable({ pacienteId, embarazoId });
+  const { control, rowCount } = await puerperioRepository.eliminar({ id, embarazoId, pacienteId });
 
-  if (rowCount === 0) throw new HttpError(404, 'Control de puerperio no encontrado');
+  if (rowCount === 0) {
+    await validarEmbarazoEditable({ pacienteId, embarazoId });
+    throw new HttpError(404, 'Control de puerperio no encontrado');
+  }
 
   await registrarAuditoria(req, {
     accion: 'eliminar',

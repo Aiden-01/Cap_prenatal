@@ -2,13 +2,17 @@ const morbilidadService = require('../services/morbilidadService');
 const { asyncHandler } = require('../middleware/asyncHandler');
 
 const listar = asyncHandler(async (req, res) => {
-  const registros = await morbilidadService.listarMorbilidad(req.params.pacienteId);
+  const registros = await morbilidadService.listarMorbilidad(
+    req.params.pacienteId,
+    req.query.embarazo_id || null
+  );
   return res.json(registros);
 });
 
 const obtener = asyncHandler(async (req, res) => {
   const registro = await morbilidadService.obtenerMorbilidad({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     id: req.params.id,
   });
 
@@ -18,6 +22,7 @@ const obtener = asyncHandler(async (req, res) => {
 const guardar = asyncHandler(async (req, res) => {
   const registro = await morbilidadService.guardarMorbilidad({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     body: req.body,
     req,
   });
@@ -28,6 +33,7 @@ const guardar = asyncHandler(async (req, res) => {
 const actualizar = asyncHandler(async (req, res) => {
   const result = await morbilidadService.actualizarMorbilidad({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     id: req.params.id,
     body: req.body,
     req,
@@ -39,6 +45,7 @@ const actualizar = asyncHandler(async (req, res) => {
 const eliminar = asyncHandler(async (req, res) => {
   const result = await morbilidadService.eliminarMorbilidad({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     id: req.params.id,
     req,
   });

@@ -251,6 +251,16 @@ async function cerrarEmbarazosEnSeguimiento(pacienteId, fechaCierre, updatedBy =
   return rows;
 }
 
+async function obtenerEmbarazoActual(pacienteId) {
+  const { rows } = await pool.query(
+    `SELECT * FROM embarazos
+     WHERE paciente_id = $1 AND estado = 'activo'
+     ORDER BY numero_embarazo DESC LIMIT 1`,
+    [pacienteId]
+  );
+  return rows[0] || null;
+}
+
 async function obtenerSiguienteNumeroEmbarazo(pacienteId) {
   const { rows } = await pool.query(
     'SELECT COALESCE(MAX(numero_embarazo), 0) + 1 AS siguiente FROM embarazos WHERE paciente_id = $1',
@@ -291,7 +301,7 @@ async function obtenerUltimoEmbarazoActivo(pacienteId) {
   return rows[0] || null;
 }
 
-async function pasarEmbarazoAPuerperio({ pacienteId, fechaCierre, observaciones, updatedBy = null }) {
+async function pasarEmbarazoAPuerperio({ pacienteId, embarazoId, fechaCierre, observaciones, updatedBy = null }) {
   const { rows } = await pool.query(
     `UPDATE embarazos
      SET estado = 'puerperio',
@@ -299,9 +309,9 @@ async function pasarEmbarazoAPuerperio({ pacienteId, fechaCierre, observaciones,
          observaciones = COALESCE($3, observaciones),
          updated_at = NOW(),
          updated_by = $4
-     WHERE paciente_id = $1 AND estado = 'activo'
+     WHERE paciente_id = $1 AND id = $5 AND estado = 'activo'
      RETURNING *`,
-    [pacienteId, fechaCierre, observaciones, updatedBy]
+    [pacienteId, fechaCierre, observaciones, updatedBy, embarazoId]
   );
   return rows[0] || null;
 }
@@ -316,7 +326,7 @@ async function obtenerUltimoEmbarazoEnSeguimiento(pacienteId) {
   return rows[0] || null;
 }
 
-async function cerrarEmbarazoEnSeguimiento({ pacienteId, fechaCierre, observaciones, updatedBy = null }) {
+async function cerrarEmbarazoEnSeguimiento({ pacienteId, embarazoId, fechaCierre, observaciones, updatedBy = null }) {
   const { rows } = await pool.query(
     `UPDATE embarazos
      SET estado = 'cerrado',
@@ -324,9 +334,9 @@ async function cerrarEmbarazoEnSeguimiento({ pacienteId, fechaCierre, observacio
          observaciones = COALESCE($3, observaciones),
          updated_at = NOW(),
          updated_by = $4
-     WHERE paciente_id = $1 AND estado IN ('activo', 'puerperio')
+     WHERE paciente_id = $1 AND id = $5 AND estado IN ('activo', 'puerperio')
      RETURNING *`,
-    [pacienteId, fechaCierre, observaciones, updatedBy]
+    [pacienteId, fechaCierre, observaciones, updatedBy, embarazoId]
   );
   return rows[0] || null;
 }
@@ -354,6 +364,7 @@ module.exports = {
   existeEmbarazoActivo,
   obtenerEmbarazoActivoId,
   obtenerEmbarazoPorId,
+  obtenerEmbarazoActual,
   obtenerEmbarazoVisibleId,
   crearEmbarazoDesdePaciente,
   obtenerExpedienteCompleto,

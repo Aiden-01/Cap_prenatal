@@ -1,6 +1,11 @@
 const planPartoRepository = require('../repositories/planPartoRepository');
-const { obtenerEmbarazoActivoId, obtenerEmbarazoActivoRequeridoId } = require('../utils/embarazos');
+const {
+  requerirEmbarazoId,
+  resolverEmbarazoParaLectura,
+  validarEmbarazoEditable,
+} = require('../utils/embarazos');
 const { registrarAuditoria } = require('../utils/auditoria');
+const { HttpError } = require('../utils/httpError');
 
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
 
@@ -31,14 +36,14 @@ function buildData(body, allowedFields) {
   return { campos, data };
 }
 
-async function obtenerPlanParto(pacienteId) {
-  const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
-  if (!embarazoId) return null;
-  return planPartoRepository.obtenerPorEmbarazo(embarazoId);
+async function obtenerPlanParto(pacienteId, embarazoIdSolicitado = null) {
+  const embarazo = await resolverEmbarazoParaLectura({ pacienteId, embarazoId: embarazoIdSolicitado });
+  return embarazo ? planPartoRepository.obtenerPorEmbarazo(embarazo.id) : null;
 }
 
-async function guardarPlanParto({ pacienteId, body, req }) {
-  const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
+async function guardarPlanParto({ pacienteId, embarazoId, body, req }) {
+  requerirEmbarazoId(embarazoId);
+  await validarEmbarazoEditable({ pacienteId, embarazoId });
 
   const existe = await planPartoRepository.obtenerPorEmbarazo(embarazoId);
   const { campos, data } = buildData(body, PLAN_PARTO_FIELDS);
@@ -50,6 +55,8 @@ async function guardarPlanParto({ pacienteId, body, req }) {
       data,
       campos,
       updatedBy: req.usuario.id,
+      embarazoId,
+      pacienteId,
     });
   } else {
     plan = await planPartoRepository.insertar({
@@ -59,6 +66,11 @@ async function guardarPlanParto({ pacienteId, body, req }) {
       registrado_por: req.usuario.id,
       updated_by: req.usuario.id,
     });
+  }
+
+  if (!plan) {
+    await validarEmbarazoEditable({ pacienteId, embarazoId });
+    throw new HttpError(409, 'No fue posible guardar el plan de parto');
   }
 
   await registrarAuditoria(req, {

@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ClipboardList, Eye, AlertTriangle } from "lucide-react";
-import api from "../api/axios";
-import { getErrorMessage } from "../utils/errorMessage";
 
 function fecha(value) {
   if (!value) return "—";
@@ -28,7 +26,7 @@ function controlTime(control) {
   return Number.isNaN(time) ? 0 : time;
 }
 
-function ControlNode({ control, index, pacienteId }) {
+function ControlNode({ control, index, pacienteId, embarazoId, isReadOnly }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const observaciones = control.observaciones || control.impresion_clinica;
@@ -95,10 +93,10 @@ function ControlNode({ control, index, pacienteId }) {
             className="btn-secondary"
             onClick={() => {
               setOpen((value) => !value);
-              navigate(`/pacientes/${pacienteId}/controles/${control.id}/editar`);
+              if (!isReadOnly) navigate(`/pacientes/${pacienteId}/controles/${control.id}/editar?embarazo_id=${embarazoId}`);
             }}
           >
-            <Eye size={13} /> Ver detalle
+            <Eye size={13} /> {isReadOnly ? (open ? "Ocultar detalle" : "Ver detalle") : "Ver / editar"}
           </button>
         </div>
       </div>
@@ -106,61 +104,31 @@ function ControlNode({ control, index, pacienteId }) {
   );
 }
 
-export default function TimelineControles({ pacienteId }) {
-  const [controles, setControles] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+export default function TimelineControles({ pacienteId, embarazoId, controles = [], isReadOnly = false }) {
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!pacienteId) return undefined;
-    let mounted = true;
+  const controlesOrdenados = Array.isArray(controles)
+    ? [...controles].sort((a, b) => controlTime(b) - controlTime(a))
+    : [];
 
-    api.get(`/pacientes/${pacienteId}/controles`)
-      .then(({ data }) => {
-        if (mounted) {
-          const controlesOrdenados = Array.isArray(data)
-            ? [...data].sort((a, b) => controlTime(b) - controlTime(a))
-            : [];
-          setControles(controlesOrdenados);
-        }
-      })
-      .catch((err) => {
-        if (mounted) setError(getErrorMessage(err, "Error al cargar controles prenatales"));
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [pacienteId]);
-
-  if (loading) {
-    return <div className="card" style={{ color: "var(--text-muted)" }}>Cargando controles...</div>;
-  }
-
-  if (error) {
-    return <div className="card" style={{ color: "var(--danger)" }}>{error}</div>;
-  }
-
-  if (!controles.length) {
+  if (!controlesOrdenados.length) {
     return (
       <div className="card empty-state" style={{ display: "grid", justifyItems: "center", gap: "0.85rem" }}>
         <ClipboardList size={28} style={{ color: "var(--primary)" }} />
         <span>Sin controles registrados aun</span>
-        <button className="btn-primary" onClick={() => navigate(`/pacientes/${pacienteId}/controles/nuevo`)}>
-          Registrar primer control
-        </button>
+        {!isReadOnly && (
+          <button className="btn-primary" onClick={() => navigate(`/pacientes/${pacienteId}/controles/nuevo?embarazo_id=${embarazoId}`)}>
+            Registrar primer control
+          </button>
+        )}
       </div>
     );
   }
 
   return (
     <div style={{ position: "relative", borderLeft: "1px solid var(--card-border)", marginLeft: "0.45rem" }}>
-      {controles.map((control, index) => (
-        <ControlNode key={control.id} control={control} index={index} pacienteId={pacienteId} />
+      {controlesOrdenados.map((control, index) => (
+        <ControlNode key={control.id} control={control} index={index} pacienteId={pacienteId} embarazoId={embarazoId} isReadOnly={isReadOnly} />
       ))}
     </div>
   );

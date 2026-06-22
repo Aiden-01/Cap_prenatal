@@ -102,7 +102,7 @@ function buildCompletitudFromExp(exp, pacienteId) {
 
   return {
     porcentaje: items.filter((item) => item.completado).length * 20,
-    embarazo_id: exp.embarazo_activo?.id,
+    embarazo_id: exp.embarazo_seleccionado?.id || exp.embarazo_activo?.id,
     total_controles: totalControles,
     items,
   };
@@ -116,39 +116,88 @@ export default function ExpedientePaciente() {
   const toast      = useGlobalToast();
   const [exp, setExp]       = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab]         = useState(searchParams.get("tab") || "general");
+  const [loadError, setLoadError] = useState("");
   const [printing, setPrinting] = useState(false);
+  const [antecedentesVacunas, setAntecedentesVacunas] = useState([]);
+  const selectedEmbarazoId = searchParams.get("embarazo_id") || "";
 
   const cargarExpediente = () => {
-    api.get(`/pacientes/${id}/expediente`)
+    api.get(`/pacientes/${id}/expediente`, {
+      params: selectedEmbarazoId ? { embarazo_id: selectedEmbarazoId } : undefined,
+    })
       .then(({ data }) => setExp(data))
       .catch(() => toast("Error al cargar expediente", "error"))
   };
 
   useEffect(() => {
-    api.get(`/pacientes/${id}/expediente`)
-      .then(({ data }) => setExp(data))
-      .catch(() => toast("Error al cargar expediente", "error"))
-      .finally(() => setLoading(false));
-  }, [id, toast]);
+    const controller = new AbortController();
+    let active = true;
+    api.get(`/pacientes/${id}/expediente`, {
+      params: selectedEmbarazoId ? { embarazo_id: selectedEmbarazoId } : undefined,
+      signal: controller.signal,
+    })
+      .then(({ data }) => {
+        if (active) {
+          setLoadError("");
+          setExp(data);
+        }
+      })
+      .catch((err) => {
+        if (!active || err?.code === "ERR_CANCELED") return;
+        setExp(null);
+        const message = "El embarazo solicitado no existe o no pertenece a la paciente";
+        setLoadError(message);
+        toast(message, "error");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [id, selectedEmbarazoId, toast]);
 
-  useEffect(() => {
-    setTab(searchParams.get("tab") || "general");
-  }, [searchParams]);
+  const tab = searchParams.get("tab") || "general";
 
   const cambiarTab = (nextTab) => {
-    setTab(nextTab);
-    setSearchParams(nextTab === "general" ? {} : { tab: nextTab }, { replace: true });
+    const next = new URLSearchParams(searchParams);
+    if (nextTab === "general") next.delete("tab");
+    else next.set("tab", nextTab);
+    setSearchParams(next, { replace: true });
   };
 
-  if (loading) return (
+  const embarazoSeleccionado = exp?.embarazo_seleccionado || exp?.embarazo_activo;
+  const isReadOnly = exp?.is_read_only ?? embarazoSeleccionado?.estado === "cerrado";
+  const isEmbarazoActual = exp?.is_embarazo_actual ?? embarazoSeleccionado?.id === exp?.embarazo_actual?.id;
+
+  useEffect(() => {
+    if (!exp || isReadOnly || !embarazoSeleccionado?.id) return;
+    const controller = new AbortController();
+    api.get(`/pacientes/${id}/vacunas/antecedentes`, {
+      params: { excluir_embarazo_id: embarazoSeleccionado.id },
+      signal: controller.signal,
+    })
+      .then(({ data }) => setAntecedentesVacunas(Array.isArray(data) ? data : []))
+      .catch((err) => {
+        if (err?.code !== "ERR_CANCELED") setAntecedentesVacunas([]);
+      });
+    return () => controller.abort();
+  }, [id, exp, isReadOnly, embarazoSeleccionado?.id]);
+
+  const expedienteDesactualizado = Boolean(
+    exp && selectedEmbarazoId &&
+    String(exp.embarazo_seleccionado?.id || exp.embarazo_activo?.id || '') !== String(selectedEmbarazoId)
+  );
+
+  if (loading || expedienteDesactualizado) return (
     <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
       Cargando expediente...
     </div>
   );
   if (!exp) return (
     <div style={{ padding: "3rem", textAlign: "center", color: "var(--danger)" }}>
-      Paciente no encontrada.
+      {loadError || "Paciente no encontrada."}
     </div>
   );
 
@@ -161,7 +210,7 @@ export default function ExpedientePaciente() {
       : nombreCompleto.length > 24
         ? "is-medium"
       : "";
-  const estadoEmbarazo = exp.embarazo_activo?.estado;
+  const estadoEmbarazo = embarazoSeleccionado?.estado;
   const puedeRegistrarPrenatal = estadoEmbarazo === "activo";
   const puedeRegistrarPuerperio = estadoEmbarazo === "activo" || estadoEmbarazo === "puerperio";
   const badgeEmbarazo = estadoEmbarazo === "activo"
@@ -169,6 +218,20 @@ export default function ExpedientePaciente() {
     : estadoEmbarazo === "puerperio"
       ? "badge-yellow"
       : "badge-blue";
+  const rutaClinica = (path) => {
+    if (!embarazoSeleccionado?.id) return path;
+    const separator = path.includes("?") ? "&" : "?";
+    return `${path}${separator}embarazo_id=${embarazoSeleccionado.id}`;
+  };
+
+  const seleccionarEmbarazo = (embarazoId) => {
+    setLoading(true);
+    setExp(null);
+    setLoadError("");
+    const next = new URLSearchParams(searchParams);
+    next.set("embarazo_id", String(embarazoId));
+    setSearchParams(next);
+  };
 
   const eliminarRegistro = async (mensaje, endpoint) => {
     if (!window.confirm(mensaje)) return;
@@ -189,10 +252,12 @@ export default function ExpedientePaciente() {
     if (fpp === null) return;
 
     try {
-      await api.post(`/pacientes/${id}/embarazos`, { fur, fpp });
+      const { data: nuevoEmbarazo } = await api.post(`/pacientes/${id}/embarazos`, { fur, fpp });
       toast("Nuevo embarazo creado", "success");
-      cargarExpediente();
-      cambiarTab("general");
+      const next = new URLSearchParams();
+      if (nuevoEmbarazo?.id) next.set("embarazo_id", String(nuevoEmbarazo.id));
+      setLoading(true);
+      setSearchParams(next);
     } catch (err) {
       toast(getErrorMessage(err, "Error al crear nuevo embarazo"), "error");
     }
@@ -202,7 +267,7 @@ export default function ExpedientePaciente() {
     if (!window.confirm("Esto cerrara el seguimiento de este embarazo. El expediente quedara en historial. ¿Continuar?")) return;
 
     try {
-      await api.post(`/pacientes/${id}/embarazo/cerrar`);
+      await api.post(`/pacientes/${id}/embarazo/cerrar`, {}, { params: { embarazo_id: embarazoSeleccionado.id } });
       toast("Embarazo cerrado", "success");
       cargarExpediente();
       cambiarTab("general");
@@ -215,7 +280,7 @@ export default function ExpedientePaciente() {
     if (estadoEmbarazo === "activo") {
       if (!window.confirm("Para registrar puerperio primero se marcara el embarazo como postparto. ¿Continuar?")) return;
       try {
-        await api.post(`/pacientes/${id}/embarazo/puerperio`);
+        await api.post(`/pacientes/${id}/embarazo/puerperio`, {}, { params: { embarazo_id: embarazoSeleccionado.id } });
         toast("Embarazo marcado en puerperio", "success");
         cargarExpediente();
       } catch (err) {
@@ -224,13 +289,16 @@ export default function ExpedientePaciente() {
       }
     }
 
-    navigate(`/pacientes/${id}/puerperio/nuevo`);
+    navigate(rutaClinica(`/pacientes/${id}/puerperio/nuevo`));
   };
 
   const imprimirFichaMspas = async () => {
     setPrinting(true);
     try {
-      const res = await api.get(`/pacientes/${id}/mspas/pdf`, { responseType: "blob" });
+      const res = await api.get(`/pacientes/${id}/mspas/pdf`, {
+        responseType: "blob",
+        params: embarazoSeleccionado?.id ? { embarazo_id: embarazoSeleccionado.id } : undefined,
+      });
       const contentType = res.headers["content-type"] || "";
       if (!contentType.includes("application/pdf")) {
         const errorText = await res.data.text();
@@ -267,7 +335,10 @@ export default function ExpedientePaciente() {
   const imprimirFichaRiesgo = async () => {
     setPrinting(true);
     try {
-      const res = await api.get(`/pacientes/${id}/riesgo/pdf`, { responseType: "blob" });
+      const res = await api.get(`/pacientes/${id}/riesgo/pdf`, {
+        responseType: "blob",
+        params: embarazoSeleccionado?.id ? { embarazo_id: embarazoSeleccionado.id } : undefined,
+      });
       const contentType = res.headers["content-type"] || "";
       if (!contentType.includes("application/pdf")) {
         const errorText = await res.data.text();
@@ -304,7 +375,10 @@ export default function ExpedientePaciente() {
   const imprimirPlanParto = async () => {
     setPrinting(true);
     try {
-      const res = await api.get(`/pacientes/${id}/plan-parto/pdf`, { responseType: "blob" });
+      const res = await api.get(`/pacientes/${id}/plan-parto/pdf`, {
+        responseType: "blob",
+        params: embarazoSeleccionado?.id ? { embarazo_id: embarazoSeleccionado.id } : undefined,
+      });
       const contentType = res.headers["content-type"] || "";
       if (!contentType.includes("application/pdf")) {
         const errorText = await res.data.text();
@@ -365,14 +439,14 @@ export default function ExpedientePaciente() {
           </div>
           <div className="patient-hero-meta">
             <span className="badge badge-blue">Exp: {p.no_expediente}</span>
-            {exp.embarazo_activo && (
+            {embarazoSeleccionado && (
               <span className={`badge ${badgeEmbarazo}`}>
-                Embarazo {exp.embarazo_activo.numero_embarazo} {exp.embarazo_activo.estado}
+                Embarazo {embarazoSeleccionado.numero_embarazo} {embarazoSeleccionado.estado}
               </span>
             )}
             {p.cui && <span>CUI: {p.cui}</span>}
-            {(exp.embarazo_activo?.fur || p.fur)  && <span>FUR: {fecha(exp.embarazo_activo?.fur || p.fur)}</span>}
-            {(exp.embarazo_activo?.fpp || p.fpp)  && <span className="patient-hero-fpp">FPP: {fecha(exp.embarazo_activo?.fpp || p.fpp)}</span>}
+            {embarazoSeleccionado?.fur && <span>FUR: {fecha(embarazoSeleccionado.fur)}</span>}
+            {embarazoSeleccionado?.fpp && <span className="patient-hero-fpp">FPP: {fecha(embarazoSeleccionado.fpp)}</span>}
             {exp.ficha_riesgo?.tiene_riesgo && (
               <span className="badge badge-red patient-risk-badge">
                 <AlertTriangle size={13} /> Riesgo obstétrico
@@ -382,8 +456,8 @@ export default function ExpedientePaciente() {
         </div>
 
         <div className="patient-hero-actions">
-          {puedeRegistrarPrenatal && (
-            <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}>
+          {!isReadOnly && puedeRegistrarPrenatal && (
+            <button className="btn-primary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/controles/nuevo`))}>
               <Plus size={14} /> Control
             </button>
           )}
@@ -399,7 +473,15 @@ export default function ExpedientePaciente() {
         </div>
       </div>
 
-      <SemaforoCompletitud pacienteId={id} initialData={buildCompletitudFromExp(exp, id)} />
+      {isReadOnly && (
+        <div className="card" style={{ marginTop: "1rem", borderColor: "var(--warn)", background: "var(--warn-lt)", color: "var(--warn)", fontWeight: 800 }}>
+          Embarazo cerrado · solo lectura
+        </div>
+      )}
+
+      {isEmbarazoActual && !isReadOnly && (
+        <SemaforoCompletitud pacienteId={id} initialData={buildCompletitudFromExp(exp, id)} />
+      )}
 
       {/* ── TABS ── */}
       <div className="content-tabs" style={{ marginBottom: "1.5rem", marginTop: "1.5rem" }}>
@@ -423,7 +505,13 @@ export default function ExpedientePaciente() {
             <SecTitle>Historial de embarazos</SecTitle>
             <Grid cols={4}>
               {exp.embarazos?.map((emb) => (
-                <div key={emb.id} className="mini-record-card">
+                <button
+                  type="button"
+                  key={emb.id}
+                  className="mini-record-card"
+                  onClick={() => seleccionarEmbarazo(emb.id)}
+                  style={{ textAlign: "left", cursor: "pointer", borderColor: emb.id === embarazoSeleccionado?.id ? "var(--primary)" : undefined }}
+                >
                   <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", alignItems: "center" }}>
                     <strong>Embarazo {emb.numero_embarazo}</strong>
                     <span className={emb.estado === "activo" ? "badge badge-green" : "badge badge-blue"}>{emb.estado}</span>
@@ -433,13 +521,14 @@ export default function ExpedientePaciente() {
                     <Row label="FPP" value={fecha(emb.fpp)} />
                     <Row label="Inicio" value={fecha(emb.fecha_inicio)} />
                     {emb.fecha_cierre && <Row label="Cierre" value={fecha(emb.fecha_cierre)} />}
+                    {emb.id === embarazoSeleccionado?.id && <span className="badge badge-blue">Seleccionado</span>}
                   </div>
-                  {(emb.estado === "activo" || emb.estado === "puerperio") && (
-                    <button className="btn-critical pregnancy-close-action" onClick={cerrarEmbarazo}>
+                  {(emb.estado === "activo" || emb.estado === "puerperio") && emb.id === embarazoSeleccionado?.id && (
+                    <span className="btn-critical pregnancy-close-action" onClick={(event) => { event.stopPropagation(); cerrarEmbarazo(); }}>
                       <CheckCircle size={14} /> Cerrar embarazo
-                    </button>
+                    </span>
                   )}
-                </div>
+                </button>
               ))}
             </Grid>
           </div>
@@ -480,10 +569,10 @@ export default function ExpedientePaciente() {
           </div>
 
           <div className="card">
-            <SecTitle>Gestación Actual</SecTitle>
+            <SecTitle>Gestación seleccionada</SecTitle>
             <Grid cols={4}>
-              <Row label="FUR" value={fecha(p.fur)} />
-              <Row label="FPP" value={fecha(p.fpp)} />
+              <Row label="FUR" value={fecha(embarazoSeleccionado?.fur)} />
+              <Row label="FPP" value={fecha(embarazoSeleccionado?.fpp)} />
               <Row label="EG confiable FUR" value={p.eg_confiable_fur ? "Sí" : "No"} />
               <Row label="EG confiable USG" value={p.eg_confiable_usg ? "Sí" : "No"} />
             </Grid>
@@ -572,14 +661,14 @@ export default function ExpedientePaciente() {
       ══════════════════════════════════════════ */}
       {tab === "controles" && (
         <div style={{ display: "grid", gap: "1rem" }}>
-          {puedeRegistrarPrenatal && exp.controles_prenatales?.length > 0 && (
+          {!isReadOnly && puedeRegistrarPrenatal && exp.controles_prenatales?.length > 0 && (
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/controles/nuevo`)}>
+              <button className="btn-primary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/controles/nuevo`))}>
                 <Plus size={14} /> Agregar siguiente control
               </button>
             </div>
           )}
-          <TimelineControles pacienteId={id} embarazoId={exp.embarazo_activo?.id} />
+          <TimelineControles pacienteId={id} embarazoId={embarazoSeleccionado?.id} controles={exp.controles_prenatales} isReadOnly={isReadOnly} />
         </div>
       )}
 
@@ -588,7 +677,7 @@ export default function ExpedientePaciente() {
       ══════════════════════════════════════════ */}
       {tab === "puerperio" && (
         <div style={{ display: "grid", gap: "1rem" }}>
-          {puedeRegistrarPuerperio && (exp.controles_puerperio?.length ?? 0) < 2 && (
+          {!isReadOnly && puedeRegistrarPuerperio && (exp.controles_puerperio?.length ?? 0) < 2 && (
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button className="btn-primary" onClick={registrarPuerperio}>
                 <Plus size={14} /> Registrar puerperio
@@ -606,12 +695,12 @@ export default function ExpedientePaciente() {
                   <span className="badge badge-blue">{pu.numero_atencion === 1 ? "1ª Atención" : "2ª Atención"} — Puerperio</span>
                   <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>{fecha(pu.fecha)}</span>
-                    <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/puerperio/${pu.id}/editar`)}>
+                    {!isReadOnly && <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/puerperio/${pu.id}/editar`))}>
                       <Pencil size={13} /> Editar
-                    </button>
-                    <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar esta atención de puerperio?", `/pacientes/${id}/controles/puerperio/${pu.id}`)}>
+                    </button>}
+                    {!isReadOnly && <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar esta atención de puerperio?", rutaClinica(`/pacientes/${id}/controles/puerperio/${pu.id}`))}>
                       <Trash2 size={13} /> Eliminar
-                    </button>
+                    </button>}
                   </div>
                 </div>
 
@@ -650,11 +739,11 @@ export default function ExpedientePaciente() {
       ══════════════════════════════════════════ */}
       {tab === "morbilidad" && (
         <div style={{ display: "grid", gap: "1rem" }}>
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/morbilidad/nuevo`)}>
+          {!isReadOnly && <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button className="btn-primary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/morbilidad/nuevo`))}>
               <Plus size={14} /> Registrar morbilidad
             </button>
-          </div>
+          </div>}
           {exp.morbilidad?.length === 0 ? (
             <div className="card empty-state">
               No hay consultas intercurrentes registradas.
@@ -668,12 +757,12 @@ export default function ExpedientePaciente() {
                     <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
                       {fecha(m.fecha)}{m.hora ? ` — ${m.hora}` : ""}
                     </span>
-                    <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/morbilidad/${m.id}/editar`)}>
+                    {!isReadOnly && <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/morbilidad/${m.id}/editar`))}>
                       <Pencil size={13} /> Editar
-                    </button>
-                    <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar esta morbilidad?", `/pacientes/${id}/morbilidad/${m.id}`)}>
+                    </button>}
+                    {!isReadOnly && <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar esta morbilidad?", rutaClinica(`/pacientes/${id}/morbilidad/${m.id}`))}>
                       <Trash2 size={13} /> Eliminar
-                    </button>
+                    </button>}
                   </div>
                 </div>
                 <div style={{ display: "grid", gap: "0.5rem" }}>
@@ -698,11 +787,11 @@ export default function ExpedientePaciente() {
           {!exp.ficha_riesgo ? (
             <div className="empty-state">
               No hay ficha de riesgo registrada.
-              <div style={{ marginTop: "1rem" }}>
-                <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/riesgo`)}>
+              {!isReadOnly && <div style={{ marginTop: "1rem" }}>
+                <button className="btn-primary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/riesgo`))}>
                   Registrar ficha de riesgo
                 </button>
-              </div>
+              </div>}
             </div>
           ) : (
             <>
@@ -715,12 +804,12 @@ export default function ExpedientePaciente() {
                   <button className="btn-primary" onClick={imprimirFichaRiesgo} disabled={printing}>
                     <Printer size={13} /> {printing ? "Generando..." : "Imprimir"}
                   </button>
-                  <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/riesgo`)}>
+                  {!isReadOnly && <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/riesgo`))}>
                     <Pencil size={13} /> Editar
-                  </button>
-                  <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar la ficha de riesgo?", `/pacientes/${id}/riesgo`)}>
+                  </button>}
+                  {!isReadOnly && <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar la ficha de riesgo?", rutaClinica(`/pacientes/${id}/riesgo`))}>
                     <Trash2 size={13} /> Eliminar
-                  </button>
+                  </button>}
                 </div>
               </div>
 
@@ -777,11 +866,11 @@ export default function ExpedientePaciente() {
           {!exp.plan_parto ? (
             <div className="empty-state">
               No hay plan de parto registrado.
-              <div style={{ marginTop: "1rem" }}>
-                <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/plan-parto`)}>
+              {!isReadOnly && <div style={{ marginTop: "1rem" }}>
+                <button className="btn-primary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/plan-parto`))}>
                   Registrar plan de parto
                 </button>
-              </div>
+              </div>}
             </div>
           ) : (
             <>
@@ -791,9 +880,9 @@ export default function ExpedientePaciente() {
                   <button className="btn-secondary" onClick={imprimirPlanParto} disabled={printing}>
                     <Printer size={13} /> {printing ? "Generando..." : "Imprimir"}
                   </button>
-                  <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/plan-parto`)}>
+                  {!isReadOnly && <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/plan-parto`))}>
                     <Pencil size={13} /> Editar
-                  </button>
+                  </button>}
                 </div>
               </div>
 
@@ -884,12 +973,38 @@ export default function ExpedientePaciente() {
           TAB: VACUNAS
       ══════════════════════════════════════════ */}
       {tab === "vacunas" && (
-        <div className="card">
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
-            <button className="btn-primary" onClick={() => navigate(`/pacientes/${id}/vacunas/nuevo`)}>
-              <Plus size={14} /> Registrar vacuna
-            </button>
-          </div>
+        <div style={{ display: "grid", gap: "1rem" }}>
+          {!isReadOnly && (
+            <div className="card">
+              <SecTitle>Antecedentes de vacunación de la paciente</SecTitle>
+              {!antecedentesVacunas.length ? (
+                <div className="empty-state">No hay antecedentes de vacunación registrados.</div>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table className="tabla">
+                    <thead><tr><th>Vacuna</th><th>Momento</th><th>Dosis</th><th>Fecha</th><th>Origen</th></tr></thead>
+                    <tbody>{antecedentesVacunas.map((v) => (
+                      <tr key={v.id}>
+                        <td>{v.tipo_vacuna?.replace("_", " ").toUpperCase()}</td>
+                        <td>{v.momento?.replaceAll("_", " ")}</td>
+                        <td>{v.numero_dosis}</td>
+                        <td>{fecha(v.fecha_dosis)}</td>
+                        <td><span className="badge badge-blue">{v.embarazo_origen_numero ? `Embarazo ${v.embarazo_origen_numero} · ${v.embarazo_origen_estado}` : "Antecedente · solo lectura"}</span></td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="card">
+          <SecTitle>Vacunas registradas en este embarazo</SecTitle>
+          {!isReadOnly && <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
+              <button className="btn-primary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/vacunas/nuevo`))}>
+                <Plus size={14} /> Registrar vacuna
+              </button>
+          </div>}
           {!exp.vacunas?.length ? (
             <div className="empty-state">
               No hay vacunas registradas.
@@ -903,7 +1018,7 @@ export default function ExpedientePaciente() {
                     <th>Momento</th>
                     <th>No. Dosis</th>
                     <th>Fecha</th>
-                    <th>Acciones</th>
+                    {!isReadOnly && <th>Acciones</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -919,22 +1034,23 @@ export default function ExpedientePaciente() {
                       </td>
                       <td>{v.numero_dosis}</td>
                       <td>{fecha(v.fecha_dosis)}</td>
-                      <td>
+                      {!isReadOnly && <td>
                         <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-                          <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/vacunas/${v.id}/editar`)}>
+                          <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/vacunas/${v.id}/editar`))}>
                             <Pencil size={13} /> Editar
                           </button>
-                          <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar esta vacuna?", `/pacientes/${id}/vacunas/${v.id}`)}>
+                          <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar esta vacuna?", rutaClinica(`/pacientes/${id}/vacunas/${v.id}`))}>
                             <Trash2 size={13} /> Eliminar
                           </button>
                         </div>
-                      </td>
+                      </td>}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
+          </div>
         </div>
       )}
 

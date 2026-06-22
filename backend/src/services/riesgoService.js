@@ -1,5 +1,9 @@
 const riesgoRepository = require('../repositories/riesgoRepository');
-const { obtenerEmbarazoActivoId, obtenerEmbarazoActivoRequeridoId } = require('../utils/embarazos');
+const {
+  requerirEmbarazoId,
+  resolverEmbarazoParaLectura,
+  validarEmbarazoEditable,
+} = require('../utils/embarazos');
 const { registrarAuditoria } = require('../utils/auditoria');
 const { HttpError } = require('../utils/httpError');
 const { filtrarCamposVih, VIH_FIELDS } = require('../utils/datosSensibles');
@@ -76,16 +80,16 @@ function riesgoFieldsPermitidos(permisos = []) {
     : RIESGO_FIELDS.filter((field) => !VIH_FIELDS.has(field));
 }
 
-async function obtenerFichaRiesgo(pacienteId) {
-  const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
-  if (!embarazoId) return null;
-  return riesgoRepository.obtenerPorEmbarazo(embarazoId);
+async function obtenerFichaRiesgo(pacienteId, embarazoIdSolicitado = null) {
+  const embarazo = await resolverEmbarazoParaLectura({ pacienteId, embarazoId: embarazoIdSolicitado });
+  return embarazo ? riesgoRepository.obtenerPorEmbarazo(embarazo.id) : null;
 }
 
-async function guardarFichaRiesgo({ pacienteId, body, req }) {
+async function guardarFichaRiesgo({ pacienteId, embarazoId, body, req }) {
   const fields = riesgoFieldsPermitidos(req.usuario.permisos);
   const bodyPermitido = filtrarCamposVih(body, req.usuario.permisos);
-  const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
+  requerirEmbarazoId(embarazoId);
+  await validarEmbarazoEditable({ pacienteId, embarazoId });
   const existe = await riesgoRepository.obtenerPorEmbarazo(embarazoId);
   if (existe) {
     throw new HttpError(409, 'Esta paciente ya tiene una ficha de riesgo registrada');
@@ -98,6 +102,10 @@ async function guardarFichaRiesgo({ pacienteId, body, req }) {
     registrado_por: req.usuario.id,
     updated_by: req.usuario.id,
   });
+  if (!ficha) {
+    await validarEmbarazoEditable({ pacienteId, embarazoId });
+    throw new HttpError(409, 'No fue posible guardar la ficha de riesgo');
+  }
 
   await registrarAuditoria(req, {
     accion: 'crear',
@@ -112,10 +120,11 @@ async function guardarFichaRiesgo({ pacienteId, body, req }) {
   return ficha;
 }
 
-async function actualizarFichaRiesgo({ pacienteId, body, req }) {
+async function actualizarFichaRiesgo({ pacienteId, embarazoId, body, req }) {
   const fields = riesgoFieldsPermitidos(req.usuario.permisos);
   const bodyPermitido = filtrarCamposVih(body, req.usuario.permisos);
-  const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
+  requerirEmbarazoId(embarazoId);
+  await validarEmbarazoEditable({ pacienteId, embarazoId });
   const before = await riesgoRepository.obtenerPorEmbarazo(embarazoId);
   const data = buildRiesgoData(bodyPermitido, fields);
   const ficha = await riesgoRepository.actualizarPorEmbarazo({
@@ -123,9 +132,13 @@ async function actualizarFichaRiesgo({ pacienteId, body, req }) {
     data,
     campos: fields,
     updatedBy: req.usuario.id,
+    pacienteId,
   });
 
-  if (!ficha) throw new HttpError(404, 'Ficha de riesgo no encontrada');
+  if (!ficha) {
+    await validarEmbarazoEditable({ pacienteId, embarazoId });
+    throw new HttpError(404, 'Ficha de riesgo no encontrada');
+  }
 
   await registrarAuditoria(req, {
     accion: 'actualizar',
@@ -141,11 +154,15 @@ async function actualizarFichaRiesgo({ pacienteId, body, req }) {
   return ficha;
 }
 
-async function eliminarFichaRiesgo({ pacienteId, req }) {
-  const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
-  const { ficha, rowCount } = await riesgoRepository.eliminarPorEmbarazo(embarazoId);
+async function eliminarFichaRiesgo({ pacienteId, embarazoId, req }) {
+  requerirEmbarazoId(embarazoId);
+  await validarEmbarazoEditable({ pacienteId, embarazoId });
+  const { ficha, rowCount } = await riesgoRepository.eliminarPorEmbarazo({ embarazoId, pacienteId });
 
-  if (rowCount === 0) throw new HttpError(404, 'Ficha de riesgo no encontrada');
+  if (rowCount === 0) {
+    await validarEmbarazoEditable({ pacienteId, embarazoId });
+    throw new HttpError(404, 'Ficha de riesgo no encontrada');
+  }
 
   await registrarAuditoria(req, {
     accion: 'eliminar',

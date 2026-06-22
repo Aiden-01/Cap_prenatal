@@ -2,6 +2,7 @@ const pacientesRepository = require('../repositories/pacientesRepository');
 const { registrarEvento: registrarAuditoria } = require('./auditService');
 const { HttpError } = require('../utils/httpError');
 const { filtrarCamposVih } = require('../utils/datosSensibles');
+const { resolverEmbarazoParaLectura, requerirEmbarazoId, validarEmbarazoEditable } = require('../utils/embarazos');
 
 const ESTADO_EMBARAZO_ACTIVO = 'activo';
 const ESTADO_EMBARAZO_PUERPERIO = 'puerperio';
@@ -334,16 +335,30 @@ async function actualizarPaciente({ id, body, req }) {
   return { message: 'Paciente actualizado' };
 }
 
-async function expedienteCompleto(id) {
-  let embarazoId = await pacientesRepository.obtenerEmbarazoVisibleId(id);
-  if (!embarazoId) {
+async function expedienteCompleto(id, embarazoIdSolicitado = null) {
+  let embarazoSeleccionado = await resolverEmbarazoParaLectura({
+    pacienteId: id,
+    embarazoId: embarazoIdSolicitado,
+  });
+  if (!embarazoSeleccionado) {
     await validarPuedeActivarEmbarazo(id);
-    embarazoId = await pacientesRepository.crearEmbarazoDesdePaciente(id);
+    const embarazoId = await pacientesRepository.crearEmbarazoDesdePaciente(id);
+    embarazoSeleccionado = await pacientesRepository.obtenerEmbarazoPorId(embarazoId);
   }
 
-  const expediente = await pacientesRepository.obtenerExpedienteCompleto(id, embarazoId);
+  const [expediente, embarazoActual] = await Promise.all([
+    pacientesRepository.obtenerExpedienteCompleto(id, embarazoSeleccionado.id),
+    pacientesRepository.obtenerEmbarazoActual(id),
+  ]);
   if (!expediente.paciente) throw new HttpError(404, 'Paciente no encontrado');
-  return expediente;
+  return {
+    ...expediente,
+    embarazo_seleccionado: embarazoSeleccionado,
+    embarazo_actual: embarazoActual,
+    embarazo_activo: embarazoSeleccionado,
+    is_read_only: embarazoSeleccionado.estado === ESTADO_EMBARAZO_CERRADO,
+    is_embarazo_actual: Boolean(embarazoActual && embarazoActual.id === embarazoSeleccionado.id),
+  };
 }
 
 async function obtenerCompletitudExpediente(pacienteId) {
@@ -454,10 +469,15 @@ async function nuevoEmbarazo({ id, body, req }) {
   return embarazo;
 }
 
-async function pasarAPuerperio({ id, body, req }) {
-  const before = await pacientesRepository.obtenerUltimoEmbarazoActivo(id);
+async function pasarAPuerperio({ id, embarazoId, body, req }) {
+  requerirEmbarazoId(embarazoId);
+  const before = await validarEmbarazoEditable({ pacienteId: id, embarazoId });
+  if (before.estado !== ESTADO_EMBARAZO_ACTIVO) {
+    throw new HttpError(409, 'Solo un embarazo activo puede pasar a puerperio');
+  }
   const embarazo = await pacientesRepository.pasarEmbarazoAPuerperio({
     pacienteId: id,
+    embarazoId,
     fechaCierre: emptyToNull(body.fecha_parto || body.fecha_cierre),
     observaciones: emptyToNull(body.observaciones),
     updatedBy: req.usuario.id,
@@ -481,10 +501,12 @@ async function pasarAPuerperio({ id, body, req }) {
   return embarazo;
 }
 
-async function cerrarEmbarazo({ id, body, req }) {
-  const before = await pacientesRepository.obtenerUltimoEmbarazoEnSeguimiento(id);
+async function cerrarEmbarazo({ id, embarazoId, body, req }) {
+  requerirEmbarazoId(embarazoId);
+  const before = await validarEmbarazoEditable({ pacienteId: id, embarazoId });
   const embarazo = await pacientesRepository.cerrarEmbarazoEnSeguimiento({
     pacienteId: id,
+    embarazoId,
     fechaCierre: emptyToNull(body.fecha_cierre),
     observaciones: emptyToNull(body.observaciones),
     updatedBy: req.usuario.id,

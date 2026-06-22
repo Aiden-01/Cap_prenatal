@@ -3,13 +3,17 @@ const { asyncHandler } = require('../middleware/asyncHandler');
 const { ocultarDatosVih } = require('../utils/datosSensibles');
 
 const listar = asyncHandler(async (req, res) => {
-  const controles = await controlesPrenatalesService.listarControles(req.params.pacienteId);
+  const controles = await controlesPrenatalesService.listarControles(
+    req.params.pacienteId,
+    req.query.embarazo_id || null
+  );
   return res.json(ocultarDatosVih(controles, req.usuario.permisos));
 });
 
 const obtener = asyncHandler(async (req, res) => {
   const control = await controlesPrenatalesService.obtenerControl({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     id: req.params.id,
   });
 
@@ -19,6 +23,7 @@ const obtener = asyncHandler(async (req, res) => {
 const crear = asyncHandler(async (req, res) => {
   const control = await controlesPrenatalesService.crearControl({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     body: req.body,
     req,
   });
@@ -29,6 +34,7 @@ const crear = asyncHandler(async (req, res) => {
 const actualizar = asyncHandler(async (req, res) => {
   const control = await controlesPrenatalesService.actualizarControl({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     id: req.params.id,
     body: req.body,
     req,
@@ -40,6 +46,7 @@ const actualizar = asyncHandler(async (req, res) => {
 const eliminar = asyncHandler(async (req, res) => {
   const result = await controlesPrenatalesService.eliminarControl({
     pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id || null,
     id: req.params.id,
     req,
   });

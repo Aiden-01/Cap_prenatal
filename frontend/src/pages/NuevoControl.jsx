@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
@@ -291,7 +291,9 @@ function inferControlFieldErrors(err) {
 export default function NuevoControl() {
   const { id, controlId } = useParams();
   const navigate = useNavigate();
-  const expedientePath = `/pacientes/${id}?tab=controles`;
+  const [searchParams] = useSearchParams();
+  const embarazoId = searchParams.get("embarazo_id") || "";
+  const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=controles`;
   const toast    = useGlobalToast();
   const { usuario } = useAuth();
   const puedeVerVih = usuario?.permisos?.includes("controles.ver_vih");
@@ -324,6 +326,11 @@ export default function NuevoControl() {
   }));
 
   useEffect(() => {
+    if (!embarazoId) {
+      toast("Selecciona un embarazo antes de registrar controles", "error");
+      navigate(`/pacientes/${id}?tab=controles`, { replace: true });
+      return;
+    }
     const parseControl = (control) => {
       const normalized = normalizeControlForForm(control);
       return ({
@@ -339,12 +346,17 @@ export default function NuevoControl() {
     };
 
     const controlesRequest = editando
-      ? api.get(`/pacientes/${id}/controles/${controlId}`)
-      : api.get(`/pacientes/${id}/controles`);
+      ? api.get(`/pacientes/${id}/controles/${controlId}`, { params: { embarazo_id: embarazoId } })
+      : api.get(`/pacientes/${id}/controles`, { params: { embarazo_id: embarazoId } });
 
-    Promise.all([controlesRequest, api.get(`/pacientes/${id}/expediente`)])
+    Promise.all([controlesRequest, api.get(`/pacientes/${id}/expediente`, { params: { embarazo_id: embarazoId } })])
       .then(([{ data }, { data: expediente }]) => {
-        setFur(expediente?.embarazo_activo?.fur || expediente?.paciente?.fur || "");
+        if (expediente?.is_read_only) {
+          toast("El embarazo esta cerrado y es de solo lectura", "error");
+          navigate(expedientePath, { replace: true });
+          return;
+        }
+        setFur(expediente?.embarazo_seleccionado?.fur || "");
         if (editando) {
           setForm(parseControl(data));
           return;
@@ -354,7 +366,7 @@ export default function NuevoControl() {
       })
       .catch(() => toast(editando ? "Error al cargar control" : "Error al calcular siguiente control", "error"))
       .finally(() => setLoadingData(false));
-  }, [id, controlId, editando, toast]);
+  }, [id, controlId, editando, embarazoId, expedientePath, navigate, toast]);
 
   const edadGestacionalSemanas = calculateGestationalWeeks(fur, form.fecha);
   const formConEdadGestacional = {
@@ -395,9 +407,9 @@ export default function NuevoControl() {
     }
     try {
       if (editando) {
-        await api.put(`/pacientes/${id}/controles/${controlId}`, payload);
+        await api.put(`/pacientes/${id}/controles/${controlId}`, payload, { params: { embarazo_id: embarazoId } });
       } else {
-        await api.post(`/pacientes/${id}/controles`, payload);
+        await api.post(`/pacientes/${id}/controles`, payload, { params: { embarazo_id: embarazoId } });
       }
       toast(editando ? "Control actualizado exitosamente" : "Control registrado exitosamente", "success");
       setTimeout(() => navigate(expedientePath), 800);

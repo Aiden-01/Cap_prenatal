@@ -1,5 +1,9 @@
 const controlesRepository = require('../repositories/controlesPrenatalesRepository');
-const { obtenerEmbarazoActivoRequeridoId } = require('../utils/embarazos');
+const {
+  requerirEmbarazoId,
+  resolverEmbarazoParaLectura,
+  validarEmbarazoEditable,
+} = require('../utils/embarazos');
 const { withGuatemalaTimeFallback } = require('../utils/guatemalaTime');
 const { registrarEvento: registrarAuditoria } = require('./auditService');
 const { HttpError } = require('../utils/httpError');
@@ -123,21 +127,25 @@ function buildCreateData({ pacienteId, embarazoId, body, usuarioId }) {
   return data;
 }
 
-async function listarControles(pacienteId) {
-  const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
-  return controlesRepository.listarPorEmbarazo(embarazoId);
+async function listarControles(pacienteId, embarazoIdSolicitado = null) {
+  const embarazo = await resolverEmbarazoParaLectura({ pacienteId, embarazoId: embarazoIdSolicitado });
+  return embarazo ? controlesRepository.listarPorEmbarazo(embarazo.id) : [];
 }
 
-async function obtenerControl({ pacienteId, id }) {
-  const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
-  const control = await controlesRepository.obtenerPorIdYEmbarazo(id, embarazoId);
+async function obtenerControl({ pacienteId, embarazoId = null, id }) {
+  const control = await controlesRepository.obtenerPorId(id);
+  if (control) await resolverEmbarazoParaLectura({ pacienteId, embarazoId: control.embarazo_id });
   if (!control) throw new HttpError(404, 'Control no encontrado');
+  if (embarazoId && String(control.embarazo_id) !== String(embarazoId)) {
+    throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
+  }
   return control;
 }
 
-async function crearControl({ pacienteId, body, req }) {
+async function crearControl({ pacienteId, embarazoId, body, req }) {
   const dataWithTime = withGuatemalaTimeFallback(body);
-  const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
+  requerirEmbarazoId(embarazoId);
+  await validarEmbarazoEditable({ pacienteId, embarazoId });
   const before = await controlesRepository.obtenerPorNumeroYEmbarazo(
     embarazoId,
     dataWithTime.numero_control
@@ -153,6 +161,10 @@ async function crearControl({ pacienteId, body, req }) {
     (puedeVerVih(req.usuario.permisos) || !VIH_FIELDS.has(field))
   );
   const control = await controlesRepository.upsert({ data, updateFields });
+  if (!control) {
+    await validarEmbarazoEditable({ pacienteId, embarazoId });
+    throw new HttpError(409, 'No fue posible guardar el control');
+  }
 
   await registrarAuditoria(req, {
     accion: before ? 'actualizar' : 'crear',
@@ -168,22 +180,31 @@ async function crearControl({ pacienteId, body, req }) {
   return control;
 }
 
-async function actualizarControl({ pacienteId, id, body, req }) {
+async function actualizarControl({ pacienteId, embarazoId, id, body, req }) {
+  requerirEmbarazoId(embarazoId);
   const bodyPermitido = filtrarCamposVih(body, req.usuario.permisos);
   const { data, campos } = buildUpdateData(bodyPermitido);
   if (campos.length === 0) throw new HttpError(400, 'Sin campos para actualizar');
 
-  const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
-  const before = await controlesRepository.obtenerPorIdYEmbarazo(id, embarazoId);
+  const before = await controlesRepository.obtenerPorId(id);
+  if (!before) throw new HttpError(404, 'Control no encontrado');
+  if (String(before.embarazo_id) !== String(embarazoId)) {
+    throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
+  }
+  await validarEmbarazoEditable({ pacienteId, embarazoId });
   const control = await controlesRepository.actualizar({
     id,
     embarazoId,
     data,
     campos,
     updatedBy: req.usuario.id,
+    pacienteId,
   });
 
-  if (!control) throw new HttpError(404, 'Control no encontrado');
+  if (!control) {
+    await validarEmbarazoEditable({ pacienteId, embarazoId });
+    throw new HttpError(404, 'Control no encontrado');
+  }
 
   await registrarAuditoria(req, {
     accion: 'actualizar',
@@ -199,11 +220,20 @@ async function actualizarControl({ pacienteId, id, body, req }) {
   return control;
 }
 
-async function eliminarControl({ pacienteId, id, req }) {
-  const embarazoId = await obtenerEmbarazoActivoRequeridoId(pacienteId);
-  const { control, rowCount } = await controlesRepository.eliminar({ id, embarazoId });
+async function eliminarControl({ pacienteId, embarazoId, id, req }) {
+  requerirEmbarazoId(embarazoId);
+  const before = await controlesRepository.obtenerPorId(id);
+  if (!before) throw new HttpError(404, 'Control no encontrado');
+  if (String(before.embarazo_id) !== String(embarazoId)) {
+    throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
+  }
+  await validarEmbarazoEditable({ pacienteId, embarazoId });
+  const { control, rowCount } = await controlesRepository.eliminar({ id, embarazoId, pacienteId });
 
-  if (rowCount === 0) throw new HttpError(404, 'Control no encontrado');
+  if (rowCount === 0) {
+    await validarEmbarazoEditable({ pacienteId, embarazoId });
+    throw new HttpError(404, 'Control no encontrado');
+  }
 
   await registrarAuditoria(req, {
     accion: 'eliminar',

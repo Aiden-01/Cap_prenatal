@@ -33,7 +33,10 @@ const actualizar = asyncHandler(async (req, res) => {
 
 // GET /api/pacientes/:id/expediente
 const expedienteCompleto = asyncHandler(async (req, res) => {
-  const expediente = await pacientesService.expedienteCompleto(req.params.id);
+  const expediente = await pacientesService.expedienteCompleto(
+    req.params.id,
+    req.query.embarazo_id || null
+  );
   return res.json(ocultarDatosVih(expediente, req.usuario.permisos));
 });
 
@@ -58,6 +61,7 @@ const nuevoEmbarazo = asyncHandler(async (req, res) => {
 const pasarAPuerperio = asyncHandler(async (req, res) => {
   const embarazo = await pacientesService.pasarAPuerperio({
     id: req.params.id,
+    embarazoId: req.query.embarazo_id || null,
     body: req.body || {},
     req,
   });
@@ -69,6 +73,7 @@ const pasarAPuerperio = asyncHandler(async (req, res) => {
 const cerrarEmbarazo = asyncHandler(async (req, res) => {
   const embarazo = await pacientesService.cerrarEmbarazo({
     id: req.params.id,
+    embarazoId: req.query.embarazo_id || null,
     body: req.body || {},
     req,
   });

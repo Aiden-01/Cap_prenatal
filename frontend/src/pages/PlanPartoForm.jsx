@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
@@ -350,7 +350,9 @@ const FIELD_LABELS = {
 export default function PlanPartoForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const expedientePath = `/pacientes/${id}?tab=plan`;
+  const [searchParams] = useSearchParams();
+  const embarazoId = searchParams.get("embarazo_id") || "";
+  const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=plan`;
   const toast = useGlobalToast();
   const [form, setForm] = useState(INIT);
   const [paciente, setPaciente] = useState(null);
@@ -363,9 +365,19 @@ export default function PlanPartoForm() {
   const p = { form, set };
 
   useEffect(() => {
+    if (!embarazoId) {
+      toast("Selecciona un embarazo antes de editar el plan de parto", "error");
+      navigate(`/pacientes/${id}?tab=plan`, { replace: true });
+      return;
+    }
     api
-      .get(`/pacientes/${id}/expediente`)
+      .get(`/pacientes/${id}/expediente`, { params: { embarazo_id: embarazoId } })
       .then(({ data }) => {
+        if (data?.is_read_only) {
+          toast("El embarazo esta cerrado y es de solo lectura", "error");
+          navigate(expedientePath, { replace: true });
+          return;
+        }
         setPaciente(data?.paciente || null);
         if (data?.plan_parto) {
           const posicionParto = data.plan_parto.posicion_parto || "";
@@ -391,7 +403,7 @@ export default function PlanPartoForm() {
       })
       .catch(() => toast("Error al cargar datos para plan de parto", "error"))
       .finally(() => setLoadingData(false));
-  }, [id, toast]);
+  }, [id, embarazoId, expedientePath, navigate, toast]);
 
   const edadGestacionalSemanas = calculateGestationalWeeks(form.fur, form.fecha);
   const formConEdadGestacional = {
@@ -412,7 +424,8 @@ export default function PlanPartoForm() {
     try {
       await api.post(
         `/pacientes/${id}/controles/plan-parto`,
-        normalizePayload(payload)
+        normalizePayload(payload),
+        { params: { embarazo_id: embarazoId } }
       );
       toast(existingPlan ? "Plan de parto actualizado" : "Plan de parto guardado", "success");
       setTimeout(() => navigate(expedientePath), 600);
