@@ -86,8 +86,6 @@ async function obtenerFichaRiesgo(pacienteId, embarazoIdSolicitado = null) {
 }
 
 async function guardarFichaRiesgo({ pacienteId, embarazoId, body, req }) {
-  const fields = riesgoFieldsPermitidos(req.usuario.permisos);
-  const bodyPermitido = filtrarCamposVih(body, req.usuario.permisos);
   requerirEmbarazoId(embarazoId);
   await validarEmbarazoEditable({ pacienteId, embarazoId });
   const existe = await riesgoRepository.obtenerPorEmbarazo(embarazoId);
@@ -98,7 +96,7 @@ async function guardarFichaRiesgo({ pacienteId, embarazoId, body, req }) {
   const ficha = await riesgoRepository.insertar({
     paciente_id: pacienteId,
     embarazo_id: embarazoId,
-    ...buildRiesgoData(bodyPermitido, fields),
+    ...buildRiesgoData(body, RIESGO_FIELDS),
     registrado_por: req.usuario.id,
     updated_by: req.usuario.id,
   });

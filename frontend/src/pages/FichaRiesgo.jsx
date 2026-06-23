@@ -4,6 +4,7 @@ import { ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { useFieldErrors } from "../hooks/useFieldErrors";
+import { useAuth } from "../hooks/useAuth";
 
 const FormErrorContext = createContext({
   fieldError: () => "",
@@ -213,7 +214,6 @@ function defaultsDesdePaciente(paciente = {}, embarazo = {}) {
     abortos_espontaneos_3mas: Boolean(paciente.abortos_3_espont_consecutivos),
     gestas_3mas: Number(paciente.gestas_previas || 0) >= 3,
     peso_ultimo_bebe_menor_2500g: Boolean(paciente.rn_menor_2500g),
-    peso_ultimo_bebe_mayor_4500g: Boolean(paciente.rn_mayor_4000g),
     antec_hipertension_preeclampsia: Boolean(paciente.antec_hipertension || paciente.antec_preeclampsia),
     cirugias_tracto_reproductivo: Boolean(paciente.cirugia_genito_urinaria || paciente.cirugia_genito_urinaria_pers),
     menor_20_anos: edad !== null ? edad < 20 : false,
@@ -238,6 +238,8 @@ export default function FichaRiesgo() {
   const embarazoId = searchParams.get("embarazo_id") || "";
   const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=riesgo`;
   const toast = useGlobalToast();
+  const { usuario } = useAuth();
+  const puedeVerVih = usuario?.permisos?.includes("controles.ver_vih");
   const [form, setForm] = useState(INIT);
   const [paciente, setPaciente] = useState(null);
   const [existingRisk, setExistingRisk] = useState(false);
@@ -248,6 +250,7 @@ export default function FichaRiesgo() {
 
   const set = (k, v) => fieldErrors.setFormValue(setForm, k, v);
   const p = { form, set };
+  const puedeCapturarVih = !existingRisk || puedeVerVih;
   const edadPaciente = paciente ? calcularEdadAnios(paciente.fecha_nacimiento) : null;
   const hasRiskFeatures = RISK_FIELDS.some((field) => Boolean(form[field]));
   const referralMissing = !String(form.referida_a || "").trim();
@@ -294,11 +297,15 @@ export default function FichaRiesgo() {
   const saveFicha = async () => {
     setLoading(true);
     fieldErrors.clearFieldErrors();
+    const payload = { ...form };
+    if (existingRisk && !puedeVerVih) {
+      delete payload.vih_positivo_sifilis;
+    }
     try {
       if (existingRisk) {
-        await api.put(`/pacientes/${id}/riesgo`, form, { params: { embarazo_id: embarazoId } });
+        await api.put(`/pacientes/${id}/riesgo`, payload, { params: { embarazo_id: embarazoId } });
       } else {
-        await api.post(`/pacientes/${id}/riesgo`, form, { params: { embarazo_id: embarazoId } });
+        await api.post(`/pacientes/${id}/riesgo`, payload, { params: { embarazo_id: embarazoId } });
       }
       toast(existingRisk ? "Ficha de riesgo actualizada" : "Ficha de riesgo guardada", "success");
       setTimeout(() => navigate(expedientePath), 600);
@@ -495,7 +502,7 @@ export default function FichaRiesgo() {
           <Toggle label="Mayor de 35 años" name="mayor_35_anos" {...p} />
           <Toggle label="Paciente Rh negativo" name="paciente_rh_negativo" {...p} />
           <Toggle label="Hemorragia vaginal" name="hemorragia_vaginal" {...p} />
-          <Toggle label="VIH+ / Sífilis" name="vih_positivo_sifilis" {...p} />
+          {puedeCapturarVih && <Toggle label="VIH+ / Sífilis" name="vih_positivo_sifilis" {...p} />}
           <Toggle label="P/A diastólica ≥ 90" name="presion_diastolica_90mas" {...p} />
           <Toggle label="Anemia" name="anemia" {...p} />
           <Toggle label="Desnutrición / obesidad" name="desnutricion_obesidad" {...p} />
