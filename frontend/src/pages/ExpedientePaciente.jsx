@@ -132,6 +132,7 @@ export default function ExpedientePaciente() {
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
+    setLoading(true);
     api.get(`/pacientes/${id}/expediente`, {
       params: selectedEmbarazoId ? { embarazo_id: selectedEmbarazoId } : undefined,
       signal: controller.signal,
@@ -168,8 +169,9 @@ export default function ExpedientePaciente() {
   };
 
   const embarazoSeleccionado = exp?.embarazo_seleccionado || exp?.embarazo_activo;
+  const embarazoSeleccionadoId = embarazoSeleccionado?.id ? String(embarazoSeleccionado.id) : "";
   const isReadOnly = exp?.is_read_only ?? embarazoSeleccionado?.estado === "cerrado";
-  const isEmbarazoActual = exp?.is_embarazo_actual ?? embarazoSeleccionado?.id === exp?.embarazo_actual?.id;
+  const isEmbarazoActual = exp?.is_embarazo_actual ?? embarazoSeleccionadoId === String(exp?.embarazo_actual?.id || "");
 
   useEffect(() => {
     if (!exp || isReadOnly || !embarazoSeleccionado?.id) return;
@@ -225,11 +227,14 @@ export default function ExpedientePaciente() {
   };
 
   const seleccionarEmbarazo = (embarazoId) => {
+    const nextEmbarazoId = String(embarazoId || "");
+    if (nextEmbarazoId === embarazoSeleccionadoId) return;
+
     setLoading(true);
     setExp(null);
     setLoadError("");
     const next = new URLSearchParams(searchParams);
-    next.set("embarazo_id", String(embarazoId));
+    next.set("embarazo_id", nextEmbarazoId);
     setSearchParams(next);
   };
 
@@ -510,7 +515,7 @@ export default function ExpedientePaciente() {
                   key={emb.id}
                   className="mini-record-card"
                   onClick={() => seleccionarEmbarazo(emb.id)}
-                  style={{ textAlign: "left", cursor: "pointer", borderColor: emb.id === embarazoSeleccionado?.id ? "var(--primary)" : undefined }}
+                  style={{ textAlign: "left", cursor: "pointer", borderColor: String(emb.id) === embarazoSeleccionadoId ? "var(--primary)" : undefined }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", alignItems: "center" }}>
                     <strong>Embarazo {emb.numero_embarazo}</strong>
@@ -521,9 +526,9 @@ export default function ExpedientePaciente() {
                     <Row label="FPP" value={fecha(emb.fpp)} />
                     <Row label="Inicio" value={fecha(emb.fecha_inicio)} />
                     {emb.fecha_cierre && <Row label="Cierre" value={fecha(emb.fecha_cierre)} />}
-                    {emb.id === embarazoSeleccionado?.id && <span className="badge badge-blue">Seleccionado</span>}
+                    {String(emb.id) === embarazoSeleccionadoId && <span className="badge badge-blue">Seleccionado</span>}
                   </div>
-                  {(emb.estado === "activo" || emb.estado === "puerperio") && emb.id === embarazoSeleccionado?.id && (
+                  {(emb.estado === "activo" || emb.estado === "puerperio") && String(emb.id) === embarazoSeleccionadoId && (
                     <span className="btn-critical pregnancy-close-action" onClick={(event) => { event.stopPropagation(); cerrarEmbarazo(); }}>
                       <CheckCircle size={14} /> Cerrar embarazo
                     </span>
