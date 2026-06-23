@@ -1,16 +1,111 @@
-# React + Vite
+# Frontend CAP Prenatal
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplicacion React/Vite para el sistema de expedientes clinicos prenatales del CAP El Chal.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19.
+- Vite 8.
+- React Router.
+- Axios.
+- Lucide React.
+- Leaflet y React Leaflet para mapa de riesgo.
+- CSS global en `src/index.css`.
 
-## React Compiler
+## Scripts
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm run dev
+npm run build
+npm run lint
+npm run preview
+```
 
-## Expanding the ESLint configuration
+## Variables
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+| Variable | Descripcion |
+| --- | --- |
+| `VITE_API_URL` | Base URL del backend. Si no existe, usa `/api`. |
+
+En desarrollo local con backend directo:
+
+```env
+VITE_API_URL=http://localhost:3001/api
+```
+
+En Docker/Nginx normalmente se usa:
+
+```env
+VITE_API_URL=/api
+```
+
+## Estructura
+
+```text
+src/
+|-- api/
+|   `-- axios.js          # Cliente HTTP con cookies y CSRF
+|-- assets/               # Imagenes estaticas
+|-- components/           # Layout, Sidebar, Toast, Chatbot, Semaforo, Timeline
+|-- context/
+|   `-- ToastContext.js
+|-- hooks/
+|   |-- useAuth.js        # Sesion local y /auth/me
+|   |-- useToast.js       # Notificaciones
+|   `-- useFieldErrors.js # Errores de validacion por campo
+|-- pages/                # Vistas principales
+|-- utils/                # Fechas, edad gestacional y mensajes de error
+|-- App.jsx               # Rutas
+|-- main.jsx              # Bootstrap React
+`-- index.css             # Tema visual global
+```
+
+## Rutas principales
+
+| Ruta | Componente |
+| --- | --- |
+| `/login` | `Login.jsx` |
+| `/dashboard` | `Dashboard.jsx` |
+| `/pacientes` | `Pacientes.jsx` |
+| `/nuevo` | `NuevaPaciente.jsx` |
+| `/pacientes/:id` | `ExpedientePaciente.jsx` |
+| `/pacientes/:id/editar` | `NuevaPaciente.jsx` |
+| `/pacientes/:id/controles/nuevo` | `NuevoControl.jsx` |
+| `/pacientes/:id/riesgo` | `FichaRiesgo.jsx` |
+| `/pacientes/:id/plan-parto` | `PlanPartoForm.jsx` |
+| `/pacientes/:id/puerperio/nuevo` | `PuerperioForm.jsx` |
+| `/pacientes/:id/morbilidad/nuevo` | `MorbilidadForm.jsx` |
+| `/pacientes/:id/vacunas/nuevo` | `VacunaForm.jsx` |
+| `/reportes` | `Reportes.jsx` |
+| `/mapa-riesgo` | `MapaRiesgo.jsx` |
+| `/usuarios` | `Usuarios.jsx` |
+
+## Autenticacion en frontend
+
+El backend guarda el JWT en cookie httpOnly. El frontend no lee ese token.
+
+`src/api/axios.js` hace lo siguiente:
+
+- Usa `withCredentials: true`.
+- Lee `cap_prenatal_csrf` desde cookies.
+- Envia `X-CSRF-Token` en `POST`, `PUT`, `PATCH` y `DELETE`.
+- Si recibe 401, limpia el usuario local y redirige a `/login`.
+
+## Expediente y embarazo seleccionado
+
+`ExpedientePaciente.jsx` es una pantalla central. Debe preservar estas reglas:
+
+- Carga `GET /pacientes/:id/expediente`.
+- Si la URL trae `?embarazo_id=`, lo envia al backend.
+- Si no hay `embarazo_id`, el backend decide el embarazo visible.
+- El embarazo actualmente mostrado es `embarazo_seleccionado` o `embarazo_activo`.
+- Al navegar a formularios clinicos se debe incluir `embarazo_id`.
+- Comparar IDs como string, porque los query params son string.
+- Si el usuario clickea el embarazo ya seleccionado, no se debe limpiar estado ni recargar.
+
+## Convenciones UI
+
+- Los formularios clinicos deben mostrar errores por campo cuando el backend devuelve `details`.
+- Las acciones clinicas deben usar toasts claros.
+- No ocultar errores de carga: detener loading y mostrar mensaje visible.
+- Las pantallas historicas de embarazo cerrado deben ser solo lectura.

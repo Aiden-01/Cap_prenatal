@@ -1,285 +1,236 @@
-# Sistema de Gestión de Expedientes Clínicos Prenatales — CAP El Chal
+# Sistema de Gestion de Expedientes Clinicos Prenatales - CAP El Chal
 
-Aplicación web fullstack para la gestión digital de expedientes clínicos prenatales del Centro de Atención Permanente (CAP) El Chal, Petén, Guatemala.
+Aplicacion web fullstack para la gestion digital de expedientes clinicos prenatales del Centro de Atencion Permanente (CAP) El Chal, Peten, Guatemala.
 
-El sistema permite registrar, consultar y dar seguimiento a la ficha de primera consulta prenatal y a los controles prenatales según formularios oficiales del Ministerio de Salud Pública y Asistencia Social de Guatemala (MSPAS). También integra gestión de riesgo obstétrico, laboratorios, vacunas, plan de parto, puerperio, morbilidad y generación de reportes en PDF fieles al formato institucional.
+El sistema permite registrar pacientes, embarazos, controles prenatales, riesgo obstetrico, laboratorios, vacunas, plan de parto, puerperio, morbilidad, referencias, reportes y documentos PDF alineados a formatos institucionales del MSPAS/CAP.
 
-## Contexto institucional
+## Contexto
 
-Este proyecto fue desarrollado como tesis de graduación universitaria para la Universidad Mariano Gálvez de Guatemala (UMG), Facultad de Ingeniería en Sistemas.
+Este proyecto fue desarrollado como tesis de graduacion universitaria para la Universidad Mariano Galvez de Guatemala, Facultad de Ingenieria en Sistemas.
 
-La solución está orientada al personal de salud del CAP El Chal, con el propósito de apoyar la digitalización de expedientes clínicos prenatales, reducir la dependencia de registros manuales, facilitar la consulta histórica de pacientes embarazadas y mejorar la generación de reportes clínicos y administrativos.
+La solucion esta pensada para el flujo operativo del CAP El Chal. No es una plataforma multitenant ni un producto comercial generico.
 
-El sistema es de uso exclusivo para el CAP El Chal. No está diseñado como plataforma multitenancy ni como producto comercial.
+## Lectura recomendada
 
-## 🧰 Tecnologías utilizadas
+- `docs/GUIA_TECNICA.md`: vision completa del sistema, arquitectura, flujos clinicos y reglas de mantenimiento.
+- `docs/API.md`: resumen de endpoints, autenticacion, permisos y parametros importantes.
+- `docs/BASE_DATOS.md`: modelo de datos, tablas principales, relacion con embarazos y scripts de base de datos.
+- `backend/src/ARCHITECTURE.md`: patron interno del backend por capas.
+- `backend/src/AUDITORIA.md`: politica de auditoria y trazabilidad.
+- `DOCKER.md`: ejecucion con Docker y notas de despliegue.
+- `docs/N8N.md`: integracion con n8n para automatizaciones.
 
-| Capa | Tecnología | Uso principal |
+## Tecnologias principales
+
+| Capa | Tecnologia | Uso |
 | --- | --- | --- |
-| Frontend | React 19 + Vite 8 | Interfaz web de usuario |
-| Estilos | Tailwind CSS 3 | Diseño responsivo y utilidades CSS |
-| Iconos | Lucide React | Iconografía de la interfaz |
-| Fuentes | Syne, DM Sans | Tipografía de encabezados y cuerpo |
-| Backend | Node.js + Express 4 | API REST y lógica del sistema |
-| Autenticación | JWT + bcryptjs | Inicio de sesión y protección de rutas |
-| Base de datos | PostgreSQL 14+ | Persistencia de expedientes clínicos |
-| Reportes | pdf-lib, Puppeteer, ExcelJS | Generación de PDF y reportes |
+| Frontend | React 19, Vite 8, React Router | Interfaz web |
+| UI | CSS propio, Tailwind CSS, Lucide React | Estilos e iconos |
+| Backend | Node.js, Express 4 | API REST |
+| Seguridad | JWT en cookie httpOnly, CSRF, bcryptjs, permisos por codigo | Autenticacion y autorizacion |
+| Base de datos | PostgreSQL 14+ | Persistencia clinica |
+| Validacion | Zod | Validacion de body, params y query |
+| PDF/reportes | pdf-lib, Puppeteer, ExcelJS, LibreOffice/Excel | Documentos institucionales y exportaciones |
+| Automatizacion | n8n opcional | Recordatorios y flujos externos |
 
-## 📦 Requisitos previos
-
-### Windows
-
-- Node.js 20 LTS o superior.
-- npm incluido con Node.js.
-- PostgreSQL 14 o superior.
-- Git para Windows.
-- Terminal recomendada: PowerShell o Windows Terminal.
-
-Instalación sugerida:
-
-```bash
-winget install OpenJS.NodeJS.LTS
-winget install PostgreSQL.PostgreSQL
-winget install Git.Git
-```
-
-### macOS
-
-- Node.js 20 LTS o superior.
-- npm incluido con Node.js.
-- PostgreSQL 14 o superior.
-- Git.
-- Homebrew recomendado para instalación de paquetes.
-
-Instalación sugerida:
-
-```bash
-brew install node
-brew install postgresql@14
-brew install git
-```
-
-### Linux
+## Requisitos locales
 
 - Node.js 20 LTS o superior.
 - npm.
 - PostgreSQL 14 o superior.
 - Git.
+- En Windows: PowerShell o Windows Terminal.
 
-Ejemplo en distribuciones basadas en Debian/Ubuntu:
+## Instalacion rapida
 
-```bash
-sudo apt update
-sudo apt install nodejs npm postgresql postgresql-contrib git
-```
-
-> Nota: en algunos sistemas Linux, los repositorios oficiales pueden incluir una versión antigua de Node.js. Para desarrollo se recomienda usar NodeSource, nvm o el gestor de paquetes oficial de la distribución.
-
-## ⚙️ Instalación y configuración
-
-### 1. Clonar el repositorio
+Instalar dependencias:
 
 ```bash
-git clone <URL_DEL_REPOSITORIO>
-cd cap_prenatal
-```
-
-### 2. Instalar dependencias del backend
-
-```bash
+npm install
 cd backend
 npm install
-```
-
-### 3. Instalar dependencias del frontend
-
-```bash
 cd ../frontend
 npm install
 ```
 
-### 4. Configurar variables de entorno del backend
-
-Crear un archivo `.env` dentro de la carpeta `backend`:
-
-```bash
-cd ../backend
-```
-
-Ejemplo de archivo `backend/.env`:
+Crear `backend/.env`:
 
 ```env
-DATABASE_URL=postgresql://postgres:tu_password@localhost:5432/cap_prenatal
-JWT_SECRET=clave_segura_para_firmar_tokens
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=cap_prenatal
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_SSL=false
+JWT_SECRET=cambiar_por_una_clave_larga_y_segura
+JWT_EXPIRES_IN=8h
 PORT=3001
+FRONTEND_URL=http://localhost:5173
+COOKIE_SAMESITE=lax
+AUTOMATION_SECRET=cambiar_por_un_secreto_largo_para_n8n
 ```
 
-### 5. Crear la base de datos
-
-Ingresar a PostgreSQL y crear la base de datos:
+Crear base de datos:
 
 ```sql
 CREATE DATABASE cap_prenatal;
 ```
 
-También puede hacerse desde terminal:
-
-#### Windows
-
-```bash
-createdb -U postgres cap_prenatal
-```
-
-#### macOS / Linux
-
-```bash
-createdb cap_prenatal
-```
-
-### 6. Ejecutar el script SQL de migración
-
-El esquema principal se encuentra en:
-
-```text
-backend/src/db/schema.sql
-```
-
-Ejecutar el script manualmente en PostgreSQL:
-
-#### Windows
-
-```bash
-psql -U postgres -d cap_prenatal -f backend/src/db/schema.sql
-```
-
-#### macOS / Linux
-
-```bash
-psql -d cap_prenatal -f backend/src/db/schema.sql
-```
-
-También existe un script de apoyo en el backend:
+Ejecutar migracion principal:
 
 ```bash
 cd backend
 npm run db:migrate
 ```
 
-### 7. Ejecutar el proyecto
+Opcional para datos iniciales:
 
-El proyecto se ejecuta con dos procesos separados: backend y frontend.
+```bash
+npm run db:seed
+```
 
-## 🚀 Desarrollo local
+## Desarrollo local
 
-### Terminal 1: backend
+Terminal 1, backend:
 
 ```bash
 cd backend
-npm start
-```
-
-El backend quedará disponible en:
-
-```text
-http://localhost:3001
-```
-
-Para desarrollo con recarga automática:
-
-```bash
 npm run dev
 ```
 
-### Terminal 2: frontend
+Backend:
+
+```text
+http://localhost:3001/api/health
+```
+
+Terminal 2, frontend:
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-El frontend quedará disponible en:
+Frontend:
 
 ```text
 http://localhost:5173
 ```
 
-## 📁 Estructura de carpetas
+## Scripts utiles
+
+Raiz:
+
+| Script | Descripcion |
+| --- | --- |
+| `npm run n8n:local` | Arranca n8n local con PowerShell. |
+| `npm run db:migrate-bi` | Ejecuta migracion de vistas BI desde backend. |
+| `npm run db:seed-bi` | Inserta datos demo para BI. |
+| `npm run test:vistas-bi` | Valida vistas BI. |
+
+Backend:
+
+| Script | Descripcion |
+| --- | --- |
+| `npm run dev` | Servidor Express con nodemon. |
+| `npm start` | Servidor Express sin recarga automatica. |
+| `npm run db:migrate` | Aplica `backend/src/db/schema.sql`. |
+| `npm run db:seed` | Crea datos iniciales de desarrollo. |
+| `npm run db:seed-demo-patients` | Crea pacientes demo. |
+| `npm run test:embarazo-activo` | Validacion manual del flujo de embarazo activo. |
+
+Frontend:
+
+| Script | Descripcion |
+| --- | --- |
+| `npm run dev` | Servidor Vite. |
+| `npm run build` | Build de produccion. |
+| `npm run lint` | ESLint. |
+| `npm run preview` | Sirve el build localmente. |
+
+## Estructura del proyecto
 
 ```text
 cap_prenatal/
-├── backend/
-│   ├── src/
-│   │   ├── assets/          # Recursos para formularios oficiales y PDF MSPAS
-│   │   ├── config/          # Configuración general del backend
-│   │   ├── controllers/     # Controladores de la API
-│   │   ├── db/              # Conexión, esquema SQL, migraciones y semillas
-│   │   ├── middleware/      # Middlewares de autenticación y seguridad
-│   │   ├── routes/          # Rutas Express por módulo
-│   │   ├── services/        # Servicios de negocio y generación de documentos
-│   │   ├── templates/       # Plantillas utilizadas para reportes
-│   │   ├── utils/           # Utilidades compartidas
-│   │   └── index.js         # Punto de entrada del servidor
-│   ├── package.json
-│   └── .env                 # Variables de entorno locales
-├── frontend/
-│   ├── public/              # Archivos públicos del frontend
-│   ├── src/
-│   │   ├── api/             # Cliente HTTP y consumo de API
-│   │   ├── assets/          # Recursos estáticos del frontend
-│   │   ├── components/      # Componentes reutilizables
-│   │   ├── context/         # Contextos globales de React
-│   │   ├── hooks/           # Hooks personalizados
-│   │   ├── pages/           # Vistas principales del sistema
-│   │   └── utils/           # Funciones auxiliares
-│   ├── package.json
-│   └── vite.config.js       # Configuración de Vite
-├── package.json
-└── README.md
+|-- backend/
+|   |-- src/
+|   |   |-- assets/          # Formularios oficiales, imagenes MSPAS y plantillas base
+|   |   |-- config/          # Coordenadas y configuracion de documentos
+|   |   |-- controllers/     # Traduccion HTTP -> servicios
+|   |   |-- db/              # Pool PostgreSQL, schema, migraciones y seeds
+|   |   |-- middleware/      # Auth, CSRF, permisos, validacion y errores
+|   |   |-- repositories/    # SQL y acceso a datos
+|   |   |-- routes/          # Rutas Express por modulo
+|   |   |-- services/        # Reglas de negocio y auditoria
+|   |   |-- templates/       # HTML e imagenes para documentos
+|   |   |-- utils/           # Utilidades compartidas
+|   |   |-- ARCHITECTURE.md  # Patron backend
+|   |   `-- AUDITORIA.md     # Politica de auditoria
+|   `-- package.json
+|-- frontend/
+|   |-- src/
+|   |   |-- api/             # Cliente Axios
+|   |   |-- components/      # Layout, sidebar, toast, chatbot, semaforo
+|   |   |-- context/         # Contextos React
+|   |   |-- hooks/           # Auth, toast y errores de campo
+|   |   |-- pages/           # Vistas principales
+|   |   `-- utils/           # Fechas, edad gestacional y errores
+|   `-- package.json
+|-- docs/                    # Documentacion operativa y tecnica
+|-- docker-compose.yml
+|-- DOCKER.md
+`-- README.md
 ```
 
-## 🔐 Variables de entorno
+## Modulos funcionales
 
-| Variable | Descripción | Ejemplo |
-| --- | --- | --- |
-| `DATABASE_URL` | Cadena de conexión a PostgreSQL utilizada por el backend. | `postgresql://postgres:password@localhost:5432/cap_prenatal` |
-| `JWT_SECRET` | Clave secreta para firmar y validar tokens JWT. Debe mantenerse privada. | `cambiar_por_una_clave_segura` |
-| `PORT` | Puerto donde se ejecuta el servidor Express. Si no se define, se usa `3001`. | `3001` |
+- Autenticacion, usuarios, roles y permisos.
+- Pacientes y expediente clinico.
+- Historial de embarazos por paciente.
+- Controles prenatales.
+- Ficha de riesgo obstetrico.
+- Laboratorio.
+- Vacunas.
+- Plan de parto.
+- Puerperio.
+- Morbilidad.
+- Referencias.
+- Mapa de riesgo.
+- Reportes y exportacion Excel.
+- PDF institucional MSPAS/CAP.
+- Chatbot de ayuda operativa.
+- Automatizaciones para n8n.
 
-## 🗂️ Módulos del sistema
+## Conceptos clave
 
-| No. | Módulo | Función principal |
-| --- | --- | --- |
-| 1 | Autenticación | Permite el inicio de sesión del personal autorizado mediante usuario, contraseña y token JWT. |
-| 2 | Panel principal | Presenta una vista general del sistema, accesos rápidos e indicadores para el seguimiento operativo. |
-| 3 | Pacientes y ficha prenatal | Registra y consulta datos generales de la paciente, antecedentes y ficha de primera consulta prenatal. |
-| 4 | Controles prenatales | Gestiona el seguimiento clínico de cada consulta prenatal, incluyendo evaluación materna y fetal. |
-| 5 | Riesgo obstétrico | Registra factores de riesgo, clasificación y criterios de seguimiento según la condición de la paciente. |
-| 6 | Laboratorios y vacunas | Administra resultados de laboratorio, estudios requeridos y registro de vacunación asociada al control prenatal. |
-| 7 | Plan de parto, puerperio y morbilidad | Documenta el plan de parto, controles posteriores y eventos de morbilidad relacionados. |
-| 8 | Reportes y PDF MSPAS | Genera reportes, censo mensual y documentos PDF alineados al formato oficial del MSPAS. |
+- La paciente puede tener varios embarazos, pero solo uno activo a la vez.
+- El expediente se carga para un embarazo seleccionado. Si la URL trae `?embarazo_id=`, se consulta ese embarazo; si no, el backend resuelve el embarazo visible preferente.
+- Los embarazos cerrados son de solo lectura.
+- Los endpoints de escritura deben validar permisos y registrar auditoria cuando modifican estado.
+- La auditoria no debe guardar contrasenas, tokens ni snapshots clinicos innecesariamente grandes.
+- Los campos sensibles de VIH se filtran segun permisos.
 
+## Docker
 
-## 📝 Notas de implementación
+Para levantar PostgreSQL, backend, frontend y n8n:
 
-- La aplicación está orientada a un equipo pequeño del CAP El Chal, por lo que utiliza autenticación simple y no implementa multitenancy.
-- Las fechas se muestran en formato local de Guatemala mediante `toLocaleDateString("es-GT")`.
-- El backend utiliza CommonJS.
-- El frontend se ejecuta con Vite en el puerto `5173`.
-- El backend se ejecuta por defecto en el puerto `3001`.
-- PostgreSQL 14 o superior es requerido para la base de datos.
+```bash
+docker compose up --build
+```
 
-## 🎓 Autor y contexto académico
+Servicios:
 
-| Campo | Información |
-| --- | --- |
-| Autor | Hugo Corado |
-| Universidad | Universidad Mariano Gálvez de Guatemala |
-| Facultad | Facultad de Ingeniería en Sistemas |
-| Tipo de proyecto | Tesis de graduación universitaria |
-| Institución beneficiaria | Centro de Atención Permanente (CAP) El Chal, Petén, Guatemala |
+```text
+Frontend: http://localhost:8080
+Backend:  http://localhost:3001/api/health
+n8n:      http://localhost:5678
+Postgres: localhost:5432
+```
 
-## 📄 Licencia
+Mas detalles en `DOCKER.md`.
 
-Este proyecto fue desarrollado con fines académicos como parte de una tesis de graduación universitaria.
+## Autor y uso
 
-Su uso está autorizado exclusivamente para el Centro de Atención Permanente (CAP) El Chal, Petén, Guatemala. Queda restringida su distribución, modificación o implementación fuera del contexto institucional y académico correspondiente sin autorización del autor y de la institución beneficiaria.
+Autor: Hugo Corado.
+
+Proyecto academico para la Universidad Mariano Galvez de Guatemala, con uso institucional previsto para el Centro de Atencion Permanente CAP El Chal, Peten, Guatemala.

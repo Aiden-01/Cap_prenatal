@@ -1,31 +1,41 @@
-# Backend Layering Pattern
+# Backend layering pattern
 
-Este backend debe crecer por modulos con responsabilidades separadas:
+Este backend crece por modulos y por capas. La regla principal es simple:
 
-- `routes`: declara endpoints, middlewares de autenticacion y validacion.
-- `controllers`: traduce HTTP a llamadas de servicio y arma respuestas HTTP.
-- `services`: contiene reglas de negocio, normalizacion de datos, coordinacion entre repositorios y auditoria.
-- `repositories`: contiene consultas SQL y acceso a PostgreSQL.
+```text
+routes -> controllers -> services -> repositories
+```
+
+## Responsabilidades
+
+- `routes`: declara endpoints, autenticacion, permisos y validaciones.
+- `controllers`: traduce HTTP a llamadas de servicio y arma la respuesta.
+- `services`: contiene reglas de negocio, normalizacion, coordinacion entre repositorios y auditoria.
+- `repositories`: contiene SQL y acceso a PostgreSQL.
 - `validations`: contiene schemas Zod por modulo.
+- `utils`: funciones compartidas sin dependencia HTTP directa.
 
 ## Flujo recomendado
 
-1. La ruta aplica `authMiddleware`, `validateBody`, `validateParams` o `validateQuery`.
-2. El controller toma `req.params`, `req.query` y `req.body`.
-3. El controller llama al service y responde con el mismo contrato de API existente.
-4. El service ejecuta reglas de negocio y llama repositorios.
-5. El repository devuelve datos puros desde PostgreSQL.
-6. El service registra auditoria cuando la operacion modifica estado.
+1. La ruta aplica `authMiddleware` cuando el endpoint requiere sesion.
+2. La ruta aplica `cargarPermisos` y `verificarPermiso` cuando corresponde.
+3. La ruta aplica `validateBody`, `validateParams` o `validateQuery`.
+4. El controller lee `req.params`, `req.query`, `req.body` y `req.usuario`.
+5. El controller llama al service.
+6. El service valida reglas de negocio y llama repositories.
+7. El repository ejecuta SQL y devuelve datos puros.
+8. El service registra auditoria si la operacion modifica estado.
+9. El controller responde JSON, archivo o blob segun contrato.
 
 ## Manejo de errores
 
-Para errores de negocio usar `AppError` o `HttpError` (alias compatible):
+Para errores de negocio usar `AppError` o `HttpError`:
 
 ```js
 throw new AppError(409, 'No hay embarazo activo', { code: 'NO_ACTIVE_PREGNANCY' });
 ```
 
-Los controllers nuevos deben usar `asyncHandler` y dejar que `middleware/errorHandler.js` convierta errores a una respuesta uniforme:
+Los controllers deben usar `asyncHandler` y dejar que `middleware/errorHandler.js` convierta errores a una respuesta uniforme:
 
 ```json
 {
@@ -35,68 +45,88 @@ Los controllers nuevos deben usar `asyncHandler` y dejar que `middleware/errorHa
 }
 ```
 
-En desarrollo el handler puede incluir `debug` para errores 500. En produccion no expone stack trace ni detalles SQL. Los errores de validacion conservan `details` por campo.
+Errores soportados por el handler:
 
-Controllers ya migrados a `asyncHandler`: pacientes, controles prenatales, puerperio, plan de parto, vacunas, riesgo, morbilidad, referencias, usuarios, auth, laboratorio, reportes, PDF y chatbot.
+- `ZodError`: devuelve `VALIDATION_ERROR` con detalles por campo.
+- PostgreSQL `23505`: devuelve conflicto con mensaje especifico segun constraint.
+- PostgreSQL `23503`: devuelve conflicto por registro relacionado.
+- PostgreSQL `22P02`: devuelve dato invalido.
+- `AppError`/`HttpError`: respeta status, message, code y details.
+- Errores inesperados: devuelve 500 sin stack en produccion.
+
+## Modulos con patron completo
+
+Los siguientes modulos ya tienen separacion en controller/service/repository/validation donde aplica:
+
+- pacientes
+- controles prenatales
+- plan de parto
+- puerperio
+- vacunas
+- riesgo obstetrico
+- morbilidad
+- referencias
+- auth
+- usuarios
+- permisos
+- reportes
+- PDF
+- chatbot
+
+Nota sobre `laboratorio`: existen controller, service, repository, validation y `routes/laboratorio.js`, pero al momento de esta auditoria documental la ruta no esta montada en `index.js` ni en `routes/pacientes.js`. No tratarla como endpoint publico terminado hasta montar la ruta o confirmar que laboratorio seguira embebido en controles prenatales.
 
 ## Modulo de referencia
 
-`pacientes` es el primer modulo separado con este patron:
+Usar `pacientes` como referencia para nuevos modulos:
 
-- `routes/pacientes.js`
-- `controllers/pacientesController.js`
-- `services/pacientesService.js`
-- `repositories/pacientesRepository.js`
-- `validations/pacientes.schemas.js`
+```text
+routes/pacientes.js
+controllers/pacientesController.js
+services/pacientesService.js
+repositories/pacientesRepository.js
+validations/pacientes.schemas.js
+```
 
-Para replicarlo en controles prenatales, puerperio, vacunas y reportes, mover primero las consultas SQL al repository, luego las reglas al service, y al final adelgazar el controller.
+## Reglas de embarazo
 
-## Segundo modulo refactorizado
+Las reglas de embarazo viven en services y utils, no en controllers:
 
-`controles prenatales` ya usa el mismo patron para sus endpoints activos:
+- `utils/embarazos.js` resuelve y valida embarazos.
+- `pacientesService.js` crea, cierra y pasa embarazos a puerperio.
+- Los modulos clinicos deben recibir o resolver `embarazo_id`.
+- Un embarazo cerrado debe tratarse como solo lectura.
+- La URL puede traer `?embarazo_id=`, pero la fuente de verdad es PostgreSQL.
 
-- `routes/controles.js`
-- `controllers/controlesPrenatalesController.js`
-- `services/controlesPrenatalesService.js`
-- `repositories/controlesPrenatalesRepository.js`
-- `validations/controles.schemas.js`
+## Seguridad
 
-`controllers/controlesController.js` queda como wrapper de compatibilidad. Las rutas activas usan controllers especificos para controles prenatales, plan de parto y puerperio.
+- Login usa JWT firmado y cookies.
+- `csrfMiddleware` protege escrituras.
+- `cargarPermisos` agrega permisos al usuario autenticado.
+- `verificarPermiso` bloquea endpoints sin permiso.
+- El rol `director` se usa para administracion de permisos.
 
-## Modulos siguientes refactorizados
+## Auditoria
 
-`plan de parto`, `puerperio` y `vacunas` ya siguen el mismo patron:
+Las escrituras clinicas deben registrar auditoria mediante `services/auditService.js` o utilidades existentes.
 
-- `controllers/planPartoController.js`
-- `services/planPartoService.js`
-- `repositories/planPartoRepository.js`
-- `controllers/puerperioController.js`
-- `services/puerperioService.js`
-- `repositories/puerperioRepository.js`
-- `controllers/vacunasController.js`
-- `services/vacunasService.js`
-- `repositories/vacunasRepository.js`
-- `controllers/riesgoController.js`
-- `services/riesgoService.js`
-- `repositories/riesgoRepository.js`
-- `controllers/morbilidadController.js`
-- `services/morbilidadService.js`
-- `repositories/morbilidadRepository.js`
-- `controllers/referenciasController.js`
-- `services/referenciasService.js`
-- `repositories/referenciasRepository.js`
-- `controllers/authController.js`
-- `services/authService.js`
-- `repositories/authRepository.js`
-- `controllers/usuariosController.js`
-- `services/usuariosService.js`
-- `repositories/usuariosRepository.js`
-- `controllers/laboratorioController.js`
-- `services/laboratorioService.js`
-- `repositories/laboratorioRepository.js`
-- `controllers/reportesController.js`
-- `services/reportesService.js`
-- `repositories/reportesRepository.js`
-- `controllers/pdfController.js`
-- `services/pdfService.js`
-- `repositories/pdfRepository.js`
+No auditar:
+
+- contrasenas,
+- hashes,
+- JWT,
+- secretos,
+- datos clinicos completos si basta metadata.
+
+Ver `AUDITORIA.md`.
+
+## Checklist para crear endpoint nuevo
+
+1. Definir ruta en `routes`.
+2. Crear schema Zod si recibe body, params o query.
+3. Agregar permiso necesario.
+4. Implementar controller con `asyncHandler`.
+5. Implementar regla en service.
+6. Implementar SQL en repository.
+7. Registrar auditoria si modifica estado.
+8. Documentar endpoint en `docs/API.md`.
+9. Si cambia base de datos, actualizar `docs/BASE_DATOS.md`.
