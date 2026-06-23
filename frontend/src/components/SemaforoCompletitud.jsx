@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle, ChevronDown, ClipboardList, X, XCircle } from "lucide-react";
+import { CheckCircle, ClipboardList, Info, ListChecks, X, XCircle } from "lucide-react";
 import api from "../api/axios";
 import { getErrorMessage } from "../utils/errorMessage";
 
@@ -127,26 +127,21 @@ export default function SemaforoCompletitud({ pacienteId, initialData = null }) 
 
   return (
     <>
-      <div
-        className="card"
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
+        className="card completitud-trigger"
         onClick={() => setExpanded(true)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            setExpanded(true);
-          }
-        }}
+        aria-label="Abrir detalle de completitud del expediente"
+        aria-expanded={expanded}
+        title="Abrir detalle de completitud del expediente"
         style={{
           display: "flex",
           alignItems: "center",
           gap: "0.7rem",
-          background: "var(--card)",
-          borderColor: "var(--card-border)",
           padding: "0.55rem 1rem",
-          cursor: "pointer",
           minWidth: 0,
+          width: "100%",
+          textAlign: "left",
         }}
       >
         <ClipboardList size={18} style={{ color: "var(--primary)", flexShrink: 0 }} />
@@ -168,8 +163,15 @@ export default function SemaforoCompletitud({ pacienteId, initialData = null }) 
         >
           {resumen}
         </span>
-        <ChevronDown size={18} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
-      </div>
+        <span className="completitud-detail-trigger" aria-hidden="true">
+          <span className="completitud-info-icon">
+            <Info size={15} strokeWidth={2.4} />
+          </span>
+          <span className="completitud-list-icon">
+            <ListChecks size={14} strokeWidth={2.2} />
+          </span>
+        </span>
+      </button>
 
       {expanded && (
         <div className="user-create-drawer-shell">
