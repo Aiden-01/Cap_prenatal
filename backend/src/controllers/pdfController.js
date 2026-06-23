@@ -374,7 +374,7 @@ function buildPlanPartoCellMap({ paciente, plan }) {
   setMapValue(map, 'I5', plan.servicio_salud || paciente.nombre_establecimiento || 'CAP El Chal');
   setMapValue(map, 'AA5', formatDate(plan.fecha));
   setMapValue(map, 'I6', plan.lugar_residencia || paciente.comunidad || paciente.domicilio);
-  setMapValue(map, 'J7:V7', nombre);
+  setMapValue(map, 'L7:V7', nombre);
   setMapValue(map, 'AL7', edadAnios(plan.fecha_nacimiento || paciente.fecha_nacimiento));
   setMapValue(map, 'J8', plan.nombre_conyuge || paciente.nombre_esposo_conviviente);
   setMapValue(map, 'T8', cleanCellText(plan.telefono || paciente.telefono).replace(/\s+/g, ' '));
