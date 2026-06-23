@@ -12,8 +12,8 @@ const { registrarAuditoria } = require('../utils/auditoria');
 const { generarFichaClinicaPrenatalPdf } = require('../services/fichaClinicaPrenatalPdf');
 
 const execFileAsync = promisify(execFile);
-const TEXT_FORMAT_CELLS = new Set(['T8', 'V8', 'F61', 'G19:J19', 'P19:S19', 'Q19:T19', 'AK19:AN19']);
-const CENTER_FORMAT_RE = /^(N6|O6|P6|Q6|S6|T6|U6|V6|Y6|Z6|AA6|AB6|AA7:AB7|AA13:AB13|K18|X18|X19|E20|K20|Q20|X20|F21|M21)$/;
+const TEXT_FORMAT_CELLS = new Set(['T8', 'V8', 'AE8:AN8', 'F61', 'G19:J19', 'P19:S19', 'Q19:T19', 'AK19:AN19']);
+const CENTER_FORMAT_RE = /^(N6|O6|P6|Q6|S6|T6|U6|V6|Y6|Z6|AA6|AB6|AA7:AB7|AA13:AB13|AE8:AN8|K18|X18|X19|E20|K20|Q20|X20|F21|M21)$/;
 
 async function pdfControl(req, res) {
   const { id } = req.params;
@@ -378,7 +378,7 @@ function buildPlanPartoCellMap({ paciente, plan }) {
   setMapValue(map, 'AL7', edadAnios(plan.fecha_nacimiento || paciente.fecha_nacimiento));
   setMapValue(map, 'J8', plan.nombre_conyuge || paciente.nombre_esposo_conviviente);
   setMapValue(map, 'T8', cleanCellText(plan.telefono || paciente.telefono).replace(/\s+/g, ' '));
-  setMapValue(map, 'AE8', formatDate(plan.fecha_nacimiento || paciente.fecha_nacimiento));
+  setMapValue(map, 'AE8:AN8', formatDate(plan.fecha_nacimiento || paciente.fecha_nacimiento));
 
   mapChoice(map, plan.estado_civil || paciente.estado_civil, {
     soltera: 'D12',
@@ -555,6 +555,39 @@ function firstCellAddress(address) {
   return String(address).split(':')[0];
 }
 
+function columnToNumber(column) {
+  return String(column)
+    .toUpperCase()
+    .split('')
+    .reduce((total, char) => total * 26 + char.charCodeAt(0) - 64, 0);
+}
+
+function parseCellAddress(address) {
+  const match = String(address).match(/^([A-Z]+)(\d+)$/i);
+  if (!match) return null;
+  return {
+    col: columnToNumber(match[1]),
+    row: Number(match[2]),
+  };
+}
+
+function applyAlignment(worksheet, address, alignment) {
+  const [startAddress, endAddress = startAddress] = String(address).split(':');
+  const start = parseCellAddress(startAddress);
+  const end = parseCellAddress(endAddress);
+  if (!start || !end) return;
+
+  for (let row = start.row; row <= end.row; row += 1) {
+    for (let col = start.col; col <= end.col; col += 1) {
+      const cell = worksheet.getCell(row, col);
+      cell.alignment = {
+        ...(cell.alignment || {}),
+        ...alignment,
+      };
+    }
+  }
+}
+
 function shouldCenterCell(address, value) {
   return (String(value).length === 1 && value === 'X') || CENTER_FORMAT_RE.test(address);
 }
@@ -568,6 +601,12 @@ async function writeExcelTemplate(templatePath, outputPath, cellMap) {
     if (value === null || value === undefined || value === '') return;
 
     if (address.includes(':')) {
+      try {
+        worksheet.unMergeCells(address);
+      } catch {
+        // It may not be merged yet.
+      }
+
       try {
         worksheet.mergeCells(address);
       } catch {
@@ -583,11 +622,10 @@ async function writeExcelTemplate(templatePath, outputPath, cellMap) {
     }
 
     if (shouldCenterCell(address, String(value))) {
-      cell.alignment = {
-        ...(cell.alignment || {}),
+      applyAlignment(worksheet, address, {
         horizontal: 'center',
         vertical: 'middle',
-      };
+      });
     }
   });
 

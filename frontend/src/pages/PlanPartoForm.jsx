@@ -118,7 +118,6 @@ const INIT = {
   edad_gestacional_au: "",
   parto_anterior_hospital: false,
   parto_anterior_caimi: false,
-  parto_anterior_cap: false,
   parto_anterior_comadrona: false,
   parto_anterior_clinica_privada: false,
   parto_anterior_otro: "",
@@ -173,19 +172,20 @@ function defaultsDesdeExpediente(exp) {
   const r = exp?.ficha_riesgo || {};
   const controles = exp?.controles_prenatales || [];
   const ultimoControl = controles.at(-1) || {};
+  const nombreConyuge = r.nombre_esposo_conviviente || p.nombre_esposo_conviviente || "";
 
   return {
     fecha: getGuatemalaDateInputValue(),
     no_registro: p.cui || "",
     servicio_salud: p.nombre_establecimiento || "CAP El Chal",
     lugar_residencia: p.comunidad || p.domicilio || "",
-    nombre_conyuge: r.nombre_esposo_conviviente || p.nombre_esposo_conviviente || "",
+    nombre_conyuge: nombreConyuge,
     telefono: r.telefono || p.telefono || "",
     fecha_nacimiento: toDateInput(p.fecha_nacimiento),
     estado_civil: r.estado_civil || p.estado_civil || "",
     pueblo: r.pueblo || p.pueblo || "",
     escolaridad: r.escolaridad || p.nivel_estudios || "",
-    con_quien_vive: p.nombre_esposo_conviviente ? "esposo" : p.vive_sola ? "sola" : "",
+    con_quien_vive: nombreConyuge ? "esposo" : p.vive_sola ? "sola" : "",
     idioma: p.comunidad_linguistica || "",
     ha_tenido_atencion_prenatal: controles.length > 0,
     no_embarazos: r.no_embarazos ?? p.gestas_previas ?? "",
@@ -201,11 +201,10 @@ function defaultsDesdeExpediente(exp) {
     edad_gestacional_au: ultimoControl.edad_gestacional_semanas ?? "",
     parto_anterior_hospital: false,
     parto_anterior_caimi: false,
-    parto_anterior_cap: false,
     parto_anterior_clinica_privada: false,
     peligro_dolor_cabeza: Boolean(ultimoControl.peligro_dolor_cabeza),
     peligro_vision_borrosa: Boolean(ultimoControl.peligro_trastornos_visuales),
-    peligro_embarazo_multiple: Boolean(r.embarazo_multiple || p.antec_gemelares),
+    peligro_embarazo_multiple: false,
     peligro_hemorragia_vaginal: Boolean(ultimoControl.peligro_hemorragia_vaginal || r.hemorragia_vaginal),
     peligro_edema_mi: Boolean(ultimoControl.peligro_hipertension),
     peligro_nino_transverso: false,
@@ -215,17 +214,17 @@ function defaultsDesdeExpediente(exp) {
     peligro_fiebre: Boolean(ultimoControl.peligro_fiebre),
     peligro_ausencia_mov_fetales: ultimoControl.movimientos_fetales === false,
     peligro_placenta_no_salia: false,
-    posicion_parto: ultimoControl.situacion_fetal || "",
+    posicion_parto: "",
     posicion_parto_otro: "",
-    lugar_atencion_parto: p.viene_referida ? "cap" : "",
+    lugar_atencion_parto: "",
     lugar_atencion_parto_otro: "",
     horas_distancia: r.tiempo_horas ?? "",
     kms_servicio: r.distancia_servicio_km ?? "",
     casa_materna_cercana: false,
     usara_casa_materna: false,
     como_trasladara: "",
-    acompana_traslado: p.nombre_esposo_conviviente ? "conyuge" : "",
-    acompana_parto: p.nombre_esposo_conviviente ? "esposo" : "",
+    acompana_traslado: nombreConyuge ? "conyuge" : "",
+    acompana_parto: nombreConyuge ? "esposo" : "",
     bebida_durante_parto: "",
     bebida_despues_parto: "",
     ropa_nino: false,
@@ -239,8 +238,8 @@ function defaultsDesdeExpediente(exp) {
     con_quien_hijos: "",
     quien_cuida_casa: "",
     telefono_vehiculo: "",
-    responsable_activar: "",
-    nombre_activara_plan: "",
+    responsable_activar: nombreConyuge ? "conyuge" : "",
+    nombre_activara_plan: nombreConyuge,
     nombre_proveedor_salud: ultimoControl.nombre_cargo_atiende || r.nombre_personal_atendio || "",
   };
 }
@@ -551,7 +550,6 @@ export default function PlanPartoForm() {
               <Select label="Con quien quedaran los hijos" name="con_quien_hijos" form={form} set={set} options={cuidadoHijosOptions} />
               <Select label="Quien cuidara la casa" name="quien_cuida_casa" form={form} set={set} options={cuidadoCasaOptions} />
               <Input label="Telefono del vehiculo" name="telefono_vehiculo" form={form} set={set} />
-              <Input label="Nombre proveedor de salud" name="nombre_proveedor_salud" form={form} set={set} />
             </div>
           </div>
 
