@@ -234,6 +234,23 @@ function drawBooleanMarks(page, font, entries) {
   });
 }
 
+function drawControlDangerSigns(page, font, control, cfg, label) {
+  const signs = cfg.signosPeligro;
+  if (!signs) return;
+
+  drawBooleanMarks(page, font, [
+    [control.peligro_hemorragia_vaginal, signs.hemorragiaVaginal, `${label}:hemorragiaVaginal`],
+    [control.peligro_palidez, signs.palidez, `${label}:palidez`],
+    [control.peligro_dolor_cabeza, signs.dolorCabeza, `${label}:dolorCabeza`],
+    [control.peligro_hipertension, signs.hipertension, `${label}:hipertension`],
+    [control.peligro_dolor_epigastrico, signs.dolorEpigastrico, `${label}:dolorEpigastrico`],
+    [control.peligro_trastornos_visuales, signs.trastornosVisuales, `${label}:trastornosVisuales`],
+    [control.peligro_fiebre, signs.fiebre, `${label}:fiebre`],
+  ]);
+
+  drawTextBox(page, font, control.peligro_otro, signs.otro, `${label}:otro`);
+}
+
 function drawPersonalDiabetesMark(page, font, p, c) {
   const tipo = p.antec_diabetes_tipo;
   if (!tipo) {
@@ -344,6 +361,11 @@ function drawDebugReferences(page, font) {
     debugPoint(page, cfg.edadGestacional.x, cfg.edadGestacional.y, `c${idx + 1}:eg`, font);
     debugPoint(page, cfg.acompanante.x, cfg.acompanante.y, `c${idx + 1}:acompanante`, font);
     debugPoint(page, cfg.atiende.x, cfg.atiende.y, `c${idx + 1}:atiende`, font);
+    if (cfg.signosPeligro) {
+      Object.entries(cfg.signosPeligro).forEach(([sign, signCfg]) => {
+        debugPoint(page, signCfg.x, signCfg.y, `c${idx + 1}:peligro:${sign}`, font);
+      });
+    }
   });
 }
 
@@ -612,6 +634,7 @@ function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planPart
     drawDate(page, font, control.fecha, cfg.fecha, `control${idx + 1}:fecha`, true);
     drawTime(page, font, control.hora, cfg.hora, `control${idx + 1}:hora`);
     drawTextBox(page, font, control.motivo_consulta, cfg.motivo, `control${idx + 1}:motivo`);
+    drawControlDangerSigns(page, font, control, cfg, `control${idx + 1}`);
     drawTextBox(page, font, control.edad_gestacional_semanas, cfg.edadGestacional, `control${idx + 1}:eg`);
     drawTextBox(page, font, control.nombre_acompanante, cfg.acompanante, `control${idx + 1}:acompanante`);
     drawTextBox(page, font, control.nombre_cargo_atiende, cfg.atiende, `control${idx + 1}:atiende`);
