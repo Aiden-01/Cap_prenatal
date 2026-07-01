@@ -397,6 +397,8 @@ export default function NuevoControl() {
     const payload = {
       ...form,
       edad_gestacional_semanas: edadGestacionalSemanas,
+      vih_resultado_valor: "",
+      vdrl_tratamiento_indicado: false,
       torch_resultado_valor: "",
       papanicolau_ivaa_fecha_toma: "",
     };
@@ -621,7 +623,6 @@ export default function NuevoControl() {
                         <option value="negativo">Negativo (-)</option>
                       </select>
                     </Field>
-                    <Inp label="Valor / nota" name="vih_resultado_valor" {...p} />
                   </div>
                 )}
               </div>
@@ -640,9 +641,6 @@ export default function NuevoControl() {
                       <option value="negativo">Negativo (-)</option>
                     </select>
                   </Field>
-                  {form.vdrl_resultado === "positivo" && (
-                    <Toggle label="Indicar tratamiento (pareja)" name="vdrl_tratamiento_indicado" {...p} />
-                  )}
                 </div>
               )}
             </div>

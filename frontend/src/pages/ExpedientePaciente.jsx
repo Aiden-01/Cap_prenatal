@@ -1098,11 +1098,6 @@ export default function ExpedientePaciente() {
                     {ctrl.hepatitis_b_realizado      && <Row label="Hepatitis B"       value={ctrl.hepatitis_b_resultado} />}
                     {ctrl.usg_realizado              && <Row label="USG" value={ctrl.usg_hallazgos || "Realizado"} />}
                   </Grid>
-                  {ctrl.vdrl_resultado === "positivo" && ctrl.vdrl_tratamiento_indicado && (
-                    <div style={{ marginTop: "0.6rem", padding: "0.5rem 0.75rem", background: "var(--warn-lt)", borderRadius: 6, fontSize: "0.8rem", color: "var(--warn)", fontWeight: 600 }}>
-                      ⚠ VDRL positivo — Tratamiento indicado a pareja
-                    </div>
-                  )}
                 </div>
               ))
           )}

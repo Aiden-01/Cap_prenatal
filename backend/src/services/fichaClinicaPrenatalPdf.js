@@ -765,10 +765,8 @@ function drawPage2({ page, font, controles }) {
     markNullableYesNo(page, font, control.orina_proteinuria, lab.orina.proteinuria, `${baseLabel}:orinaProteinuria`);
     drawLabDoneResult(page, font, control, 'heces_realizada', 'heces_resultado', lab.heces, `${baseLabel}:heces`);
     markPositiveNegative(page, font, control.vih_resultado, lab.vih, `${baseLabel}:vih`);
-    drawTextBox(page, font, control.vih_resultado_valor, lab.vih.note, `${baseLabel}:vihNota`);
     markPositiveNegative(page, font, control.vdrl_resultado, lab.vdrl, `${baseLabel}:vdrl`);
     drawTextBox(page, font, control.vdrl_resultado, lab.vdrl.result, `${baseLabel}:vdrlResultado`);
-    markYesNo(page, font, control.vdrl_tratamiento_indicado, lab.vdrl.treatment, `${baseLabel}:vdrlTratamiento`);
     markBooleanPositiveNegative(page, font, control.torch_resultado_positivo, lab.torch, `${baseLabel}:torch`);
     drawTextBox(page, font, control.torch_resultado_valor, lab.torch.result, `${baseLabel}:torchResultado`);
     markPositiveNegative(page, font, control.papanicolau_ivaa_resultado, lab.papanicolauIvaa, `${baseLabel}:papanicolauIvaa`);
