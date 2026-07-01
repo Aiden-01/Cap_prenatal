@@ -4,11 +4,18 @@ const PAGE = {
 };
 
 const CONTROL_COLUMNS = [62, 169, 276, 383, 490];
+const PAGE2_CONTROL_COLUMNS = [62, 169, 276, 383];
 
 // Helper para pares No/Si. En esta ficha la primera casilla es "No" y la
 // segunda, a la derecha, es "Si". Ajusta x/y sobre la casilla "No"; gap mueve
 // la casilla "Si" horizontalmente.
 const yn = (x, y, gap = 12) => ({ no: { x, y }, yes: { x: x + gap, y } });
+const siNo = (x, y, gap = 12) => ({ yes: { x, y }, no: { x: x + gap, y } });
+const when = (active, cfg) => (active ? cfg : null);
+
+// ============================================================
+// PAGINA 1: DATOS GENERALES, ANTECEDENTES Y PRIMERA MATRIZ
+// ============================================================
 
 // Guia rapida para la zona de ANTECEDENTES de la pagina 1:
 // - Antecedentes familiares:
@@ -235,11 +242,81 @@ const page1 = {
   })),
 };
 
+// =============================================================================================================================
+// PAGINA 2: CONTROLES, LABORATORIOS Y ORIENTACIONES
+// =================================================================================================================
+
+const page2Control = (x, idx) => ({
+  examenFisico: {
+    pa: { x: x + 5, y: 109, w: 96, size: 5.8 },
+    fc: { x: x + 5, y: 125, w: 96, size: 5.8 },
+    fr: { x: x + 5, y: 140, w: 96, size: 5.8 },
+    temperatura: { x: x + 5, y: 155, w: 96, size: 5.8 },
+    perimetroBraquial: when(idx === 0 || idx === 4, { x: x + 5, y: 171, w: 96, size: 5.8 }),
+    peso: when(idx !== 0, { x: x + 5, y: 186, w: 96, size: 5.8 }),
+    talla: when(idx !== 0, { x: x + 5, y: 201, w: 96, size: 5.8 }),
+    imc: when(idx !== 0, { x: x + 5, y: 216, w: 96, size: 5.8 }),
+    bucodental: when(idx === 0 || idx === 2 || idx === 4, siNo(x + 40, 232)),
+    mamas: siNo(x + (idx === 1 ? 44 : idx === 3 ? 42 : 40), 247),
+  },
+  examenObstetrico: {
+    alturaUterina: when(idx !== 0, { x: x + 5, y: 281, w: 96, size: 5.8 }),
+    fcf: when(idx !== 0, { x: x + 5, y: 296, w: 96, size: 5.8 }),
+    movimientosFetales: when(idx !== 0, siNo(x + 44, 311)),
+    situacionFetal: when(idx >= 2, { x: x + 5, y: 328, w: 96, size: 5.6 }),
+    presentacionFetal: when(idx >= 2, { x: x + 5, y: 343, w: 96, size: 5.6 }),
+  },
+  examenGinecologico: {
+    sangreManchado: siNo(x + (idx >= 1 && idx <= 3 ? 43 : 45), 374),
+    verrugasHerpesPapilomas: siNo(x + (idx >= 1 && idx <= 3 ? 44 : 46), 394),
+    flujoVaginal: siNo(x + (idx >= 1 && idx <= 3 ? 44 : 46), 411),
+    otros: { x: x + 5, y: 419, w: 96, size: 5.2 },
+  },
+  laboratorios: {
+    hematologia: when(idx === 0 || idx === 2 || idx === 4, { done: siNo(x + 7, 455), result: { x: x + 34, y: 455, w: 68, size: 4.8 } }),
+    glicemia: { done: siNo(x + 7, 470), result: { x: x + 34, y: 470, w: 68, size: 4.8 } },
+    grupoRh: when(idx === 0 || idx === 4, { positive: { x: x + 7, y: 487 }, negative: { x: x + 22, y: 487 }, result: { x: x + 34, y: 487, w: 68, size: 4.8 } }),
+    orina: {
+      done: siNo(x + 45, 501),
+      bacteriuria: siNo(x + 45, 516),
+      proteinuria: siNo(x + 45, 532),
+    },
+    heces: when(idx === 0 || idx === 4, { done: siNo(x + 7, 548), result: { x: x + 34, y: 548, w: 68, size: 4.8 } }),
+    vih: { positive: { x: x + 7, y: 567 }, negative: { x: x + 22, y: 567 }, result: { x: x + 34, y: 567, w: 28, size: 4.5 }, note: { x: x + 65, y: 567, w: 35, size: 4.5 } },
+    vdrl: { positive: { x: x + 7, y: 582 }, negative: { x: x + 22, y: 582 }, result: { x: x + 34, y: 582, w: 28, size: 4.5 }, treatment: siNo(x + 65, 582) },
+    torch: { positive: { x: x + 7, y: 612 }, negative: { x: x + 22, y: 612 }, result: { x: x + 34, y: 612, w: 68, size: 4.5 } },
+    papanicolauIvaa: { positive: { x: x + 7, y: 627 }, negative: { x: x + 22, y: 627 }, result: { x: x + 34, y: 627, w: 68, size: 4.5 } },
+    hepatitisB: { positive: { x: x + 7, y: 642 }, negative: { x: x + 22, y: 642 }, result: { x: x + 34, y: 642, w: 68, size: 4.5 } },
+    otros: { x: x + 5, y: 657, w: 96, size: 4.8 },
+  },
+  estudiosComplementarios: {
+    usg: siNo(x + 9, 694),
+    hallazgosUsg: { x: x + 5, y: 716, w: 96, h: 24, size: 4.8, maxLines: 2 },
+  },
+  orientaciones: {
+    planEmergenciaParto: siNo(x + 9, 758),
+    alimentacionEmbarazo: siNo(x + 9, 773),
+    senalesPeligro: siNo(x + 9, 788),
+    importanciaAtenciones: siNo(x + 9, 803),
+    prePostPruebaVih: when(idx !== 2, siNo(x + 9, 818)),
+    tratamientoItsPareja: siNo(x + 9, 833),
+    lactanciaMaterna: siNo(x + 9, 848),
+    planificacionFamiliar: when(idx === 3 || idx === 4, siNo(x + 9, 863)),
+    importanciaPostparto: when(idx === 3 || idx === 4, siNo(x + 9, 878)),
+    vacunacionNino: when(idx === 3 || idx === 4, siNo(x + 9, 893)),
+    otros: { x: x + 5, y: 908, w: 96, size: 4.8 },
+  },
+});
+
+const page2 = {
+  controls: PAGE2_CONTROL_COLUMNS.map((x, idx) => page2Control(x, idx)),
+};
+
 module.exports = {
   PAGE,
   pages: {
     1: page1,
-    2: {},
+    2: page2,
     3: {},
     4: {},
   },

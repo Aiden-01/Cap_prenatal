@@ -132,6 +132,7 @@ function debugPoint(page, x, yTop, label, font) {
 }
 
 function drawTextBox(page, font, value, cfg, label) {
+  if (!cfg) return;
   const text = safe(value);
   if (!text) return;
 
@@ -214,6 +215,7 @@ function markChoice(page, font, value, options, label) {
 }
 
 function markYesNo(page, font, value, cfg, label) {
+  if (!cfg) return;
   drawMark(page, font, bool(value) ? cfg.yes : cfg.no, label);
 }
 
@@ -321,6 +323,76 @@ function drawVaccines(page, font, vacunas = [], c) {
 function drawYesNoMarks(page, font, entries) {
   entries.forEach(([value, cfg, label]) => {
     markYesNo(page, font, value, cfg, label);
+  });
+}
+
+function markNullableYesNo(page, font, value, cfg, label) {
+  if (!cfg) return;
+  if (value === null || value === undefined || value === '') return;
+  markYesNo(page, font, value, cfg, label);
+}
+
+function formatPa(control) {
+  if (!control.pa_sistolica && !control.pa_diastolica) return '';
+  return `${safe(control.pa_sistolica)}/${safe(control.pa_diastolica)}`;
+}
+
+function markPositiveNegative(page, font, value, cfg, label) {
+  if (!cfg) return;
+  const normalized = safe(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  if (!normalized) return;
+  if (normalized.startsWith('pos') || normalized === '+') {
+    drawMark(page, font, cfg.positive, `${label}:positive`);
+  } else if (normalized.startsWith('neg') || normalized === '-') {
+    drawMark(page, font, cfg.negative, `${label}:negative`);
+  }
+}
+
+function markBooleanPositiveNegative(page, font, value, cfg, label) {
+  if (!cfg) return;
+  if (value === null || value === undefined || value === '') return;
+  drawMark(page, font, bool(value) ? cfg.positive : cfg.negative, label);
+}
+
+function drawLabDoneResult(page, font, control, doneField, resultField, cfg, label) {
+  if (!cfg) return;
+  markYesNo(page, font, control[doneField], cfg.done, `${label}:done`);
+  drawTextBox(page, font, control[resultField], cfg.result, `${label}:result`);
+}
+
+function drawPage2DebugReferences(page, font) {
+  if (!isDebugEnabled()) return;
+  const c = coords.pages[2];
+  c.controls.forEach((cfg, idx) => {
+    const label = `p2c${idx + 1}`;
+    [
+      cfg.examenFisico,
+      cfg.examenObstetrico,
+      cfg.examenGinecologico,
+      cfg.laboratorios,
+      cfg.estudiosComplementarios,
+      cfg.orientaciones,
+    ].forEach((section) => {
+      Object.entries(section).forEach(([key, value]) => {
+        if (!value) return;
+        if (value.x !== undefined) {
+          debugPoint(page, value.x, value.y, `${label}:${key}`, font);
+          return;
+        }
+        Object.entries(value).forEach(([subKey, subValue]) => {
+          if (!subValue) return;
+          if (subValue.x !== undefined) {
+            debugPoint(page, subValue.x, subValue.y, `${label}:${key}:${subKey}`, font);
+          } else {
+            debugPoint(page, subValue.yes.x, subValue.yes.y, `${label}:${key}:${subKey}:yes`, font);
+            debugPoint(page, subValue.no.x, subValue.no.y, `${label}:${key}:${subKey}:no`, font);
+          }
+        });
+      });
+    });
   });
 }
 
@@ -643,6 +715,87 @@ function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planPart
   drawDebugReferences(page, font);
 }
 
+function drawPage2({ page, font, controles }) {
+  const c = coords.pages[2];
+
+  c.controls.forEach((cfg, idx) => {
+    const control = controlAt(controles, idx + 1);
+    if (!control.id && !control.fecha && !control.numero_control) return;
+
+    const baseLabel = `page2:control${idx + 1}`;
+    const fisico = cfg.examenFisico;
+    const obstetrico = cfg.examenObstetrico;
+    const gine = cfg.examenGinecologico;
+    const lab = cfg.laboratorios;
+    const estudios = cfg.estudiosComplementarios;
+    const orient = cfg.orientaciones;
+
+    drawTextBox(page, font, formatPa(control), fisico.pa, `${baseLabel}:pa`);
+    drawTextBox(page, font, control.frecuencia_cardiaca, fisico.fc, `${baseLabel}:fc`);
+    drawTextBox(page, font, control.frecuencia_respiratoria, fisico.fr, `${baseLabel}:fr`);
+    drawTextBox(page, font, control.temperatura, fisico.temperatura, `${baseLabel}:temperatura`);
+    drawTextBox(page, font, control.perimetro_braquial_cm, fisico.perimetroBraquial, `${baseLabel}:perimetroBraquial`);
+    drawTextBox(page, font, control.peso_kg, fisico.peso, `${baseLabel}:peso`);
+    drawTextBox(page, font, control.talla_cm, fisico.talla, `${baseLabel}:talla`);
+    drawTextBox(page, font, control.imc, fisico.imc, `${baseLabel}:imc`);
+    markNullableYesNo(page, font, control.examen_bucodental, fisico.bucodental, `${baseLabel}:bucodental`);
+    markNullableYesNo(page, font, control.examen_mamas, fisico.mamas, `${baseLabel}:mamas`);
+
+    drawTextBox(page, font, control.altura_uterina_cm, obstetrico.alturaUterina, `${baseLabel}:alturaUterina`);
+    drawTextBox(page, font, control.fcf, obstetrico.fcf, `${baseLabel}:fcf`);
+    markNullableYesNo(page, font, control.movimientos_fetales, obstetrico.movimientosFetales, `${baseLabel}:movimientosFetales`);
+    drawTextBox(page, font, control.situacion_fetal, obstetrico.situacionFetal, `${baseLabel}:situacionFetal`);
+    drawTextBox(page, font, control.presentacion_fetal, obstetrico.presentacionFetal, `${baseLabel}:presentacionFetal`);
+
+    markYesNo(page, font, control.sangre_manchado, gine.sangreManchado, `${baseLabel}:sangreManchado`);
+    markYesNo(page, font, control.verrugas_herpes_papilomas, gine.verrugasHerpesPapilomas, `${baseLabel}:verrugasHerpesPapilomas`);
+    markYesNo(page, font, control.flujo_vaginal, gine.flujoVaginal, `${baseLabel}:flujoVaginal`);
+    drawTextBox(page, font, control.otros_ginecologico, gine.otros, `${baseLabel}:otrosGinecologico`);
+
+    drawLabDoneResult(page, font, control, 'hematologia_realizada', 'hematologia_resultado', lab.hematologia, `${baseLabel}:hematologia`);
+    drawLabDoneResult(page, font, control, 'glicemia_realizada', 'glicemia_resultado', lab.glicemia, `${baseLabel}:glicemia`);
+    if (lab.grupoRh && (control.grupo_rh_realizado || control.grupo_rh_resultado)) {
+      const rh = safe(control.grupo_rh_resultado);
+      if (rh.includes('+')) drawMark(page, font, lab.grupoRh.positive, `${baseLabel}:grupoRh:positive`);
+      if (rh.includes('-')) drawMark(page, font, lab.grupoRh.negative, `${baseLabel}:grupoRh:negative`);
+      drawTextBox(page, font, rh.replace(/[+-]/g, ''), lab.grupoRh.result, `${baseLabel}:grupoRh:result`);
+    }
+    markYesNo(page, font, control.orina_realizada, lab.orina.done, `${baseLabel}:orina`);
+    markNullableYesNo(page, font, control.orina_bacteriuria, lab.orina.bacteriuria, `${baseLabel}:orinaBacteriuria`);
+    markNullableYesNo(page, font, control.orina_proteinuria, lab.orina.proteinuria, `${baseLabel}:orinaProteinuria`);
+    drawLabDoneResult(page, font, control, 'heces_realizada', 'heces_resultado', lab.heces, `${baseLabel}:heces`);
+    markPositiveNegative(page, font, control.vih_resultado, lab.vih, `${baseLabel}:vih`);
+    drawTextBox(page, font, control.vih_resultado_valor, lab.vih.note, `${baseLabel}:vihNota`);
+    markPositiveNegative(page, font, control.vdrl_resultado, lab.vdrl, `${baseLabel}:vdrl`);
+    drawTextBox(page, font, control.vdrl_resultado, lab.vdrl.result, `${baseLabel}:vdrlResultado`);
+    markYesNo(page, font, control.vdrl_tratamiento_indicado, lab.vdrl.treatment, `${baseLabel}:vdrlTratamiento`);
+    markBooleanPositiveNegative(page, font, control.torch_resultado_positivo, lab.torch, `${baseLabel}:torch`);
+    drawTextBox(page, font, control.torch_resultado_valor, lab.torch.result, `${baseLabel}:torchResultado`);
+    markPositiveNegative(page, font, control.papanicolau_ivaa_resultado, lab.papanicolauIvaa, `${baseLabel}:papanicolauIvaa`);
+    drawTextBox(page, font, control.papanicolau_ivaa_resultado, lab.papanicolauIvaa.result, `${baseLabel}:papanicolauIvaaResultado`);
+    markPositiveNegative(page, font, control.hepatitis_b_resultado, lab.hepatitisB, `${baseLabel}:hepatitisB`);
+    drawTextBox(page, font, control.hepatitis_b_resultado, lab.hepatitisB.result, `${baseLabel}:hepatitisBResultado`);
+    drawTextBox(page, font, control.otros_lab, lab.otros, `${baseLabel}:otrosLab`);
+
+    markYesNo(page, font, control.usg_realizado, estudios.usg, `${baseLabel}:usg`);
+    drawTextBox(page, font, control.usg_hallazgos, estudios.hallazgosUsg, `${baseLabel}:hallazgosUsg`);
+
+    markYesNo(page, font, control.orient_plan_emergencia_parto, orient.planEmergenciaParto, `${baseLabel}:orientPlanEmergencia`);
+    markYesNo(page, font, control.orient_alimentacion_embarazo, orient.alimentacionEmbarazo, `${baseLabel}:orientAlimentacion`);
+    markYesNo(page, font, control.orient_senales_peligro, orient.senalesPeligro, `${baseLabel}:orientSenalesPeligro`);
+    markYesNo(page, font, control.orient_importancia_atenciones, orient.importanciaAtenciones, `${baseLabel}:orientImportanciaAtenciones`);
+    markYesNo(page, font, control.orient_pre_post_prueba_vih, orient.prePostPruebaVih, `${baseLabel}:orientPrePostVih`);
+    markYesNo(page, font, control.orient_tratamiento_its_pareja, orient.tratamientoItsPareja, `${baseLabel}:orientTratamientoIts`);
+    markYesNo(page, font, control.orient_lactancia_materna, orient.lactanciaMaterna, `${baseLabel}:orientLactancia`);
+    markYesNo(page, font, control.orient_planificacion_familiar, orient.planificacionFamiliar, `${baseLabel}:orientPlanificacion`);
+    markYesNo(page, font, control.orient_importancia_postparto, orient.importanciaPostparto, `${baseLabel}:orientPostparto`);
+    markYesNo(page, font, control.orient_vacunacion_nino, orient.vacunacionNino, `${baseLabel}:orientVacunacion`);
+    drawTextBox(page, font, control.orient_otros, orient.otros, `${baseLabel}:orientOtros`);
+  });
+
+  drawPage2DebugReferences(page, font);
+}
+
 async function generarFichaClinicaPrenatalPdf({
   paciente,
   embarazo,
@@ -659,6 +812,7 @@ async function generarFichaClinicaPrenatalPdf({
 
   const pages = pdfDoc.getPages();
   if (!pages[0]) throw new Error('La plantilla PDF no tiene pagina 1');
+  if (!pages[1]) throw new Error('La plantilla PDF no tiene pagina 2');
 
   drawPage1({
     page: pages[0],
@@ -669,6 +823,12 @@ async function generarFichaClinicaPrenatalPdf({
     riesgo,
     planParto,
     vacunas,
+  });
+
+  drawPage2({
+    page: pages[1],
+    font,
+    controles,
   });
 
   drawPuerperioSummary({
