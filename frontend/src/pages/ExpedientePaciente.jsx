@@ -10,7 +10,7 @@ import {
   Syringe, Activity, FlaskConical, Baby, FileText, Printer,
   CalendarDays, ChevronRight, Droplets, LockKeyhole, Microscope,
   ShieldCheck, TestTube2, ChevronDown, Car,
-  PackageCheck, ClipboardCheck, MapPin, PenLine
+  PackageCheck, ClipboardCheck, MapPin, PenLine, Clock, UserRound
 } from "lucide-react";
 import { getErrorMessage } from "../utils/errorMessage";
 
@@ -486,6 +486,54 @@ function PlanSummaryItem({ item }) {
   );
 }
 
+function morbilidadTime(item) {
+  const dateOnly = String(item?.fecha || "").split("T")[0];
+  const time = item?.hora || "00:00";
+  const value = new Date(`${dateOnly || "1970-01-01"}T${time}`).getTime();
+  return Number.isNaN(value) ? 0 : value;
+}
+
+function morbilidadDateParts(value) {
+  if (!value) return { day: "--", month: "---", year: "" };
+  const dateOnly = String(value).split("T")[0];
+  const date = new Date(`${dateOnly}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return { day: "--", month: "---", year: "" };
+  return {
+    day: String(date.getDate()).padStart(2, "0"),
+    month: date.toLocaleDateString("es-GT", { month: "short" }).replace(".", "").toUpperCase(),
+    year: String(date.getFullYear()),
+  };
+}
+
+function MorbilidadBlock({ icon: Icon, title, children }) {
+  return (
+    <section className="morbidity-detail-block">
+      <div className="morbidity-block-title">
+        <Icon size={15} />
+        <h4>{title}</h4>
+      </div>
+      <p>{children || "-"}</p>
+    </section>
+  );
+}
+
+const VACCINE_GROUPS = [
+  { id: "previo_embarazo", label: "Previo embarazo" },
+  { id: "durante_embarazo", label: "Durante embarazo" },
+  { id: "postparto_aborto", label: "Postparto/Aborto" },
+];
+
+function vaccineLabel(value) {
+  return (value || "-").replaceAll("_", " ").toUpperCase();
+}
+
+function vaccineGroups(vaccines = []) {
+  return VACCINE_GROUPS.map((group) => ({
+    ...group,
+    items: vaccines.filter((vaccine) => vaccine.momento === group.id),
+  }));
+}
+
 function buildCompletitudFromExp(exp, pacienteId) {
   const totalControles = exp.controles_prenatales?.length ?? 0;
   const minimoControles = 4;
@@ -542,6 +590,12 @@ export default function ExpedientePaciente() {
   const [antecedentesVacunas, setAntecedentesVacunas] = useState([]);
   const [selectedLabControlId, setSelectedLabControlId] = useState(null);
   const [selectedPlanSectionId, setSelectedPlanSectionId] = useState("generales");
+  const [selectedMorbilidadId, setSelectedMorbilidadId] = useState(null);
+  const [openVaccineGroups, setOpenVaccineGroups] = useState({
+    previo_embarazo: true,
+    durante_embarazo: true,
+    postparto_aborto: true,
+  });
   const [openRiskSections, setOpenRiskSections] = useState({
     antecedentes: true,
     embarazo: false,
@@ -651,6 +705,11 @@ export default function ExpedientePaciente() {
   const planSections = exp.plan_parto ? buildPlanSections(exp.plan_parto) : [];
   const selectedPlanSection = planSections.find((section) => section.id === selectedPlanSectionId) || planSections[0];
   const planTotalRegistered = planSections.reduce((total, section) => total + section.count, 0);
+  const morbilidadOrdenada = Array.isArray(exp.morbilidad)
+    ? [...exp.morbilidad].sort((a, b) => morbilidadTime(b) - morbilidadTime(a))
+    : [];
+  const selectedMorbilidad = morbilidadOrdenada.find((item) => item.id === selectedMorbilidadId) || morbilidadOrdenada[0];
+  const vacunasAgrupadas = vaccineGroups(exp.vacunas || []);
   const puedeVerVih = usuario?.permisos?.includes("controles.ver_vih");
   const controlesLaboratorio = (exp.controles_prenatales || []).filter(hasAnyLabResult);
   const selectedLabControl = controlesLaboratorio.find((control) => control.id === selectedLabControlId) || controlesLaboratorio[0];
@@ -1232,43 +1291,107 @@ export default function ExpedientePaciente() {
           TAB: MORBILIDAD
       ══════════════════════════════════════════ */}
       {tab === "morbilidad" && (
-        <div style={{ display: "grid", gap: "1rem" }}>
-          {!isReadOnly && <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button className="btn-primary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/morbilidad/nuevo`))}>
-              <Plus size={14} /> Registrar morbilidad
-            </button>
-          </div>}
-          {exp.morbilidad?.length === 0 ? (
+        <div className="morbidity-module">
+          {!isReadOnly && (
+            <div className="morbidity-top-actions">
+              <button className="btn-primary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/morbilidad/nuevo`))}>
+                <Plus size={14} /> Registrar morbilidad
+              </button>
+            </div>
+          )}
+          {morbilidadOrdenada.length === 0 ? (
             <div className="card empty-state">
               No hay consultas intercurrentes registradas.
             </div>
           ) : (
-            exp.morbilidad.map((m) => (
-              <div className="card" key={m.id}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <span style={{ fontWeight: 600, color: "var(--text)", fontSize: "0.9rem" }}>{m.motivo_consulta}</span>
-                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
-                      {fecha(m.fecha)}{m.hora ? ` — ${m.hora}` : ""}
-                    </span>
-                    {!isReadOnly && <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/morbilidad/${m.id}/editar`))}>
-                      <Pencil size={13} /> Editar
-                    </button>}
-                    {!isReadOnly && <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar esta morbilidad?", rutaClinica(`/pacientes/${id}/morbilidad/${m.id}`))}>
-                      <Trash2 size={13} /> Eliminar
-                    </button>}
+            <div className="morbidity-layout">
+              <aside className="morbidity-timeline-panel">
+                <div className="morbidity-panel-heading">
+                  <h3>Historial de morbilidad</h3>
+                  <p>{morbilidadOrdenada.length} episodio{morbilidadOrdenada.length === 1 ? "" : "s"} registrado{morbilidadOrdenada.length === 1 ? "" : "s"}</p>
+                </div>
+                <div className="morbidity-timeline-list">
+                  {morbilidadOrdenada.map((m) => {
+                    const parts = morbilidadDateParts(m.fecha);
+                    const selected = selectedMorbilidad?.id === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        className={`morbidity-timeline-item ${selected ? "is-selected" : ""}`}
+                        onClick={() => setSelectedMorbilidadId(m.id)}
+                      >
+                        <span className="morbidity-date-chip">
+                          <strong>{parts.day}</strong>
+                          <small>{parts.month}</small>
+                          <em>{parts.year}</em>
+                        </span>
+                        <span className="morbidity-timeline-dot" />
+                        <span className="morbidity-episode-card">
+                          <strong>{m.motivo_consulta || "Morbilidad registrada"}</strong>
+                          <small><Clock size={12} /> {m.hora || "--:--"}</small>
+                          {m.nombre_cargo_atiende && <small><UserRound size={12} /> {m.nombre_cargo_atiende}</small>}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {!isReadOnly && (
+                  <button className="btn-secondary morbidity-register-inline" onClick={() => navigate(rutaClinica(`/pacientes/${id}/morbilidad/nuevo`))}>
+                    <Plus size={14} /> Registrar morbilidad
+                  </button>
+                )}
+              </aside>
+
+              {selectedMorbilidad && (
+                <section className="morbidity-detail-panel">
+                  <div className="morbidity-detail-header">
+                    <div className="morbidity-detail-title">
+                      <span className="morbidity-detail-icon"><FileText size={18} /></span>
+                      <div>
+                        <h3>{selectedMorbilidad.motivo_consulta || "Morbilidad registrada"}</h3>
+                        <p><CalendarDays size={13} /> {fecha(selectedMorbilidad.fecha)}{selectedMorbilidad.hora ? ` · ${selectedMorbilidad.hora}` : ""}</p>
+                      </div>
+                    </div>
+                    {!isReadOnly && (
+                      <div className="morbidity-detail-actions">
+                        <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/morbilidad/${selectedMorbilidad.id}/editar`))}>
+                          <Pencil size={13} /> Editar
+                        </button>
+                        <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar esta morbilidad?", rutaClinica(`/pacientes/${id}/morbilidad/${selectedMorbilidad.id}`))}>
+                          <Trash2 size={13} /> Eliminar
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div style={{ display: "grid", gap: "0.5rem" }}>
-                  <Row label="Historia enfermedad actual" value={m.historia_enfermedad_actual} />
-                  <Row label="Revisión por sistemas"      value={m.revision_por_sistemas} />
-                  <Row label="Examen físico"              value={m.examen_fisico} />
-                  <Row label="Impresión clínica"          value={m.impresion_clinica} />
-                  <Row label="Tratamiento / Referencia"   value={m.tratamiento_referencia} />
-                  <Row label="Nombre / cargo atiende"     value={m.nombre_cargo_atiende} />
-                </div>
-              </div>
-            ))
+
+                  <div className="morbidity-detail-grid">
+                    <div className="morbidity-detail-column">
+                      <MorbilidadBlock icon={FileText} title="Historia enfermedad actual">
+                        {selectedMorbilidad.historia_enfermedad_actual}
+                      </MorbilidadBlock>
+                      <MorbilidadBlock icon={Activity} title="Revisión por sistemas">
+                        {selectedMorbilidad.revision_por_sistemas}
+                      </MorbilidadBlock>
+                      <MorbilidadBlock icon={Microscope} title="Examen físico">
+                        {selectedMorbilidad.examen_fisico}
+                      </MorbilidadBlock>
+                    </div>
+                    <div className="morbidity-detail-column">
+                      <MorbilidadBlock icon={ClipboardCheck} title="Impresión clínica">
+                        {selectedMorbilidad.impresion_clinica}
+                      </MorbilidadBlock>
+                      <MorbilidadBlock icon={ShieldCheck} title="Tratamiento / referencia">
+                        {selectedMorbilidad.tratamiento_referencia}
+                      </MorbilidadBlock>
+                      <MorbilidadBlock icon={UserRound} title="Nombre / cargo atiende">
+                        {selectedMorbilidad.nombre_cargo_atiende}
+                      </MorbilidadBlock>
+                    </div>
+                  </div>
+                </section>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -1476,19 +1599,27 @@ export default function ExpedientePaciente() {
           TAB: VACUNAS
       ══════════════════════════════════════════ */}
       {tab === "vacunas" && (
-        <div style={{ display: "grid", gap: "1rem" }}>
+        <div className="vaccines-module">
           {!isReadOnly && (
-            <div className="card">
-              <SecTitle>Antecedentes de vacunación de la paciente</SecTitle>
+            <section className="vaccines-card">
+              <div className="vaccines-card-heading">
+                <h3>Antecedentes de vacunación de la paciente</h3>
+              </div>
               {!antecedentesVacunas.length ? (
-                <div className="empty-state">No hay antecedentes de vacunación registrados.</div>
+                <div className="vaccines-empty-state">
+                  <div className="vaccines-empty-icon">
+                    <ShieldCheck size={28} />
+                  </div>
+                  <strong>No hay antecedentes de vacunación registrados.</strong>
+                  <p>Cuando se registren vacunas en embarazos anteriores, se mostrarán aquí.</p>
+                </div>
               ) : (
-                <div style={{ overflowX: "auto" }}>
-                  <table className="tabla">
+                <div className="vaccines-table-wrap">
+                  <table className="vaccines-table">
                     <thead><tr><th>Vacuna</th><th>Momento</th><th>Dosis</th><th>Fecha</th><th>Origen</th></tr></thead>
                     <tbody>{antecedentesVacunas.map((v) => (
                       <tr key={v.id}>
-                        <td>{v.tipo_vacuna?.replace("_", " ").toUpperCase()}</td>
+                        <td>{vaccineLabel(v.tipo_vacuna)}</td>
                         <td>{v.momento?.replaceAll("_", " ")}</td>
                         <td>{v.numero_dosis}</td>
                         <td>{fecha(v.fecha_dosis)}</td>
@@ -1498,63 +1629,92 @@ export default function ExpedientePaciente() {
                   </table>
                 </div>
               )}
-            </div>
+            </section>
           )}
 
-          <div className="card">
-          <SecTitle>Vacunas registradas en este embarazo</SecTitle>
-          {!isReadOnly && <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
-              <button className="btn-primary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/vacunas/nuevo`))}>
-                <Plus size={14} /> Registrar vacuna
-              </button>
-          </div>}
-          {!exp.vacunas?.length ? (
-            <div className="empty-state">
-              No hay vacunas registradas.
+          <section className="vaccines-card vaccines-main-card">
+            <div className="vaccines-card-heading">
+              <h3>Vacunas registradas en este embarazo</h3>
+              {!isReadOnly && (
+                <button className="btn-primary vaccines-register-button" onClick={() => navigate(rutaClinica(`/pacientes/${id}/vacunas/nuevo`))}>
+                  <Plus size={14} /> Registrar vacuna
+                </button>
+              )}
             </div>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table className="tabla">
-                <thead>
-                  <tr>
-                    <th>Vacuna</th>
-                    <th>Momento</th>
-                    <th>No. Dosis</th>
-                    <th>Fecha</th>
-                    {!isReadOnly && <th>Acciones</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {exp.vacunas.map((v) => (
-                    <tr key={v.id}>
-                      <td style={{ fontWeight: 500 }}>{v.tipo_vacuna?.replace("_", " ").toUpperCase()}</td>
-                      <td>
-                        <span className="badge badge-blue">
-                          {v.momento === "previo_embarazo" ? "Previo embarazo"
-                            : v.momento === "durante_embarazo" ? "Durante embarazo"
-                            : "Postparto/Aborto"}
+
+            {!exp.vacunas?.length ? (
+              <div className="vaccines-empty-state is-compact">
+                <div className="vaccines-empty-icon">
+                  <Syringe size={26} />
+                </div>
+                <strong>No hay vacunas registradas.</strong>
+                <p>Al registrar vacunas para este embarazo, aparecerán agrupadas por momento.</p>
+              </div>
+            ) : (
+              <div className="vaccines-group-stack">
+                {vacunasAgrupadas.map((group) => {
+                  const open = Boolean(openVaccineGroups[group.id]);
+                  return (
+                    <article className="vaccines-group" key={group.id}>
+                      <button
+                        type="button"
+                        className="vaccines-group-header"
+                        onClick={() => setOpenVaccineGroups((current) => ({ ...current, [group.id]: !current[group.id] }))}
+                      >
+                        <span className="vaccines-group-title">
+                          <CalendarDays size={16} />
+                          <strong>{group.label}</strong>
+                          <em>{group.items.length}</em>
                         </span>
-                      </td>
-                      <td>{v.numero_dosis}</td>
-                      <td>{fecha(v.fecha_dosis)}</td>
-                      {!isReadOnly && <td>
-                        <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-                          <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/vacunas/${v.id}/editar`))}>
-                            <Pencil size={13} /> Editar
-                          </button>
-                          <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar esta vacuna?", rutaClinica(`/pacientes/${id}/vacunas/${v.id}`))}>
-                            <Trash2 size={13} /> Eliminar
-                          </button>
+                        {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      </button>
+
+                      {open && (
+                        <div className="vaccines-table-wrap">
+                          {group.items.length ? (
+                            <table className="vaccines-table">
+                              <thead>
+                                <tr>
+                                  <th>Vacuna</th>
+                                  <th>No. dosis</th>
+                                  <th>Fecha</th>
+                                  {!isReadOnly && <th>Acciones</th>}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {group.items.map((v) => (
+                                  <tr key={v.id}>
+                                    <td><span className="vaccine-name"><Syringe size={14} /> {vaccineLabel(v.tipo_vacuna)}</span></td>
+                                    <td>{v.numero_dosis}</td>
+                                    <td>{fecha(v.fecha_dosis)}</td>
+                                    {!isReadOnly && (
+                                      <td>
+                                        <div className="vaccines-actions">
+                                          <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/vacunas/${v.id}/editar`))}>
+                                            <Pencil size={13} /> Editar
+                                          </button>
+                                          <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar esta vacuna?", rutaClinica(`/pacientes/${id}/vacunas/${v.id}`))}>
+                                            <Trash2 size={13} /> Eliminar
+                                          </button>
+                                        </div>
+                                      </td>
+                                    )}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <div className="vaccines-group-empty">No hay vacunas registradas en este momento.</div>
+                          )}
                         </div>
-                      </td>}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
             </div>
-          )}
-          </div>
-        </div>
       )}
 
       {/* ══════════════════════════════════════════
