@@ -68,6 +68,7 @@ UPDATE pacientes p
 SET comunidad_id = c.id
 FROM comunidades c
 WHERE p.comunidad_id IS NULL
+  AND LOWER(BTRIM(COALESCE(p.municipio, ''))) = 'el chal'
   AND TRIM(LOWER(p.comunidad)) = TRIM(LOWER(c.nombre));
 
 CREATE TABLE IF NOT EXISTS comunidades_aliases (
@@ -134,6 +135,7 @@ WITH alias_match AS (
     ) || '%'
   )
   WHERE p.comunidad_id IS NULL
+    AND LOWER(BTRIM(COALESCE(p.municipio, ''))) = 'el chal'
     AND COALESCE(BTRIM(p.comunidad), '') <> ''
   ORDER BY p.id, LENGTH(ca.alias) DESC
 )

@@ -717,11 +717,37 @@ CREATE TABLE IF NOT EXISTS comunidades (
   territorio SMALLINT NOT NULL CHECK (territorio BETWEEN 1 AND 4),
   sector CHAR(1) NOT NULL CHECK (sector IN ('A', 'B')),
   lat DECIMAL(10,7) NOT NULL,
-  lng DECIMAL(10,7) NOT NULL
+  lng DECIMAL(10,7) NOT NULL,
+  activo BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_comunidades_nombre
   ON comunidades (nombre);
+
+ALTER TABLE comunidades
+  ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
+UPDATE comunidades
+SET activo = TRUE
+WHERE activo IS NULL;
+
+UPDATE comunidades
+SET created_at = COALESCE(created_at, NOW()),
+    updated_at = COALESCE(updated_at, created_at, NOW());
+
+ALTER TABLE comunidades
+  ALTER COLUMN activo SET DEFAULT TRUE,
+  ALTER COLUMN activo SET NOT NULL,
+  ALTER COLUMN created_at SET DEFAULT NOW(),
+  ALTER COLUMN updated_at SET DEFAULT NOW();
 
 INSERT INTO comunidades (nombre, territorio, sector, lat, lng) VALUES
 ('El Chal - Barrio El Paraiso',  1, 'A', 16.6413305, -89.6532061),
@@ -781,6 +807,7 @@ UPDATE pacientes p
 SET comunidad_id = c.id
 FROM comunidades c
 WHERE p.comunidad_id IS NULL
+  AND LOWER(BTRIM(COALESCE(p.municipio, ''))) = 'el chal'
   AND TRIM(LOWER(p.comunidad)) = TRIM(LOWER(c.nombre));
 
 CREATE TABLE IF NOT EXISTS comunidades_aliases (
@@ -847,6 +874,7 @@ WITH alias_match AS (
     ) || '%'
   )
   WHERE p.comunidad_id IS NULL
+    AND LOWER(BTRIM(COALESCE(p.municipio, ''))) = 'el chal'
     AND COALESCE(BTRIM(p.comunidad), '') <> ''
   ORDER BY p.id, LENGTH(ca.alias) DESC
 )

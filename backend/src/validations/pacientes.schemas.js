@@ -36,6 +36,7 @@ const pacienteBase = {
   territorio: optionalText(100),
   sector: optionalText(80),
   comunidad: optionalText(100),
+  comunidad_id: optionalInt(1, 2147483647),
   telefono: optionalText(20),
   nivel_estudios: optionalEnum(['ninguno', 'primaria', 'basico', 'diversificado', 'universitaria', 'secundaria']),
   ultimo_anio_aprobado: optionalInt(0, 20),

@@ -1,12 +1,13 @@
 ﻿import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useMemo } from "react";
 import { createContext, useContext } from "react";
 import { useEffect } from "react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import {
   Building2, User, Heart, Baby, ShieldAlert, CheckCircle,
-  ChevronLeft, ChevronRight, Save
+  AlertTriangle, ChevronLeft, ChevronRight, Save
 } from "lucide-react";
 import { getErrorMessage } from "../utils/errorMessage";
 import { useFieldErrors } from "../hooks/useFieldErrors";
@@ -87,6 +88,18 @@ const MUNICIPIOS_PETEN = [
   { value: "Las Cruces", label: "Las Cruces" },
 ];
 
+function esMunicipioElChal(municipio) {
+  return String(municipio || "").trim().toLowerCase() === "el chal";
+}
+
+function normalizarBusqueda(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 // ─── HELPERS DE CAMPO ────────────────────────────────────────
 function Field({ label, required, children, name }) {
   const { fieldError } = useFormErrorUi();
@@ -129,6 +142,134 @@ function Select({ label, name, options, required, form, set }) {
           <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>
         ))}
       </select>
+    </Field>
+  );
+}
+
+function ComunidadField({
+  form,
+  set,
+  comunidades,
+  loading,
+  error,
+  modoLibreElChal,
+  setModoLibreElChal,
+  onSelectComunidad,
+}) {
+  const { inputClass } = useFormErrorUi();
+  const municipioElChal = esMunicipioElChal(form.municipio);
+  const query = normalizarBusqueda(form.comunidad);
+  const opcionesFiltradas = useMemo(() => {
+    if (!query) return comunidades.slice(0, 8);
+    return comunidades
+      .filter((comunidad) => normalizarBusqueda(comunidad.nombre).includes(query))
+      .slice(0, 8);
+  }, [comunidades, query]);
+
+  if (!municipioElChal || modoLibreElChal) {
+    return (
+      <Field label="Comunidad" name="comunidad">
+        <input
+          className={inputClass("comunidad")}
+          name="comunidad"
+          value={form.comunidad ?? ""}
+          onChange={(e) => set("comunidad", e.target.value)}
+        />
+        {municipioElChal && (
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setModoLibreElChal(false)}
+            style={{ marginTop: "0.5rem", minHeight: 34, padding: "0.4rem 0.65rem" }}
+          >
+            Usar catálogo
+          </button>
+        )}
+        <p style={{ margin: "0.45rem 0 0", color: "var(--text-muted)", fontSize: "0.78rem", lineHeight: 1.35 }}>
+          {municipioElChal
+            ? "Seleccione una comunidad del catálogo para ubicar correctamente a la paciente en el mapa de riesgo."
+            : "La comunidad se registrará como texto libre y no se ubicará en el mapa de riesgo de El Chal."}
+        </p>
+      </Field>
+    );
+  }
+
+  return (
+    <Field label="Comunidad" name="comunidad">
+      <input
+        className={inputClass("comunidad")}
+        name="comunidad"
+        value={form.comunidad ?? ""}
+        onChange={(e) => set("comunidad", e.target.value)}
+        placeholder="Buscar comunidad de El Chal"
+        autoComplete="off"
+      />
+
+      <div style={{
+        marginTop: "0.45rem",
+        border: "1px solid var(--border)",
+        borderRadius: 8,
+        overflow: "hidden",
+        background: "var(--surface)",
+      }}>
+        {loading && (
+          <div style={{ padding: "0.55rem 0.65rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
+            Cargando comunidades...
+          </div>
+        )}
+        {!loading && error && (
+          <div style={{ padding: "0.55rem 0.65rem", color: "var(--danger)", fontSize: "0.8rem" }}>
+            {error}
+          </div>
+        )}
+        {!loading && !error && opcionesFiltradas.map((comunidad) => (
+          <button
+            key={comunidad.id}
+            type="button"
+            onClick={() => onSelectComunidad(comunidad)}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "0.75rem",
+              padding: "0.55rem 0.65rem",
+              border: 0,
+              borderBottom: "1px solid var(--border)",
+              background: Number(form.comunidad_id) === Number(comunidad.id) ? "var(--primary-lt)" : "transparent",
+              color: "var(--text)",
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            <span>{comunidad.nombre}</span>
+            <span style={{ color: "var(--text-muted)", fontSize: "0.74rem", whiteSpace: "nowrap" }}>
+              T{comunidad.territorio} · S{comunidad.sector}
+            </span>
+          </button>
+        ))}
+        {!loading && !error && opcionesFiltradas.length === 0 && (
+          <div style={{ padding: "0.55rem 0.65rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
+            Sin coincidencias
+          </div>
+        )}
+      </div>
+
+      <button
+        type="button"
+        className="btn-secondary"
+        onClick={() => {
+          set("comunidad_id", null);
+          setModoLibreElChal(true);
+        }}
+        style={{ marginTop: "0.5rem", minHeight: 34, padding: "0.4rem 0.65rem" }}
+      >
+        No aparece en el catálogo
+      </button>
+
+      <p style={{ margin: "0.45rem 0 0", color: "var(--text-muted)", fontSize: "0.78rem", lineHeight: 1.35 }}>
+        Seleccione una comunidad del catálogo para ubicar correctamente a la paciente en el mapa de riesgo.
+      </p>
     </Field>
   );
 }
@@ -228,7 +369,7 @@ const INIT = {
   fecha_nacimiento: "", edad_manual: "", edad_calculada: "", rango_edad: "",
   clasificacion_alfa_beta: "",
   domicilio: "", municipio: "El Chal", territorio: "",
-  sector: "", comunidad: "", telefono: "",
+  sector: "", comunidad: "", comunidad_id: null, telefono: "",
   nivel_estudios: "", ultimo_anio_aprobado: "",
   profesion_oficio: "", estado_civil: "",
   vive_sola: false,
@@ -287,6 +428,10 @@ export default function NuevaPaciente() {
   const [form, setForm]       = useState(INIT);
   const [cuiError, setCuiError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [comunidadesActivas, setComunidadesActivas] = useState([]);
+  const [comunidadesLoading, setComunidadesLoading] = useState(false);
+  const [comunidadesError, setComunidadesError] = useState("");
+  const [modoLibreElChal, setModoLibreElChal] = useState(false);
   const cuiInputRef           = useRef(null);
   const navigate              = useNavigate();
   const toast                 = useGlobalToast();
@@ -295,7 +440,39 @@ export default function NuevaPaciente() {
 
   const set = (k, v) => {
     if (k === "cui") setCuiError("");
+    fieldErrors.clearFieldError(k);
+
+    if (k === "municipio") {
+      setModoLibreElChal(false);
+      setForm((current) => ({
+        ...current,
+        municipio: v,
+        comunidad_id: null,
+      }));
+      return;
+    }
+
+    if (k === "comunidad") {
+      setForm((current) => ({
+        ...current,
+        comunidad: v,
+        comunidad_id: null,
+      }));
+      return;
+    }
+
     fieldErrors.setFormValue(setForm, k, v);
+  };
+
+  const seleccionarComunidad = (comunidad) => {
+    fieldErrors.clearFieldError("comunidad");
+    fieldErrors.clearFieldError("comunidad_id");
+    setModoLibreElChal(false);
+    setForm((current) => ({
+      ...current,
+      comunidad: comunidad.nombre,
+      comunidad_id: comunidad.id,
+    }));
   };
   const cuiIncompleto = form.cui && !/^\d{13}$/.test(form.cui);
   const goToCuiField = () => {
@@ -334,6 +511,29 @@ export default function NuevaPaciente() {
   };
 
   useEffect(() => {
+    let alive = true;
+    setComunidadesLoading(true);
+    setComunidadesError("");
+
+    api.get("/comunidades/activas")
+      .then(({ data }) => {
+        if (!alive) return;
+        setComunidadesActivas(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setComunidadesError(getErrorMessage(err, "Error al cargar comunidades."));
+      })
+      .finally(() => {
+        if (alive) setComunidadesLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!editando) return;
 
     api.get(`/pacientes/${id}`)
@@ -350,6 +550,7 @@ export default function NuevaPaciente() {
           fpp: data.fpp ? data.fpp.split("T")[0] : "",
           fin_embarazo_anterior: data.fin_embarazo_anterior ? data.fin_embarazo_anterior.split("T")[0] : "",
           antec_emb_ectopico_num: data.antec_emb_ectopico_num ?? (data.antec_emb_ectopico ? 1 : 0),
+          comunidad_id: esMunicipioElChal(data.municipio) ? (data.comunidad_id ?? null) : null,
         }));
       })
       .catch(() => toast("Error al cargar datos de la paciente", "error"))
@@ -438,8 +639,10 @@ export default function NuevaPaciente() {
     setLoading(true);
     fieldErrors.clearFieldErrors();
     try {
+      const municipioElChal = esMunicipioElChal(form.municipio);
       const payload = {
         ...form,
+        comunidad_id: municipioElChal ? (form.comunidad_id || null) : null,
         fpp: form.fpp || calcularFppDesdeFur(form.fur),
         antec_diabetes: Boolean(form.antec_diabetes_tipo),
         fuma_activamente: Boolean(
@@ -649,7 +852,16 @@ export default function NuevaPaciente() {
                 <Select label="Sector" name="sector" form={form} set={set}
                   options={["A", "B"]}
                 />
-                <Input label="Comunidad" name="comunidad" form={form} set={set} />
+                <ComunidadField
+                  form={form}
+                  set={set}
+                  comunidades={comunidadesActivas}
+                  loading={comunidadesLoading}
+                  error={comunidadesError}
+                  modoLibreElChal={modoLibreElChal}
+                  setModoLibreElChal={setModoLibreElChal}
+                  onSelectComunidad={seleccionarComunidad}
+                />
                 <Input label="Teléfono" name="telefono" form={form} set={set} />
               </div>
             </div>

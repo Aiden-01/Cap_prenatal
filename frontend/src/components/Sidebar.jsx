@@ -2,7 +2,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, UserPlus, BarChart3,
-  Settings, X, LogOut, Menu, Moon, Sun, KeyRound, MapPin
+  Settings, X, LogOut, Menu, Moon, Sun, KeyRound, MapPin, MapPinned
 } from "lucide-react";
 
 const NAV = [
@@ -15,6 +15,10 @@ const NAV = [
 
 const NAV_ADMIN = [
   { label: "Usuarios", path: "/usuarios", icon: Settings, delay: 250 },
+];
+
+const NAV_DIRECTOR = [
+  { label: "Comunidades", path: "/comunidades", icon: MapPinned, delay: 250 },
 ];
 
 // Color fijo del sidebar — no depende del tema, siempre oscuro
@@ -87,9 +91,11 @@ export default function Sidebar({
     window.setTimeout(() => setThemeSwitching(false), 520);
   };
 
-  const items = usuario?.rol === "admin" || usuario?.rol === "director"
-    ? [...NAV, ...NAV_ADMIN]
-    : NAV;
+  const items = [
+    ...NAV,
+    ...(usuario?.rol === "director" ? NAV_DIRECTOR : []),
+    ...(usuario?.rol === "admin" || usuario?.rol === "director" ? NAV_ADMIN : []),
+  ];
 
   return (
     <>

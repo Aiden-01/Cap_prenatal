@@ -1,0 +1,20 @@
+ALTER TABLE comunidades
+  ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
+UPDATE comunidades
+SET activo = TRUE
+WHERE activo IS NULL;
+
+UPDATE comunidades
+SET created_at = COALESCE(created_at, NOW()),
+    updated_at = COALESCE(updated_at, created_at, NOW());
+
+ALTER TABLE comunidades
+  ALTER COLUMN activo SET DEFAULT TRUE,
+  ALTER COLUMN activo SET NOT NULL,
+  ALTER COLUMN created_at SET DEFAULT NOW(),
+  ALTER COLUMN updated_at SET DEFAULT NOW();

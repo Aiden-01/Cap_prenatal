@@ -49,6 +49,10 @@ function uniqueMessage(err) {
     return 'Ya existe esa atencion de puerperio para esta paciente';
   }
 
+  if (err.constraint === 'ux_comunidades_nombre') {
+    return 'Ya existe una comunidad con ese nombre';
+  }
+
   return 'Ya existe un registro con esos datos';
 }
 

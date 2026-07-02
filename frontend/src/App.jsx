@@ -15,10 +15,12 @@ import VacunaForm from "./pages/VacunaForm";
 import Reportes from "./pages/Reportes";
 import MapaRiesgo from "./pages/MapaRiesgo";
 import Usuarios from "./pages/Usuarios";
+import Comunidades from "./pages/Comunidades";
 
-function PrivateRoute({ children, adminOnly = false }) {
+function PrivateRoute({ children, adminOnly = false, directorOnly = false }) {
   const { usuario, isAdmin } = useAuth();
   if (!usuario) return <Navigate to="/login" replace />;
+  if (directorOnly && usuario.rol !== "director") return <Navigate to="/dashboard" replace />;
   if (adminOnly && !isAdmin) return <Navigate to="/dashboard" replace />;
   return children;
 }
@@ -48,6 +50,7 @@ export default function App() {
           <Route path="nuevo" element={<NuevaPaciente />} />
           <Route path="reportes" element={<Reportes />} />
           <Route path="mapa-riesgo" element={<MapaRiesgo />} />
+          <Route path="comunidades" element={<PrivateRoute directorOnly><Comunidades /></PrivateRoute>} />
           <Route path="usuarios" element={<PrivateRoute adminOnly><Usuarios /></PrivateRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" />} />

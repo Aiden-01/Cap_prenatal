@@ -21,6 +21,7 @@ const MODULO_POR_ENTIDAD = {
   planes_parto: 'plan_parto',
   referencias_efectuadas: 'referencias',
   usuarios: 'usuarios',
+  comunidades: 'comunidades',
 };
 
 function sanitize(value) {
