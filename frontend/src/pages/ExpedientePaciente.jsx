@@ -2,11 +2,15 @@
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
+import { useAuth } from "../hooks/useAuth";
 import SemaforoCompletitud from "../components/SemaforoCompletitud";
 import TimelineControles from "../components/TimelineControles";
 import {
   ChevronLeft, Plus, AlertTriangle, CheckCircle, Pencil, Trash2,
-  Syringe, Activity, FlaskConical, Baby, FileText, Printer
+  Syringe, Activity, FlaskConical, Baby, FileText, Printer,
+  CalendarDays, ChevronRight, Droplets, LockKeyhole, Microscope,
+  ShieldCheck, TestTube2, ChevronDown, Car,
+  PackageCheck, ClipboardCheck, MapPin, PenLine
 } from "lucide-react";
 import { getErrorMessage } from "../utils/errorMessage";
 
@@ -66,6 +70,422 @@ function fecha(d) {
   return Number.isNaN(date.getTime()) ? "Sin fecha" : date.toLocaleDateString("es-GT");
 }
 
+function normalizeResult(value) {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
+function readableResult(value) {
+  const text = normalizeResult(value);
+  if (!text) return "";
+  return text
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function isNoAplica(value) {
+  return normalizeResult(value).toLowerCase() === "no_aplica";
+}
+
+function labStudy(label, realizado, value, fallback = "Realizado") {
+  if (isNoAplica(value)) {
+    return { label, status: "not-applicable", value: "No corresponde" };
+  }
+  if (!realizado) {
+    return { label, status: "not-done", value: "No realizado" };
+  }
+  return { label, status: "done", value: normalizeResult(value) || fallback };
+}
+
+function labTorch(control) {
+  if (!control.torch_realizado) return { label: "TORCH", status: "not-done", value: "No realizado" };
+  if (control.torch_resultado_positivo === null || control.torch_resultado_positivo === undefined) {
+    return { label: "TORCH", status: "done", value: control.torch_resultado_valor || "Realizado" };
+  }
+  const result = control.torch_resultado_positivo ? "Positivo" : "Negativo";
+  return {
+    label: "TORCH",
+    status: "done",
+    value: control.torch_resultado_valor ? `${result} · ${control.torch_resultado_valor}` : result,
+  };
+}
+
+function labOrina(control) {
+  const value = [
+    control.orina_bacteriuria && "Bacteriuria+",
+    control.orina_proteinuria && "Proteinuria+",
+  ].filter(Boolean).join(" / ");
+  return labStudy("Orina", control.orina_realizada, value, "Realizada");
+}
+
+function labVih(control, puedeVerVih) {
+  if (!puedeVerVih) {
+    return { label: "VIH", status: "restricted", value: "Sin permiso para visualizar" };
+  }
+  if (isNoAplica(control.vih_resultado)) {
+    return { label: "VIH", status: "not-applicable", value: "No corresponde" };
+  }
+  if (!control.vih_realizado) {
+    return { label: "VIH", status: "not-done", value: "No realizado" };
+  }
+  return {
+    label: "VIH",
+    status: "done",
+    value: control.vih_resultado_valor || readableResult(control.vih_resultado) || "Realizado",
+  };
+}
+
+function hasAnyLabResult(control) {
+  return Boolean(
+    control.hematologia_realizada || control.glicemia_realizada || control.grupo_rh_realizado ||
+    control.orina_realizada || control.heces_realizada || control.vih_realizado ||
+    control.vdrl_realizado || control.torch_realizado || control.papanicolau_ivaa_realizado ||
+    control.hepatitis_b_realizado || control.usg_realizado || normalizeResult(control.otros_lab)
+  );
+}
+
+function labDoneCount(control, puedeVerVih) {
+  const fields = [
+    control.hematologia_realizada,
+    control.glicemia_realizada,
+    control.grupo_rh_realizado,
+    control.orina_realizada,
+    control.heces_realizada,
+    puedeVerVih && control.vih_realizado,
+    control.vdrl_realizado,
+    control.torch_realizado,
+    control.papanicolau_ivaa_realizado,
+    control.hepatitis_b_realizado,
+    control.usg_realizado,
+    Boolean(normalizeResult(control.otros_lab)),
+  ];
+  return fields.filter(Boolean).length;
+}
+
+function LabStudyRow({ study }) {
+  const restricted = study.status === "restricted";
+  return (
+    <div className={`lab-study-row is-${study.status}`}>
+      <span className="lab-study-label">{study.label}</span>
+      <span className="lab-study-value">
+        {restricted && <LockKeyhole size={13} />}
+        {study.value}
+      </span>
+    </div>
+  );
+}
+
+function LabCategoryCard({ icon: Icon, title, studies }) {
+  return (
+    <article className="lab-category-card">
+      <div className="lab-category-title">
+        <Icon size={18} />
+        <h4>{title}</h4>
+      </div>
+      <div className="lab-study-list">
+        {studies.map((study) => (
+          <LabStudyRow key={study.label} study={study} />
+        ))}
+      </div>
+    </article>
+  );
+}
+
+const RISK_SECTIONS = [
+  {
+    id: "antecedentes",
+    title: "Antecedentes obstétricos",
+    criteria: [
+      ["muerte_fetal_neonatal_previa", "Muerte fetal/neonatal previa"],
+      ["abortos_espontaneos_3mas", "3+ abortos espontáneos consecutivos"],
+      ["gestas_3mas", "3+ gestas"],
+      ["peso_ultimo_bebe_menor_2500g", "RN anterior < 2500g"],
+      ["peso_ultimo_bebe_mayor_4500g", "RN anterior > 4500g"],
+      ["antec_hipertension_preeclampsia", "Antec. HTA / preeclampsia"],
+      ["cirugias_tracto_reproductivo", "Cirugías tracto reproductivo"],
+    ],
+  },
+  {
+    id: "embarazo",
+    title: "Embarazo actual",
+    criteria: [
+      ["embarazo_multiple", "Embarazo múltiple"],
+      ["menor_20_anos", "Menor de 20 años"],
+      ["mayor_35_anos", "Mayor de 35 años"],
+      ["paciente_rh_negativo", "Paciente Rh (-)"],
+      ["hemorragia_vaginal", "Hemorragia vaginal"],
+      ["vih_positivo_sifilis", "VIH+ / Sífilis"],
+      ["presion_diastolica_90mas", "P/A diastólica >= 90"],
+      ["anemia", "Anemia"],
+      ["desnutricion_obesidad", "Desnutrición / Obesidad"],
+      ["dolor_abdominal", "Dolor abdominal"],
+      ["sintomatologia_urinaria", "Sintomatología urinaria"],
+      ["ictericia", "Ictericia"],
+    ],
+  },
+  {
+    id: "historia",
+    title: "Historia clínica general",
+    criteria: [
+      ["diabetes", "Diabetes"],
+      ["enfermedad_renal", "Enfermedad renal"],
+      ["enfermedad_corazon", "Enfermedad del corazón"],
+      ["hipertension_arterial", "Hipertensión arterial"],
+      ["consumo_drogas_alcohol_tabaco", "Drogas/alcohol/tabaco"],
+      ["otra_enfermedad_severa", "Otra enf. severa"],
+    ],
+  },
+];
+
+function riskPositiveCount(risk, section) {
+  return section.criteria.filter(([field]) => Boolean(risk?.[field])).length;
+}
+
+function riskTotalCount() {
+  return RISK_SECTIONS.reduce((total, section) => total + section.criteria.length, 0);
+}
+
+function RiskCriterion({ label, checked }) {
+  return (
+    <div className={`risk-criterion ${checked ? "is-on" : ""}`}>
+      <span className="risk-criterion-check">{checked && <CheckCircle size={13} />}</span>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function RiskSection({ number, section, risk, isOpen, onToggle }) {
+  const selected = riskPositiveCount(risk, section);
+  return (
+    <article className={`risk-section-card ${isOpen ? "is-open" : ""}`}>
+      <button type="button" className="risk-section-header" onClick={onToggle}>
+        <span className="risk-section-number">{number}</span>
+        <strong>{section.title}</strong>
+        {!isOpen && <span className="risk-section-count">{selected} criterios seleccionados</span>}
+        {isOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+      </button>
+      {isOpen && (
+        <div className="risk-criteria-grid">
+          {section.criteria.map(([field, label]) => (
+            <RiskCriterion key={field} label={label} checked={Boolean(risk?.[field])} />
+          ))}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function planValue(value) {
+  if (value === null || value === undefined || value === "") return "-";
+  return String(value);
+}
+
+function planDate(value) {
+  if (!value) return "-";
+  return fecha(value);
+}
+
+function planBoolValue(value) {
+  return value ? "Sí" : "No";
+}
+
+function planItem(label, value) {
+  return { label, value: planValue(value), filled: value !== null && value !== undefined && value !== "" };
+}
+
+function planDateItem(label, value) {
+  return { label, value: planDate(value), filled: Boolean(value) };
+}
+
+function planBoolItem(label, value) {
+  return { label, value: planBoolValue(value), filled: Boolean(value), isBoolean: true };
+}
+
+function countPlanFilled(items) {
+  return items.filter((item) => item.filled).length;
+}
+
+function buildPlanSections(plan) {
+  const sections = [
+    {
+      id: "generales",
+      number: 1,
+      title: "Datos generales",
+      Icon: FileText,
+      summary: "Identificación, residencia y datos personales.",
+      metricLabel: "datos registrados",
+      criticalFields: ["servicio_salud", "lugar_residencia", "telefono"],
+      items: [
+        planItem("No. registro", plan.no_registro),
+        planItem("Servicio de salud", plan.servicio_salud),
+        planDateItem("Fecha", plan.fecha),
+        planItem("Lugar de residencia", plan.lugar_residencia),
+        planItem("Nombre cónyuge", plan.nombre_conyuge),
+        planItem("Teléfono", plan.telefono),
+        planDateItem("Fecha de nacimiento", plan.fecha_nacimiento),
+        planItem("Estado civil", plan.estado_civil),
+        planItem("Pueblo", plan.pueblo),
+        planItem("Escolaridad", plan.escolaridad),
+        planItem("Con quién vive", plan.con_quien_vive),
+        planItem("Idioma", plan.idioma),
+      ],
+    },
+    {
+      id: "obstetrico",
+      number: 2,
+      title: "Resumen obstétrico",
+      Icon: Activity,
+      summary: "Antecedentes obstétricos y edad gestacional.",
+      metricLabel: "datos registrados",
+      criticalFields: ["fur", "fecha_probable_parto", "ha_tenido_atencion_prenatal"],
+      items: [
+        planBoolItem("Atención prenatal", plan.ha_tenido_atencion_prenatal),
+        planItem("No. embarazos", plan.no_embarazos),
+        planItem("No. partos", plan.no_partos),
+        planItem("No. abortos", plan.no_abortos),
+        planItem("No. hijos vivos", plan.no_hijos_vivos),
+        planItem("No. hijos muertos", plan.no_hijos_muertos),
+        planDateItem("FUR", plan.fur),
+        planDateItem("FPP", plan.fecha_probable_parto),
+        planItem("No. cesáreas", plan.no_cesareas),
+        planDateItem("Última cesárea", plan.fecha_ultima_cesarea),
+        planItem("Edad gestacional UR", plan.edad_gestacional_semanas),
+        planItem("Edad gestacional AU", plan.edad_gestacional_au),
+      ],
+    },
+    {
+      id: "peligro",
+      number: 3,
+      title: "Signos de peligro",
+      Icon: AlertTriangle,
+      summary: "Signos reconocidos para activar atención o traslado.",
+      metricLabel: "signos evaluados",
+      criticalFields: [
+        "peligro_hemorragia_vaginal",
+        "peligro_convulsiones",
+        "peligro_ausencia_mov_fetales",
+      ],
+      items: [
+        planBoolItem("Dolor de cabeza", plan.peligro_dolor_cabeza),
+        planBoolItem("Visión borrosa", plan.peligro_vision_borrosa),
+        planBoolItem("Embarazo múltiple", plan.peligro_embarazo_multiple),
+        planBoolItem("Hemorragia vaginal", plan.peligro_hemorragia_vaginal),
+        planBoolItem("Edema MI", plan.peligro_edema_mi),
+        planBoolItem("Niño transverso", plan.peligro_nino_transverso),
+        planBoolItem("Dolor de estómago", plan.peligro_dolor_estomago),
+        planBoolItem("Salida de líquidos", plan.peligro_salida_liquidos),
+        planBoolItem("Convulsiones", plan.peligro_convulsiones),
+        planBoolItem("Fiebre", plan.peligro_fiebre),
+        planBoolItem("Ausencia movimientos fetales", plan.peligro_ausencia_mov_fetales),
+        planBoolItem("Placenta no salió", plan.peligro_placenta_no_salia),
+      ],
+    },
+    {
+      id: "atencion",
+      number: 4,
+      title: "Atención del parto",
+      Icon: MapPin,
+      summary: "Lugar, posición y distancia al servicio elegido.",
+      metricLabel: "decisiones registradas",
+      criticalFields: ["lugar_atencion_parto", "posicion_parto", "nombre_proveedor_salud"],
+      items: [
+        planItem("Posición parto", plan.posicion_parto),
+        planItem("Lugar atención parto", plan.lugar_atencion_parto),
+        planBoolItem("Casa materna cercana", plan.casa_materna_cercana),
+        planBoolItem("Usará casa materna", plan.usara_casa_materna),
+        planItem("Horas distancia", plan.horas_distancia),
+        planItem("Kms servicio", plan.kms_servicio),
+        planItem("Proveedor salud", plan.nombre_proveedor_salud),
+      ],
+    },
+    {
+      id: "traslado",
+      number: 5,
+      title: "Traslado y recursos",
+      Icon: Car,
+      summary: "Movilización, contacto y recursos para emergencia.",
+      metricLabel: "recursos definidos",
+      criticalFields: ["como_trasladara", "telefono_vehiculo", "responsable_activar"],
+      items: [
+        planItem("Cómo se trasladará", plan.como_trasladara),
+        planItem("Acompaña traslado", plan.acompana_traslado),
+        planItem("Teléfono vehículo", plan.telefono_vehiculo),
+        planBoolItem("Cuenta ahorro", plan.cuenta_ahorro),
+        planItem("Con quién hijos", plan.con_quien_hijos),
+        planItem("Quién cuida casa", plan.quien_cuida_casa),
+        planItem("Responsable activar", plan.responsable_activar),
+        planItem("Nombre activa plan", plan.nombre_activara_plan),
+      ],
+    },
+    {
+      id: "preparacion",
+      number: 6,
+      title: "Acompañamiento y preparación",
+      Icon: PackageCheck,
+      summary: "Acompañantes, bebidas y artículos preparados.",
+      metricLabel: "preparativos registrados",
+      criticalFields: ["acompana_parto", "ropa_nino", "ropa_madre"],
+      items: [
+        planItem("Acompaña parto", plan.acompana_parto),
+        planItem("Bebida durante parto", plan.bebida_durante_parto),
+        planItem("Bebida después parto", plan.bebida_despues_parto),
+        planBoolItem("Ropa niño", plan.ropa_nino),
+        planBoolItem("Ropa madre", plan.ropa_madre),
+        planItem("Otros artículos", plan.otros_articulos),
+      ],
+    },
+    {
+      id: "documentos",
+      number: 7,
+      title: "Documentos y responsables",
+      Icon: ClipboardCheck,
+      summary: "Documentos y comité de emergencia.",
+      metricLabel: "puntos verificados",
+      criticalFields: ["lleva_dpi_madre", "comunicado_comite"],
+      items: [
+        planBoolItem("DPI madre", plan.lleva_dpi_madre),
+        planBoolItem("DPI cónyuge", plan.lleva_dpi_conyuge),
+        planBoolItem("Partida nacimiento", plan.lleva_partida_nacimiento),
+        planBoolItem("Comité comunicado", plan.comunicado_comite),
+        planItem("Responsable activar", plan.responsable_activar),
+        planItem("Nombre activa plan", plan.nombre_activara_plan),
+      ],
+    },
+    {
+      id: "firmas",
+      number: 8,
+      title: "Firmas / constancias",
+      Icon: PenLine,
+      summary: "Constancias y responsables visibles en la ficha oficial.",
+      metricLabel: "constancias registradas",
+      criticalFields: ["nombre_proveedor_salud", "no_registro"],
+      items: [
+        planItem("No. registro", plan.no_registro),
+        planItem("Embarazada", plan.no_registro ? "Identificada" : ""),
+        planItem("Cónyuge / conviviente", plan.nombre_conyuge),
+        planItem("Proveedor de salud", plan.nombre_proveedor_salud),
+        planItem("Servicio de salud", plan.servicio_salud),
+      ],
+    },
+  ];
+
+  return sections.map((section) => ({
+    ...section,
+    count: countPlanFilled(section.items),
+    criticalCount: section.criticalFields.filter((field) => Boolean(plan?.[field])).length,
+    criticalTotal: section.criticalFields.length,
+  }));
+}
+
+function PlanSummaryItem({ item }) {
+  return (
+    <div className={`plan-summary-item ${item.isBoolean && item.filled ? "is-on" : ""}`}>
+      <span>{item.label}</span>
+      <strong>{item.value}</strong>
+    </div>
+  );
+}
+
 function buildCompletitudFromExp(exp, pacienteId) {
   const totalControles = exp.controles_prenatales?.length ?? 0;
   const minimoControles = 4;
@@ -114,11 +534,19 @@ export default function ExpedientePaciente() {
   const navigate   = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const toast      = useGlobalToast();
+  const { usuario } = useAuth();
   const [exp, setExp]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [printing, setPrinting] = useState(false);
   const [antecedentesVacunas, setAntecedentesVacunas] = useState([]);
+  const [selectedLabControlId, setSelectedLabControlId] = useState(null);
+  const [selectedPlanSectionId, setSelectedPlanSectionId] = useState("generales");
+  const [openRiskSections, setOpenRiskSections] = useState({
+    antecedentes: true,
+    embarazo: false,
+    historia: false,
+  });
   const selectedEmbarazoId = searchParams.get("embarazo_id") || "";
 
   const cargarExpediente = () => {
@@ -215,6 +643,67 @@ export default function ExpedientePaciente() {
   const estadoEmbarazo = embarazoSeleccionado?.estado;
   const puedeRegistrarPrenatal = estadoEmbarazo === "activo";
   const puedeRegistrarPuerperio = estadoEmbarazo === "activo" || estadoEmbarazo === "puerperio";
+  const riskTotalCriteria = riskTotalCount();
+  const riskPositiveCriteria = exp.ficha_riesgo
+    ? RISK_SECTIONS.reduce((total, section) => total + riskPositiveCount(exp.ficha_riesgo, section), 0)
+    : 0;
+  const riskNegativeCriteria = riskTotalCriteria - riskPositiveCriteria;
+  const planSections = exp.plan_parto ? buildPlanSections(exp.plan_parto) : [];
+  const selectedPlanSection = planSections.find((section) => section.id === selectedPlanSectionId) || planSections[0];
+  const planTotalRegistered = planSections.reduce((total, section) => total + section.count, 0);
+  const puedeVerVih = usuario?.permisos?.includes("controles.ver_vih");
+  const controlesLaboratorio = (exp.controles_prenatales || []).filter(hasAnyLabResult);
+  const selectedLabControl = controlesLaboratorio.find((control) => control.id === selectedLabControlId) || controlesLaboratorio[0];
+  const selectedLabCategories = selectedLabControl ? [
+    {
+      title: "Hematología",
+      icon: Droplets,
+      studies: [
+        labStudy("Hemoglobina (Hb)", selectedLabControl.hematologia_realizada, selectedLabControl.hematologia_resultado),
+      ],
+    },
+    {
+      title: "Química",
+      icon: TestTube2,
+      studies: [
+        labStudy("Glicemia en ayunas", selectedLabControl.glicemia_realizada, selectedLabControl.glicemia_resultado),
+      ],
+    },
+    {
+      title: "Tamizajes / Infecciosos",
+      icon: ShieldCheck,
+      studies: [
+        labStudy("Grupo y RH", selectedLabControl.grupo_rh_realizado, selectedLabControl.grupo_rh_resultado),
+        labStudy("VDRL/RPR", selectedLabControl.vdrl_realizado, readableResult(selectedLabControl.vdrl_resultado)),
+        labVih(selectedLabControl, puedeVerVih),
+        labStudy("Hepatitis B", selectedLabControl.hepatitis_b_realizado, readableResult(selectedLabControl.hepatitis_b_resultado)),
+        labTorch(selectedLabControl),
+      ],
+    },
+    {
+      title: "Orina y Heces",
+      icon: FlaskConical,
+      studies: [
+        labOrina(selectedLabControl),
+        labStudy("Heces", selectedLabControl.heces_realizada, selectedLabControl.heces_resultado),
+      ],
+    },
+    {
+      title: "Citología",
+      icon: FileText,
+      studies: [
+        labStudy("Papanicolau / IVAA", selectedLabControl.papanicolau_ivaa_realizado, selectedLabControl.papanicolau_ivaa_resultado),
+      ],
+    },
+    {
+      title: "Complementarios",
+      icon: Microscope,
+      studies: [
+        labStudy("USG", selectedLabControl.usg_realizado, selectedLabControl.usg_hallazgos),
+        labStudy("Otros", Boolean(normalizeResult(selectedLabControl.otros_lab)), selectedLabControl.otros_lab),
+      ],
+    },
+  ] : [];
   const badgeEmbarazo = estadoEmbarazo === "activo"
     ? "badge-green"
     : estadoEmbarazo === "puerperio"
@@ -788,7 +1277,7 @@ export default function ExpedientePaciente() {
           TAB: RIESGO OBSTÉTRICO
       ══════════════════════════════════════════ */}
       {tab === "riesgo" && (
-        <div className="card">
+        <div className="risk-module-card">
           {!exp.ficha_riesgo ? (
             <div className="empty-state">
               No hay ficha de riesgo registrada.
@@ -800,65 +1289,72 @@ export default function ExpedientePaciente() {
             </div>
           ) : (
             <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                <h3>Ficha de Riesgo Obstétrico</h3>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <div className="risk-module-header">
+                <div className="risk-title-row">
+                  <h3>Ficha de Riesgo Obstétrico</h3>
                   {exp.ficha_riesgo.tiene_riesgo
-                    ? <span className="badge badge-red">⚠ PRESENTA RIESGO</span>
-                    : <span className="badge badge-green"><CheckCircle size={11} /> SIN RIESGO</span>}
-                  <button className="btn-primary" onClick={imprimirFichaRiesgo} disabled={printing}>
+                    ? <span className="badge badge-red risk-status-badge"><AlertTriangle size={13} /> Presenta riesgo</span>
+                    : <span className="badge badge-green risk-status-badge"><CheckCircle size={13} /> Sin riesgo</span>}
+                </div>
+                <div className="risk-action-row">
+                  <button className="btn-secondary risk-action-button" onClick={imprimirFichaRiesgo} disabled={printing}>
                     <Printer size={13} /> {printing ? "Generando..." : "Imprimir"}
                   </button>
-                  {!isReadOnly && <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/riesgo`))}>
+                  {!isReadOnly && <button className="btn-secondary risk-action-button" onClick={() => navigate(rutaClinica(`/pacientes/${id}/riesgo`))}>
                     <Pencil size={13} /> Editar
                   </button>}
-                  {!isReadOnly && <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar la ficha de riesgo?", rutaClinica(`/pacientes/${id}/riesgo`))}>
+                  {!isReadOnly && <button className="btn-secondary risk-action-button" onClick={() => eliminarRegistro("¿Eliminar la ficha de riesgo?", rutaClinica(`/pacientes/${id}/riesgo`))}>
                     <Trash2 size={13} /> Eliminar
                   </button>}
                 </div>
               </div>
 
-              <SecTitle>Antecedentes Obstétricos (criterios 1-7)</SecTitle>
-              <GridAuto>
-                <SiNo label="Muerte fetal/neonatal previa"       value={exp.ficha_riesgo.muerte_fetal_neonatal_previa} />
-                <SiNo label="3+ abortos espontáneos consecutivos" value={exp.ficha_riesgo.abortos_espontaneos_3mas} />
-                <SiNo label="3+ gestas"                           value={exp.ficha_riesgo.gestas_3mas} />
-                <SiNo label="RN anterior < 2500g"                 value={exp.ficha_riesgo.peso_ultimo_bebe_menor_2500g} />
-                <SiNo label="RN anterior > 4500g"                 value={exp.ficha_riesgo.peso_ultimo_bebe_mayor_4500g} />
-                <SiNo label="Antec. HTA / preeclampsia"           value={exp.ficha_riesgo.antec_hipertension_preeclampsia} />
-                <SiNo label="Cirugías tracto reproductivo"        value={exp.ficha_riesgo.cirugias_tracto_reproductivo} />
-              </GridAuto>
+              <div className="risk-content-layout">
+                <div className="risk-sections-stack">
+                  {RISK_SECTIONS.map((section, index) => (
+                    <RiskSection
+                      key={section.id}
+                      number={index + 1}
+                      section={section}
+                      risk={exp.ficha_riesgo}
+                      isOpen={Boolean(openRiskSections[section.id])}
+                      onToggle={() => setOpenRiskSections((current) => ({
+                        ...current,
+                        [section.id]: !current[section.id],
+                      }))}
+                    />
+                  ))}
+                </div>
 
-              <SecTitle style={{ marginTop: "1rem" }}>Embarazo Actual (criterios 8-19)</SecTitle>
-              <GridAuto>
-                <SiNo label="Embarazo múltiple"        value={exp.ficha_riesgo.embarazo_multiple} />
-                <SiNo label="Menor de 20 años"         value={exp.ficha_riesgo.menor_20_anos} />
-                <SiNo label="Mayor de 35 años"         value={exp.ficha_riesgo.mayor_35_anos} />
-                <SiNo label="Paciente Rh (−)"          value={exp.ficha_riesgo.paciente_rh_negativo} />
-                <SiNo label="Hemorragia vaginal"        value={exp.ficha_riesgo.hemorragia_vaginal} />
-                <SiNo label="VIH+ / Sífilis"           value={exp.ficha_riesgo.vih_positivo_sifilis} />
-                <SiNo label="P/A diastólica ≥ 90"      value={exp.ficha_riesgo.presion_diastolica_90mas} />
-                <SiNo label="Anemia"                   value={exp.ficha_riesgo.anemia} />
-                <SiNo label="Desnutrición / Obesidad"  value={exp.ficha_riesgo.desnutricion_obesidad} />
-                <SiNo label="Dolor abdominal"          value={exp.ficha_riesgo.dolor_abdominal} />
-                <SiNo label="Sintomatología urinaria"  value={exp.ficha_riesgo.sintomatologia_urinaria} />
-                <SiNo label="Ictericia"                value={exp.ficha_riesgo.ictericia} />
-              </GridAuto>
-
-              <SecTitle style={{ marginTop: "1rem" }}>Historia Clínica General (criterios 20-25)</SecTitle>
-              <GridAuto>
-                <SiNo label="Diabetes"               value={exp.ficha_riesgo.diabetes} />
-                <SiNo label="Enfermedad renal"       value={exp.ficha_riesgo.enfermedad_renal} />
-                <SiNo label="Enfermedad del corazón" value={exp.ficha_riesgo.enfermedad_corazon} />
-                <SiNo label="Hipertensión arterial"  value={exp.ficha_riesgo.hipertension_arterial} />
-                <SiNo label="Drogas/alcohol/tabaco"  value={exp.ficha_riesgo.consumo_drogas_alcohol_tabaco} />
-                <SiNo label="Otra enf. severa"       value={exp.ficha_riesgo.otra_enfermedad_severa} />
-              </GridAuto>
+                <aside className="risk-summary-panel">
+                  <h4>Resumen del riesgo</h4>
+                  <div className="risk-summary-block">
+                    <span>Estado actual</span>
+                    {exp.ficha_riesgo.tiene_riesgo
+                      ? <strong className="risk-summary-status is-risk">Presenta riesgo</strong>
+                      : <strong className="risk-summary-status is-ok">Sin riesgo</strong>}
+                  </div>
+                  <div className="risk-summary-metrics">
+                    <div>
+                      <span>Criterios positivos</span>
+                      <strong>{riskPositiveCriteria}</strong>
+                    </div>
+                    <div>
+                      <span>Criterios no presentes</span>
+                      <strong>{riskNegativeCriteria}</strong>
+                    </div>
+                  </div>
+                  <div className="risk-summary-date">
+                    <CalendarDays size={16} />
+                    <span>Evaluación realizada el:<strong>{fecha(exp.ficha_riesgo.fecha)}</strong></span>
+                  </div>
+                </aside>
+              </div>
 
               {exp.ficha_riesgo.referida_a && (
-                <div style={{ marginTop: "1rem", padding: "0.75rem", background: "var(--warn-lt)", borderRadius: 8, border: "1px solid var(--warn)" }}>
-                  <span style={{ color: "var(--warn)", fontWeight: 600, fontSize: "0.82rem" }}>Referida a: </span>
-                  <span style={{ fontSize: "0.85rem" }}>{exp.ficha_riesgo.referida_a}</span>
+                <div className="risk-referral-strip">
+                  <FileText size={18} />
+                  <span><strong>Referida a:</strong> {exp.ficha_riesgo.referida_a}</span>
                 </div>
               )}
             </>
@@ -867,7 +1363,7 @@ export default function ExpedientePaciente() {
       )}
 
       {tab === "plan" && (
-        <div className="card">
+        <div className="birth-plan-card">
           {!exp.plan_parto ? (
             <div className="empty-state">
               No hay plan de parto registrado.
@@ -879,96 +1375,98 @@ export default function ExpedientePaciente() {
             </div>
           ) : (
             <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                <h3>Plan de Parto</h3>
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                  <button className="btn-secondary" onClick={imprimirPlanParto} disabled={printing}>
+              <div className="birth-plan-header">
+                <div>
+                  <div className="birth-plan-title-row">
+                    <h3>Plan de Parto</h3>
+                    <span className="badge badge-green birth-plan-status">
+                      <CheckCircle size={13} /> Registrado
+                    </span>
+                  </div>
+                  <p>Preparación, traslado y atención planificada para el parto.</p>
+                </div>
+                <div className="birth-plan-actions">
+                  <button className="btn-secondary birth-plan-action" onClick={imprimirPlanParto} disabled={printing}>
                     <Printer size={13} /> {printing ? "Generando..." : "Imprimir"}
                   </button>
-                  {!isReadOnly && <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/plan-parto`))}>
+                  {!isReadOnly && <button className="btn-secondary birth-plan-action" onClick={() => navigate(rutaClinica(`/pacientes/${id}/plan-parto`))}>
                     <Pencil size={13} /> Editar
                   </button>}
                 </div>
               </div>
 
-              <SecTitle>Datos generales</SecTitle>
-              <Grid cols={3}>
-                <Row label="No. registro" value={exp.plan_parto.no_registro} />
-                <Row label="Servicio de salud" value={exp.plan_parto.servicio_salud} />
-                <Row label="Lugar residencia" value={exp.plan_parto.lugar_residencia} />
-                <Row label="Fecha" value={fecha(exp.plan_parto.fecha)} />
-                <Row label="Nombre cónyuge" value={exp.plan_parto.nombre_conyuge} />
-                <Row label="Teléfono" value={exp.plan_parto.telefono} />
-                <Row label="Fecha de nacimiento" value={fecha(exp.plan_parto.fecha_nacimiento)} />
-                <Row label="Estado civil" value={exp.plan_parto.estado_civil} />
-                <Row label="Pueblo" value={exp.plan_parto.pueblo} />
-                <Row label="Escolaridad" value={exp.plan_parto.escolaridad} />
-                <Row label="Con quién vive" value={exp.plan_parto.con_quien_vive} />
-                <Row label="Idioma" value={exp.plan_parto.idioma} />
-              </Grid>
+              <div className="birth-plan-layout">
+                <div className="birth-plan-section-grid">
+                  {planSections.map((section) => {
+                    const Icon = section.Icon;
+                    const selected = selectedPlanSection?.id === section.id;
+                    return (
+                      <button
+                        key={section.id}
+                        type="button"
+                        className={`birth-plan-section-card ${selected ? "is-selected" : ""}`}
+                        onClick={() => setSelectedPlanSectionId(section.id)}
+                      >
+                        <span className="birth-plan-card-icon"><Icon size={20} /></span>
+                        <span className="birth-plan-card-number">{section.number}</span>
+                        <strong>{section.title}</strong>
+                        <small>{section.summary}</small>
+                        <span className="birth-plan-card-footer">
+                          <span>Completa</span>
+                          <em>{section.count} {section.metricLabel}</em>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-              <div style={{ marginTop: "0.85rem" }}>
-                <GridAuto>
-                  <SiNo label="Atención prenatal" value={exp.plan_parto.ha_tenido_atencion_prenatal} />
-                  <SiNo label="Casa materna cercana" value={exp.plan_parto.casa_materna_cercana} />
-                  <SiNo label="Usará casa materna" value={exp.plan_parto.usara_casa_materna} />
-                  <SiNo label="Ropa niño" value={exp.plan_parto.ropa_nino} />
-                  <SiNo label="Ropa madre" value={exp.plan_parto.ropa_madre} />
-                  <SiNo label="Lleva DPI madre" value={exp.plan_parto.lleva_dpi_madre} />
-                  <SiNo label="Lleva DPI cónyuge" value={exp.plan_parto.lleva_dpi_conyuge} />
-                  <SiNo label="Lleva partida" value={exp.plan_parto.lleva_partida_nacimiento} />
-                  <SiNo label="Cuenta ahorro" value={exp.plan_parto.cuenta_ahorro} />
-                  <SiNo label="Comité comunicado" value={exp.plan_parto.comunicado_comite} />
-                </GridAuto>
+                {selectedPlanSection && (
+                  <aside className="birth-plan-detail-panel">
+                    <div className="birth-plan-detail-heading">
+                      <span className="birth-plan-card-icon">
+                        {(() => {
+                          const Icon = selectedPlanSection.Icon;
+                          return <Icon size={20} />;
+                        })()}
+                      </span>
+                      <div>
+                        <h4>{selectedPlanSection.title}</h4>
+                        <p>{selectedPlanSection.summary}</p>
+                      </div>
+                    </div>
+                    <div className="birth-plan-detail-stats">
+                      <div>
+                        <span>Bloques registrados</span>
+                        <strong>{selectedPlanSection.count} / {selectedPlanSection.items.length}</strong>
+                      </div>
+                      <div>
+                        <span>Datos críticos</span>
+                        <strong>
+                          {selectedPlanSection.criticalCount === selectedPlanSection.criticalTotal
+                            ? "Completos"
+                            : `${selectedPlanSection.criticalCount} / ${selectedPlanSection.criticalTotal}`}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Última actualización</span>
+                        <strong>{fecha(exp.plan_parto.fecha)}</strong>
+                      </div>
+                    </div>
+                    <div className="birth-plan-summary-list">
+                      {selectedPlanSection.items.map((item) => (
+                        <PlanSummaryItem key={item.label} item={item} />
+                      ))}
+                    </div>
+                  </aside>
+                )}
               </div>
 
-              <SecTitle style={{ marginTop: "1rem" }}>Resumen obstétrico</SecTitle>
-              <Grid cols={4}>
-                <Row label="No. embarazos" value={exp.plan_parto.no_embarazos} />
-                <Row label="No. partos" value={exp.plan_parto.no_partos} />
-                <Row label="No. abortos" value={exp.plan_parto.no_abortos} />
-                <Row label="No. hijos vivos" value={exp.plan_parto.no_hijos_vivos} />
-                <Row label="No. hijos muertos" value={exp.plan_parto.no_hijos_muertos} />
-                <Row label="FUR" value={fecha(exp.plan_parto.fur)} />
-                <Row label="FPP" value={fecha(exp.plan_parto.fecha_probable_parto)} />
-                <Row label="No. cesáreas" value={exp.plan_parto.no_cesareas} />
-                <Row label="Última cesárea" value={fecha(exp.plan_parto.fecha_ultima_cesarea)} />
-                <Row label="Edad gestacional UR" value={exp.plan_parto.edad_gestacional_semanas} />
-                <Row label="Edad gestacional AU" value={exp.plan_parto.edad_gestacional_au} />
-              </Grid>
-
-              <SecTitle style={{ marginTop: "1rem" }}>Logística y responsables</SecTitle>
-              <Grid cols={3}>
-                <Row label="Posición parto" value={exp.plan_parto.posicion_parto} />
-                <Row label="Lugar atención parto" value={exp.plan_parto.lugar_atencion_parto} />
-                <Row label="Cómo se trasladará" value={exp.plan_parto.como_trasladara} />
-                <Row label="Acompaña traslado" value={exp.plan_parto.acompana_traslado} />
-                <Row label="Acompaña parto" value={exp.plan_parto.acompana_parto} />
-                <Row label="Horas distancia" value={exp.plan_parto.horas_distancia} />
-                <Row label="Kms servicio" value={exp.plan_parto.kms_servicio} />
-                <Row label="Con quién hijos" value={exp.plan_parto.con_quien_hijos} />
-                <Row label="Quién cuida casa" value={exp.plan_parto.quien_cuida_casa} />
-                <Row label="Teléfono vehículo" value={exp.plan_parto.telefono_vehiculo} />
-                <Row label="Responsable activar" value={exp.plan_parto.responsable_activar} />
-                <Row label="Nombre activa plan" value={exp.plan_parto.nombre_activara_plan} />
-                <Row label="Proveedor salud" value={exp.plan_parto.nombre_proveedor_salud} />
-              </Grid>
-
-              <SecTitle style={{ marginTop: "1rem" }}>Signos de peligro</SecTitle>
-              <GridAuto>
-                <SiNo label="Dolor de cabeza" value={exp.plan_parto.peligro_dolor_cabeza} />
-                <SiNo label="Visión borrosa" value={exp.plan_parto.peligro_vision_borrosa} />
-                <SiNo label="Embarazo múltiple" value={exp.plan_parto.peligro_embarazo_multiple} />
-                <SiNo label="Hemorragia vaginal" value={exp.plan_parto.peligro_hemorragia_vaginal} />
-                <SiNo label="Edema MI" value={exp.plan_parto.peligro_edema_mi} />
-                <SiNo label="Niño transverso" value={exp.plan_parto.peligro_nino_transverso} />
-                <SiNo label="Dolor de estómago" value={exp.plan_parto.peligro_dolor_estomago} />
-                <SiNo label="Salida de líquidos" value={exp.plan_parto.peligro_salida_liquidos} />
-                <SiNo label="Convulsiones" value={exp.plan_parto.peligro_convulsiones} />
-                <SiNo label="Fiebre" value={exp.plan_parto.peligro_fiebre} />
-                <SiNo label="Ausencia movimientos fetales" value={exp.plan_parto.peligro_ausencia_mov_fetales} />
-                <SiNo label="Placenta no salió" value={exp.plan_parto.peligro_placenta_no_salia} />
-              </GridAuto>
+              <div className="birth-plan-key-strip">
+                <MapPin size={18} />
+                <span>
+                  <strong>Lugar de atención del parto:</strong> {planValue(exp.plan_parto.lugar_atencion_parto)}
+                </span>
+              </div>
             </>
           )}
         </div>
@@ -1063,43 +1561,64 @@ export default function ExpedientePaciente() {
           TAB: LABORATORIOS
       ══════════════════════════════════════════ */}
       {tab === "laboratorio" && (
-        <div style={{ display: "grid", gap: "1rem" }}>
-          {!exp.controles_prenatales?.some(c =>
-            c.hematologia_realizada || c.glicemia_realizada || c.orina_realizada ||
-            c.vih_realizado || c.vdrl_realizado || c.hepatitis_b_realizado
-          ) ? (
+        <div className="lab-explorer-shell">
+          {!controlesLaboratorio.length ? (
             <div className="card empty-state">
               No hay resultados de laboratorio registrados.
             </div>
           ) : (
-            exp.controles_prenatales
-              .filter(c =>
-                c.hematologia_realizada || c.glicemia_realizada || c.grupo_rh_realizado ||
-                c.orina_realizada || c.heces_realizada || c.vih_realizado ||
-                c.vdrl_realizado || c.torch_realizado || c.papanicolau_ivaa_realizado ||
-                c.hepatitis_b_realizado || c.usg_realizado
-              )
-              .map((ctrl) => (
-                <div className="card" key={ctrl.id}>
-                  <div style={{ marginBottom: "0.85rem" }}>
-                    <span className="badge badge-blue">Control {ctrl.numero_control}</span>
-                    <span style={{ color: "var(--text-muted)", fontSize: "0.8rem", marginLeft: "0.75rem" }}>{fecha(ctrl.fecha)}</span>
-                  </div>
-                  <Grid cols={3}>
-                    {ctrl.hematologia_realizada     && <Row label="Hematología"       value={ctrl.hematologia_resultado} />}
-                    {ctrl.glicemia_realizada         && <Row label="Glicemia en ayunas" value={ctrl.glicemia_resultado} />}
-                    {ctrl.grupo_rh_realizado         && <Row label="Grupo y RH"        value={ctrl.grupo_rh_resultado} />}
-                    {ctrl.orina_realizada            && <Row label="Orina" value={[ctrl.orina_bacteriuria && "Bacteriuria+", ctrl.orina_proteinuria && "Proteinuria+"].filter(Boolean).join(" / ") || "Realizada"} />}
-                    {ctrl.heces_realizada            && <Row label="Heces"             value={ctrl.heces_resultado} />}
-                    {ctrl.vih_realizado              && <Row label="VIH"               value={ctrl.vih_resultado} />}
-                    {ctrl.vdrl_realizado             && <Row label="VDRL/RPR"          value={ctrl.vdrl_resultado} />}
-                    {ctrl.torch_realizado            && <Row label="TORCH"             value={ctrl.torch_resultado_positivo ? "Positivo" : "Negativo"} />}
-                    {ctrl.papanicolau_ivaa_realizado && <Row label="Papanicolau/IVAA"  value={ctrl.papanicolau_ivaa_resultado} />}
-                    {ctrl.hepatitis_b_realizado      && <Row label="Hepatitis B"       value={ctrl.hepatitis_b_resultado} />}
-                    {ctrl.usg_realizado              && <Row label="USG" value={ctrl.usg_hallazgos || "Realizado"} />}
-                  </Grid>
+            <>
+              <aside className="lab-history-panel">
+                <div className="lab-panel-heading">
+                  <h3>Controles / Laboratorios</h3>
+                  <p>Historial de resultados de laboratorio</p>
                 </div>
-              ))
+                <div className="lab-control-list">
+                  {controlesLaboratorio.map((ctrl) => {
+                    const selected = selectedLabControl?.id === ctrl.id;
+                    const count = labDoneCount(ctrl, puedeVerVih);
+                    return (
+                      <button
+                        key={ctrl.id}
+                        type="button"
+                        className={`lab-control-item ${selected ? "is-selected" : ""}`}
+                        onClick={() => setSelectedLabControlId(ctrl.id)}
+                      >
+                        <span className="lab-control-marker">{count}</span>
+                        <span className="lab-control-main">
+                          <strong>Control {ctrl.numero_control}</strong>
+                          <small><CalendarDays size={13} /> {fecha(ctrl.fecha_control || ctrl.fecha)}</small>
+                        </span>
+                        <span className="lab-control-summary">{count} registrado{count === 1 ? "" : "s"}</span>
+                        <ChevronRight size={17} />
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="lab-history-footer">
+                  Mostrando {controlesLaboratorio.length} de {controlesLaboratorio.length} controles
+                </div>
+              </aside>
+
+              <section className="lab-detail-panel">
+                <div className="lab-detail-header">
+                  <div>
+                    <span className="lab-selected-pill">Control {selectedLabControl?.numero_control}</span>
+                    <span className="lab-selected-date">{fecha(selectedLabControl?.fecha_control || selectedLabControl?.fecha)}</span>
+                  </div>
+                </div>
+                <div className="lab-category-grid">
+                  {selectedLabCategories.map((category) => (
+                    <LabCategoryCard
+                      key={category.title}
+                      icon={category.icon}
+                      title={category.title}
+                      studies={category.studies}
+                    />
+                  ))}
+                </div>
+              </section>
+            </>
           )}
         </div>
       )}

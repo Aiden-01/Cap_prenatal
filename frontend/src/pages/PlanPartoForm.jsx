@@ -360,7 +360,26 @@ export default function PlanPartoForm() {
   const [loading, setLoading] = useState(false);
   const fieldErrors = useFieldErrors(FIELD_LABELS);
 
-  const set = (k, v) => fieldErrors.setFormValue(setForm, k, v);
+  const set = (k, v) => {
+    setForm((current) => {
+      const next = { ...current, [k]: v };
+      if (k === "responsable_activar" && v === "conyuge" && current.nombre_conyuge) {
+        next.nombre_activara_plan = current.nombre_conyuge;
+      }
+      if (
+        k === "nombre_conyuge" &&
+        current.responsable_activar === "conyuge" &&
+        (!current.nombre_activara_plan || current.nombre_activara_plan === current.nombre_conyuge)
+      ) {
+        next.nombre_activara_plan = v;
+      }
+      return next;
+    });
+    fieldErrors.clearFieldError(k);
+    if (k === "responsable_activar" || k === "nombre_conyuge") {
+      fieldErrors.clearFieldError("nombre_activara_plan");
+    }
+  };
   const p = { form, set };
 
   useEffect(() => {
@@ -379,8 +398,10 @@ export default function PlanPartoForm() {
         }
         setPaciente(data?.paciente || null);
         if (data?.plan_parto) {
+          const expedienteDefaults = defaultsDesdeExpediente(data);
           const posicionParto = data.plan_parto.posicion_parto || "";
           const lugarAtencionParto = data.plan_parto.lugar_atencion_parto || "";
+          const nombreConyuge = data.plan_parto.nombre_conyuge || expedienteDefaults.nombre_conyuge || "";
           setExistingPlan(true);
           setForm((f) => ({
             ...f,
@@ -390,6 +411,11 @@ export default function PlanPartoForm() {
             lugar_atencion_parto: lugarAtencionParto && !hasOptionValue(lugarOptions, lugarAtencionParto) ? "otro" : lugarAtencionParto,
             lugar_atencion_parto_otro: lugarAtencionParto && !hasOptionValue(lugarOptions, lugarAtencionParto) ? lugarAtencionParto : "",
             no_registro: data.plan_parto.no_registro || data?.paciente?.cui || "",
+            lugar_residencia: data.plan_parto.lugar_residencia || expedienteDefaults.lugar_residencia,
+            nombre_conyuge: nombreConyuge,
+            nombre_activara_plan:
+              data.plan_parto.nombre_activara_plan ||
+              (data.plan_parto.responsable_activar === "conyuge" ? nombreConyuge : ""),
             fecha: toDateInput(data.plan_parto.fecha) || f.fecha,
             fecha_nacimiento: toDateInput(data.plan_parto.fecha_nacimiento),
             fur: toDateInput(data.plan_parto.fur),
