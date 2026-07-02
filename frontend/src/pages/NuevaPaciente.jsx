@@ -132,16 +132,23 @@ function Input({ label, name, type = "text", required, form, set, inputRef, ...r
   );
 }
 
-function Select({ label, name, options, required, form, set }) {
+function Select({ label, name, options, required, form, set, disabled = false, helpText = "" }) {
   const { inputClass } = useFormErrorUi();
   return (
     <Field label={label} required={required} name={name}>
-      <select className={inputClass(name)} name={name} value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)}>
+      <select
+        className={`${inputClass(name)} ${disabled ? "community-locked-field" : ""}`}
+        name={name}
+        value={form[name] ?? ""}
+        onChange={(e) => set(name, e.target.value)}
+        disabled={disabled}
+      >
         <option value="">— Seleccionar —</option>
         {options.map((o) => (
           <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>
         ))}
       </select>
+      {helpText && <p className="community-field-help">{helpText}</p>}
     </Field>
   );
 }
@@ -157,14 +164,23 @@ function ComunidadField({
   onSelectComunidad,
 }) {
   const { inputClass } = useFormErrorUi();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const municipioElChal = esMunicipioElChal(form.municipio);
   const query = normalizarBusqueda(form.comunidad);
   const opcionesFiltradas = useMemo(() => {
-    if (!query) return comunidades.slice(0, 8);
-    return comunidades
-      .filter((comunidad) => normalizarBusqueda(comunidad.nombre).includes(query))
-      .slice(0, 8);
-  }, [comunidades, query]);
+    return comunidades.filter((comunidad) => {
+      const coincideBusqueda = !query || normalizarBusqueda(comunidad.nombre).includes(query);
+      const coincideTerritorio = !form.territorio || String(comunidad.territorio) === String(form.territorio);
+      const coincideSector = !form.sector || String(comunidad.sector) === String(form.sector);
+      return coincideBusqueda && coincideTerritorio && coincideSector;
+    });
+  }, [comunidades, form.sector, form.territorio, query]);
+
+  const seleccionarOpcionLibre = () => {
+    set("comunidad_id", null);
+    setModoLibreElChal(true);
+    setDropdownOpen(false);
+  };
 
   if (!municipioElChal || modoLibreElChal) {
     return (
@@ -178,9 +194,8 @@ function ComunidadField({
         {municipioElChal && (
           <button
             type="button"
-            className="btn-secondary"
+            className="btn-secondary community-catalog-toggle"
             onClick={() => setModoLibreElChal(false)}
-            style={{ marginTop: "0.5rem", minHeight: 34, padding: "0.4rem 0.65rem" }}
           >
             Usar catálogo
           </button>
@@ -196,79 +211,77 @@ function ComunidadField({
 
   return (
     <Field label="Comunidad" name="comunidad">
-      <input
-        className={inputClass("comunidad")}
-        name="comunidad"
-        value={form.comunidad ?? ""}
-        onChange={(e) => set("comunidad", e.target.value)}
-        placeholder="Buscar comunidad de El Chal"
-        autoComplete="off"
-      />
+      <div className="community-autocomplete">
+        <input
+          className={inputClass("comunidad")}
+          name="comunidad"
+          value={form.comunidad ?? ""}
+          onChange={(e) => {
+            set("comunidad", e.target.value);
+            setDropdownOpen(true);
+          }}
+          onFocus={() => setDropdownOpen(true)}
+          onBlur={() => window.setTimeout(() => setDropdownOpen(false), 120)}
+          placeholder="Buscar comunidad de El Chal"
+          autoComplete="off"
+        />
 
-      <div style={{
-        marginTop: "0.45rem",
-        border: "1px solid var(--border)",
-        borderRadius: 8,
-        overflow: "hidden",
-        background: "var(--surface)",
-      }}>
-        {loading && (
-          <div style={{ padding: "0.55rem 0.65rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
-            Cargando comunidades...
-          </div>
-        )}
-        {!loading && error && (
-          <div style={{ padding: "0.55rem 0.65rem", color: "var(--danger)", fontSize: "0.8rem" }}>
-            {error}
-          </div>
-        )}
-        {!loading && !error && opcionesFiltradas.map((comunidad) => (
-          <button
-            key={comunidad.id}
-            type="button"
-            onClick={() => onSelectComunidad(comunidad)}
-            style={{
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "0.75rem",
-              padding: "0.55rem 0.65rem",
-              border: 0,
-              borderBottom: "1px solid var(--border)",
-              background: Number(form.comunidad_id) === Number(comunidad.id) ? "var(--primary-lt)" : "transparent",
-              color: "var(--text)",
-              cursor: "pointer",
-              textAlign: "left",
-            }}
-          >
-            <span>{comunidad.nombre}</span>
-            <span style={{ color: "var(--text-muted)", fontSize: "0.74rem", whiteSpace: "nowrap" }}>
-              T{comunidad.territorio} · S{comunidad.sector}
-            </span>
-          </button>
-        ))}
-        {!loading && !error && opcionesFiltradas.length === 0 && (
-          <div style={{ padding: "0.55rem 0.65rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
-            Sin coincidencias
+        {dropdownOpen && (
+          <div className="community-autocomplete__dropdown">
+            <div className="community-autocomplete__results">
+              {loading && (
+                <div className="community-autocomplete__message">
+                  Cargando comunidades...
+                </div>
+              )}
+              {!loading && error && (
+                <div className="community-autocomplete__message is-error">
+                  {error}
+                </div>
+              )}
+              {!loading && !error && opcionesFiltradas.map((comunidad) => {
+                const selected = Number(form.comunidad_id) === Number(comunidad.id);
+                return (
+                  <button
+                    key={comunidad.id}
+                    type="button"
+                    className={`community-autocomplete__option ${selected ? "is-selected" : ""}`}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      onSelectComunidad(comunidad);
+                      setDropdownOpen(false);
+                    }}
+                  >
+                    <span className="community-autocomplete__name">{comunidad.nombre}</span>
+                    <span className="community-autocomplete__meta">
+                      Territorio {comunidad.territorio} · Sector {comunidad.sector}
+                    </span>
+                  </button>
+                );
+              })}
+              {!loading && !error && opcionesFiltradas.length === 0 && (
+                <div className="community-autocomplete__message">
+                  No se encontraron comunidades.
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="community-autocomplete__free"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={seleccionarOpcionLibre}
+            >
+              No aparece en el catálogo
+            </button>
           </div>
         )}
       </div>
 
-      <button
-        type="button"
-        className="btn-secondary"
-        onClick={() => {
-          set("comunidad_id", null);
-          setModoLibreElChal(true);
-        }}
-        style={{ marginTop: "0.5rem", minHeight: 34, padding: "0.4rem 0.65rem" }}
-      >
-        No aparece en el catálogo
-      </button>
-
       <p style={{ margin: "0.45rem 0 0", color: "var(--text-muted)", fontSize: "0.78rem", lineHeight: 1.35 }}>
-        Seleccione una comunidad del catálogo para ubicar correctamente a la paciente en el mapa de riesgo.
+        {form.comunidad_id
+          ? "Territorio y sector se completan automáticamente al seleccionar una comunidad del catálogo."
+          : "Seleccione una comunidad del catálogo para ubicar correctamente a la paciente en el mapa de riesgo."}
       </p>
     </Field>
   );
@@ -467,11 +480,15 @@ export default function NuevaPaciente() {
   const seleccionarComunidad = (comunidad) => {
     fieldErrors.clearFieldError("comunidad");
     fieldErrors.clearFieldError("comunidad_id");
+    fieldErrors.clearFieldError("territorio");
+    fieldErrors.clearFieldError("sector");
     setModoLibreElChal(false);
     setForm((current) => ({
       ...current,
       comunidad: comunidad.nombre,
       comunidad_id: comunidad.id,
+      territorio: String(comunidad.territorio ?? ""),
+      sector: String(comunidad.sector ?? ""),
     }));
   };
   const cuiIncompleto = form.cui && !/^\d{13}$/.test(form.cui);
@@ -692,6 +709,7 @@ export default function NuevaPaciente() {
   };
 
   const p = { form, set };
+  const comunidadCatalogoSeleccionada = esMunicipioElChal(form.municipio) && Boolean(form.comunidad_id);
   const nombrePaciente = `${form.nombres || ""} ${form.apellidos || ""}`.trim();
 
   return (
@@ -846,12 +864,6 @@ export default function NuevaPaciente() {
                 />
                 <Input label="Domicilio" name="domicilio" form={form} set={set} />
                 <Select label="Municipio" name="municipio" form={form} set={set} options={MUNICIPIOS_PETEN} />
-                <Select label="Territorio" name="territorio" form={form} set={set}
-                  options={["1", "2", "3", "4"]}
-                />
-                <Select label="Sector" name="sector" form={form} set={set}
-                  options={["A", "B"]}
-                />
                 <ComunidadField
                   form={form}
                   set={set}
@@ -861,6 +873,16 @@ export default function NuevaPaciente() {
                   modoLibreElChal={modoLibreElChal}
                   setModoLibreElChal={setModoLibreElChal}
                   onSelectComunidad={seleccionarComunidad}
+                />
+                <Select label="Territorio" name="territorio" form={form} set={set}
+                  options={["1", "2", "3", "4"]}
+                  disabled={comunidadCatalogoSeleccionada}
+                  helpText={comunidadCatalogoSeleccionada ? "Se completa automáticamente por la comunidad seleccionada." : ""}
+                />
+                <Select label="Sector" name="sector" form={form} set={set}
+                  options={["A", "B"]}
+                  disabled={comunidadCatalogoSeleccionada}
+                  helpText={comunidadCatalogoSeleccionada ? "Se completa automáticamente por la comunidad seleccionada." : ""}
                 />
                 <Input label="Teléfono" name="telefono" form={form} set={set} />
               </div>
