@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Edit3,
+  Info,
   Loader2,
   MapPinned,
   PlusCircle,
@@ -442,17 +443,46 @@ export default function Comunidades() {
           font-size: 0.92rem;
         }
 
+        .comunidades-notices {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 0.6rem;
+        }
+
         .comunidades-note {
           display: flex;
           align-items: flex-start;
           gap: 0.55rem;
-          padding: 0.75rem 0.85rem;
+          padding: 0.64rem 0.78rem;
           border: 1px solid var(--border);
           border-radius: 8px;
           color: var(--text-muted);
-          background: var(--surface2);
-          font-size: 0.84rem;
-          line-height: 1.4;
+          background: color-mix(in srgb, var(--surface2) 62%, var(--surface));
+          font-size: 0.82rem;
+          line-height: 1.35;
+        }
+
+        .comunidades-note svg {
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+
+        .comunidades-note-info {
+          border-color: color-mix(in srgb, var(--info) 34%, var(--border));
+          background: color-mix(in srgb, var(--info-lt) 46%, var(--surface));
+        }
+
+        .comunidades-note-info svg {
+          color: var(--info);
+        }
+
+        .comunidades-note-warning {
+          border-color: color-mix(in srgb, var(--warn) 38%, var(--border));
+          background: color-mix(in srgb, var(--warn-lt) 36%, var(--surface));
+        }
+
+        .comunidades-note-warning svg {
+          color: var(--warn);
         }
 
         .comunidades-toolbar {
@@ -483,21 +513,135 @@ export default function Comunidades() {
           overflow-x: auto;
         }
 
-        .comunidades-table .muted {
+        .comunidades-table {
+          min-width: 1060px;
+          table-layout: fixed;
+        }
+
+        .comunidades-table th {
+          text-align: center;
+          vertical-align: middle;
+          white-space: normal;
+        }
+
+        .comunidades-table td {
+          text-align: center;
+          vertical-align: middle;
+        }
+
+        .comunidades-table td.comunidades-table__community {
+          text-align: left;
+        }
+
+        .comunidades-table__community {
+          width: 30%;
+          min-width: 260px;
+        }
+
+        .comunidades-table__territory {
+          width: 86px;
+        }
+
+        .comunidades-table__sector {
+          width: 72px;
+        }
+
+        .comunidades-table__coords {
+          width: 150px;
+        }
+
+        .comunidades-table__patients {
+          width: 122px;
+        }
+
+        .comunidades-table__risk {
+          width: 154px;
+        }
+
+        .comunidades-table__status {
+          width: 96px;
+        }
+
+        .comunidades-table__actions {
+          width: 210px;
+          min-width: 210px;
+        }
+
+        .comunidades-coordinates {
+          display: inline-grid;
+          gap: 0.12rem;
+          justify-items: center;
+          min-width: 8.5rem;
+          line-height: 1.2;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .comunidades-coordinate-primary {
+          color: var(--text);
+          font-weight: 650;
+        }
+
+        .comunidades-coordinate-secondary {
           color: var(--text-muted);
           font-size: 0.8rem;
+        }
+
+        .comunidades-table__risk .badge,
+        .comunidades-table__status .badge {
+          justify-content: center;
         }
 
         .comunidades-actions {
           display: flex;
           align-items: center;
-          gap: 0.4rem;
-          justify-content: flex-end;
+          gap: 0.35rem;
+          justify-content: center;
+          flex-wrap: nowrap;
         }
 
-        .comunidades-actions button {
+        .comunidades-actions .comunidades-action-button {
+          appearance: none;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           min-height: 32px;
-          padding: 0.38rem 0.55rem;
+          height: 32px;
+          padding: 0.34rem 0.58rem;
+          border-radius: 7px;
+          font-family: "DM Sans", sans-serif;
+          font-size: 0.8rem;
+          font-weight: 500;
+          line-height: 1;
+          gap: 0.32rem;
+          white-space: nowrap;
+          flex: 0 0 auto;
+          box-shadow: none;
+          cursor: pointer;
+          transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.12s;
+        }
+
+        .comunidades-actions .comunidades-action-button svg {
+          width: 13px;
+          height: 13px;
+          flex-shrink: 0;
+        }
+
+        .comunidades-actions .comunidades-action-danger {
+          background: color-mix(in srgb, var(--danger-lt) 82%, var(--surface));
+          border: 1px solid color-mix(in srgb, var(--danger) 46%, var(--border));
+          color: var(--danger);
+          font-weight: 600;
+        }
+
+        .comunidades-actions .comunidades-action-danger:hover {
+          background: var(--danger-lt);
+          border-color: color-mix(in srgb, var(--danger) 68%, var(--border));
+          color: var(--danger);
+        }
+
+        .comunidades-actions .comunidades-action-reactivate {
+          color: var(--accent);
+          border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
         }
 
         .comunidades-empty {
@@ -600,8 +744,17 @@ export default function Comunidades() {
             grid-template-columns: 1fr;
           }
 
+          .comunidades-notices {
+            grid-template-columns: 1fr;
+          }
+
           .comunidades-modal-body {
             grid-template-columns: 1fr;
+          }
+
+          .comunidades-actions {
+            justify-content: center;
+            flex-wrap: wrap;
           }
         }
       `}</style>
@@ -617,12 +770,21 @@ export default function Comunidades() {
         </button>
       </div>
 
-      <div className="comunidades-note">
-        <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-        <span>
-          Este catálogo corresponde a comunidades de El Chal. Las pacientes provenientes de otros municipios pueden registrarse
-          con comunidad en texto libre y no aparecerán necesariamente en el mapa de riesgo.
-        </span>
+      <div className="comunidades-notices">
+        <div className="comunidades-note comunidades-note-info">
+          <Info size={16} />
+          <span>
+            Aquí se administran solo las comunidades de El Chal que se muestran en el mapa de riesgo. Si una paciente viene de
+            otro municipio, su comunidad puede escribirse manualmente y no aparecerá en el mapa.
+          </span>
+        </div>
+        <div className="comunidades-note comunidades-note-warning">
+          <AlertTriangle size={16} />
+          <span>
+            Antes de guardar una comunidad, revise bien su ubicación y sus coordenadas de latitud y longitud, porque esa
+            información define dónde se mostrará en el mapa.
+          </span>
+        </div>
       </div>
 
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
@@ -672,14 +834,14 @@ export default function Comunidades() {
             <table className="tabla comunidades-table">
               <thead>
                 <tr>
-                  <th>Comunidad</th>
-                  <th>Territorio</th>
-                  <th>Sector</th>
-                  <th>Coordenadas</th>
-                  <th>Pacientes asociados</th>
-                  <th>Riesgo activo</th>
-                  <th>Estado</th>
-                  <th style={{ textAlign: "right" }}>Acciones</th>
+                  <th className="comunidades-table__community">Comunidad</th>
+                  <th className="comunidades-table__territory">Territorio</th>
+                  <th className="comunidades-table__sector">Sector</th>
+                  <th className="comunidades-table__coords">Coordenadas</th>
+                  <th className="comunidades-table__patients">Pacientes asociados</th>
+                  <th className="comunidades-table__risk">Riesgo activo</th>
+                  <th className="comunidades-table__status">Estado</th>
+                  <th className="comunidades-table__actions">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -687,17 +849,19 @@ export default function Comunidades() {
                   const riesgoActivo = Number(comunidad.total_riesgo_activo || 0) > 0;
                   return (
                     <tr key={comunidad.id}>
-                      <td>
+                      <td className="comunidades-table__community">
                         <strong>{comunidad.nombre}</strong>
                       </td>
-                      <td>{comunidad.territorio}</td>
-                      <td>{comunidad.sector}</td>
-                      <td>
-                        <div>{formatCoordinate(comunidad.lat)}</div>
-                        <div className="muted">{formatCoordinate(comunidad.lng)}</div>
+                      <td className="comunidades-table__territory">{comunidad.territorio}</td>
+                      <td className="comunidades-table__sector">{comunidad.sector}</td>
+                      <td className="comunidades-table__coords">
+                        <div className="comunidades-coordinates">
+                          <div className="comunidades-coordinate-primary">{formatCoordinate(comunidad.lat)}</div>
+                          <div className="comunidades-coordinate-secondary">{formatCoordinate(comunidad.lng)}</div>
+                        </div>
                       </td>
-                      <td>{Number(comunidad.total_pacientes || 0)}</td>
-                      <td>
+                      <td className="comunidades-table__patients">{Number(comunidad.total_pacientes || 0)}</td>
+                      <td className="comunidades-table__risk">
                         {riesgoActivo ? (
                           <span className="badge badge-red">
                             <AlertTriangle size={12} />
@@ -710,26 +874,26 @@ export default function Comunidades() {
                           </span>
                         )}
                       </td>
-                      <td>
+                      <td className="comunidades-table__status">
                         {comunidad.activo ? (
                           <span className="badge badge-green">Activa</span>
                         ) : (
                           <span className="badge badge-orange">Inactiva</span>
                         )}
                       </td>
-                      <td>
+                      <td className="comunidades-table__actions">
                         <div className="comunidades-actions">
-                          <button type="button" className="btn-secondary" onClick={() => abrirEditar(comunidad)}>
+                          <button type="button" className="btn-secondary comunidades-action-button" onClick={() => abrirEditar(comunidad)}>
                             <Edit3 size={14} />
                             Editar
                           </button>
                           {comunidad.activo ? (
-                            <button type="button" className="btn-danger" onClick={() => setConfirmTarget(comunidad)}>
+                            <button type="button" className="comunidades-action-button comunidades-action-danger" onClick={() => setConfirmTarget(comunidad)}>
                               <XCircle size={14} />
                               Desactivar
                             </button>
                           ) : (
-                            <button type="button" className="btn-secondary" onClick={() => reactivar(comunidad)} disabled={actionLoading}>
+                            <button type="button" className="btn-secondary comunidades-action-button comunidades-action-reactivate" onClick={() => reactivar(comunidad)} disabled={actionLoading}>
                               <RotateCcw size={14} />
                               Reactivar
                             </button>
