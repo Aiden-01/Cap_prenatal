@@ -336,90 +336,111 @@ const page2 = {
 // PAGINA 4: PUERPERIO
 // =================================================================================================================
 
-const puerperioBlock = (offsetY = 0, includeApego = true) => ({
-  fecha: { x: 52, y: 111 + offsetY, yearOffset: 42 },
-  hora: { hour: { x: 162, y: 111 + offsetY }, minute: { x: 186, y: 111 + offsetY } },
-  signosPeligro: { x: 142, y: 136 + offsetY, w: 410, size: 5.6, maxLines: 1 },
-  diasDespuesParto: { x: 143, y: 157 + offsetY, w: 155, size: 5.8 },
-  lugarParto: { x: 143, y: 176 + offsetY, w: 155, size: 5.8 },
-  quienAtendioParto: { x: 143, y: 194 + offsetY, w: 155, size: 5.8 },
-  recienNacidoVivo: siNo(104, 210 + offsetY),
-  apegoInmediato: includeApego ? siNo(226, 210 + offsetY) : null,
-  lactanciaMaternaExclusiva: siNo(405, 210 + offsetY),
-  pa: { x: 345, y: 157 + offsetY, w: 68, size: 7.8 },
-  fc: { x: 345, y: 174 + offsetY, w: 68, size: 7.8 },
-  fr: { x: 486, y: 174 + offsetY, w: 58, size: 7.8 },
-  tipoParto: { x: 366, y: 194 + offsetY, w: 48, size: 5.8 },
-  temperatura: {
-    boxes: [
-      { x: 512, y: 194 + offsetY, w: 10, size: 5.8, align: 'center' },
-      { x: 524, y: 194 + offsetY, w: 10, size: 5.8, align: 'center' },
-      { x: 533, y: 194 + offsetY, w: 18, size: 5.8, align: 'center' },
-    ],
-  },
-  heridaOperatoria: { x: 507, y: 209 + offsetY, w: 60, size: 5.4 },
-  examenMamas: {
-    x: 114,
-    y: 228 + offsetY,
-    w: 430,
-    firstLineX: 114,
-    firstLineWidth: 430,
-    nextLinesX: 52,
-    nextLinesWidth: 500,
-    size: 5.6,
-    maxLines: 2,
-    lineGap: 5,
-  },
-  examenGinecologico: {
-    x: 315,
-    y: 268 + offsetY,
-    w: 245,
-    firstLineX: 315,
-    firstLineWidth: 245,
-    nextLinesX: 52,
-    nextLinesWidth: 500,
-    size: 5.4,
-    maxLines: 3,
-    lineGap: 5,
-  },
-  orientacionConsejeria: {
-    x: 92,
-    y: 339 + offsetY,
-    w: 455,
-    firstLineX: 92,
-    firstLineWidth: 455,
-    nextLinesX: 52,
-    nextLinesWidth: 500,
-    size: 5.6,
-    maxLines: 3,
-    lineGap: 8,
-  },
-  impresionClinica: {
-    x: 75,
-    y: 392 + offsetY,
-    w: 470,
-    firstLineX: 75,
-    firstLineWidth: 470,
-    nextLinesX: 52,
-    nextLinesWidth: 500,
-    size: 5.6,
-    maxLines: 3,
-    lineGap: 8,
-  },
-  tratamiento: {
-    x: 61,
-    y: 447 + offsetY,
-    w: 485,
-    firstLineX: 61,
-    firstLineWidth: 485,
-    nextLinesX: 52,
-    nextLinesWidth: 500,
-    size: 5.6,
-    maxLines: 3,
-    lineGap: 8,
-  },
-  nombreCargoAtiende: { x: 155, y: 499 + offsetY, w: 390, size: 7.6 },
-});
+const puerperioBlock = (offsetY = 0, includeApego = true) => {
+  const block = {
+    fecha: { x: 52, y: 111 + offsetY, yearOffset: 42 },
+    hora: { hour: { x: 162, y: 111 + offsetY }, minute: { x: 186, y: 111 + offsetY } },
+    signosPeligro: { x: 142, y: 136 + offsetY, w: 410, size: 5.6, maxLines: 1 },
+    diasDespuesParto: { x: 143, y: 157 + offsetY, w: 155, size: 5.8 },
+    lugarParto: { x: 143, y: 176 + offsetY, w: 155, size: 5.8 },
+    quienAtendioParto: { x: 143, y: 194 + offsetY, w: 155, size: 5.8 },
+    recienNacidoVivo: siNo(104, 210 + offsetY),
+    apegoInmediato: includeApego ? siNo(226, 210 + offsetY) : null,
+    lactanciaMaternaExclusiva: siNo(405, 210 + offsetY),
+    pa: { x: 345, y: 157 + offsetY, w: 68, size: 7.8 },
+    fc: { x: 345, y: 174 + offsetY, w: 68, size: 7.8 },
+    fr: { x: 486, y: 174 + offsetY, w: 58, size: 7.8 },
+    tipoParto: { x: 366, y: 194 + offsetY, w: 48, size: 5.8 },
+    temperatura: {
+      boxes: [
+        { x: 512, y: 194 + offsetY, w: 10, size: 5.8, align: 'center' },
+        { x: 524, y: 194 + offsetY, w: 10, size: 5.8, align: 'center' },
+        { x: 533, y: 194 + offsetY, w: 18, size: 5.8, align: 'center' },
+      ],
+    },
+    heridaOperatoria: { x: 507, y: 209 + offsetY, w: 60, size: 5.4 },
+    examenMamas: {
+      x: 114,
+      y: 228 + offsetY,
+      w: 430,
+      firstLineX: 114,
+      firstLineWidth: 430,
+      nextLinesX: 52,
+      nextLinesWidth: 500,
+      size: 5.6,
+      maxLines: 2,
+      lineGap: 5,
+    },
+    examenGinecologico: {
+      x: 315,
+      y: 268 + offsetY,
+      w: 245,
+      firstLineX: 315,
+      firstLineWidth: 245,
+      nextLinesX: 52,
+      nextLinesWidth: 500,
+      size: 5.4,
+      maxLines: 3,
+      lineGap: 5,
+    },
+    orientacionConsejeria: {
+      x: 92,
+      y: 339 + offsetY,
+      w: 455,
+      firstLineX: 92,
+      firstLineWidth: 455,
+      nextLinesX: 52,
+      nextLinesWidth: 500,
+      size: 5.6,
+      maxLines: 3,
+      lineGap: 8,
+    },
+    impresionClinica: {
+      x: 75,
+      y: 392 + offsetY,
+      w: 470,
+      firstLineX: 75,
+      firstLineWidth: 470,
+      nextLinesX: 52,
+      nextLinesWidth: 500,
+      size: 5.6,
+      maxLines: 3,
+      lineGap: 8,
+    },
+    tratamiento: {
+      x: 61,
+      y: 447 + offsetY,
+      w: 485,
+      firstLineX: 61,
+      firstLineWidth: 485,
+      nextLinesX: 52,
+      nextLinesWidth: 500,
+      size: 5.6,
+      maxLines: 3,
+      lineGap: 8,
+    },
+    nombreCargoAtiende: { x: 155, y: 499 + offsetY, w: 390, size: 7.6 },
+  };
+
+  if (!includeApego) {
+    block.fecha.y += 8;
+    block.hora.hour.y += 8;
+    block.hora.minute.y += 8;
+    block.signosPeligro.y += 5;
+    block.recienNacidoVivo = siNo(104, 208 + offsetY);
+    block.lactanciaMaternaExclusiva = siNo(235, 210 + offsetY);
+    block.heridaOperatoria.x = block.tipoParto.x;
+    block.heridaOperatoria.w = 180;
+    block.examenMamas.y -= 1;
+    block.examenGinecologico.y -= 5;
+    block.orientacionConsejeria.y -= 2;
+    block.impresionClinica.y -= 1;
+    block.tratamiento.y -= 3;
+    block.nombreCargoAtiende.y -= 3;
+  }
+
+  return block;
+};
 
 const page4 = {
   puerperio: [

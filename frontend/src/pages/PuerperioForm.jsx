@@ -53,6 +53,46 @@ const FIELD_LABELS = {
   signos_peligro: "Signos de peligro",
 };
 
+const SECOND_PUERPERIO_INHERITED_FIELDS = [
+  "lugar_atencion_parto",
+  "quien_atendio_parto",
+  "recien_nacido_vivo",
+  "tipo_parto",
+];
+
+function dateOnly(value) {
+  return value ? String(value).split("T")[0] : "";
+}
+
+function daysBetweenDates(start, end) {
+  const startDate = new Date(`${dateOnly(start)}T00:00:00`);
+  const endDate = new Date(`${dateOnly(end)}T00:00:00`);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null;
+  return Math.round((endDate.getTime() - startDate.getTime()) / 86400000);
+}
+
+function calculateSecondPuerperioDays(firstPuerperio, secondDate) {
+  if (!firstPuerperio) return "";
+  const firstDays = Number(firstPuerperio.dias_despues_parto);
+  const diff = daysBetweenDates(firstPuerperio.fecha, secondDate);
+  if (!Number.isFinite(firstDays) || diff === null) return "";
+  return Math.max(0, firstDays + diff);
+}
+
+function getInheritedSecondPuerperioFields(firstPuerperio) {
+  if (!firstPuerperio) return {};
+  return SECOND_PUERPERIO_INHERITED_FIELDS.reduce((acc, field) => {
+    acc[field] = firstPuerperio[field] ?? INIT[field];
+    return acc;
+  }, { tuvo_apego_inmediato: false });
+}
+
+function preventNumberWheel(e) {
+  if (document.activeElement === e.currentTarget) {
+    e.currentTarget.blur();
+  }
+}
+
 function inferPuerperioFieldErrors(err) {
   const code = err?.response?.data?.code;
   const message = getErrorMessage(err, "");
@@ -71,6 +111,7 @@ function Input({ label, name, form, set, type = "text", errors = {}, inputClass,
     <Field label={label} error={errors[name]}>
       <input className={inputClass ? inputClass(name) : "input-field"} type={type} value={form[name] ?? ""}
         onChange={(e) => set(name, type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
+        onWheel={type === "number" ? preventNumberWheel : undefined}
         {...rest}
       />
     </Field>
@@ -94,10 +135,24 @@ export default function PuerperioForm() {
   const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=puerperio`;
   const toast = useGlobalToast();
   const [form, setForm] = useState(initialPuerperioForm);
+  const [firstPuerperio, setFirstPuerperio] = useState(null);
   const [loading, setLoading] = useState(false);
   const fieldErrors = useFieldErrors(FIELD_LABELS, inferPuerperioFieldErrors);
   const editando = Boolean(puerperioId);
-  const set = (k, v) => fieldErrors.setFormValue(setForm, k, v);
+  const isSecondPuerperio = Number(form.numero_atencion) === 2;
+  const set = (k, v) => {
+    fieldErrors.setFormValue(setForm, k, v);
+    if (k === "fecha" && isSecondPuerperio && firstPuerperio && !editando) {
+      fieldErrors.setFormValue(setForm, "dias_despues_parto", calculateSecondPuerperioDays(firstPuerperio, v));
+    }
+    if (k === "numero_atencion" && Number(v) === 2 && firstPuerperio && !editando) {
+      setForm((current) => ({
+        ...current,
+        ...getInheritedSecondPuerperioFields(firstPuerperio),
+        dias_despues_parto: calculateSecondPuerperioDays(firstPuerperio, current.fecha),
+      }));
+    }
+  };
   const p = { form, set, errors: fieldErrors.fieldErrors, inputClass: fieldErrors.inputClass };
 
   useEffect(() => {
@@ -118,8 +173,18 @@ export default function PuerperioForm() {
       if (editando) {
         setForm({ ...initialPuerperioForm(), ...data, fecha: data.fecha ? data.fecha.split("T")[0] : INIT.fecha });
       } else {
-        const siguiente = Math.min(2, Math.max(0, ...(data || []).map((r) => Number(r.numero_atencion) || 0)) + 1);
-        setForm((f) => ({ ...f, numero_atencion: siguiente }));
+        const registros = data || [];
+        const primerRegistro = registros.find((r) => Number(r.numero_atencion) === 1) || null;
+        const siguiente = Math.min(2, Math.max(0, ...registros.map((r) => Number(r.numero_atencion) || 0)) + 1);
+        setFirstPuerperio(primerRegistro);
+        setForm((f) => ({
+          ...f,
+          ...(siguiente === 2 ? getInheritedSecondPuerperioFields(primerRegistro) : {}),
+          numero_atencion: siguiente,
+          dias_despues_parto: siguiente === 2
+            ? calculateSecondPuerperioDays(primerRegistro, f.fecha)
+            : f.dias_despues_parto,
+        }));
       }
     }).catch(() => toast("Error al cargar puerperio", "error"));
   }, [id, puerperioId, editando, embarazoId, expedientePath, navigate, toast]);
@@ -129,8 +194,9 @@ export default function PuerperioForm() {
     setLoading(true);
     fieldErrors.clearFieldErrors();
     try {
-      if (editando) await api.put(`/pacientes/${id}/controles/puerperio/${puerperioId}`, form, { params: { embarazo_id: embarazoId } });
-      else await api.post(`/pacientes/${id}/controles/puerperio`, form, { params: { embarazo_id: embarazoId } });
+      const payload = Number(form.numero_atencion) === 2 ? { ...form, tuvo_apego_inmediato: false } : form;
+      if (editando) await api.put(`/pacientes/${id}/controles/puerperio/${puerperioId}`, payload, { params: { embarazo_id: embarazoId } });
+      else await api.post(`/pacientes/${id}/controles/puerperio`, payload, { params: { embarazo_id: embarazoId } });
       toast(editando ? "Puerperio actualizado" : "Puerperio registrado", "success");
       navigate(expedientePath);
     } catch (err) {
@@ -154,29 +220,34 @@ export default function PuerperioForm() {
           </div>
         )}
         <div className="form-section-body col-4">
-          <Input label="No. atención" name="numero_atencion" type="number" {...p} />
-          <Input label="Fecha" name="fecha" type="date" {...p} />
+          <Input label="No. atención" name="numero_atencion" type="number" min="1" max="2" step="1" inputMode="numeric" {...p} />
+          <Input label="Fecha" name="fecha" type="date" max={getGuatemalaDateInputValue()} {...p} />
           <Input label="Hora" name="hora" type="time" {...p} />
-          <Input label="Días después del parto" name="dias_despues_parto" type="number" {...p} />
+          <Input label="Días después del parto" name="dias_despues_parto" type="number" min="0" max="60" step="1" inputMode="numeric" {...p} />
           <Input label="Lugar del parto" name="lugar_atencion_parto" {...p} />
           <Input label="Quién atendió parto" name="quien_atendio_parto" {...p} />
           <Field label="Tipo de parto" error={fieldErrors.fieldError("tipo_parto")}>
             <select className={fieldErrors.inputClass("tipo_parto")} value={form.tipo_parto} onChange={(e) => set("tipo_parto", e.target.value)}>
-              <option value="">—</option><option value="vaginal">Vaginal</option><option value="cesarea">Cesárea</option><option value="forceps">Fórceps</option><option value="otro">Otro</option>
+              <option value="">—</option><option value="vaginal">Vaginal</option><option value="cesarea">Cesárea</option>
             </select>
           </Field>
-          <Input label="P/A sistólica" name="pa_sistolica" type="number" {...p} />
-          <Input label="P/A diastólica" name="pa_diastolica" type="number" {...p} />
-          <Input label="FC" name="frecuencia_cardiaca" type="number" min="0" placeholder="Frecuencia cardiaca (lpm)" {...p} />
-          <Input label="FR" name="frecuencia_respiratoria" type="number" min="0" placeholder="Frecuencia respiratoria (rpm)" {...p} />
-          <Input label="Temperatura" name="temperatura" type="number" step="0.1" {...p} />
+          <Input label="P/A sistólica" name="pa_sistolica" type="number" min="50" max="250" step="1" inputMode="numeric" {...p} />
+          <Input label="P/A diastólica" name="pa_diastolica" type="number" min="30" max="160" step="1" inputMode="numeric" {...p} />
+          <Input label="FC" name="frecuencia_cardiaca" type="number" min="30" max="220" step="1" inputMode="numeric" placeholder="Frecuencia cardiaca (lpm)" {...p} />
+          <Input label="FR" name="frecuencia_respiratoria" type="number" min="5" max="80" step="1" inputMode="numeric" placeholder="Frecuencia respiratoria (rpm)" {...p} />
+          <Input label="Temperatura" name="temperatura" type="number" min="30" max="45" step="0.1" inputMode="decimal" {...p} />
           <Input label="Nombre/cargo atiende" name="nombre_cargo_atiende" {...p} />
         </div>
         <div style={{ display: "flex", gap: "1rem", padding: "1rem", flexWrap: "wrap" }}>
           <Toggle label="RN vivo" name="recien_nacido_vivo" form={form} set={set} />
-          <Toggle label="Apego inmediato" name="tuvo_apego_inmediato" form={form} set={set} />
+          {!isSecondPuerperio && <Toggle label="Apego inmediato" name="tuvo_apego_inmediato" form={form} set={set} />}
           <Toggle label="Lactancia materna exclusiva" name="lactancia_materna_exclusiva" form={form} set={set} />
         </div>
+        {isSecondPuerperio && firstPuerperio && !editando && (
+          <div className="muted-text" style={{ padding: "0 1rem 1rem", fontSize: "0.8rem" }}>
+            Se heredaron los datos del parto desde la primera atencion. Los dias despues del parto se calculan segun la fecha del segundo control.
+          </div>
+        )}
         <div className="form-section-body col-2">
           {["signos_peligro","herida_operatoria","examen_mamas","examen_ginecologico","orientacion_consejeria","impresion_clinica","tratamiento"].map((name) => (
             <Field key={name} label={name.replaceAll("_", " ")} error={fieldErrors.fieldError(name)}>
