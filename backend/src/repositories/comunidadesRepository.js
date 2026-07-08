@@ -58,7 +58,40 @@ function riesgoActivoAgregadoLateral() {
     ) riesgo_activo ON TRUE`;
 }
 
-async function listarAdmin() {
+function filtrosAdmin({ q, estado, territorio, sector }) {
+  const values = [];
+  const where = [];
+
+  if (q) {
+    values.push(`%${q}%`);
+    where.push(`c.nombre ILIKE $${values.length}`);
+  }
+
+  if (estado === 'activas') where.push('c.activo = TRUE');
+  if (estado === 'inactivas') where.push('c.activo = FALSE');
+
+  if (territorio && territorio !== 'todos') {
+    values.push(Number(territorio));
+    where.push(`c.territorio = $${values.length}`);
+  }
+
+  if (sector && sector !== 'todos') {
+    values.push(sector);
+    where.push(`c.sector = $${values.length}`);
+  }
+
+  return {
+    params: values,
+    whereSql: where.length ? `WHERE ${where.join(' AND ')}` : '',
+  };
+}
+
+async function listarAdmin({ q = '', estado = 'activas', territorio = 'todos', sector = 'todos', limite, offset } = {}) {
+  const filtros = filtrosAdmin({ q, estado, territorio, sector });
+  const params = [...filtros.params, limite, offset];
+  const limiteParam = params.length - 1;
+  const offsetParam = params.length;
+
   const { rows } = await pool.query(`
     SELECT
       c.id,
@@ -75,9 +108,21 @@ async function listarAdmin() {
     FROM comunidades c
     ${pacientesDirectosAgregadoLateral()}
     ${riesgoActivoAgregadoLateral()}
+    ${filtros.whereSql}
     ORDER BY c.activo DESC, c.territorio, c.sector, c.nombre
-  `);
+    LIMIT $${limiteParam} OFFSET $${offsetParam}
+  `, params);
   return rows;
+}
+
+async function contarAdmin({ q = '', estado = 'activas', territorio = 'todos', sector = 'todos' } = {}) {
+  const filtros = filtrosAdmin({ q, estado, territorio, sector });
+  const { rows } = await pool.query(`
+    SELECT COUNT(*)::INTEGER AS total
+    FROM comunidades c
+    ${filtros.whereSql}
+  `, filtros.params);
+  return Number(rows[0]?.total || 0);
 }
 
 async function listarActivas() {
@@ -179,6 +224,7 @@ async function actualizarActivo({ id, activo, usuarioId }) {
 module.exports = {
   actualizar,
   actualizarActivo,
+  contarAdmin,
   crear,
   existeNombre,
   listarActivas,

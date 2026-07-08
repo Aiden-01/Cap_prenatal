@@ -442,7 +442,7 @@ export default function NuevaPaciente() {
   const [cuiError, setCuiError] = useState("");
   const [loading, setLoading] = useState(false);
   const [comunidadesActivas, setComunidadesActivas] = useState([]);
-  const [comunidadesLoading, setComunidadesLoading] = useState(false);
+  const [comunidadesLoading, setComunidadesLoading] = useState(true);
   const [comunidadesError, setComunidadesError] = useState("");
   const [modoLibreElChal, setModoLibreElChal] = useState(false);
   const cuiInputRef           = useRef(null);
@@ -529,8 +529,6 @@ export default function NuevaPaciente() {
 
   useEffect(() => {
     let alive = true;
-    setComunidadesLoading(true);
-    setComunidadesError("");
 
     api.get("/comunidades/activas")
       .then(({ data }) => {
@@ -775,7 +773,7 @@ export default function NuevaPaciente() {
             <div className="form-section">
               <div className="form-section-header">Datos del Establecimiento</div>
               <div className="form-section-body col-2">
-                <Input label="No. de Expediente" name="no_expediente" required form={form} set={set} placeholder="Ej: 2025-001" />
+                <Input label="No. de Expediente" name="no_expediente" required form={form} set={set} placeholder="Ej: 01/2026" />
                 <Input
                   label="CUI (DPI)"
                   name="cui"

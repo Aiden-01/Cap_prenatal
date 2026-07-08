@@ -32,8 +32,31 @@ async function assertNombreDisponible({ nombre, excluirId = null }) {
   }
 }
 
-async function listarComunidadesAdmin() {
-  return comunidadesRepository.listarAdmin();
+async function listarComunidadesAdmin(query = {}) {
+  const {
+    buscar = '',
+    estado = 'activas',
+    territorio = 'todos',
+    sector = 'todos',
+    pagina = 1,
+    limite = 10,
+  } = query;
+  const paginaActual = Math.max(parseInt(pagina, 10) || 1, 1);
+  const limiteActual = Math.min(Math.max(parseInt(limite, 10) || 10, 1), 100);
+  const offset = (paginaActual - 1) * limiteActual;
+  const filtros = {
+    q: String(buscar || '').trim(),
+    estado,
+    territorio,
+    sector,
+  };
+
+  const [data, total] = await Promise.all([
+    comunidadesRepository.listarAdmin({ ...filtros, limite: limiteActual, offset }),
+    comunidadesRepository.contarAdmin(filtros),
+  ]);
+
+  return { data, total };
 }
 
 async function listarComunidadesActivas() {

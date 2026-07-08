@@ -1,8 +1,8 @@
 const comunidadesService = require('../services/comunidadesService');
 const { asyncHandler } = require('../middleware/asyncHandler');
 
-const listarAdmin = asyncHandler(async (_req, res) => {
-  const comunidades = await comunidadesService.listarComunidadesAdmin();
+const listarAdmin = asyncHandler(async (req, res) => {
+  const comunidades = await comunidadesService.listarComunidadesAdmin(req.query);
   return res.json(comunidades);
 });
 

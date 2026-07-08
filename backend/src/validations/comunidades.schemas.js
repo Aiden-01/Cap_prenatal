@@ -1,4 +1,6 @@
 const {
+  optionalInt,
+  optionalText,
   z,
   requiredInt,
   requiredText,
@@ -29,6 +31,16 @@ const comunidadSchema = z.object({
   lng: requiredNumber(-180, 180, 'Longitud'),
 });
 
+const comunidadListQuerySchema = z.object({
+  buscar: optionalText(100),
+  estado: z.enum(['activas', 'inactivas', 'todas']).optional(),
+  territorio: z.enum(['todos', '1', '2', '3', '4']).optional(),
+  sector: z.enum(['todos', 'A', 'B']).optional(),
+  pagina: optionalInt(1, 100000),
+  limite: optionalInt(1, 100),
+}).passthrough();
+
 module.exports = {
+  comunidadListQuerySchema,
   comunidadSchema,
 };

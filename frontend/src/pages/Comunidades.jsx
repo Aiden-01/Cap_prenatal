@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import {
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   Edit3,
   Info,
@@ -32,6 +34,8 @@ const EMPTY_FORM = {
   lat: "",
   lng: "",
 };
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 const markerIcon = L.divIcon({
   className: "comunidades-map-marker",
@@ -252,6 +256,7 @@ function ConfirmDesactivar({ comunidad, loading, onCancel, onConfirm }) {
 export default function Comunidades() {
   const toast = useGlobalToast();
   const [comunidades, setComunidades] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -260,42 +265,58 @@ export default function Comunidades() {
   const [estado, setEstado] = useState("activas");
   const [territorio, setTerritorio] = useState("todos");
   const [sector, setSector] = useState("todos");
+  const [pagina, setPagina] = useState(1);
+  const [limite, setLimite] = useState(10);
+  const [reloadKey, setReloadKey] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState({});
   const [confirmTarget, setConfirmTarget] = useState(null);
 
-  const cargarComunidades = async () => {
+  const prepararConsulta = () => {
     setLoading(true);
     setError("");
-    try {
-      const { data } = await api.get("/comunidades");
-      setComunidades(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(getErrorMessage(err, "Error al cargar comunidades."));
-    } finally {
-      setLoading(false);
-    }
+  };
+
+  const recargarComunidades = () => {
+    prepararConsulta();
+    setReloadKey((current) => current + 1);
   };
 
   useEffect(() => {
-    cargarComunidades();
-  }, []);
+    let cancelado = false;
 
-  const comunidadesFiltradas = useMemo(() => {
-    const q = String(busqueda || "").trim().toLowerCase();
-    return comunidades.filter((comunidad) => {
-      const coincideNombre = !q || String(comunidad.nombre || "").toLowerCase().includes(q);
-      const coincideEstado =
-        estado === "todas" ||
-        (estado === "activas" && comunidad.activo) ||
-        (estado === "inactivas" && !comunidad.activo);
-      const coincideTerritorio = territorio === "todos" || String(comunidad.territorio) === territorio;
-      const coincideSector = sector === "todos" || comunidad.sector === sector;
-      return coincideNombre && coincideEstado && coincideTerritorio && coincideSector;
-    });
-  }, [busqueda, comunidades, estado, sector, territorio]);
+    api.get("/comunidades", { params: { buscar: busqueda, estado, territorio, sector, pagina, limite } })
+      .then(({ data }) => {
+        if (cancelado) return;
+        const rows = Array.isArray(data?.data) ? data.data : [];
+        const totalRows = Number(data?.total || 0);
+        const totalPages = Math.max(1, Math.ceil(totalRows / limite));
+
+        if (rows.length === 0 && totalRows > 0 && pagina > totalPages) {
+          setPagina(totalPages);
+          return;
+        }
+
+        setComunidades(rows);
+        setTotal(totalRows);
+      })
+      .catch((err) => {
+        if (!cancelado) setError(getErrorMessage(err, "Error al cargar comunidades."));
+      })
+      .finally(() => {
+        if (!cancelado) setLoading(false);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [busqueda, estado, territorio, sector, pagina, limite, reloadKey]);
+
+  const totalPaginas = Math.max(1, Math.ceil(total / limite));
+  const inicio = total === 0 ? 0 : (pagina - 1) * limite + 1;
+  const fin = Math.min(pagina * limite, total);
 
   const setField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -378,7 +399,13 @@ export default function Comunidades() {
       setEditing(null);
       setForm(EMPTY_FORM);
       setFormErrors({});
-      await cargarComunidades();
+      if (editing) {
+        recargarComunidades();
+      } else {
+        prepararConsulta();
+        setPagina(1);
+        setReloadKey((current) => current + 1);
+      }
     } catch (err) {
       toast(getErrorMessage(err, "Error al guardar comunidad"), "error");
     } finally {
@@ -393,7 +420,7 @@ export default function Comunidades() {
       await api.patch(`/comunidades/${confirmTarget.id}/desactivar`);
       toast("Comunidad desactivada", "success");
       setConfirmTarget(null);
-      await cargarComunidades();
+      recargarComunidades();
     } catch (err) {
       toast(getErrorMessage(err, "No se puede desactivar esta comunidad porque tiene casos de riesgo activo asociados."), "error");
     } finally {
@@ -406,7 +433,7 @@ export default function Comunidades() {
     try {
       await api.patch(`/comunidades/${comunidad.id}/reactivar`);
       toast("Comunidad reactivada", "success");
-      await cargarComunidades();
+      recargarComunidades();
     } catch (err) {
       toast(getErrorMessage(err, "Error al reactivar comunidad"), "error");
     } finally {
@@ -650,6 +677,33 @@ export default function Comunidades() {
           color: var(--text-muted);
         }
 
+        .comunidades-footer {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.75rem;
+          padding: 0.8rem 1rem;
+          border-top: 1px solid var(--border);
+          background: var(--surface);
+        }
+
+        .comunidades-footer-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
+        .comunidades-footer-page {
+          min-width: 4.8rem;
+          padding: 0.5rem 0.7rem;
+          text-align: center;
+          font-size: 0.83rem;
+          color: var(--text-muted);
+          font-variant-numeric: tabular-nums;
+        }
+
         .comunidades-modal {
           width: min(760px, calc(100vw - 2rem));
         }
@@ -756,6 +810,15 @@ export default function Comunidades() {
             justify-content: center;
             flex-wrap: wrap;
           }
+
+          .comunidades-footer {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .comunidades-footer-actions {
+            justify-content: flex-start;
+          }
         }
       `}</style>
 
@@ -794,23 +857,54 @@ export default function Comunidades() {
             <input
               className="input-field"
               value={busqueda}
-              onChange={(event) => setBusqueda(event.target.value)}
+              onChange={(event) => {
+                prepararConsulta();
+                setBusqueda(event.target.value);
+                setPagina(1);
+              }}
               placeholder="Buscar por comunidad"
             />
           </div>
-          <select className="input-field" value={estado} onChange={(event) => setEstado(event.target.value)} aria-label="Filtrar por estado">
+          <select
+            className="input-field"
+            value={estado}
+            onChange={(event) => {
+              prepararConsulta();
+              setEstado(event.target.value);
+              setPagina(1);
+            }}
+            aria-label="Filtrar por estado"
+          >
             <option value="activas">Activas</option>
             <option value="inactivas">Inactivas</option>
             <option value="todas">Todas</option>
           </select>
-          <select className="input-field" value={territorio} onChange={(event) => setTerritorio(event.target.value)} aria-label="Filtrar por territorio">
+          <select
+            className="input-field"
+            value={territorio}
+            onChange={(event) => {
+              prepararConsulta();
+              setTerritorio(event.target.value);
+              setPagina(1);
+            }}
+            aria-label="Filtrar por territorio"
+          >
             <option value="todos">Territorios</option>
             <option value="1">Territorio 1</option>
             <option value="2">Territorio 2</option>
             <option value="3">Territorio 3</option>
             <option value="4">Territorio 4</option>
           </select>
-          <select className="input-field" value={sector} onChange={(event) => setSector(event.target.value)} aria-label="Filtrar por sector">
+          <select
+            className="input-field"
+            value={sector}
+            onChange={(event) => {
+              prepararConsulta();
+              setSector(event.target.value);
+              setPagina(1);
+            }}
+            aria-label="Filtrar por sector"
+          >
             <option value="todos">Sectores</option>
             <option value="A">Sector A</option>
             <option value="B">Sector B</option>
@@ -845,7 +939,7 @@ export default function Comunidades() {
                 </tr>
               </thead>
               <tbody>
-                {comunidadesFiltradas.map((comunidad) => {
+                {comunidades.map((comunidad) => {
                   const riesgoActivo = Number(comunidad.total_riesgo_activo || 0) > 0;
                   return (
                     <tr key={comunidad.id}>
@@ -903,7 +997,7 @@ export default function Comunidades() {
                     </tr>
                   );
                 })}
-                {comunidadesFiltradas.length === 0 && (
+                {comunidades.length === 0 && (
                   <tr>
                     <td colSpan={8}>
                       <div className="comunidades-empty">No hay comunidades con los filtros seleccionados.</div>
@@ -912,6 +1006,57 @@ export default function Comunidades() {
                 )}
               </tbody>
             </table>
+            {total > 0 && (
+              <div className="comunidades-footer">
+                <span style={{ fontSize: "0.83rem", color: "var(--text-muted)" }}>
+                  Mostrando {inicio}-{fin} de {total} comunidades
+                </span>
+                <div className="comunidades-footer-actions">
+                  <select
+                    className="input-field"
+                    value={limite}
+                    onChange={(event) => {
+                      prepararConsulta();
+                      setLimite(Number(event.target.value));
+                      setPagina(1);
+                    }}
+                    aria-label="Comunidades por pagina"
+                    style={{ margin: 0, width: 92, padding: "0.5rem 0.65rem" }}
+                  >
+                    {PAGE_SIZE_OPTIONS.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => {
+                      prepararConsulta();
+                      setPagina((current) => Math.max(1, current - 1));
+                    }}
+                    disabled={pagina === 1}
+                  >
+                    <ChevronLeft size={15} />
+                    Anterior
+                  </button>
+                  <span className="comunidades-footer-page">
+                    {pagina} / {totalPaginas}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => {
+                      prepararConsulta();
+                      setPagina((current) => Math.min(totalPaginas, current + 1));
+                    }}
+                    disabled={pagina === totalPaginas}
+                  >
+                    Siguiente
+                    <ChevronRight size={15} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
