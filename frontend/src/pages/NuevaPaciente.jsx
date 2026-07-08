@@ -88,8 +88,61 @@ const MUNICIPIOS_PETEN = [
   { value: "Las Cruces", label: "Las Cruces" },
 ];
 
+const IDIOMAS_MAYAS = [
+  "Poqomchi'",
+  "Achi'",
+  "Q'eqchi'",
+  "Ch'orti'",
+  "Kaqchikel",
+  "Poqomam",
+  "Sipakapense",
+  "Tz'utujil",
+  "Mam",
+  "Ixil",
+  "Sakapulteko",
+  "Uspanteko",
+  "Awakateko",
+  "Chalchiteko",
+  "Akateko",
+  "Chuj",
+  "Jakalteko/Popti'",
+  "Q'anjob'al",
+  "Tektiteko",
+  "K'iche'",
+  "Itza'",
+  "Mopan",
+];
+
+const IDIOMA_MAYA_DEFAULT = "Q'eqchi'";
+
+const COMUNIDAD_AUTOMATICA_POR_PUEBLO = {
+  mestizo: "Español",
+  ladino: "Español",
+  ladino_mestizo: "Español",
+  "ladino/mestizo": "Español",
+  garifuna: "Garífuna",
+  xinca: "Xinka",
+  xinka: "Xinka",
+};
+
+const PUEBLO_OPTIONS = [
+  { value: "maya", label: "Maya" },
+  { value: "garifuna", label: "Garífuna" },
+  { value: "xinca", label: "Xinka" },
+  { value: "mestizo", label: "Ladino/Mestizo" },
+  { value: "otro", label: "Otro" },
+];
+
 function esMunicipioElChal(municipio) {
   return String(municipio || "").trim().toLowerCase() === "el chal";
+}
+
+function normalizarPueblo(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 }
 
 function normalizarBusqueda(value) {
@@ -98,6 +151,40 @@ function normalizarBusqueda(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function getComunidadLinguisticaConfig(pueblo) {
+  const puebloNormalizado = normalizarPueblo(pueblo);
+  const automaticValue = COMUNIDAD_AUTOMATICA_POR_PUEBLO[puebloNormalizado] || "";
+
+  if (automaticValue) {
+    return {
+      mode: "automatic",
+      value: automaticValue,
+      helpText: "Este valor se asigna automáticamente según el pueblo seleccionado.",
+    };
+  }
+
+  if (puebloNormalizado === "maya") {
+    return {
+      mode: "maya",
+      value: "",
+      helpText: "Seleccione el idioma maya correspondiente.",
+    };
+  }
+
+  return {
+    mode: "free",
+    value: "",
+    helpText: "Escriba la comunidad lingüística correspondiente.",
+  };
+}
+
+function getPuebloPayloadValue(pueblo) {
+  const puebloNormalizado = normalizarPueblo(pueblo);
+  if (["ladino", "ladino_mestizo", "ladino/mestizo"].includes(puebloNormalizado)) return "mestizo";
+  if (puebloNormalizado === "xinka") return "xinca";
+  return pueblo || "";
 }
 
 // ─── HELPERS DE CAMPO ────────────────────────────────────────
@@ -149,6 +236,58 @@ function Select({ label, name, options, required, form, set, disabled = false, h
         ))}
       </select>
       {helpText && <p className="community-field-help">{helpText}</p>}
+    </Field>
+  );
+}
+
+function ComunidadLinguisticaField({ form, set }) {
+  const { inputClass } = useFormErrorUi();
+  const config = getComunidadLinguisticaConfig(form.pueblo);
+
+  if (config.mode === "automatic") {
+    return (
+      <Field label="Comunidad Lingüística" name="comunidad_linguistica">
+        <input
+          className={`${inputClass("comunidad_linguistica")} community-locked-field`}
+          name="comunidad_linguistica"
+          value={config.value}
+          readOnly
+          aria-readonly="true"
+        />
+        <p className="community-field-help">{config.helpText}</p>
+      </Field>
+    );
+  }
+
+  if (config.mode === "maya") {
+    return (
+      <Field label="Comunidad Lingüística" required name="comunidad_linguistica">
+        <select
+          className={inputClass("comunidad_linguistica")}
+          name="comunidad_linguistica"
+          value={form.comunidad_linguistica ?? ""}
+          onChange={(event) => set("comunidad_linguistica", event.target.value)}
+        >
+          <option value="">— Seleccionar —</option>
+          {IDIOMAS_MAYAS.map((idioma) => (
+            <option key={idioma} value={idioma}>{idioma}</option>
+          ))}
+        </select>
+        <p className="community-field-help">{config.helpText}</p>
+      </Field>
+    );
+  }
+
+  return (
+    <Field label="Comunidad Lingüística" name="comunidad_linguistica">
+      <input
+        className={inputClass("comunidad_linguistica")}
+        name="comunidad_linguistica"
+        value={form.comunidad_linguistica ?? ""}
+        onChange={(event) => set("comunidad_linguistica", event.target.value)}
+        placeholder="Especifique comunidad lingüística"
+      />
+      <p className="community-field-help">{config.helpText}</p>
     </Field>
   );
 }
@@ -455,6 +594,21 @@ export default function NuevaPaciente() {
     if (k === "cui") setCuiError("");
     fieldErrors.clearFieldError(k);
 
+    if (k === "pueblo") {
+      const config = getComunidadLinguisticaConfig(v);
+      fieldErrors.clearFieldError("comunidad_linguistica");
+      setForm((current) => ({
+        ...current,
+        pueblo: v,
+        comunidad_linguistica: config.mode === "automatic"
+          ? config.value
+          : config.mode === "maya"
+            ? IDIOMA_MAYA_DEFAULT
+            : "",
+      }));
+      return;
+    }
+
     if (k === "municipio") {
       setModoLibreElChal(false);
       setForm((current) => ({
@@ -555,6 +709,7 @@ export default function NuevaPaciente() {
       .then(({ data }) => {
         const fechaNacimiento = data.fecha_nacimiento ? data.fecha_nacimiento.split("T")[0] : "";
         const edadDesdeFecha = calcularEdad(fechaNacimiento);
+        const comunidadConfig = getComunidadLinguisticaConfig(data.pueblo);
         setForm((f) => ({
           ...f,
           ...data,
@@ -565,6 +720,9 @@ export default function NuevaPaciente() {
           fpp: data.fpp ? data.fpp.split("T")[0] : "",
           fin_embarazo_anterior: data.fin_embarazo_anterior ? data.fin_embarazo_anterior.split("T")[0] : "",
           antec_emb_ectopico_num: data.antec_emb_ectopico_num ?? (data.antec_emb_ectopico ? 1 : 0),
+          comunidad_linguistica: comunidadConfig.mode === "automatic"
+            ? comunidadConfig.value
+            : (data.comunidad_linguistica ?? ""),
           comunidad_id: esMunicipioElChal(data.municipio) ? (data.comunidad_id ?? null) : null,
         }));
       })
@@ -651,12 +809,27 @@ export default function NuevaPaciente() {
       toast("El CUI debe tener exactamente 13 dígitos", "error");
       return;
     }
+    const comunidadLinguisticaConfig = getComunidadLinguisticaConfig(form.pueblo);
+    if (comunidadLinguisticaConfig.mode === "maya" && !String(form.comunidad_linguistica || "").trim()) {
+      fieldErrors.setErrorsFromResponse(
+        { response: { data: { details: [{ campo: "comunidad_linguistica", mensaje: "Seleccione el idioma maya correspondiente" }] } } },
+        "Campos requeridos"
+      );
+      setStep(1);
+      toast("Seleccione la comunidad lingüística para pueblo Maya", "error");
+      return;
+    }
     setLoading(true);
     fieldErrors.clearFieldErrors();
     try {
       const municipioElChal = esMunicipioElChal(form.municipio);
+      const comunidadLinguistica = comunidadLinguisticaConfig.mode === "automatic"
+        ? comunidadLinguisticaConfig.value
+        : String(form.comunidad_linguistica || "").trim();
       const payload = {
         ...form,
+        pueblo: getPuebloPayloadValue(form.pueblo),
+        comunidad_linguistica: comunidadLinguistica,
         comunidad_id: municipioElChal ? (form.comunidad_id || null) : null,
         fpp: form.fpp || calcularFppDesdeFur(form.fur),
         antec_diabetes: Boolean(form.antec_diabetes_tipo),
@@ -928,15 +1101,9 @@ export default function NuevaPaciente() {
               <div className="form-section-header">Identidad y Origen</div>
               <div className="form-section-body col-2">
                 <Select label="Pueblo" name="pueblo" form={form} set={set}
-                  options={[
-                    { value: "maya",     label: "Maya" },
-                    { value: "garifuna", label: "Garífuna" },
-                    { value: "xinca",    label: "Xinca" },
-                    { value: "mestizo",  label: "Mestizo" },
-                    { value: "otro",     label: "Otro" },
-                  ]}
+                  options={PUEBLO_OPTIONS}
                 />
-                <Input label="Comunidad Lingüística" name="comunidad_linguistica" form={form} set={set} />
+                <ComunidadLinguisticaField form={form} set={set} />
               </div>
               <div className="form-section-body col-2" style={{ marginTop: "0.75rem" }}>
                 <Toggle label="Es migrante" name="es_migrante" {...p} />

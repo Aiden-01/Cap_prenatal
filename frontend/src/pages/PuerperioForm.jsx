@@ -66,11 +66,13 @@ function Field({ label, children, error }) {
   return <div className="form-group"><label className="input-label">{label}</label>{children}{error && <div className="field-error-text">{error}</div>}</div>;
 }
 
-function Input({ label, name, form, set, type = "text", errors = {}, inputClass }) {
+function Input({ label, name, form, set, type = "text", errors = {}, inputClass, ...rest }) {
   return (
     <Field label={label} error={errors[name]}>
       <input className={inputClass ? inputClass(name) : "input-field"} type={type} value={form[name] ?? ""}
-        onChange={(e) => set(name, type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)} />
+        onChange={(e) => set(name, type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
+        {...rest}
+      />
     </Field>
   );
 }
@@ -165,7 +167,9 @@ export default function PuerperioForm() {
           </Field>
           <Input label="P/A sistólica" name="pa_sistolica" type="number" {...p} />
           <Input label="P/A diastólica" name="pa_diastolica" type="number" {...p} />
-          <Input label="Temperatura" name="temperatura" type="number" {...p} />
+          <Input label="FC" name="frecuencia_cardiaca" type="number" min="0" placeholder="Frecuencia cardiaca (lpm)" {...p} />
+          <Input label="FR" name="frecuencia_respiratoria" type="number" min="0" placeholder="Frecuencia respiratoria (rpm)" {...p} />
+          <Input label="Temperatura" name="temperatura" type="number" step="0.1" {...p} />
           <Input label="Nombre/cargo atiende" name="nombre_cargo_atiende" {...p} />
         </div>
         <div style={{ display: "flex", gap: "1rem", padding: "1rem", flexWrap: "wrap" }}>

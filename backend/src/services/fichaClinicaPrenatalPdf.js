@@ -92,6 +92,18 @@ function fitText(text, font, size, width) {
   return out ? `${out}...` : '';
 }
 
+function fitTextWithEllipsis(text, font, size, width) {
+  let out = safe(text).replace(/\s+/g, ' ').trim();
+  if (!out) return '';
+  const suffix = '...';
+
+  while (out.length > 1 && font.widthOfTextAtSize(`${out}${suffix}`, size) > width) {
+    out = out.slice(0, -1).trimEnd();
+  }
+
+  return out ? `${out}${suffix}` : suffix;
+}
+
 function wrapText(text, font, size, width, maxLines = 2) {
   const words = safe(text).replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
   const lines = [];
@@ -113,6 +125,74 @@ function wrapText(text, font, size, width, maxLines = 2) {
     lines[maxLines - 1] = fitText(lines[maxLines - 1], font, size, width);
   }
   return lines;
+}
+
+function takeLine(words, font, size, width) {
+  let line = '';
+  let consumed = 0;
+
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (font.widthOfTextAtSize(next, size) <= width || !line) {
+      line = next;
+      consumed += 1;
+      continue;
+    }
+    break;
+  }
+
+  return {
+    line: fitText(line, font, size, width),
+    remaining: words.slice(consumed),
+  };
+}
+
+function drawWrappedTextWithFirstLineOffset({
+  page,
+  text,
+  firstLineX,
+  firstLineWidth,
+  nextLinesX,
+  nextLinesWidth,
+  startY,
+  lineHeight,
+  maxLines,
+  font,
+  fontSize,
+  color = rgb(0.05, 0.05, 0.05),
+}) {
+  const words = safe(text).replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  if (!words.length || !maxLines) return;
+
+  const lines = [];
+  let remaining = words;
+  let first = takeLine(remaining, font, fontSize, firstLineWidth);
+  if (first.line) lines.push({ text: first.line, x: firstLineX });
+  remaining = first.remaining;
+
+  while (remaining.length && lines.length < maxLines) {
+    const current = takeLine(remaining, font, fontSize, nextLinesWidth);
+    if (!current.line) break;
+    lines.push({ text: current.line, x: nextLinesX });
+    remaining = current.remaining;
+  }
+
+  if (remaining.length && lines.length) {
+    const lastIndex = lines.length - 1;
+    const width = lastIndex === 0 ? firstLineWidth : nextLinesWidth;
+    lines[lastIndex].text = fitTextWithEllipsis(lines[lastIndex].text, font, fontSize, width);
+  }
+
+  const y = yFromTop(page, startY, fontSize);
+  lines.forEach((line, idx) => {
+    page.drawText(line.text, {
+      x: line.x,
+      y: y - idx * lineHeight,
+      size: fontSize,
+      font,
+      color,
+    });
+  });
 }
 
 function debugPoint(page, x, yTop, label, font) {
@@ -141,6 +221,23 @@ function drawTextBox(page, font, value, cfg, label) {
   const x = cfg.x;
   let y = yFromTop(page, cfg.y, size);
   debugPoint(page, x, cfg.y, label, font);
+
+  if (cfg.maxLines && cfg.maxLines > 1 && (cfg.firstLineX !== undefined || cfg.nextLinesX !== undefined)) {
+    drawWrappedTextWithFirstLineOffset({
+      page,
+      text,
+      firstLineX: cfg.firstLineX ?? x,
+      firstLineWidth: cfg.firstLineWidth ?? width,
+      nextLinesX: cfg.nextLinesX ?? cfg.firstLineX ?? x,
+      nextLinesWidth: cfg.nextLinesWidth ?? cfg.firstLineWidth ?? width,
+      startY: cfg.y,
+      lineHeight: cfg.lineHeight ?? (size + (cfg.lineGap ?? 1.5)),
+      maxLines: cfg.maxLines,
+      font,
+      fontSize: size,
+    });
+    return;
+  }
 
   if (cfg.maxLines && cfg.maxLines > 1) {
     const lines = wrapText(text, font, size, width, cfg.maxLines);
@@ -337,6 +434,31 @@ function formatPa(control) {
   return `${safe(control.pa_sistolica)}/${safe(control.pa_diastolica)}`;
 }
 
+function temperaturaParts(value) {
+  const text = safe(value).replace(',', '.').trim();
+  if (!text) return ['', '', ''];
+
+  const [integerPart = '', decimalPart = ''] = text.split('.');
+  if (!integerPart) return ['', '', decimalPart ? `.${decimalPart}` : ''];
+
+  return [
+    integerPart.length > 1 ? integerPart.slice(0, -1) : '',
+    integerPart.slice(-1),
+    decimalPart ? `.${decimalPart}` : '',
+  ];
+}
+
+function drawTemperaturaBoxes(page, font, value, cfg, label) {
+  if (!cfg?.boxes) {
+    drawTextBox(page, font, value, cfg, label);
+    return;
+  }
+
+  temperaturaParts(value).forEach((part, index) => {
+    drawTextBox(page, font, part, cfg.boxes[index], `${label}:${index}`);
+  });
+}
+
 function markPositiveNegative(page, font, value, cfg, label) {
   if (!cfg) return;
   const normalized = safe(value)
@@ -443,118 +565,6 @@ function drawDebugReferences(page, font) {
 
 function controlAt(controles, numero) {
   return controles.find((c) => Number(c.numero_control) === numero) || {};
-}
-
-function formatDate(value) {
-  const parts = dateParts(value);
-  if (!parts.y || !parts.m || !parts.d) return '';
-  return `${parts.d}/${parts.m}/${parts.y}`;
-}
-
-function compactYesNo(value) {
-  if (value === null || value === undefined || value === '') return '';
-  return bool(value) ? 'Si' : 'No';
-}
-
-function drawWrappedLine(page, font, label, value, x, y, width, size = 8.5) {
-  const cleanValue = safe(value).replace(/\s+/g, ' ').trim();
-  if (!cleanValue) return y;
-
-  const labelText = `${label}: `;
-  page.drawText(labelText, { x, y, size, font, color: rgb(0.05, 0.05, 0.05) });
-
-  const labelWidth = font.widthOfTextAtSize(labelText, size);
-  const lines = wrapText(cleanValue, font, size, width - labelWidth, 3);
-  lines.forEach((line, idx) => {
-    page.drawText(line, {
-      x: idx === 0 ? x + labelWidth : x,
-      y: y - idx * (size + 3),
-      size,
-      font,
-      color: rgb(0.05, 0.05, 0.05),
-    });
-  });
-
-  return y - Math.max(lines.length, 1) * (size + 3);
-}
-
-function drawPuerperioSummary({ pdfDoc, font, paciente, embarazo, puerperio = [] }) {
-  if (!puerperio.length) return;
-
-  const marginX = 42;
-  let page = pdfDoc.addPage([coords.PAGE.width, coords.PAGE.height]);
-  let y = page.getHeight() - 54;
-
-  const addContinuationPage = () => {
-    page = pdfDoc.addPage([coords.PAGE.width, coords.PAGE.height]);
-    y = page.getHeight() - 54;
-  };
-
-  page.drawText('Anexo de puerperio', {
-    x: marginX,
-    y,
-    size: 16,
-    font,
-    color: rgb(0.02, 0.12, 0.22),
-  });
-  y -= 22;
-
-  page.drawText('Resumen generado desde los controles de puerperio registrados en el sistema.', {
-    x: marginX,
-    y,
-    size: 8.5,
-    font,
-    color: rgb(0.18, 0.22, 0.25),
-  });
-  y -= 28;
-
-  const nombre = `${safe(paciente?.nombres)} ${safe(paciente?.apellidos)}`.trim();
-  y = drawWrappedLine(page, font, 'Paciente', nombre, marginX, y, 520, 8.5);
-  y = drawWrappedLine(page, font, 'No. expediente', paciente?.no_expediente, marginX, y, 520, 8.5);
-  y = drawWrappedLine(page, font, 'Embarazo', embarazo?.numero_embarazo, marginX, y, 520, 8.5);
-  y -= 10;
-
-  puerperio.forEach((registro) => {
-    if (y < 170) {
-      addContinuationPage();
-    }
-
-    page.drawText(`${registro.numero_atencion || ''}a atencion de puerperio`, {
-      x: marginX,
-      y,
-      size: 11,
-      font,
-      color: rgb(0.02, 0.12, 0.22),
-    });
-    y -= 18;
-
-    const fields = [
-      ['Fecha', formatDate(registro.fecha)],
-      ['Hora', safe(registro.hora).slice(0, 5)],
-      ['Dias despues del parto', registro.dias_despues_parto],
-      ['Lugar del parto', registro.lugar_atencion_parto],
-      ['Quien atendio parto', registro.quien_atendio_parto],
-      ['Tipo de parto', registro.tipo_parto],
-      ['RN vivo', compactYesNo(registro.recien_nacido_vivo)],
-      ['Apego inmediato', compactYesNo(registro.tuvo_apego_inmediato)],
-      ['Lactancia materna exclusiva', compactYesNo(registro.lactancia_materna_exclusiva)],
-      ['P/A', registro.pa_sistolica ? `${registro.pa_sistolica}/${registro.pa_diastolica || ''}` : ''],
-      ['Temperatura', registro.temperatura],
-      ['Signos de peligro', registro.signos_peligro],
-      ['Examen mamas', registro.examen_mamas],
-      ['Examen ginecologico', registro.examen_ginecologico],
-      ['Orientacion/consejeria', registro.orientacion_consejeria],
-      ['Impresion clinica', registro.impresion_clinica],
-      ['Tratamiento', registro.tratamiento],
-      ['Nombre/cargo atiende', registro.nombre_cargo_atiende],
-    ];
-
-    fields.forEach(([label, value]) => {
-      if (y < 80) addContinuationPage();
-      y = drawWrappedLine(page, font, label, value, marginX, y, 520, 8);
-    });
-    y -= 12;
-  });
 }
 
 function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planParto, vacunas = [] }) {
@@ -794,6 +804,46 @@ function drawPage2({ page, font, controles }) {
   drawPage2DebugReferences(page, font);
 }
 
+function drawPage4({ page, font, puerperio = [] }) {
+  const c = coords.pages[4]?.puerperio;
+  if (!page || !Array.isArray(c)) return;
+
+  const byNumero = new Map();
+  puerperio.forEach((registro) => {
+    const numero = Number(registro.numero_atencion);
+    if (numero === 1 || numero === 2) byNumero.set(numero, registro);
+  });
+
+  [1, 2].forEach((numero, index) => {
+    const registro = byNumero.get(numero) || puerperio[index];
+    const cfg = c[index];
+    if (!registro || !cfg) return;
+
+    drawDate(page, font, registro.fecha, cfg.fecha, `puerperio${numero}:fecha`);
+    drawTime(page, font, registro.hora, cfg.hora, `puerperio${numero}:hora`);
+    drawTextBox(page, font, registro.signos_peligro, cfg.signosPeligro, `puerperio${numero}:signosPeligro`);
+    drawTextBox(page, font, registro.dias_despues_parto, cfg.diasDespuesParto, `puerperio${numero}:diasPostparto`);
+    drawTextBox(page, font, registro.lugar_atencion_parto, cfg.lugarParto, `puerperio${numero}:lugarParto`);
+    drawTextBox(page, font, registro.quien_atendio_parto, cfg.quienAtendioParto, `puerperio${numero}:quienAtendio`);
+    drawTextBox(page, font, formatPa(registro), cfg.pa, `puerperio${numero}:pa`);
+    drawTextBox(page, font, registro.frecuencia_cardiaca, cfg.fc, `puerperio${numero}:fc`);
+    drawTextBox(page, font, registro.frecuencia_respiratoria, cfg.fr, `puerperio${numero}:fr`);
+    drawTextBox(page, font, registro.tipo_parto, cfg.tipoParto, `puerperio${numero}:tipoParto`);
+    drawTemperaturaBoxes(page, font, registro.temperatura, cfg.temperatura, `puerperio${numero}:temperatura`);
+    drawTextBox(page, font, registro.herida_operatoria, cfg.heridaOperatoria, `puerperio${numero}:herida`);
+    drawTextBox(page, font, registro.examen_mamas, cfg.examenMamas, `puerperio${numero}:mamas`);
+    drawTextBox(page, font, registro.examen_ginecologico, cfg.examenGinecologico, `puerperio${numero}:ginecologico`);
+    drawTextBox(page, font, registro.orientacion_consejeria, cfg.orientacionConsejeria, `puerperio${numero}:orientacion`);
+    drawTextBox(page, font, registro.impresion_clinica, cfg.impresionClinica, `puerperio${numero}:impresion`);
+    drawTextBox(page, font, registro.tratamiento, cfg.tratamiento, `puerperio${numero}:tratamiento`);
+    drawTextBox(page, font, registro.nombre_cargo_atiende, cfg.nombreCargoAtiende, `puerperio${numero}:atiende`);
+
+    markNullableYesNo(page, font, registro.recien_nacido_vivo, cfg.recienNacidoVivo, `puerperio${numero}:rnVivo`);
+    markNullableYesNo(page, font, registro.tuvo_apego_inmediato, cfg.apegoInmediato, `puerperio${numero}:apego`);
+    markNullableYesNo(page, font, registro.lactancia_materna_exclusiva, cfg.lactanciaMaternaExclusiva, `puerperio${numero}:lactancia`);
+  });
+}
+
 async function generarFichaClinicaPrenatalPdf({
   paciente,
   embarazo,
@@ -811,6 +861,7 @@ async function generarFichaClinicaPrenatalPdf({
   const pages = pdfDoc.getPages();
   if (!pages[0]) throw new Error('La plantilla PDF no tiene pagina 1');
   if (!pages[1]) throw new Error('La plantilla PDF no tiene pagina 2');
+  if (!pages[3]) throw new Error('La plantilla PDF no tiene pagina 4');
 
   drawPage1({
     page: pages[0],
@@ -829,11 +880,9 @@ async function generarFichaClinicaPrenatalPdf({
     controles,
   });
 
-  drawPuerperioSummary({
-    pdfDoc,
+  drawPage4({
+    page: pages[3],
     font,
-    paciente,
-    embarazo,
     puerperio,
   });
 
@@ -847,6 +896,7 @@ module.exports = {
     drawTextBox,
     drawDate,
     drawTime,
+    drawWrappedTextWithFirstLineOffset,
     markYesNo,
     drawMark,
     fitText,

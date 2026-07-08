@@ -1270,6 +1270,8 @@ export default function ExpedientePaciente() {
                   <Row label="Quién atendió"    value={pu.quien_atendio_parto} />
                   <Row label="Tipo de parto"    value={pu.tipo_parto} />
                   <Row label="P/A" value={pu.pa_sistolica ? `${pu.pa_sistolica}/${pu.pa_diastolica}` : null} />
+                  <Row label="FC" value={pu.frecuencia_cardiaca ? `${pu.frecuencia_cardiaca} lpm` : null} />
+                  <Row label="FR" value={pu.frecuencia_respiratoria ? `${pu.frecuencia_respiratoria} rpm` : null} />
                   <Row label="Temperatura"      value={pu.temperatura ? `${pu.temperatura}°C` : null} />
                 </Grid>
                 <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
