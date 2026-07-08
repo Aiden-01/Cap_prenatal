@@ -3581,6 +3581,467 @@ h1, h2, h3, h4 {
   }
 }
 
+.puerperium-module {
+  display: grid;
+  gap: 1rem;
+}
+
+.puerperium-top-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.puerperium-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: stretch;
+}
+
+.puerperium-history-panel,
+.puerperium-detail-panel,
+.puerperium-empty-state {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary-lt) 22%, transparent), transparent 230px),
+    var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.puerperium-history-panel {
+  min-height: 520px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.puerperium-panel-heading {
+  padding: 1.05rem 1rem 0.7rem;
+}
+
+.puerperium-panel-heading h3 {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 850;
+}
+
+.puerperium-panel-heading p {
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.puerperium-timeline-list {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 0.85rem;
+  padding: 0.85rem 0.95rem 1rem;
+  overflow-y: auto;
+}
+
+.puerperium-timeline-list::before {
+  content: "";
+  position: absolute;
+  left: 1.72rem;
+  top: 1.15rem;
+  bottom: 1.15rem;
+  width: 1px;
+  background: color-mix(in srgb, var(--primary) 30%, var(--border));
+}
+
+.puerperium-timeline-item {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: grid;
+  grid-template-columns: 1.55rem minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+  cursor: pointer;
+  font-family: "DM Sans", sans-serif;
+  text-align: left;
+}
+
+.puerperium-timeline-dot {
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface2) 70%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 36%, var(--border));
+  font-size: 0.76rem;
+  font-weight: 850;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--surface) 76%, transparent);
+}
+
+.puerperium-history-card {
+  min-width: 0;
+  padding: 0.82rem 0.86rem;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface2) 34%, var(--surface));
+  display: grid;
+  gap: 0.35rem;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, transform 0.14s ease;
+}
+
+.puerperium-history-card strong {
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 850;
+  line-height: 1.3;
+}
+
+.puerperium-history-card small {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.puerperium-timeline-item > svg {
+  color: var(--text-muted);
+}
+
+.puerperium-timeline-item:hover .puerperium-history-card {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+  background: color-mix(in srgb, var(--primary-lt) 20%, var(--surface));
+  transform: translateY(-1px);
+}
+
+.puerperium-timeline-item.is-selected .puerperium-timeline-dot {
+  color: white;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  border-color: color-mix(in srgb, var(--primary) 72%, var(--border));
+}
+
+.puerperium-timeline-item.is-selected .puerperium-history-card {
+  border-color: color-mix(in srgb, var(--primary) 72%, var(--border));
+  background: color-mix(in srgb, var(--primary-lt) 44%, var(--surface));
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--primary) 13%, transparent);
+}
+
+.puerperium-detail-panel {
+  padding: 1.05rem;
+  display: grid;
+  align-content: start;
+  gap: 0.8rem;
+}
+
+.puerperium-detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.puerperium-detail-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.puerperium-detail-title > span:not(.badge) {
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+}
+
+.puerperium-detail-actions {
+  display: flex;
+  gap: 0.55rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.puerperium-detail-actions .btn-secondary {
+  min-height: 2.2rem;
+  padding: 0.42rem 0.76rem;
+  background: color-mix(in srgb, var(--surface2) 42%, transparent);
+  font-size: 0.8rem;
+}
+
+.puerperium-detail-actions .danger-outline {
+  border-color: color-mix(in srgb, var(--danger) 62%, var(--border));
+  color: color-mix(in srgb, var(--danger) 82%, var(--text));
+}
+
+.puerperium-danger-alert {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: start;
+  padding: 0.8rem 0.95rem;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--danger) 62%, var(--border));
+  background: color-mix(in srgb, var(--danger-lt) 52%, var(--surface));
+}
+
+.puerperium-danger-alert svg,
+.puerperium-danger-alert strong {
+  color: var(--danger);
+}
+
+.puerperium-danger-alert strong {
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.puerperium-danger-alert p {
+  color: var(--text);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.puerperium-summary-section,
+.puerperium-indicators-section,
+.puerperium-clinical-list {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface2) 30%, transparent);
+}
+
+.puerperium-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.75rem 0.9rem 0.35rem;
+}
+
+.puerperium-section-title svg {
+  color: var(--primary);
+}
+
+.puerperium-section-title h4 {
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.puerperium-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 0.45rem 0.85rem 0.85rem;
+}
+
+.puerperium-metric {
+  min-width: 0;
+  display: grid;
+  gap: 0.32rem;
+  padding: 0.68rem 0.85rem;
+  border-left: 1px solid color-mix(in srgb, var(--border) 58%, transparent);
+}
+
+.puerperium-metric:nth-child(4n + 1) {
+  border-left: none;
+}
+
+.puerperium-metric:nth-child(n + 5) {
+  border-top: 1px solid color-mix(in srgb, var(--border) 46%, transparent);
+}
+
+.puerperium-metric span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.puerperium-metric strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 0.94rem;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.puerperium-indicators-section {
+  padding-bottom: 0.7rem;
+}
+
+.puerperium-indicators {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.25rem 0.9rem 0;
+}
+
+.puerperium-indicator {
+  min-height: 2.15rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 62%, transparent);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.puerperium-indicator svg {
+  color: var(--text-muted);
+}
+
+.puerperium-indicator.is-on {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  background: color-mix(in srgb, var(--accent-lt) 52%, transparent);
+}
+
+.puerperium-indicator.is-on svg {
+  color: var(--accent);
+}
+
+.puerperium-indicator.is-off {
+  color: var(--text-muted);
+  opacity: 0.78;
+}
+
+.puerperium-clinical-list {
+  display: grid;
+}
+
+.puerperium-clinical-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(150px, 190px) minmax(0, 1fr);
+  gap: 0.9rem;
+  padding: 0.9rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 52%, transparent);
+}
+
+.puerperium-clinical-row:first-child {
+  border-top: none;
+}
+
+.puerperium-clinical-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.puerperium-clinical-icon {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary-lt) 50%, var(--surface2));
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+}
+
+.puerperium-clinical-heading strong {
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 850;
+  line-height: 1.3;
+}
+
+.puerperium-clinical-row p {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.puerperium-empty-state {
+  min-height: 280px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.puerperium-empty-icon {
+  width: 3rem;
+  height: 3rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary-lt) 58%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+}
+
+.puerperium-empty-state h3 {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 850;
+}
+
+.puerperium-empty-state p {
+  max-width: 360px;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 1080px) {
+  .puerperium-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .puerperium-history-panel {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .puerperium-top-actions,
+  .puerperium-detail-header,
+  .puerperium-detail-actions,
+  .puerperium-detail-actions .btn-secondary {
+    display: grid;
+    width: 100%;
+    justify-items: stretch;
+  }
+
+  .puerperium-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .puerperium-metric:nth-child(odd) {
+    border-left: none;
+  }
+
+  .puerperium-metric:nth-child(n + 3) {
+    border-top: 1px solid color-mix(in srgb, var(--border) 46%, transparent);
+  }
+
+  .puerperium-clinical-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .puerperium-danger-alert {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .puerperium-danger-alert p {
+    grid-column: 1 / -1;
+  }
+}
+
 .vaccines-module {
   display: grid;
   gap: 1rem;

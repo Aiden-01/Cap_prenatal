@@ -63,11 +63,49 @@ function GridAuto({ children }) {
   );
 }
 
+function PuerperioMetric({ label, value }) {
+  return (
+    <div className="puerperium-metric">
+      <span>{label}</span>
+      <strong>{value || "—"}</strong>
+    </div>
+  );
+}
+
+function PuerperioIndicator({ label, value }) {
+  return (
+    <span className={`puerperium-indicator ${value ? "is-on" : "is-off"}`}>
+      <CheckCircle size={15} />
+      {label}
+    </span>
+  );
+}
+
+function PuerperioClinicalRow({ icon: Icon, title, children }) {
+  if (!children) return null;
+  return (
+    <div className="puerperium-clinical-row">
+      <div className="puerperium-clinical-heading">
+        <span className="puerperium-clinical-icon"><Icon size={18} /></span>
+        <strong>{title}</strong>
+      </div>
+      <p>{children}</p>
+    </div>
+  );
+}
+
 function fecha(d) {
   if (!d) return "—";
   const dateOnly = String(d).split("T")[0];
   const date = new Date(`${dateOnly}T00:00:00`);
   return Number.isNaN(date.getTime()) ? "Sin fecha" : date.toLocaleDateString("es-GT");
+}
+
+function tipoParto(value) {
+  const normalized = normalizeResult(value).toLowerCase();
+  if (normalized === "cesarea") return "Cesárea";
+  if (normalized === "vaginal") return "Vaginal";
+  return value || "";
 }
 
 function normalizeResult(value) {
@@ -591,6 +629,7 @@ export default function ExpedientePaciente() {
   const [selectedLabControlId, setSelectedLabControlId] = useState(null);
   const [selectedPlanSectionId, setSelectedPlanSectionId] = useState("generales");
   const [selectedMorbilidadId, setSelectedMorbilidadId] = useState(null);
+  const [selectedPuerperioId, setSelectedPuerperioId] = useState(null);
   const [openVaccineGroups, setOpenVaccineGroups] = useState({
     previo_embarazo: true,
     durante_embarazo: true,
@@ -709,6 +748,10 @@ export default function ExpedientePaciente() {
     ? [...exp.morbilidad].sort((a, b) => morbilidadTime(b) - morbilidadTime(a))
     : [];
   const selectedMorbilidad = morbilidadOrdenada.find((item) => item.id === selectedMorbilidadId) || morbilidadOrdenada[0];
+  const puerperioOrdenado = Array.isArray(exp.controles_puerperio)
+    ? [...exp.controles_puerperio].sort((a, b) => Number(a.numero_atencion || 0) - Number(b.numero_atencion || 0))
+    : [];
+  const selectedPuerperio = puerperioOrdenado.find((item) => item.id === selectedPuerperioId) || puerperioOrdenado[0];
   const vacunasAgrupadas = vaccineGroups(exp.vacunas || []);
   const puedeVerVih = usuario?.permisos?.includes("controles.ver_vih");
   const controlesLaboratorio = (exp.controles_prenatales || []).filter(hasAnyLabResult);
@@ -1229,62 +1272,125 @@ export default function ExpedientePaciente() {
           TAB: PUERPERIO
       ══════════════════════════════════════════ */}
       {tab === "puerperio" && (
-        <div style={{ display: "grid", gap: "1rem" }}>
-          {!isReadOnly && puedeRegistrarPuerperio && (exp.controles_puerperio?.length ?? 0) < 2 && (
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <div className="puerperium-module">
+          {!isReadOnly && puedeRegistrarPuerperio && puerperioOrdenado.length > 0 && puerperioOrdenado.length < 2 && (
+            <div className="puerperium-top-actions">
               <button className="btn-primary" onClick={registrarPuerperio}>
                 <Plus size={14} /> Registrar puerperio
               </button>
             </div>
           )}
-          {exp.controles_puerperio?.length === 0 ? (
-            <div className="card empty-state">
-              No hay atenciones de puerperio registradas.
+
+          {puerperioOrdenado.length === 0 ? (
+            <div className="puerperium-empty-state">
+              <span className="puerperium-empty-icon"><Baby size={24} /></span>
+              <h3>No hay atenciones de puerperio registradas.</h3>
+              <p>Cuando se registre una atención, aparecerá en este historial.</p>
+              {!isReadOnly && puedeRegistrarPuerperio && (
+                <button className="btn-primary" onClick={registrarPuerperio}>
+                  <Plus size={14} /> Registrar puerperio
+                </button>
+              )}
             </div>
           ) : (
-            exp.controles_puerperio.map((pu) => (
-              <div className="card" key={pu.id}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <span className="badge badge-blue">{pu.numero_atencion === 1 ? "1ª Atención" : "2ª Atención"} — Puerperio</span>
-                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>{fecha(pu.fecha)}</span>
-                    {!isReadOnly && <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/puerperio/${pu.id}/editar`))}>
-                      <Pencil size={13} /> Editar
-                    </button>}
-                    {!isReadOnly && <button className="btn-secondary" onClick={() => eliminarRegistro("¿Eliminar esta atención de puerperio?", rutaClinica(`/pacientes/${id}/controles/puerperio/${pu.id}`))}>
-                      <Trash2 size={13} /> Eliminar
-                    </button>}
-                  </div>
+            <div className="puerperium-layout">
+              <aside className="puerperium-history-panel">
+                <div className="puerperium-panel-heading">
+                  <h3>Puerperio</h3>
+                  <p>{puerperioOrdenado.length} {puerperioOrdenado.length === 1 ? "atención registrada" : "atenciones registradas"}</p>
                 </div>
-
-                {pu.signos_peligro && (
-                  <div style={{ background: "var(--danger-lt)", border: "1px solid var(--danger)", borderRadius: 8, padding: "0.6rem 0.9rem", marginBottom: "0.85rem" }}>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--danger)" }}>⚠ Signos de peligro: </span>
-                    <span style={{ fontSize: "0.82rem" }}>{pu.signos_peligro}</span>
-                  </div>
-                )}
-
-                <Grid cols={3}>
-                  <Row label="Días postparto"   value={pu.dias_despues_parto} />
-                  <Row label="Lugar del parto"  value={pu.lugar_atencion_parto} />
-                  <Row label="Quién atendió"    value={pu.quien_atendio_parto} />
-                  <Row label="Tipo de parto"    value={pu.tipo_parto} />
-                  <Row label="P/A" value={pu.pa_sistolica ? `${pu.pa_sistolica}/${pu.pa_diastolica}` : null} />
-                  <Row label="FC" value={pu.frecuencia_cardiaca ? `${pu.frecuencia_cardiaca} lpm` : null} />
-                  <Row label="FR" value={pu.frecuencia_respiratoria ? `${pu.frecuencia_respiratoria} rpm` : null} />
-                  <Row label="Temperatura"      value={pu.temperatura ? `${pu.temperatura}°C` : null} />
-                </Grid>
-                <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                  <SiNo label="RN vivo"               value={pu.recien_nacido_vivo} />
-                  <SiNo label="Apego inmediato"        value={pu.tuvo_apego_inmediato} />
-                  <SiNo label="Lactancia materna excl." value={pu.lactancia_materna_exclusiva} />
+                <div className="puerperium-timeline-list">
+                  {puerperioOrdenado.map((pu, index) => {
+                    const selected = selectedPuerperio?.id === pu.id;
+                    return (
+                      <button
+                        key={pu.id}
+                        type="button"
+                        className={`puerperium-timeline-item ${selected ? "is-selected" : ""}`}
+                        onClick={() => setSelectedPuerperioId(pu.id)}
+                      >
+                        <span className="puerperium-timeline-dot">{index + 1}</span>
+                        <span className="puerperium-history-card">
+                          <strong>{pu.numero_atencion === 1 ? "1ª Atención" : "2ª Atención"} — Puerperio</strong>
+                          <small>{fecha(pu.fecha)}</small>
+                        </span>
+                        <ChevronRight size={16} />
+                      </button>
+                    );
+                  })}
                 </div>
-                {pu.examen_mamas      && <div style={{ marginTop: "0.6rem" }}><Row label="Examen de mamas" value={pu.examen_mamas} /></div>}
-                {pu.examen_ginecologico && <div style={{ marginTop: "0.4rem" }}><Row label="Examen ginecológico" value={pu.examen_ginecologico} /></div>}
-                {pu.impresion_clinica  && <div style={{ marginTop: "0.4rem" }}><Row label="Impresión clínica" value={pu.impresion_clinica} /></div>}
-                {pu.tratamiento        && <div style={{ marginTop: "0.4rem" }}><Row label="Tratamiento" value={pu.tratamiento} /></div>}
-              </div>
-            ))
+              </aside>
+
+              {selectedPuerperio && (
+                <section className="puerperium-detail-panel">
+                  <div className="puerperium-detail-header">
+                    <div className="puerperium-detail-title">
+                      <span className="badge badge-blue">
+                        {selectedPuerperio.numero_atencion === 1 ? "1ª Atención" : "2ª Atención"} — Puerperio
+                      </span>
+                      <span><CalendarDays size={15} /> {fecha(selectedPuerperio.fecha)}</span>
+                    </div>
+                    {!isReadOnly && (
+                      <div className="puerperium-detail-actions">
+                        <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/puerperio/${selectedPuerperio.id}/editar`))}>
+                          <Pencil size={13} /> Editar
+                        </button>
+                        <button className="btn-secondary danger-outline" onClick={() => eliminarRegistro("¿Eliminar esta atención de puerperio?", rutaClinica(`/pacientes/${id}/controles/puerperio/${selectedPuerperio.id}`))}>
+                          <Trash2 size={13} /> Eliminar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedPuerperio.signos_peligro && (
+                    <div className="puerperium-danger-alert">
+                      <AlertTriangle size={17} />
+                      <strong>Signos de peligro</strong>
+                      <p>{selectedPuerperio.signos_peligro}</p>
+                    </div>
+                  )}
+
+                  <section className="puerperium-summary-section">
+                    <div className="puerperium-section-title">
+                      <Activity size={17} />
+                      <h4>Resumen clínico</h4>
+                    </div>
+                    <div className="puerperium-summary-grid">
+                      <PuerperioMetric label="Días postparto" value={selectedPuerperio.dias_despues_parto} />
+                      <PuerperioMetric label="Tipo de parto" value={tipoParto(selectedPuerperio.tipo_parto)} />
+                      <PuerperioMetric label="Lugar del parto" value={selectedPuerperio.lugar_atencion_parto} />
+                      <PuerperioMetric label="P/A" value={selectedPuerperio.pa_sistolica ? `${selectedPuerperio.pa_sistolica}/${selectedPuerperio.pa_diastolica || ""}` : ""} />
+                      <PuerperioMetric label="FC" value={selectedPuerperio.frecuencia_cardiaca ? `${selectedPuerperio.frecuencia_cardiaca} lpm` : ""} />
+                      <PuerperioMetric label="FR" value={selectedPuerperio.frecuencia_respiratoria ? `${selectedPuerperio.frecuencia_respiratoria} rpm` : ""} />
+                      <PuerperioMetric label="Temperatura" value={selectedPuerperio.temperatura ? `${selectedPuerperio.temperatura} °C` : ""} />
+                      <PuerperioMetric label="Quién atendió" value={selectedPuerperio.quien_atendio_parto} />
+                    </div>
+                  </section>
+
+                  <section className="puerperium-indicators-section">
+                    <div className="puerperium-section-title">
+                      <Baby size={17} />
+                      <h4>Indicadores postparto</h4>
+                    </div>
+                    <div className="puerperium-indicators">
+                      <PuerperioIndicator label="RN vivo" value={selectedPuerperio.recien_nacido_vivo} />
+                      {(Number(selectedPuerperio.numero_atencion) !== 2 || selectedPuerperio.tuvo_apego_inmediato) && (
+                        <PuerperioIndicator label="Apego inmediato" value={selectedPuerperio.tuvo_apego_inmediato} />
+                      )}
+                      <PuerperioIndicator label="Lactancia materna excl." value={selectedPuerperio.lactancia_materna_exclusiva} />
+                    </div>
+                  </section>
+
+                  <section className="puerperium-clinical-list">
+                    <PuerperioClinicalRow icon={Activity} title="Examen de mamas">{selectedPuerperio.examen_mamas}</PuerperioClinicalRow>
+                    <PuerperioClinicalRow icon={Baby} title="Examen ginecológico">{selectedPuerperio.examen_ginecologico}</PuerperioClinicalRow>
+                    <PuerperioClinicalRow icon={ClipboardCheck} title="Orientación / Consejería">{selectedPuerperio.orientacion_consejeria}</PuerperioClinicalRow>
+                    <PuerperioClinicalRow icon={FileText} title="Impresión clínica">{selectedPuerperio.impresion_clinica}</PuerperioClinicalRow>
+                    <PuerperioClinicalRow icon={ClipboardCheck} title="Tratamiento">{selectedPuerperio.tratamiento}</PuerperioClinicalRow>
+                  </section>
+                </section>
+              )}
+            </div>
           )}
         </div>
       )}
