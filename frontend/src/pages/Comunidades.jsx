@@ -9,10 +9,13 @@ import {
   Edit3,
   Info,
   Loader2,
+  MapPin,
   MapPinned,
   PlusCircle,
   RotateCcw,
   Search,
+  ShieldCheck,
+  Users,
   X,
   XCircle,
 } from "lucide-react";
@@ -43,6 +46,29 @@ const markerIcon = L.divIcon({
   iconSize: [22, 22],
   iconAnchor: [11, 11],
 });
+
+function overviewMarkerIcon(hasRisk, selected) {
+  return L.divIcon({
+    className: "comunidades-overview-marker",
+    html: `<div class="${hasRisk ? "has-risk" : ""} ${selected ? "is-selected" : ""}"><span></span></div>`,
+    iconSize: [30, 38],
+    iconAnchor: [15, 38],
+  });
+}
+
+function OverviewMapView({ comunidades }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const positions = comunidades
+      .map((item) => [parseCoordinate(item.lat), parseCoordinate(item.lng)])
+      .filter(([lat, lng]) => lat !== null && lng !== null);
+    if (positions.length === 1) map.setView(positions[0], 13);
+    if (positions.length > 1) map.fitBounds(positions, { padding: [36, 36], maxZoom: 13 });
+  }, [comunidades, map]);
+
+  return null;
+}
 
 function parseCoordinate(value) {
   if (value === "" || value === null || value === undefined) return null;
@@ -273,6 +299,7 @@ export default function Comunidades() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState({});
   const [confirmTarget, setConfirmTarget] = useState(null);
+  const [selectedMapId, setSelectedMapId] = useState(null);
 
   const prepararConsulta = () => {
     setLoading(true);
@@ -317,6 +344,15 @@ export default function Comunidades() {
   const totalPaginas = Math.max(1, Math.ceil(total / limite));
   const inicio = total === 0 ? 0 : (pagina - 1) * limite + 1;
   const fin = Math.min(pagina * limite, total);
+  const totalPacientesVisibles = comunidades.reduce((sum, item) => sum + Number(item.total_pacientes || 0), 0);
+  const totalRiesgosVisibles = comunidades.reduce((sum, item) => sum + Number(item.total_riesgo_activo || 0), 0);
+  const activasVisibles = comunidades.filter((item) => item.activo).length;
+  const comunidadesConCoordenadas = comunidades.filter(
+    (item) => parseCoordinate(item.lat) !== null && parseCoordinate(item.lng) !== null,
+  );
+  const selectedMapCommunity = comunidadesConCoordenadas.find((item) => item.id === selectedMapId)
+    || comunidadesConCoordenadas[0]
+    || null;
 
   const setField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -789,6 +825,146 @@ export default function Comunidades() {
           box-shadow: 0 10px 20px rgba(15,23,42,0.32);
         }
 
+        .comunidades-titlebar {
+          align-items: center;
+          padding: 0.15rem 0 0.35rem;
+        }
+
+        .comunidades-titlebar h1 {
+          font-size: clamp(1.55rem, 2vw, 2rem);
+        }
+
+        .comunidades-titlebar .btn-primary {
+          min-height: 42px;
+          padding-inline: 1rem;
+          box-shadow: 0 8px 24px color-mix(in srgb, var(--primary) 22%, transparent);
+        }
+
+        .comunidades-note-single {
+          align-items: center;
+          padding: 0.72rem 0.9rem;
+          border-color: color-mix(in srgb, var(--info) 28%, var(--border));
+          background: color-mix(in srgb, var(--info-lt) 24%, var(--surface));
+        }
+
+        .comunidades-stats {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 0.8rem;
+        }
+
+        .comunidades-stat {
+          display: flex;
+          align-items: center;
+          gap: 0.85rem;
+          min-height: 92px;
+          padding: 1rem;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+          background: var(--surface);
+          box-shadow: var(--shadow-sm);
+        }
+
+        .comunidades-stat-icon {
+          display: grid;
+          place-items: center;
+          width: 42px;
+          height: 42px;
+          flex: 0 0 42px;
+          border-radius: 12px;
+          color: var(--primary);
+          background: color-mix(in srgb, var(--primary-lt) 74%, var(--surface));
+        }
+
+        .comunidades-stat.is-success .comunidades-stat-icon { color: var(--accent); background: var(--accent-lt); }
+        .comunidades-stat.is-warning .comunidades-stat-icon { color: var(--warn); background: var(--warn-lt); }
+        .comunidades-stat strong { display: block; color: var(--text); font-size: 1.45rem; line-height: 1; }
+        .comunidades-stat span { display: block; margin-top: 0.32rem; color: var(--text-muted); font-size: 0.82rem; }
+
+        .comunidades-workspace {
+          display: grid;
+          grid-template-columns: minmax(680px, 1.45fr) minmax(360px, 0.85fr);
+          gap: 1rem;
+          align-items: stretch;
+        }
+
+        .comunidades-list-card,
+        .comunidades-map-card {
+          min-width: 0;
+          overflow: hidden;
+          padding: 0;
+        }
+
+        .comunidades-toolbar {
+          grid-template-columns: minmax(190px, 1fr) repeat(3, minmax(110px, 145px)) 38px;
+          padding: 0.85rem;
+        }
+
+        .comunidades-toolbar .input-field { margin: 0; min-height: 38px; }
+        .comunidades-filter-reset { width: 38px; height: 38px; padding: 0; justify-content: center; }
+
+        .comunidades-table { min-width: 820px; }
+        .comunidades-table__coords { display: none; }
+        .comunidades-table th,
+        .comunidades-table td { padding-block: 0.78rem; }
+        .comunidades-table tbody tr { cursor: default; }
+        .comunidades-table tbody tr:hover td { background: color-mix(in srgb, var(--primary-lt) 28%, var(--surface)); }
+
+        .comunidades-name {
+          display: flex;
+          align-items: center;
+          gap: 0.55rem;
+          text-align: left;
+        }
+
+        .comunidades-name-icon { color: var(--primary); flex: 0 0 auto; }
+        .comunidades-soft-pill { display: inline-flex; padding: 0.28rem 0.5rem; border: 1px solid var(--border); border-radius: 7px; background: var(--surface2); font-size: 0.76rem; }
+        .comunidades-risk-count { display: inline-flex; align-items: center; gap: 0.32rem; color: var(--warn); font-weight: 800; }
+        .comunidades-risk-count.is-high { color: var(--danger); }
+        .comunidades-risk-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+        .comunidades-actions { gap: 0.35rem; }
+        .comunidades-action-button { width: 34px; min-width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 8px; }
+        .comunidades-action-button span { display: none; }
+
+        .comunidades-map-header { display: flex; align-items: center; justify-content: space-between; padding: 0.95rem 1rem; border-bottom: 1px solid var(--border); }
+        .comunidades-map-header h2 { margin: 0; font-size: 0.98rem; color: var(--text); }
+        .comunidades-map-header span { font-size: 0.76rem; color: var(--text-muted); }
+        .comunidades-overview-map { height: 100%; min-height: 540px; width: 100%; background: var(--surface2); }
+        .comunidades-map-stage { position: relative; min-height: 540px; height: calc(100% - 54px); }
+        .comunidades-map-empty { display: grid; place-items: center; min-height: 540px; padding: 2rem; text-align: center; color: var(--text-muted); }
+
+        .comunidades-map-summary {
+          position: absolute;
+          z-index: 500;
+          left: 0.85rem;
+          right: 0.85rem;
+          bottom: 0.85rem;
+          display: flex;
+          align-items: center;
+          gap: 0.7rem;
+          padding: 0.8rem;
+          border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+          border-radius: 11px;
+          background: color-mix(in srgb, var(--surface) 94%, transparent);
+          box-shadow: var(--shadow-lg);
+          backdrop-filter: blur(10px);
+        }
+
+        .comunidades-map-summary > svg { color: var(--primary); flex: 0 0 auto; }
+        .comunidades-map-summary strong { display: block; color: var(--text); font-size: 0.9rem; }
+        .comunidades-map-summary span { display: block; margin-top: 0.18rem; color: var(--text-muted); font-size: 0.75rem; }
+        .comunidades-overview-marker { background: transparent; border: 0; }
+        .comunidades-overview-marker > div { position: relative; width: 26px; height: 32px; border-radius: 16px 16px 16px 4px; transform: rotate(-45deg); background: var(--primary); border: 3px solid #fff; box-shadow: 0 6px 14px rgba(15,23,42,.35); }
+        .comunidades-overview-marker > div.has-risk { background: var(--warn); }
+        .comunidades-overview-marker > div.is-selected { background: var(--danger); transform: rotate(-45deg) scale(1.14); }
+        .comunidades-overview-marker span { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: white; top: 7px; left: 7px; }
+
+        @media (max-width: 1280px) {
+          .comunidades-workspace { grid-template-columns: 1fr; }
+          .comunidades-map-stage, .comunidades-overview-map, .comunidades-map-empty { min-height: 420px; }
+        }
+
         @media (max-width: 900px) {
           .comunidades-titlebar {
             flex-direction: column;
@@ -801,6 +977,8 @@ export default function Comunidades() {
           .comunidades-notices {
             grid-template-columns: 1fr;
           }
+
+          .comunidades-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
           .comunidades-modal-body {
             grid-template-columns: 1fr;
@@ -820,6 +998,11 @@ export default function Comunidades() {
             justify-content: flex-start;
           }
         }
+
+        @media (max-width: 560px) {
+          .comunidades-stats { grid-template-columns: 1fr; }
+          .comunidades-stat { min-height: 78px; }
+        }
       `}</style>
 
       <div className="comunidades-titlebar">
@@ -834,23 +1017,35 @@ export default function Comunidades() {
       </div>
 
       <div className="comunidades-notices">
-        <div className="comunidades-note comunidades-note-info">
+        <div className="comunidades-note comunidades-note-single">
           <Info size={16} />
           <span>
-            Aquí se administran solo las comunidades de El Chal que se muestran en el mapa de riesgo. Si una paciente viene de
-            otro municipio, su comunidad puede escribirse manualmente y no aparecerá en el mapa.
-          </span>
-        </div>
-        <div className="comunidades-note comunidades-note-warning">
-          <AlertTriangle size={16} />
-          <span>
-            Antes de guardar una comunidad, revise bien su ubicación y sus coordenadas de latitud y longitud, porque esa
-            información define dónde se mostrará en el mapa.
+            Las coordenadas determinan la ubicación de cada comunidad en el mapa de riesgo. Verifíquelas antes de guardar.
           </span>
         </div>
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+      <div className="comunidades-stats" aria-label="Resumen de comunidades visibles">
+        <div className="comunidades-stat">
+          <div className="comunidades-stat-icon"><MapPinned size={21} /></div>
+          <div><strong>{total}</strong><span>Comunidades encontradas</span></div>
+        </div>
+        <div className="comunidades-stat is-success">
+          <div className="comunidades-stat-icon"><ShieldCheck size={21} /></div>
+          <div><strong>{activasVisibles}</strong><span>Activas en esta página</span></div>
+        </div>
+        <div className="comunidades-stat">
+          <div className="comunidades-stat-icon"><Users size={21} /></div>
+          <div><strong>{totalPacientesVisibles}</strong><span>Pacientes en esta página</span></div>
+        </div>
+        <div className="comunidades-stat is-warning">
+          <div className="comunidades-stat-icon"><AlertTriangle size={21} /></div>
+          <div><strong>{totalRiesgosVisibles}</strong><span>Riesgos activos visibles</span></div>
+        </div>
+      </div>
+
+      <div className="comunidades-workspace">
+      <div className="card comunidades-list-card">
         <div className="comunidades-toolbar">
           <div className="comunidades-search">
             <Search size={16} />
@@ -909,6 +1104,22 @@ export default function Comunidades() {
             <option value="A">Sector A</option>
             <option value="B">Sector B</option>
           </select>
+          <button
+            type="button"
+            className="btn-secondary comunidades-filter-reset"
+            title="Limpiar filtros"
+            aria-label="Limpiar filtros"
+            onClick={() => {
+              prepararConsulta();
+              setBusqueda("");
+              setEstado("activas");
+              setTerritorio("todos");
+              setSector("todos");
+              setPagina(1);
+            }}
+          >
+            <RotateCcw size={15} />
+          </button>
         </div>
 
         {loading && (
@@ -944,10 +1155,13 @@ export default function Comunidades() {
                   return (
                     <tr key={comunidad.id}>
                       <td className="comunidades-table__community">
-                        <strong>{comunidad.nombre}</strong>
+                        <div className="comunidades-name">
+                          <MapPin className="comunidades-name-icon" size={16} />
+                          <strong>{comunidad.nombre}</strong>
+                        </div>
                       </td>
-                      <td className="comunidades-table__territory">{comunidad.territorio}</td>
-                      <td className="comunidades-table__sector">{comunidad.sector}</td>
+                      <td className="comunidades-table__territory"><span className="comunidades-soft-pill">Territorio {comunidad.territorio}</span></td>
+                      <td className="comunidades-table__sector"><span className="comunidades-soft-pill">Sector {comunidad.sector}</span></td>
                       <td className="comunidades-table__coords">
                         <div className="comunidades-coordinates">
                           <div className="comunidades-coordinate-primary">{formatCoordinate(comunidad.lat)}</div>
@@ -957,15 +1171,12 @@ export default function Comunidades() {
                       <td className="comunidades-table__patients">{Number(comunidad.total_pacientes || 0)}</td>
                       <td className="comunidades-table__risk">
                         {riesgoActivo ? (
-                          <span className="badge badge-red">
-                            <AlertTriangle size={12} />
-                            Riesgo activo
+                          <span className={`comunidades-risk-count ${Number(comunidad.total_riesgo_activo || 0) >= 3 ? "is-high" : ""}`}>
+                            <span className="comunidades-risk-dot" />
+                            {Number(comunidad.total_riesgo_activo || 0)}
                           </span>
                         ) : (
-                          <span className="badge badge-green">
-                            <CheckCircle2 size={12} />
-                            Sin riesgo activo
-                          </span>
+                          <span style={{ color: "var(--text-muted)" }}>0</span>
                         )}
                       </td>
                       <td className="comunidades-table__status">
@@ -979,17 +1190,17 @@ export default function Comunidades() {
                         <div className="comunidades-actions">
                           <button type="button" className="btn-secondary comunidades-action-button" onClick={() => abrirEditar(comunidad)}>
                             <Edit3 size={14} />
-                            Editar
+                            <span>Editar</span>
                           </button>
                           {comunidad.activo ? (
                             <button type="button" className="comunidades-action-button comunidades-action-danger" onClick={() => setConfirmTarget(comunidad)}>
                               <XCircle size={14} />
-                              Desactivar
+                              <span>Desactivar</span>
                             </button>
                           ) : (
                             <button type="button" className="btn-secondary comunidades-action-button comunidades-action-reactivate" onClick={() => reactivar(comunidad)} disabled={actionLoading}>
                               <RotateCcw size={14} />
-                              Reactivar
+                              <span>Reactivar</span>
                             </button>
                           )}
                         </div>
@@ -1059,6 +1270,60 @@ export default function Comunidades() {
             )}
           </div>
         )}
+      </div>
+
+      <section className="card comunidades-map-card" aria-label="Ubicación territorial">
+        <div className="comunidades-map-header">
+          <h2>Ubicación territorial</h2>
+          <span>{comunidadesConCoordenadas.length} ubicaciones visibles</span>
+        </div>
+        <div className="comunidades-map-stage">
+          {comunidadesConCoordenadas.length > 0 ? (
+            <>
+              <MapContainer
+                center={EL_CHAL_CENTER}
+                zoom={11}
+                minZoom={10}
+                maxZoom={18}
+                maxBounds={EL_CHAL_BOUNDS}
+                maxBoundsViscosity={1.0}
+                scrollWheelZoom
+                className="comunidades-overview-map"
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                <OverviewMapView comunidades={comunidadesConCoordenadas} />
+                {comunidadesConCoordenadas.map((comunidad) => (
+                  <Marker
+                    key={comunidad.id}
+                    position={[Number(comunidad.lat), Number(comunidad.lng)]}
+                    icon={overviewMarkerIcon(
+                      Number(comunidad.total_riesgo_activo || 0) > 0,
+                      comunidad.id === selectedMapCommunity?.id,
+                    )}
+                    eventHandlers={{ click: () => setSelectedMapId(comunidad.id) }}
+                  />
+                ))}
+              </MapContainer>
+              {selectedMapCommunity && (
+                <div className="comunidades-map-summary">
+                  <MapPin size={24} />
+                  <div>
+                    <strong>{selectedMapCommunity.nombre}</strong>
+                    <span>Territorio {selectedMapCommunity.territorio} · Sector {selectedMapCommunity.sector} · {Number(selectedMapCommunity.total_pacientes || 0)} pacientes</span>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="comunidades-map-empty">
+              <div><MapPinned size={28} /><p>No hay ubicaciones disponibles con los filtros actuales.</p></div>
+            </div>
+          )}
+        </div>
+      </section>
       </div>
 
       <ComunidadModal
