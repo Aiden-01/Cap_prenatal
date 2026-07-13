@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
-import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
-import L from "leaflet";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   AlertTriangle,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   CheckCircle2,
   Edit3,
   Info,
@@ -19,16 +19,16 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import "leaflet/dist/leaflet.css";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { getErrorMessage } from "../utils/errorMessage";
 
-const EL_CHAL_CENTER = [16.4870, -89.6820];
-const EL_CHAL_BOUNDS = [
-  [16.30, -89.94],
-  [16.70, -89.52],
-];
+const ComunidadMiniMap = lazy(() => import("../components/ComunidadesMaps").then((module) => ({
+  default: module.ComunidadMiniMap,
+})));
+const ComunidadesOverviewMap = lazy(() => import("../components/ComunidadesMaps").then((module) => ({
+  default: module.ComunidadesOverviewMap,
+})));
 
 const EMPTY_FORM = {
   nombre: "",
@@ -40,36 +40,6 @@ const EMPTY_FORM = {
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
-const markerIcon = L.divIcon({
-  className: "comunidades-map-marker",
-  html: `<div></div>`,
-  iconSize: [22, 22],
-  iconAnchor: [11, 11],
-});
-
-function overviewMarkerIcon(hasRisk, selected) {
-  return L.divIcon({
-    className: "comunidades-overview-marker",
-    html: `<div class="${hasRisk ? "has-risk" : ""} ${selected ? "is-selected" : ""}"><span></span></div>`,
-    iconSize: [30, 38],
-    iconAnchor: [15, 38],
-  });
-}
-
-function OverviewMapView({ comunidades }) {
-  const map = useMap();
-
-  useEffect(() => {
-    const positions = comunidades
-      .map((item) => [parseCoordinate(item.lat), parseCoordinate(item.lng)])
-      .filter(([lat, lng]) => lat !== null && lng !== null);
-    if (positions.length === 1) map.setView(positions[0], 13);
-    if (positions.length > 1) map.fitBounds(positions, { padding: [36, 36], maxZoom: 13 });
-  }, [comunidades, map]);
-
-  return null;
-}
-
 function parseCoordinate(value) {
   if (value === "" || value === null || value === undefined) return null;
   const number = Number(value);
@@ -79,25 +49,6 @@ function parseCoordinate(value) {
 function formatCoordinate(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number.toFixed(7) : "";
-}
-
-function MiniMapEvents({ onPick }) {
-  useMapEvents({
-    click(event) {
-      onPick(event.latlng.lat, event.latlng.lng);
-    },
-  });
-  return null;
-}
-
-function MiniMapView({ position }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (position) map.setView(position, Math.max(map.getZoom(), 13));
-  }, [map, position]);
-
-  return null;
 }
 
 function ComunidadModal({
@@ -111,11 +62,6 @@ function ComunidadModal({
   onSubmit,
   onPickCoords,
 }) {
-  const lat = parseCoordinate(form.lat);
-  const lng = parseCoordinate(form.lng);
-  const position = lat !== null && lng !== null ? [lat, lng] : null;
-  const mapCenter = position || EL_CHAL_CENTER;
-
   if (!open) return null;
 
   return (
@@ -209,24 +155,9 @@ function ComunidadModal({
           </div>
 
           <div className="comunidades-map-box">
-            <MapContainer
-              center={mapCenter}
-              zoom={13}
-              minZoom={10}
-              maxZoom={18}
-              maxBounds={EL_CHAL_BOUNDS}
-              maxBoundsViscosity={1.0}
-              scrollWheelZoom
-              className="comunidades-mini-map"
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              <MiniMapEvents onPick={onPickCoords} />
-              <MiniMapView position={position} />
-              {position && <Marker position={position} icon={markerIcon} />}
-            </MapContainer>
+            <Suspense fallback={<div className="comunidades-map-loading"><Loader2 className="spin" size={18} /> Cargando mapa...</div>}>
+              <ComunidadMiniMap lat={form.lat} lng={form.lng} onPickCoords={onPickCoords} />
+            </Suspense>
           </div>
         </div>
 
@@ -300,6 +231,13 @@ export default function Comunidades() {
   const [formErrors, setFormErrors] = useState({});
   const [confirmTarget, setConfirmTarget] = useState(null);
   const [selectedMapId, setSelectedMapId] = useState(null);
+  const [mapOpen, setMapOpen] = useState(false);
+  const [mapInitialized, setMapInitialized] = useState(false);
+
+  const toggleMap = () => {
+    setMapInitialized(true);
+    setMapOpen((current) => !current);
+  };
 
   const prepararConsulta = () => {
     setLoading(true);
@@ -888,6 +826,8 @@ export default function Comunidades() {
           align-items: stretch;
         }
 
+        .comunidades-workspace.is-map-collapsed { grid-template-columns: 1fr; }
+
         .comunidades-list-card,
         .comunidades-map-card {
           min-width: 0;
@@ -927,12 +867,16 @@ export default function Comunidades() {
         .comunidades-action-button { width: 34px; min-width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 8px; }
         .comunidades-action-button span { display: none; }
 
-        .comunidades-map-header { display: flex; align-items: center; justify-content: space-between; padding: 0.95rem 1rem; border-bottom: 1px solid var(--border); }
+        .comunidades-map-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); }
+        .comunidades-map-card.is-collapsed .comunidades-map-header { border-bottom: 0; }
+        .comunidades-map-header-copy { min-width: 0; }
         .comunidades-map-header h2 { margin: 0; font-size: 0.98rem; color: var(--text); }
         .comunidades-map-header span { font-size: 0.76rem; color: var(--text-muted); }
+        .comunidades-map-toggle { flex: 0 0 auto; }
         .comunidades-overview-map { height: 100%; min-height: 540px; width: 100%; background: var(--surface2); }
         .comunidades-map-stage { position: relative; min-height: 540px; height: calc(100% - 54px); }
         .comunidades-map-empty { display: grid; place-items: center; min-height: 540px; padding: 2rem; text-align: center; color: var(--text-muted); }
+        .comunidades-map-loading { display: flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: inherit; height: 100%; padding: 2rem; color: var(--text-muted); background: var(--surface2); }
 
         .comunidades-map-summary {
           position: absolute;
@@ -1044,7 +988,7 @@ export default function Comunidades() {
         </div>
       </div>
 
-      <div className="comunidades-workspace">
+      <div className={`comunidades-workspace ${mapOpen ? "" : "is-map-collapsed"}`}>
       <div className="card comunidades-list-card">
         <div className="comunidades-toolbar">
           <div className="comunidades-search">
@@ -1272,41 +1216,34 @@ export default function Comunidades() {
         )}
       </div>
 
-      <section className="card comunidades-map-card" aria-label="Ubicación territorial">
+      <section className={`card comunidades-map-card ${mapOpen ? "" : "is-collapsed"}`} aria-label="Ubicación territorial">
         <div className="comunidades-map-header">
-          <h2>Ubicación territorial</h2>
-          <span>{comunidadesConCoordenadas.length} ubicaciones visibles</span>
+          <div className="comunidades-map-header-copy">
+            <h2>Ubicación territorial</h2>
+            <span>{mapOpen ? `${comunidadesConCoordenadas.length} ubicaciones visibles` : "El mapa se carga solo cuando lo necesitas"}</span>
+          </div>
+          <button
+            type="button"
+            className="btn-secondary comunidades-map-toggle"
+            onClick={toggleMap}
+            aria-expanded={mapOpen}
+            aria-controls="comunidades-overview-map-panel"
+          >
+            {mapOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            {mapOpen ? "Ocultar mapa" : "Mostrar mapa"}
+          </button>
         </div>
-        <div className="comunidades-map-stage">
+        {mapInitialized && <div id="comunidades-overview-map-panel" className="comunidades-map-stage" hidden={!mapOpen}>
           {comunidadesConCoordenadas.length > 0 ? (
             <>
-              <MapContainer
-                center={EL_CHAL_CENTER}
-                zoom={11}
-                minZoom={10}
-                maxZoom={18}
-                maxBounds={EL_CHAL_BOUNDS}
-                maxBoundsViscosity={1.0}
-                scrollWheelZoom
-                className="comunidades-overview-map"
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              <Suspense fallback={<div className="comunidades-map-loading"><Loader2 className="spin" size={18} /> Cargando mapa...</div>}>
+                <ComunidadesOverviewMap
+                  comunidades={comunidadesConCoordenadas}
+                  selectedCommunity={selectedMapCommunity}
+                  onSelect={setSelectedMapId}
+                  visible={mapOpen}
                 />
-                <OverviewMapView comunidades={comunidadesConCoordenadas} />
-                {comunidadesConCoordenadas.map((comunidad) => (
-                  <Marker
-                    key={comunidad.id}
-                    position={[Number(comunidad.lat), Number(comunidad.lng)]}
-                    icon={overviewMarkerIcon(
-                      Number(comunidad.total_riesgo_activo || 0) > 0,
-                      comunidad.id === selectedMapCommunity?.id,
-                    )}
-                    eventHandlers={{ click: () => setSelectedMapId(comunidad.id) }}
-                  />
-                ))}
-              </MapContainer>
+              </Suspense>
               {selectedMapCommunity && (
                 <div className="comunidades-map-summary">
                   <MapPin size={24} />
@@ -1322,7 +1259,7 @@ export default function Comunidades() {
               <div><MapPinned size={28} /><p>No hay ubicaciones disponibles con los filtros actuales.</p></div>
             </div>
           )}
-        </div>
+        </div>}
       </section>
       </div>
 

@@ -1,4 +1,5 @@
 ﻿import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import { useAuth } from "./hooks/useAuth";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
@@ -13,9 +14,18 @@ import PuerperioForm from "./pages/PuerperioForm";
 import MorbilidadForm from "./pages/MorbilidadForm";
 import VacunaForm from "./pages/VacunaForm";
 import Reportes from "./pages/Reportes";
-import MapaRiesgo from "./pages/MapaRiesgo";
 import Usuarios from "./pages/Usuarios";
-import Comunidades from "./pages/Comunidades";
+
+const MapaRiesgo = lazy(() => import("./pages/MapaRiesgo"));
+const Comunidades = lazy(() => import("./pages/Comunidades"));
+
+function LazyPage({ children }) {
+  return (
+    <Suspense fallback={<div className="card" style={{ padding: "1rem" }}>Cargando módulo...</div>}>
+      {children}
+    </Suspense>
+  );
+}
 
 function PrivateRoute({ children, adminOnly = false, directorOnly = false }) {
   const { usuario, isAdmin } = useAuth();
@@ -49,8 +59,8 @@ export default function App() {
           <Route path="pacientes/:id/vacunas/:vacunaId/editar" element={<VacunaForm />} />
           <Route path="nuevo" element={<NuevaPaciente />} />
           <Route path="reportes" element={<Reportes />} />
-          <Route path="mapa-riesgo" element={<MapaRiesgo />} />
-          <Route path="comunidades" element={<PrivateRoute directorOnly><Comunidades /></PrivateRoute>} />
+          <Route path="mapa-riesgo" element={<LazyPage><MapaRiesgo /></LazyPage>} />
+          <Route path="comunidades" element={<PrivateRoute directorOnly><LazyPage><Comunidades /></LazyPage></PrivateRoute>} />
           <Route path="usuarios" element={<PrivateRoute adminOnly><Usuarios /></PrivateRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" />} />
