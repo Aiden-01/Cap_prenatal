@@ -127,6 +127,98 @@ function wrapText(text, font, size, width, maxLines = 2) {
   return lines;
 }
 
+function wrapTextToWidths(text, font, size, widths) {
+  const pending = safe(text).replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  const lines = [];
+
+  while (pending.length && lines.length < widths.length) {
+    const width = widths[lines.length];
+    let line = '';
+
+    while (pending.length) {
+      const word = pending[0];
+      const next = line ? `${line} ${word}` : word;
+      if (font.widthOfTextAtSize(next, size) <= width) {
+        line = next;
+        pending.shift();
+        continue;
+      }
+
+      if (line) break;
+
+      let chars = '';
+      while (chars.length < word.length && font.widthOfTextAtSize(`${chars}${word[chars.length]}`, size) <= width) {
+        chars += word[chars.length];
+      }
+      if (!chars) chars = word[0];
+      line = chars;
+      const remainder = word.slice(chars.length);
+      if (remainder) pending[0] = remainder;
+      else pending.shift();
+      break;
+    }
+
+    if (line) lines.push(line);
+  }
+
+  return { lines, overflow: pending.length > 0 };
+}
+
+function layoutAdaptiveText(text, font, cfg) {
+  const maxLines = cfg.maxLines || 1;
+  const widths = Array.from({ length: maxLines }, (_, index) => (
+    index === 0 ? (cfg.firstLineWidth ?? cfg.w) : (cfg.nextLinesWidth ?? cfg.w)
+  ));
+  const maxSize = cfg.size || 5.8;
+  const minSize = cfg.minSize || maxSize;
+  let selected;
+
+  for (let size = maxSize; size >= minSize - 0.01; size -= 0.2) {
+    const layout = wrapTextToWidths(text, font, size, widths);
+    selected = { ...layout, size: Math.max(size, minSize), widths };
+    if (!layout.overflow) break;
+  }
+
+  if (!selected) return { lines: [], size: maxSize, truncated: false, widths };
+  if (selected.overflow && selected.lines.length) {
+    const last = selected.lines.length - 1;
+    selected.lines[last] = fitTextWithEllipsis(
+      selected.lines[last],
+      font,
+      selected.size,
+      widths[last]
+    );
+  }
+
+  return {
+    lines: selected.lines,
+    size: selected.size,
+    truncated: selected.overflow,
+    widths,
+  };
+}
+
+function drawAdaptiveTextBox(page, font, value, cfg, label) {
+  if (!cfg || !safe(value).trim()) return { lines: [], truncated: false };
+  const layout = layoutAdaptiveText(value, font, cfg);
+  const lineHeight = cfg.lineHeight || layout.size + 1.5;
+  const firstX = cfg.firstLineX ?? cfg.x;
+  const nextX = cfg.nextLinesX ?? cfg.x;
+  const y = yFromTop(page, cfg.y, layout.size);
+  debugPoint(page, firstX, cfg.y, label, font);
+
+  layout.lines.forEach((line, index) => {
+    page.drawText(line, {
+      x: index === 0 ? firstX : nextX,
+      y: y - index * lineHeight,
+      size: layout.size,
+      font,
+      color: rgb(0.05, 0.05, 0.05),
+    });
+  });
+  return layout;
+}
+
 function takeLine(words, font, size, width) {
   let line = '';
   let consumed = 0;
@@ -804,6 +896,66 @@ function drawPage2({ page, font, controles }) {
   drawPage2DebugReferences(page, font);
 }
 
+function seleccionarMorbilidades(morbilidad = [], embarazoId = null, capacity = 2) {
+  const filtradas = morbilidad.filter((registro) => (
+    embarazoId === null || embarazoId === undefined
+      ? true
+      : String(registro.embarazo_id) === String(embarazoId)
+  ));
+  filtradas.sort((a, b) => {
+    const fechaA = `${safe(a.fecha)}T${safe(a.hora || '23:59:59')}`;
+    const fechaB = `${safe(b.fecha)}T${safe(b.hora || '23:59:59')}`;
+    return fechaA.localeCompare(fechaB) || Number(a.id || 0) - Number(b.id || 0);
+  });
+  return {
+    eventos: filtradas.slice(0, capacity),
+    omitidos: Math.max(filtradas.length - capacity, 0),
+  };
+}
+
+function drawPage3({ page, font, embarazo, controles = [], morbilidad = [] }) {
+  const c = coords.pages[3];
+  c.supplementation.forEach((cfg, index) => {
+    const control = controlAt(controles, index + 1);
+    if (!control.id && !control.fecha && !control.numero_control) return;
+
+    markNullableYesNo(page, font, control.sulfato_ferroso, cfg.sulfatoFerroso, `page3:control${index + 1}:sulfatoFerroso`);
+    drawTextBox(page, font, control.sulfato_ferroso_tabletas, cfg.sulfatoFerrosoTabletas, `page3:control${index + 1}:sulfatoTabletas`);
+    markNullableYesNo(page, font, control.acido_folico, cfg.acidoFolico, `page3:control${index + 1}:acidoFolico`);
+    drawTextBox(page, font, control.acido_folico_tabletas, cfg.acidoFolicoTabletas, `page3:control${index + 1}:acidoTabletas`);
+    drawAdaptiveTextBox(page, font, control.suplementacion_hallazgos, cfg.hallazgos, `page3:control${index + 1}:hallazgos`);
+    drawAdaptiveTextBox(page, font, control.suplementacion_tratamiento, cfg.tratamiento, `page3:control${index + 1}:tratamiento`);
+  });
+
+  const seleccion = seleccionarMorbilidades(
+    morbilidad,
+    embarazo?.id ?? null,
+    c.morbidityCapacity
+  );
+  seleccion.eventos.forEach((registro, index) => {
+    const cfg = c.morbidity[index];
+    if (cfg.fecha) drawDate(page, font, registro.fecha, cfg.fecha, `page3:morbilidad${index + 1}:fecha`, true);
+    if (cfg.hora) drawTime(page, font, registro.hora, cfg.hora, `page3:morbilidad${index + 1}:hora`);
+    if (cfg.motivoConsulta) {
+      drawAdaptiveTextBox(page, font, registro.motivo_consulta, cfg.motivoConsulta, `page3:morbilidad${index + 1}:motivo`);
+    }
+    drawAdaptiveTextBox(page, font, registro.historia_enfermedad_actual, cfg.historiaEnfermedadActual, `page3:morbilidad${index + 1}:historia`);
+    drawAdaptiveTextBox(page, font, registro.revision_por_sistemas, cfg.revisionPorSistemas, `page3:morbilidad${index + 1}:revision`);
+    drawAdaptiveTextBox(page, font, registro.examen_fisico, cfg.examenFisico, `page3:morbilidad${index + 1}:examen`);
+    drawAdaptiveTextBox(page, font, registro.impresion_clinica, cfg.impresionClinica, `page3:morbilidad${index + 1}:impresion`);
+    drawAdaptiveTextBox(page, font, registro.tratamiento_referencia, cfg.tratamientoReferencia, `page3:morbilidad${index + 1}:tratamiento`);
+    drawAdaptiveTextBox(
+      page,
+      font,
+      registro.nombre_cargo_atiende || registro.persona_atiende_pdf,
+      cfg.nombreCargoAtiende,
+      `page3:morbilidad${index + 1}:atiende`
+    );
+  });
+
+  return seleccion;
+}
+
 function drawPage4({ page, font, puerperio = [] }) {
   const c = coords.pages[4]?.puerperio;
   if (!page || !Array.isArray(c)) return;
@@ -831,11 +983,11 @@ function drawPage4({ page, font, puerperio = [] }) {
     drawTextBox(page, font, registro.tipo_parto, cfg.tipoParto, `puerperio${numero}:tipoParto`);
     drawTemperaturaBoxes(page, font, registro.temperatura, cfg.temperatura, `puerperio${numero}:temperatura`);
     drawTextBox(page, font, registro.herida_operatoria, cfg.heridaOperatoria, `puerperio${numero}:herida`);
-    drawTextBox(page, font, registro.examen_mamas, cfg.examenMamas, `puerperio${numero}:mamas`);
-    drawTextBox(page, font, registro.examen_ginecologico, cfg.examenGinecologico, `puerperio${numero}:ginecologico`);
-    drawTextBox(page, font, registro.orientacion_consejeria, cfg.orientacionConsejeria, `puerperio${numero}:orientacion`);
-    drawTextBox(page, font, registro.impresion_clinica, cfg.impresionClinica, `puerperio${numero}:impresion`);
-    drawTextBox(page, font, registro.tratamiento, cfg.tratamiento, `puerperio${numero}:tratamiento`);
+    drawAdaptiveTextBox(page, font, registro.examen_mamas, cfg.examenMamas, `puerperio${numero}:mamas`);
+    drawAdaptiveTextBox(page, font, registro.examen_ginecologico, cfg.examenGinecologico, `puerperio${numero}:ginecologico`);
+    drawAdaptiveTextBox(page, font, registro.orientacion_consejeria, cfg.orientacionConsejeria, `puerperio${numero}:orientacion`);
+    drawAdaptiveTextBox(page, font, registro.impresion_clinica, cfg.impresionClinica, `puerperio${numero}:impresion`);
+    drawAdaptiveTextBox(page, font, registro.tratamiento, cfg.tratamiento, `puerperio${numero}:tratamiento`);
     drawTextBox(page, font, registro.nombre_cargo_atiende, cfg.nombreCargoAtiende, `puerperio${numero}:atiende`);
 
     markNullableYesNo(page, font, registro.recien_nacido_vivo, cfg.recienNacidoVivo, `puerperio${numero}:rnVivo`);
@@ -848,6 +1000,7 @@ async function generarFichaClinicaPrenatalPdf({
   paciente,
   embarazo,
   controles = [],
+  morbilidad = [],
   puerperio = [],
   vacunas = [],
   riesgo = null,
@@ -859,9 +1012,7 @@ async function generarFichaClinicaPrenatalPdf({
   const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
   const pages = pdfDoc.getPages();
-  if (!pages[0]) throw new Error('La plantilla PDF no tiene pagina 1');
-  if (!pages[1]) throw new Error('La plantilla PDF no tiene pagina 2');
-  if (!pages[3]) throw new Error('La plantilla PDF no tiene pagina 4');
+  if (pages.length < 4) throw new Error('La plantilla PDF debe tener al menos cuatro paginas');
 
   drawPage1({
     page: pages[0],
@@ -880,6 +1031,14 @@ async function generarFichaClinicaPrenatalPdf({
     controles,
   });
 
+  drawPage3({
+    page: pages[2],
+    font,
+    embarazo,
+    controles,
+    morbilidad,
+  });
+
   drawPage4({
     page: pages[3],
     font,
@@ -894,12 +1053,17 @@ module.exports = {
   // Exported for future page 2-4 work and coordinate calibration tests.
   helpers: {
     drawTextBox,
+    drawAdaptiveTextBox,
     drawDate,
     drawTime,
     drawWrappedTextWithFirstLineOffset,
     markYesNo,
     drawMark,
     fitText,
+    layoutAdaptiveText,
     safe,
+    seleccionarMorbilidades,
+    drawPage3,
+    drawPage4,
   },
 };

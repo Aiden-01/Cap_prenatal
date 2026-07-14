@@ -248,6 +248,14 @@ PDF institucionales:
 - Plan de parto.
 - Control prenatal individual.
 
+La pagina 3 de la ficha MSPAS prenatal se completa con `pdf-lib` sobre la plantilla oficial:
+
+- Las cinco columnas de suplementacion corresponden, sin consolidar ni sumar, a los controles prenatales 1 a 5. Se imprimen sulfato ferroso, numero de tabletas, acido folico, numero de tabletas, hallazgos y tratamiento.
+- La morbilidad se filtra por el embarazo seleccionado, se ordena por fecha, hora e identificador y admite los dos primeros eventos cronologicos. Los eventos adicionales no se imprimen.
+- El segundo bloque oficial no incluye casillas repetidas para fecha, hora ni motivo de consulta; esos tres datos solo pueden mostrarse para el primer evento. Los demas campos se imprimen en ambos bloques.
+- Para la persona que atiende se usa `nombre_cargo_atiende`; si esta vacio, se utiliza el nombre real del usuario asociado mediante `registrado_por`. Si ninguno esta disponible, el espacio queda vacio.
+- Los textos extensos reducen su fuente hasta un minimo legible y luego se recortan con puntos suspensivos dentro de la casilla.
+
 La generacion usa una mezcla de:
 
 - Assets oficiales en `backend/src/assets`.

@@ -5,6 +5,7 @@ const PAGE = {
 
 const CONTROL_COLUMNS = [62, 169, 276, 383, 490];
 const PAGE2_CONTROL_COLUMNS = [62, 169, 276, 383];
+const PAGE3_CONTROL_COLUMNS = [62, 169, 276, 383, 490];
 
 // Helper para pares No/Si. En esta ficha la primera casilla es "No" y la
 // segunda, a la derecha, es "Si". Ajusta x/y sobre la casilla "No"; gap mueve
@@ -333,6 +334,64 @@ const page2 = {
 };
 
 // ==================================================================================================================
+// PAGINA 3: SUPLEMENTACION Y MORBILIDAD DURANTE EL EMBARAZO
+// ==================================================================================================================
+
+const page3Supplementation = (x) => ({
+  sulfatoFerroso: siNo(x + 7, 109),
+  sulfatoFerrosoTabletas: { x: x + 5, y: 121, w: 96, size: 5.6, align: 'center' },
+  acidoFolico: siNo(x + 7, 139),
+  acidoFolicoTabletas: { x: x + 5, y: 152, w: 96, size: 5.6, align: 'center' },
+  hallazgos: { x: x + 4, y: 165, w: 98, h: 13, size: 5.0, minSize: 4.2, maxLines: 2, lineHeight: 5.5 },
+  tratamiento: { x: x + 4, y: 180, w: 98, h: 13, size: 5.0, minSize: 4.2, maxLines: 2, lineHeight: 5.5 },
+});
+
+const morbidityText = ({ firstLineX, firstLineWidth, y, maxLines = 3 }) => ({
+  x: firstLineX,
+  y,
+  w: firstLineWidth,
+  h: 43,
+  firstLineX,
+  firstLineWidth,
+  nextLinesX: 25,
+  nextLinesWidth: 562,
+  size: 5.8,
+  minSize: 4.8,
+  maxLines,
+  lineHeight: 13,
+});
+
+const morbidityBlock = (offsetY = 0, includeHeader = false) => ({
+  fecha: includeHeader ? { x: 55, y: 228, yearOffset: 49 } : null,
+  hora: includeHeader ? {
+    hour: { x: 162, y: 228 },
+    minute: { x: 186, y: 228 },
+  } : null,
+  motivoConsulta: includeHeader ? {
+    ...morbidityText({ firstLineX: 300, firstLineWidth: 286, y: 214, maxLines: 2 }),
+    nextLinesX: 220,
+    nextLinesWidth: 366,
+    h: 24,
+    lineHeight: 13,
+  } : null,
+  historiaEnfermedadActual: morbidityText({ firstLineX: 154, firstLineWidth: 432, y: 247 + offsetY }),
+  revisionPorSistemas: morbidityText({ firstLineX: 110, firstLineWidth: 476, y: 299 + offsetY }),
+  examenFisico: morbidityText({ firstLineX: 80, firstLineWidth: 506, y: 351 + offsetY }),
+  impresionClinica: morbidityText({ firstLineX: 93, firstLineWidth: 493, y: 402 + offsetY }),
+  tratamientoReferencia: morbidityText({ firstLineX: 132, firstLineWidth: 454, y: 454 + offsetY }),
+  nombreCargoAtiende: morbidityText({ firstLineX: 189, firstLineWidth: 397, y: 506 + offsetY }),
+});
+
+const page3 = {
+  supplementation: PAGE3_CONTROL_COLUMNS.map((x) => page3Supplementation(x)),
+  morbidityCapacity: 2,
+  morbidity: [
+    morbidityBlock(0, true),
+    morbidityBlock(312, false),
+  ],
+};
+
+// ==================================================================================================================
 // PAGINA 4: PUERPERIO
 // =================================================================================================================
 
@@ -365,11 +424,12 @@ const puerperioBlock = (offsetY = 0, includeApego = true) => {
       w: 430,
       firstLineX: 114,
       firstLineWidth: 430,
-      nextLinesX: 52,
-      nextLinesWidth: 500,
+      nextLinesX: 25,
+      nextLinesWidth: 562,
       size: 5.6,
+      minSize: 4.8,
       maxLines: 2,
-      lineGap: 5,
+      lineHeight: 12,
     },
     examenGinecologico: {
       x: 315,
@@ -377,11 +437,12 @@ const puerperioBlock = (offsetY = 0, includeApego = true) => {
       w: 245,
       firstLineX: 315,
       firstLineWidth: 245,
-      nextLinesX: 52,
-      nextLinesWidth: 500,
+      nextLinesX: 25,
+      nextLinesWidth: 562,
       size: 5.4,
+      minSize: 4.8,
       maxLines: 3,
-      lineGap: 5,
+      lineHeight: 13,
     },
     orientacionConsejeria: {
       x: 92,
@@ -389,11 +450,12 @@ const puerperioBlock = (offsetY = 0, includeApego = true) => {
       w: 455,
       firstLineX: 92,
       firstLineWidth: 455,
-      nextLinesX: 52,
-      nextLinesWidth: 500,
+      nextLinesX: 25,
+      nextLinesWidth: 562,
       size: 5.6,
+      minSize: 4.8,
       maxLines: 3,
-      lineGap: 8,
+      lineHeight: 13,
     },
     impresionClinica: {
       x: 75,
@@ -401,11 +463,12 @@ const puerperioBlock = (offsetY = 0, includeApego = true) => {
       w: 470,
       firstLineX: 75,
       firstLineWidth: 470,
-      nextLinesX: 52,
-      nextLinesWidth: 500,
+      nextLinesX: 25,
+      nextLinesWidth: 562,
       size: 5.6,
+      minSize: 4.8,
       maxLines: 3,
-      lineGap: 8,
+      lineHeight: 13,
     },
     tratamiento: {
       x: 61,
@@ -413,11 +476,12 @@ const puerperioBlock = (offsetY = 0, includeApego = true) => {
       w: 485,
       firstLineX: 61,
       firstLineWidth: 485,
-      nextLinesX: 52,
-      nextLinesWidth: 500,
+      nextLinesX: 25,
+      nextLinesWidth: 562,
       size: 5.6,
+      minSize: 4.8,
       maxLines: 3,
-      lineGap: 8,
+      lineHeight: 13,
     },
     nombreCargoAtiende: { x: 155, y: 499 + offsetY, w: 390, size: 7.6 },
   };
@@ -454,7 +518,7 @@ module.exports = {
   pages: {
     1: page1,
     2: page2,
-    3: {},
+    3: page3,
     4: page4,
   },
 };

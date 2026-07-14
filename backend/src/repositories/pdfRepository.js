@@ -14,7 +14,7 @@ async function obtenerControlConPaciente({ id, pacienteId, embarazoId = null }) 
 }
 
 async function obtenerFichaMspasData({ pacienteId, embarazoId }) {
-  const [pacienteRes, embarazoRes, controlesRes, puerperioRes, riesgoRes, planPartoRes, vacunasRes] = await Promise.all([
+  const [pacienteRes, embarazoRes, controlesRes, puerperioRes, riesgoRes, planPartoRes, vacunasRes, morbilidadRes] = await Promise.all([
     pool.query('SELECT * FROM pacientes WHERE id = $1', [pacienteId]),
     pool.query('SELECT * FROM embarazos WHERE id = $1', [embarazoId]),
     pool.query(
@@ -37,6 +37,15 @@ async function obtenerFichaMspasData({ pacienteId, embarazoId }) {
       'SELECT * FROM vacunas_paciente WHERE embarazo_id = $1 ORDER BY tipo_vacuna, momento, numero_dosis',
       [embarazoId]
     ),
+    pool.query(
+      `SELECT m.*,
+              COALESCE(NULLIF(BTRIM(m.nombre_cargo_atiende), ''), u.nombre_completo) AS persona_atiende_pdf
+       FROM morbilidad_embarazo m
+       LEFT JOIN usuarios u ON u.id = m.registrado_por
+       WHERE m.embarazo_id = $1
+       ORDER BY m.fecha ASC, m.hora ASC NULLS LAST, m.id ASC`,
+      [embarazoId]
+    ),
   ]);
 
   return {
@@ -47,6 +56,7 @@ async function obtenerFichaMspasData({ pacienteId, embarazoId }) {
     riesgo: riesgoRes.rows[0] || null,
     planParto: planPartoRes.rows[0] || null,
     vacunas: vacunasRes.rows,
+    morbilidad: morbilidadRes.rows,
   };
 }
 
