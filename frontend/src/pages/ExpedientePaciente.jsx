@@ -622,7 +622,7 @@ export default function ExpedientePaciente() {
   const toast      = useGlobalToast();
   const { usuario } = useAuth();
   const [exp, setExp]       = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loadedRequestKey, setLoadedRequestKey] = useState("");
   const [loadError, setLoadError] = useState("");
   const [printing, setPrinting] = useState(false);
   const [antecedentesVacunas, setAntecedentesVacunas] = useState([]);
@@ -641,6 +641,8 @@ export default function ExpedientePaciente() {
     historia: false,
   });
   const selectedEmbarazoId = searchParams.get("embarazo_id") || "";
+  const requestKey = `${id}:${selectedEmbarazoId || "actual"}`;
+  const loading = loadedRequestKey !== requestKey;
 
   const cargarExpediente = () => {
     api.get(`/pacientes/${id}/expediente`, {
@@ -653,7 +655,6 @@ export default function ExpedientePaciente() {
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
-    setLoading(true);
     api.get(`/pacientes/${id}/expediente`, {
       params: selectedEmbarazoId ? { embarazo_id: selectedEmbarazoId } : undefined,
       signal: controller.signal,
@@ -672,13 +673,13 @@ export default function ExpedientePaciente() {
         toast(message, "error");
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) setLoadedRequestKey(requestKey);
       });
     return () => {
       active = false;
       controller.abort();
     };
-  }, [id, selectedEmbarazoId, toast]);
+  }, [id, requestKey, selectedEmbarazoId, toast]);
 
   const tab = searchParams.get("tab") || "general";
 
@@ -743,7 +744,6 @@ export default function ExpedientePaciente() {
   const riskNegativeCriteria = riskTotalCriteria - riskPositiveCriteria;
   const planSections = exp.plan_parto ? buildPlanSections(exp.plan_parto) : [];
   const selectedPlanSection = planSections.find((section) => section.id === selectedPlanSectionId) || planSections[0];
-  const planTotalRegistered = planSections.reduce((total, section) => total + section.count, 0);
   const morbilidadOrdenada = Array.isArray(exp.morbilidad)
     ? [...exp.morbilidad].sort((a, b) => morbilidadTime(b) - morbilidadTime(a))
     : [];
@@ -821,7 +821,6 @@ export default function ExpedientePaciente() {
     const nextEmbarazoId = String(embarazoId || "");
     if (nextEmbarazoId === embarazoSeleccionadoId) return;
 
-    setLoading(true);
     setExp(null);
     setLoadError("");
     const next = new URLSearchParams(searchParams);
@@ -852,7 +851,6 @@ export default function ExpedientePaciente() {
       toast("Nuevo embarazo creado", "success");
       const next = new URLSearchParams();
       if (nuevoEmbarazo?.id) next.set("embarazo_id", String(nuevoEmbarazo.id));
-      setLoading(true);
       setSearchParams(next);
     } catch (err) {
       toast(getErrorMessage(err, "Error al crear nuevo embarazo"), "error");

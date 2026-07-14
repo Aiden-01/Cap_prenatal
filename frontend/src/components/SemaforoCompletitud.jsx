@@ -88,37 +88,38 @@ function CompletitudItem({ item }) {
 }
 
 export default function SemaforoCompletitud({ pacienteId, initialData = null }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [remote, setRemote] = useState({ key: "", data: null, error: "" });
   const [expanded, setExpanded] = useState(false);
+  const requestKey = String(pacienteId || "");
+  const hasInitialData = initialData !== null && initialData !== undefined;
+  const remoteMatches = remote.key === requestKey;
+  const data = hasInitialData ? initialData : remoteMatches ? remote.data : null;
+  const loading = !hasInitialData && Boolean(pacienteId) && !remoteMatches;
+  const error = hasInitialData || !remoteMatches ? "" : remote.error;
 
   useEffect(() => {
-    if (initialData) {
-      setData(initialData);
-      setLoading(false);
-      setError("");
-      return;
-    }
-
-    if (!pacienteId) return;
+    if (hasInitialData || !pacienteId) return;
     let mounted = true;
+    const currentKey = String(pacienteId);
 
     api.get(`/pacientes/${pacienteId}/completitud`)
       .then(({ data: response }) => {
-        if (mounted) setData(response);
+        if (mounted) setRemote({ key: currentKey, data: response, error: "" });
       })
       .catch((err) => {
-        if (mounted) setError(getErrorMessage(err, "Error al cargar completitud del expediente"));
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setRemote({
+            key: currentKey,
+            data: null,
+            error: getErrorMessage(err, "Error al cargar completitud del expediente"),
+          });
+        }
       });
 
     return () => {
       mounted = false;
     };
-  }, [pacienteId, initialData]);
+  }, [hasInitialData, pacienteId]);
 
   const porcentaje = Number(data?.porcentaje || 0);
   const resumen = loading

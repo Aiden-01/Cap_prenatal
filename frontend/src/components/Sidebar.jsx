@@ -40,27 +40,30 @@ export default function Sidebar({
   const navigate  = useNavigate();
   const location  = useLocation();
 
-  const [dark, setDark]       = useState(() => getInitialTheme(usuario) === "dark");
+  const themeKey = getThemeKey(usuario);
+  const [theme, setTheme] = useState(() => ({
+    key: themeKey,
+    dark: getInitialTheme(usuario) === "dark",
+  }));
+  const dark = theme.key === themeKey
+    ? theme.dark
+    : getInitialTheme(usuario) === "dark";
   const [themeSwitching, setThemeSwitching] = useState(false);
   const visible = !isMobile || menuOpen;
-
-  useEffect(() => {
-    setDark(getInitialTheme(usuario) === "dark");
-  }, [usuario?.username, usuario?.id]);
 
   // 🌙 DARK MODE
   useEffect(() => {
     const html = document.documentElement;
     if (dark) {
       html.classList.add("dark");
-      localStorage.setItem(getThemeKey(usuario), "dark");
+      localStorage.setItem(themeKey, "dark");
       localStorage.setItem("theme", "dark");
     } else {
       html.classList.remove("dark");
-      localStorage.setItem(getThemeKey(usuario), "light");
+      localStorage.setItem(themeKey, "light");
       localStorage.setItem("theme", "light");
     }
-  }, [dark, usuario]);
+  }, [dark, themeKey]);
 
   useEffect(() => {
     if (isMobile || collapsed) return;
@@ -87,7 +90,7 @@ export default function Sidebar({
 
   const handleThemeToggle = () => {
     setThemeSwitching(true);
-    setDark(!dark);
+    setTheme({ key: themeKey, dark: !dark });
     window.setTimeout(() => setThemeSwitching(false), 520);
   };
 

@@ -43,8 +43,12 @@ function buildWelcomeMessage(firstName) {
 export default function ChatbotWidget() {
   const { usuario } = useAuth();
   const firstName = getFirstName(usuario);
+  const identityKey = String(usuario?.id || usuario?.username || "anonymous");
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState(() => [buildWelcomeMessage(firstName)]);
+  const [conversation, setConversation] = useState(() => ({
+    identityKey,
+    messages: [],
+  }));
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState({});
@@ -57,6 +61,23 @@ export default function ChatbotWidget() {
     return `${prefix}-${messageIdRef.current}`;
   };
 
+  const updateMessages = (updater) => {
+    setConversation((current) => {
+      const currentMessages = current.identityKey === identityKey ? current.messages : [];
+      return {
+        identityKey,
+        messages: updater(currentMessages),
+      };
+    });
+  };
+
+  const messages = useMemo(() => {
+    const currentMessages = conversation.identityKey === identityKey
+      ? conversation.messages
+      : [];
+    return [buildWelcomeMessage(firstName), ...currentMessages];
+  }, [conversation, firstName, identityKey]);
+
   const lastBotMessage = useMemo(
     () => [...messages].reverse().find((message) => message.from === "bot"),
     [messages]
@@ -66,13 +87,6 @@ export default function ChatbotWidget() {
     setOpen(true);
     setTimeout(() => inputRef.current?.focus(), 120);
   };
-
-  useEffect(() => {
-    setMessages((current) => {
-      if (current.length !== 1 || current[0]?.id !== "welcome") return current;
-      return [buildWelcomeMessage(firstName)];
-    });
-  }, [firstName]);
 
   useEffect(() => {
     if (!open) return;
@@ -92,17 +106,15 @@ export default function ChatbotWidget() {
       text: cleanText,
     };
 
-    setMessages((current) => [...current, userMessage]);
+    updateMessages((current) => [...current, userMessage]);
     setInput("");
     setLoading(true);
 
     try {
-      const startedAt = Date.now();
-      const { data } = await api.post("/chatbot/mensaje", { mensaje: cleanText });
-      const elapsed = Date.now() - startedAt;
-      if (elapsed < MIN_RESPONSE_DELAY_MS) {
-        await wait(MIN_RESPONSE_DELAY_MS - elapsed);
-      }
+      const [{ data }] = await Promise.all([
+        api.post("/chatbot/mensaje", { mensaje: cleanText }),
+        wait(MIN_RESPONSE_DELAY_MS),
+      ]);
       const botMessage = {
         id: createMessageId("bot"),
         from: "bot",
@@ -113,9 +125,9 @@ export default function ChatbotWidget() {
         disclaimer: data.disclaimer,
         suggestions: data.suggestions || [],
       };
-      setMessages((current) => [...current, botMessage]);
+      updateMessages((current) => [...current, botMessage]);
     } catch {
-      setMessages((current) => [
+      updateMessages((current) => [
         ...current,
         {
           id: createMessageId("bot-error"),

@@ -93,12 +93,14 @@ export default function Pacientes() {
   const [pagina, setPagina] = useState(1);
   const [limite, setLimite] = useState(10);
   const [expandida, setExpandida] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loadedQueryKey, setLoadedQueryKey] = useState("");
   const navigate = useNavigate();
+  const queryKey = JSON.stringify([buscar, pagina, limite]);
+  const loading = loadedQueryKey !== queryKey;
 
   useEffect(() => {
     let cancelado = false;
-    setLoading(true);
+    const currentQueryKey = JSON.stringify([buscar, pagina, limite]);
 
     api.get("/pacientes", { params: { buscar, pagina, limite } })
       .then(({ data }) => {
@@ -109,7 +111,7 @@ export default function Pacientes() {
       })
       .catch(console.error)
       .finally(() => {
-        if (!cancelado) setLoading(false);
+        if (!cancelado) setLoadedQueryKey(currentQueryKey);
       });
 
     return () => { cancelado = true; };
