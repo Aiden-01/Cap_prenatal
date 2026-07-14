@@ -9,6 +9,7 @@
     "db:migrate": "node src/db/migrate.js",
     "db:migrate-bi": "node src/db/migrateBiViews.js",
     "db:seed": "node src/db/seed.js",
+    "test:chatbot": "node --test test/chatbotService.test.js",
     "test:authorization": "node --test test/authorization.test.js",
     "test:migrate": "node --test test/migrate.test.js",
     "test:permissions-audit": "node --test test/permissionsAudit.test.js",

@@ -842,4 +842,6 @@ module.exports = {
   knowledgeBase,
   normalizeText,
   parseFurDate,
+  scoreIntent,
+  tokenize,
 };
