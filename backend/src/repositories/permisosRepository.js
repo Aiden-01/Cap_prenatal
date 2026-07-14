@@ -32,8 +32,8 @@ async function listarCatalogo() {
   return rows;
 }
 
-async function listarCodigosPorUsuario(usuarioId) {
-  const { rows } = await pool.query(
+async function listarCodigosPorUsuario(usuarioId, db = pool) {
+  const { rows } = await db.query(
     `SELECT p.codigo
      FROM usuario_permisos up
      JOIN permisos p ON p.id = up.permiso_id
@@ -44,8 +44,8 @@ async function listarCodigosPorUsuario(usuarioId) {
   return rows.map((row) => row.codigo);
 }
 
-async function listarPermisosPorUsuario(usuarioId) {
-  const { rows } = await pool.query(
+async function listarPermisosPorUsuario(usuarioId, db = pool) {
+  const { rows } = await db.query(
     `SELECT p.id, p.codigo, p.descripcion, p.categoria, up.otorgado_por, up.fecha_otorgado
      FROM usuario_permisos up
      JOIN permisos p ON p.id = up.permiso_id
@@ -56,43 +56,68 @@ async function listarPermisosPorUsuario(usuarioId) {
   return rows;
 }
 
-async function existenCodigos(codigos) {
+async function existenCodigos(codigos, db = pool, bloquear = false) {
   if (!codigos.length) return [];
-  const { rows } = await pool.query(
-    'SELECT codigo FROM permisos WHERE codigo = ANY($1::text[])',
+  const bloqueo = bloquear ? ' FOR KEY SHARE' : '';
+  const { rows } = await db.query(
+    `SELECT codigo FROM permisos WHERE codigo = ANY($1::text[])${bloqueo}`,
     [codigos]
   );
   return rows.map((row) => row.codigo);
 }
 
-async function reemplazarPermisosUsuario({ usuarioId, codigos, otorgadoPor = null }) {
+async function enTransaccion(callback) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query('DELETE FROM usuario_permisos WHERE usuario_id = $1', [usuarioId]);
-
-    if (codigos.length) {
-      await client.query(
-        `INSERT INTO usuario_permisos (usuario_id, permiso_id, otorgado_por)
-         SELECT $1, p.id, $3
-         FROM permisos p
-         WHERE p.codigo = ANY($2::text[])
-         ON CONFLICT (usuario_id, permiso_id) DO UPDATE SET
-           otorgado_por = EXCLUDED.otorgado_por,
-           fecha_otorgado = NOW()`,
-        [usuarioId, codigos, otorgadoPor]
-      );
-    }
-
+    const result = await callback(client);
     await client.query('COMMIT');
+    return result;
   } catch (err) {
-    await client.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.warn('[permisos] No se pudo revertir la transaccion:', rollbackError.message);
+    }
     throw err;
   } finally {
     client.release();
   }
+}
 
-  return listarPermisosPorUsuario(usuarioId);
+async function bloquearUsuarioPermisos(usuarioId, db) {
+  const { rowCount } = await db.query(
+    'SELECT id FROM usuarios WHERE id = $1 FOR UPDATE',
+    [usuarioId]
+  );
+  return rowCount > 0;
+}
+
+async function aplicarReemplazoPermisos({ usuarioId, codigos, otorgadoPor = null }, db) {
+  await db.query('DELETE FROM usuario_permisos WHERE usuario_id = $1', [usuarioId]);
+
+  if (codigos.length) {
+    await db.query(
+      `INSERT INTO usuario_permisos (usuario_id, permiso_id, otorgado_por)
+       SELECT $1, p.id, $3
+       FROM permisos p
+       WHERE p.codigo = ANY($2::text[])
+       ON CONFLICT (usuario_id, permiso_id) DO UPDATE SET
+         otorgado_por = EXCLUDED.otorgado_por,
+         fecha_otorgado = NOW()`,
+      [usuarioId, codigos, otorgadoPor]
+    );
+  }
+
+  return listarPermisosPorUsuario(usuarioId, db);
+}
+
+async function reemplazarPermisosUsuario(args, db = null) {
+  if (db) {
+    return aplicarReemplazoPermisos(args, db);
+  }
+
+  return enTransaccion((client) => aplicarReemplazoPermisos(args, client));
 }
 
 async function asignarPermisosIniciales({ usuarioId, rol, otorgadoPor = null }) {
@@ -134,7 +159,9 @@ async function reemplazarPermisosPorRol({ usuarioId, rol, otorgadoPor = null }) 
 module.exports = {
   PERMISOS_POR_ROL,
   asignarPermisosIniciales,
+  bloquearUsuarioPermisos,
   codigosPorRol,
+  enTransaccion,
   existenCodigos,
   listarCatalogo,
   listarCodigosPorUsuario,

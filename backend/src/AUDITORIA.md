@@ -2,7 +2,9 @@
 
 La auditoria actual es hibrida: algunos modulos registran eventos mediante `services/auditService.js` y otros mediante utilidades compatibles en `utils/auditoria.js`. Ambos caminos escriben en `auditoria_eventos`.
 
-La politica actual es no bloquear la operacion clinica si falla la escritura de auditoria. El servicio registra un warning/error en consola y permite que la operacion principal continue.
+La politica general es no bloquear la operacion clinica si falla la escritura de auditoria. El servicio registra un warning/error en consola y permite que la operacion principal continue.
+
+La actualizacion directa de permisos de un usuario (`PUT /api/usuarios/:id/permisos`) es una excepcion deliberada: el reemplazo y el evento `usuario_permisos_actualizados` se escriben con la misma conexion y transaccion. Si falla la auditoria obligatoria, tambien se revierten los permisos. El evento conserva el actor, el usuario afectado, los conjuntos anterior y nuevo ordenados, y los permisos agregados y retirados. Una solicitud cuyo conjunto normalizado no cambia no escribe un evento, porque no hubo cambio efectivo de privilegios.
 
 ## Objetivo
 

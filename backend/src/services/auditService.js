@@ -20,6 +20,7 @@ const MODULO_POR_ENTIDAD = {
   fichas_riesgo_obstetrico: 'riesgo_obstetrico',
   planes_parto: 'plan_parto',
   referencias_efectuadas: 'referencias',
+  usuario_permisos: 'permisos',
   usuarios: 'usuarios',
   comunidades: 'comunidades',
 };
@@ -67,11 +68,11 @@ function normalizeEvent(req, event) {
   };
 }
 
-async function registrarEvento(req, event) {
+async function registrarEvento(req, event, { db = pool, obligatorio = false } = {}) {
   const auditEvent = normalizeEvent(req, event);
 
   try {
-    await pool.query(
+    await db.query(
       `INSERT INTO auditoria_eventos (
         usuario_id, accion, modulo, entidad_afectada, id_entidad,
         tabla, registro_id, paciente_id, embarazo_id,
@@ -96,6 +97,7 @@ async function registrarEvento(req, event) {
     );
   } catch (err) {
     console.warn('[audit] No se pudo registrar auditoria:', err.message);
+    if (obligatorio) throw err;
   }
 }
 
