@@ -12,6 +12,7 @@
     "test:authorization": "node --test test/authorization.test.js",
     "test:migrate": "node --test test/migrate.test.js",
     "test:permissions-audit": "node --test test/permissionsAudit.test.js",
+    "test:role-permissions-audit": "node --test test/rolePermissionsAudit.test.js",
     "test:embarazo-activo": "node src/db/manualValidacionEmbarazoActivo.js",
     "db:seed-demo-patients": "node src/db/seedDemoPatients.js",
     "db:seed-bi": "node src/db/seedBiDemo.js",

@@ -25,8 +25,8 @@ function codigosPorRol(rol) {
   return PERMISOS_POR_ROL[rol] === null ? null : [...(PERMISOS_POR_ROL[rol] || [])];
 }
 
-async function listarCatalogo() {
-  const { rows } = await pool.query(
+async function listarCatalogo(db = pool) {
+  const { rows } = await db.query(
     'SELECT id, codigo, descripcion, categoria FROM permisos ORDER BY categoria, codigo'
   );
   return rows;

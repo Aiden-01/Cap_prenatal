@@ -6,6 +6,8 @@ La politica general es no bloquear la operacion clinica si falla la escritura de
 
 La actualizacion directa de permisos de un usuario (`PUT /api/usuarios/:id/permisos`) es una excepcion deliberada: el reemplazo y el evento `usuario_permisos_actualizados` se escriben con la misma conexion y transaccion. Si falla la auditoria obligatoria, tambien se revierten los permisos. El evento conserva el actor, el usuario afectado, los conjuntos anterior y nuevo ordenados, y los permisos agregados y retirados. Una solicitud cuyo conjunto normalizado no cambia no escribe un evento, porque no hubo cambio efectivo de privilegios.
 
+El cambio de rol mediante `PUT /api/usuarios/:id` conserva la politica de reemplazar todos los permisos por los predeterminados del nuevo rol. La actualizacion del usuario, el reemplazo y las auditorias obligatorias se ejecutan en una sola transaccion. El evento de permisos usa el mismo tipo e incluye `origen: cambio_rol`, `rol_anterior` y `rol_nuevo`. Si el cambio de rol no altera efectivamente el conjunto, se registra la actualizacion del usuario pero no un evento de permisos sin diferencias.
+
 ## Objetivo
 
 La auditoria debe responder:

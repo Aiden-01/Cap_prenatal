@@ -61,8 +61,8 @@ async function crear({ nombreCompleto, username, passwordHash, rol, createdBy = 
   return rows[0];
 }
 
-async function obtenerPorId(id) {
-  const { rows } = await pool.query(
+async function obtenerPorId(id, db = pool) {
+  const { rows } = await db.query(
     `SELECT u.id, u.nombre_completo, u.username, u.activo, r.nombre AS rol,
             u.created_at, u.updated_at, u.created_by, u.updated_by,
             ${USUARIO_TIENE_HISTORIAL_SQL} AS tiene_registros,
@@ -98,9 +98,9 @@ async function contarDirectoresActivos() {
   return parseInt(rows[0].count, 10);
 }
 
-async function actualizar({ id, nombreCompleto, activo, rol, passwordHash, updatedBy = null }) {
+async function actualizar({ id, nombreCompleto, activo, rol, passwordHash, updatedBy = null }, db = pool) {
   if (passwordHash) {
-    const { rows } = await pool.query(
+    const { rows } = await db.query(
       `UPDATE usuarios SET nombre_completo=$1, activo=$2,
        rol_id=(SELECT id FROM roles WHERE nombre=$3),
        password_hash=$4, updated_at=NOW(), updated_by=$5 WHERE id=$6
@@ -111,7 +111,7 @@ async function actualizar({ id, nombreCompleto, activo, rol, passwordHash, updat
     return rows[0] || null;
   }
 
-  const { rows } = await pool.query(
+  const { rows } = await db.query(
     `UPDATE usuarios SET nombre_completo=$1, activo=$2,
      rol_id=(SELECT id FROM roles WHERE nombre=$3),
      updated_at=NOW(), updated_by=$4 WHERE id=$5

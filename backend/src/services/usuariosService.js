@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
 const usuariosRepository = require('../repositories/usuariosRepository');
 const permisosRepository = require('../repositories/permisosRepository');
+const permisosService = require('./permisosService');
+const auditService = require('./auditService');
 const { registrarAuditoria } = require('../utils/auditoria');
 const { HttpError } = require('../utils/httpError');
 
@@ -16,8 +18,8 @@ function assertPuedeAsignarRol({ rol, actorRol }) {
   }
 }
 
-async function obtenerTargetVisible({ id, req }) {
-  const target = await usuariosRepository.obtenerVisibleParaActor({
+async function obtenerTargetVisible({ id, req, repository = usuariosRepository }) {
+  const target = await repository.obtenerVisibleParaActor({
     id,
     actorRol: req.usuario.rol,
   });
@@ -53,73 +55,134 @@ async function crearUsuario({ body, req }) {
   return usuario;
 }
 
-async function assertPuedeCambiarSelf({ id, actorId, activo, rol }) {
+async function assertPuedeCambiarSelf({
+  id,
+  actorId,
+  activo,
+  rol,
+  repository = usuariosRepository,
+}) {
   const esSelf = String(id) === String(actorId);
   if (esSelf && activo === false) {
     throw new HttpError(403, 'No puedes desactivar tu propia cuenta');
   }
 
   if (esSelf && rol && rol !== 'admin') {
-    const adminsActivos = await usuariosRepository.contarAdminsActivos();
+    const adminsActivos = await repository.contarAdminsActivos();
     if (adminsActivos <= 1) {
       throw new HttpError(403, 'No puedes cambiar tu rol: eres el unico administrador activo');
     }
   }
 }
 
-async function assertNoDejaSinDirector({ target, nextActivo, nextRol }) {
+async function assertNoDejaSinDirector({
+  target,
+  nextActivo,
+  nextRol,
+  repository = usuariosRepository,
+}) {
   const eraDirectorActivo = target.rol === 'director' && target.activo === true;
   const dejaDeSerDirector = nextRol && nextRol !== 'director';
   const quedaInactivo = nextActivo === false;
 
   if (eraDirectorActivo && (dejaDeSerDirector || quedaInactivo)) {
-    const directoresActivos = await usuariosRepository.contarDirectoresActivos();
+    const directoresActivos = await repository.contarDirectoresActivos();
     if (directoresActivos <= 1) {
       throw new HttpError(403, 'No puedes dejar el sistema sin un director activo');
     }
   }
 }
 
-async function actualizarUsuario({ id, body, req }) {
-  const before = await obtenerTargetVisible({ id, req });
-  assertPuedeAsignarRol({ rol: body.rol, actorRol: req.usuario.rol });
+async function actualizarUsuario({ id, body, req, dependencies = {} }) {
+  const usuariosRepo = dependencies.usuariosRepository || usuariosRepository;
+  const permisosRepo = dependencies.permisosRepository || permisosRepository;
+  const permisosLogic = dependencies.permisosService || permisosService;
+  const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
+  const registrarAuditoriaNormal = dependencies.registrarAuditoria || registrarAuditoria;
+  const before = await obtenerTargetVisible({ id, req, repository: usuariosRepo });
+  const nextRol = body.rol ?? before.rol;
+  assertPuedeAsignarRol({ rol: nextRol, actorRol: req.usuario.rol });
   await assertPuedeCambiarSelf({
     id,
     actorId: req.usuario.id,
     activo: body.activo,
-    rol: body.rol,
+    rol: nextRol,
+    repository: usuariosRepo,
   });
 
   await assertNoDejaSinDirector({
     target: before,
     nextActivo: body.activo ?? before.activo,
-    nextRol: body.rol,
+    nextRol,
+    repository: usuariosRepo,
   });
 
   const passwordHash = body.password ? await bcrypt.hash(body.password, 12) : null;
-  const usuario = await usuariosRepository.actualizar({
+  const actualizar = (db = null, estadoAnterior = before) => usuariosRepo.actualizar({
     id,
     nombreCompleto: body.nombre_completo,
-    activo: body.activo ?? before.activo,
-    rol: body.rol,
+    activo: body.activo ?? estadoAnterior.activo,
+    rol: nextRol,
     passwordHash,
     updatedBy: req.usuario.id,
-  });
+  }, db || undefined);
 
-  if (before.rol !== body.rol) {
-    await permisosRepository.reemplazarPermisosPorRol({
-      usuarioId: id,
-      rol: body.rol,
-      otorgadoPor: req.usuario.id,
+  if (before.rol !== nextRol) {
+    await permisosRepo.enTransaccion(async (db) => {
+      const bloqueado = await permisosRepo.bloquearUsuarioPermisos(id, db);
+      if (!bloqueado) throw new HttpError(404, 'Usuario no encontrado');
+
+      const estadoAnterior = await usuariosRepo.obtenerPorId(id, db);
+      if (!estadoAnterior || (req.usuario.rol === 'admin' && estadoAnterior.rol === 'director')) {
+        throw new HttpError(404, 'Usuario no encontrado');
+      }
+
+      const usuario = await actualizar(db, estadoAnterior);
+      if (estadoAnterior.rol !== nextRol) {
+        let codigos = permisosRepo.codigosPorRol(nextRol);
+        if (codigos === null) {
+          const catalogo = await permisosRepo.listarCatalogo(db);
+          codigos = catalogo.map((permiso) => permiso.codigo);
+        }
+
+        await permisosLogic.reemplazarPermisosEnTransaccion({
+          usuarioId: id,
+          codigos,
+          req,
+          db,
+          contexto: {
+            origen: 'cambio_rol',
+            rol_anterior: estadoAnterior.rol,
+            rol_nuevo: nextRol,
+          },
+          dependencies: {
+            permisosRepository: permisosRepo,
+            registrarEvento,
+          },
+        });
+      }
+
+      await registrarEvento(req, {
+        accion: 'actualizar',
+        tabla: 'usuarios',
+        registroId: id,
+        datosAnteriores: estadoAnterior,
+        datosNuevos: { ...usuario, rol: nextRol, password_cambiado: Boolean(body.password) },
+        descripcion: 'Usuario actualizado',
+      }, { db, obligatorio: true });
     });
+
+    return { message: 'Usuario actualizado' };
   }
 
-  await registrarAuditoria(req, {
+  const usuario = await actualizar();
+
+  await registrarAuditoriaNormal(req, {
     accion: 'actualizar',
     tabla: 'usuarios',
     registroId: id,
     datosAnteriores: before,
-    datosNuevos: { ...usuario, rol: body.rol, password_cambiado: Boolean(body.password) },
+    datosNuevos: { ...usuario, rol: nextRol, password_cambiado: Boolean(body.password) },
     descripcion: 'Usuario actualizado',
   });
 

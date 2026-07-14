@@ -34,10 +34,86 @@ function sonMismosPermisos(anteriores, nuevos) {
     && anteriores.every((codigo, index) => codigo === nuevos[index]);
 }
 
+function calcularDiferenciasPermisos(anteriores, nuevos) {
+  const anterioresSet = new Set(anteriores);
+  const nuevosSet = new Set(nuevos);
+  return {
+    agregados: nuevos.filter((codigo) => !anterioresSet.has(codigo)),
+    retirados: anteriores.filter((codigo) => !nuevosSet.has(codigo)),
+  };
+}
+
+async function reemplazarPermisosEnTransaccion({
+  usuarioId,
+  codigos,
+  req,
+  db,
+  contexto = {},
+  dependencies = {},
+}) {
+  const permisosRepo = dependencies.permisosRepository || permisosRepository;
+  const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
+  const nuevos = normalizarCodigos(codigos);
+  const existentes = await permisosRepo.existenCodigos(nuevos, db, true);
+  const faltantes = nuevos.filter((codigo) => !existentes.includes(codigo));
+  if (faltantes.length) {
+    throw new HttpError(400, `Permisos invalidos: ${faltantes.join(', ')}`, {
+      code: 'PERMISOS_INVALIDOS',
+    });
+  }
+
+  const anteriores = normalizarCodigos(
+    await permisosRepo.listarCodigosPorUsuario(usuarioId, db)
+  );
+  if (sonMismosPermisos(anteriores, nuevos)) {
+    return {
+      cambio: false,
+      permisos: await permisosRepo.listarPermisosPorUsuario(usuarioId, db),
+      anteriores,
+      nuevos,
+      agregados: [],
+      retirados: [],
+    };
+  }
+
+  const permisos = await permisosRepo.reemplazarPermisosUsuario({
+    usuarioId,
+    codigos: nuevos,
+    otorgadoPor: req.usuario.id,
+  }, db);
+  const { agregados, retirados } = calcularDiferenciasPermisos(anteriores, nuevos);
+
+  await registrarEvento(req, {
+    usuarioId: req.usuario.id,
+    accion: 'actualizar',
+    modulo: 'permisos',
+    entidadAfectada: 'usuario_permisos',
+    tabla: 'usuario_permisos',
+    idEntidad: usuarioId,
+    registroId: usuarioId,
+    datosAnteriores: {
+      tipo_evento: 'usuario_permisos_actualizados',
+      usuario_afectado_id: usuarioId,
+      permisos: anteriores,
+      ...contexto,
+    },
+    datosNuevos: {
+      tipo_evento: 'usuario_permisos_actualizados',
+      usuario_afectado_id: usuarioId,
+      permisos: nuevos,
+      permisos_agregados: agregados,
+      permisos_retirados: retirados,
+      ...contexto,
+    },
+    descripcion: 'usuario_permisos_actualizados',
+  }, { db, obligatorio: true });
+
+  return { cambio: true, permisos, anteriores, nuevos, agregados, retirados };
+}
+
 async function reemplazarPermisosUsuario({ usuarioId, codigos, req, dependencies = {} }) {
   const permisosRepo = dependencies.permisosRepository || permisosRepository;
   const usuariosRepo = dependencies.usuariosRepository || usuariosRepository;
-  const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
 
   requireDirector(req);
   const usuario = await usuariosRepo.obtenerVisibleParaActor({
@@ -51,60 +127,23 @@ async function reemplazarPermisosUsuario({ usuarioId, codigos, req, dependencies
     const usuarioBloqueado = await permisosRepo.bloquearUsuarioPermisos(usuarioId, db);
     if (!usuarioBloqueado) throw new HttpError(404, 'Usuario no encontrado');
 
-    const existentes = await permisosRepo.existenCodigos(uniqueCodigos, db, true);
-    const faltantes = uniqueCodigos.filter((codigo) => !existentes.includes(codigo));
-    if (faltantes.length) {
-      throw new HttpError(400, `Permisos invalidos: ${faltantes.join(', ')}`, {
-        code: 'PERMISOS_INVALIDOS',
-      });
-    }
-
-    const anteriores = (await permisosRepo.listarCodigosPorUsuario(usuarioId, db)).sort();
-    if (sonMismosPermisos(anteriores, uniqueCodigos)) {
-      return permisosRepo.listarPermisosPorUsuario(usuarioId, db);
-    }
-
-    const permisos = await permisosRepo.reemplazarPermisosUsuario({
+    const resultado = await reemplazarPermisosEnTransaccion({
       usuarioId,
       codigos: uniqueCodigos,
-      otorgadoPor: req.usuario.id,
-    }, db);
-
-    const anterioresSet = new Set(anteriores);
-    const nuevosSet = new Set(uniqueCodigos);
-    const agregados = uniqueCodigos.filter((codigo) => !anterioresSet.has(codigo));
-    const retirados = anteriores.filter((codigo) => !nuevosSet.has(codigo));
-
-    await registrarEvento(req, {
-      usuarioId: req.usuario.id,
-      accion: 'actualizar',
-      modulo: 'permisos',
-      entidadAfectada: 'usuario_permisos',
-      tabla: 'usuario_permisos',
-      idEntidad: usuarioId,
-      registroId: usuarioId,
-      datosAnteriores: {
-        tipo_evento: 'usuario_permisos_actualizados',
-        usuario_afectado_id: usuarioId,
-        permisos: anteriores,
-      },
-      datosNuevos: {
-        tipo_evento: 'usuario_permisos_actualizados',
-        usuario_afectado_id: usuarioId,
-        permisos: uniqueCodigos,
-        permisos_agregados: agregados,
-        permisos_retirados: retirados,
-      },
-      descripcion: 'usuario_permisos_actualizados',
-    }, { db, obligatorio: true });
-
-    return permisos;
+      req,
+      db,
+      contexto: { origen: 'actualizacion_directa' },
+      dependencies,
+    });
+    return resultado.permisos;
   });
 }
 
 module.exports = {
+  calcularDiferenciasPermisos,
   listarCatalogo,
   listarPermisosUsuario,
   normalizarCodigos,
+  reemplazarPermisosEnTransaccion,
   reemplazarPermisosUsuario,
 };
