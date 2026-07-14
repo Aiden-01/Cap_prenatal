@@ -1,5 +1,6 @@
 const express = require('express');
 const { listar, obtener, guardar, actualizar, eliminar } = require('../controllers/morbilidadController');
+const { verificarPermiso } = require('../middleware/permisos');
 const { validateBody, validateParams } = require('../middleware/validate');
 const { nestedIdParams } = require('../validations/common.schemas');
 const {
@@ -9,10 +10,10 @@ const {
 
 const router = express.Router({ mergeParams: true });
 
-router.get('/',      listar);
-router.post('/',     validateBody(morbilidadCreateSchema), guardar);
-router.get('/:id',   validateParams(nestedIdParams), obtener);
-router.put('/:id',   validateParams(nestedIdParams), validateBody(morbilidadUpdateSchema), actualizar);
-router.delete('/:id',validateParams(nestedIdParams), eliminar);
+router.get('/',      verificarPermiso('pacientes.ver'), listar);
+router.post('/',     verificarPermiso('controles.crear'), validateBody(morbilidadCreateSchema), guardar);
+router.get('/:id',   verificarPermiso('pacientes.ver'), validateParams(nestedIdParams), obtener);
+router.put('/:id',   verificarPermiso('controles.editar'), validateParams(nestedIdParams), validateBody(morbilidadUpdateSchema), actualizar);
+router.delete('/:id',verificarPermiso('controles.editar'), validateParams(nestedIdParams), eliminar);
 
 module.exports = router;

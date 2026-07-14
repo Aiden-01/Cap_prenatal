@@ -9,6 +9,7 @@
     "db:migrate": "node src/db/migrate.js",
     "db:migrate-bi": "node src/db/migrateBiViews.js",
     "db:seed": "node src/db/seed.js",
+    "test:authorization": "node --test test/authorization.test.js",
     "test:embarazo-activo": "node src/db/manualValidacionEmbarazoActivo.js",
     "db:seed-demo-patients": "node src/db/seedDemoPatients.js",
     "db:seed-bi": "node src/db/seedBiDemo.js",

@@ -16,15 +16,27 @@ const {
 const router = express.Router({ mergeParams: true });
 
 // Plan de parto (1 por embarazo activo)
-router.get('/plan-parto',  planPartoController.obtenerPlanParto);
-router.post('/plan-parto', validateBody(planPartoSchema), planPartoController.guardarPlanParto);
+router.get('/plan-parto', verificarPermiso('pacientes.ver'), planPartoController.obtenerPlanParto);
+router.post(
+  '/plan-parto',
+  verificarPermiso('controles.crear'),
+  verificarPermiso('controles.editar'),
+  validateBody(planPartoSchema),
+  planPartoController.guardarPlanParto
+);
 
 // Puerperio (1a y 2a atencion)
-router.get('/puerperio',        puerperioController.listarPuerperio);
-router.post('/puerperio',       validateBody(puerperioCreateSchema), puerperioController.guardarPuerperio);
-router.get('/puerperio/:id',    validateParams(nestedIdParams), puerperioController.obtenerPuerperio);
-router.put('/puerperio/:id',    validateParams(nestedIdParams), validateBody(puerperioUpdateSchema), puerperioController.actualizarPuerperio);
-router.delete('/puerperio/:id', validateParams(nestedIdParams), puerperioController.eliminarPuerperio);
+router.get('/puerperio',        verificarPermiso('pacientes.ver'), puerperioController.listarPuerperio);
+router.post(
+  '/puerperio',
+  verificarPermiso('controles.crear'),
+  verificarPermiso('controles.editar'),
+  validateBody(puerperioCreateSchema),
+  puerperioController.guardarPuerperio
+);
+router.get('/puerperio/:id',    verificarPermiso('pacientes.ver'), validateParams(nestedIdParams), puerperioController.obtenerPuerperio);
+router.put('/puerperio/:id',    verificarPermiso('controles.editar'), validateParams(nestedIdParams), validateBody(puerperioUpdateSchema), puerperioController.actualizarPuerperio);
+router.delete('/puerperio/:id', verificarPermiso('controles.editar'), validateParams(nestedIdParams), puerperioController.eliminarPuerperio);
 
 // Controles prenatales
 router.get('/',       verificarPermiso('pacientes.ver'), controlesPrenatalesController.listar);
