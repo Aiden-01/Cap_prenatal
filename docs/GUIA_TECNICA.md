@@ -301,11 +301,13 @@ En codigo el header se lee como `x-cap-prenatal-secret`.
 
 Mas detalle operativo en `docs/N8N.md`.
 
+## Laboratorios
+
+Los resultados de laboratorio pertenecen a cada control prenatal y `controles_prenatales` es su unico modelo canonico. No existe un endpoint independiente de laboratorio: la captura se realiza desde el formulario de controles y la consulta desde los controles y el expediente de la paciente.
+
+Los resultados sensibles de VIH conservan el filtrado y los permisos vigentes, incluido `controles.ver_vih` para su visualizacion.
+
 ## Pendientes y fuera de alcance
-
-Pendientes tecnicos detectados:
-
-- `backend/src/routes/laboratorio.js` existe, pero no esta montada como ruta publica en `index.js` ni bajo `routes/pacientes.js`. No consumir `/api/pacientes/:pacienteId/laboratorio` hasta definir y montar oficialmente esa ruta.
 
 Fuera de alcance actual:
 

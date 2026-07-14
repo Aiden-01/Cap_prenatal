@@ -75,7 +75,7 @@ referencias_efectuadas
 | `usuario_permisos` | Relacion usuario-permiso. |
 | `pacientes` | Datos generales, antecedentes, datos obstetricos base y campos institucionales. |
 | `embarazos` | Historial de embarazos por paciente. |
-| `controles_prenatales` | Consultas prenatales por embarazo. |
+| `controles_prenatales` | Consultas prenatales por embarazo y modelo canonico de sus resultados de laboratorio. |
 | `fichas_riesgo_obstetrico` | Evaluacion de riesgo obstetrico por embarazo. |
 | `planes_parto` | Plan de parto por embarazo. |
 | `vacunas_paciente` | Vacunas asociadas a paciente/embarazo. |
@@ -85,6 +85,12 @@ referencias_efectuadas
 | `comunidades` | Catalogo geografico/comunitario. |
 | `comunidades_aliases` | Alias para normalizar comunidades. |
 | `auditoria_eventos` | Trazabilidad de operaciones. |
+
+## Laboratorios
+
+Los resultados de laboratorio se almacenan como parte de cada registro de `controles_prenatales`; no existe una tabla independiente `resultados_laboratorio`. Su captura y actualizacion siguen el flujo del control prenatal, y su visualizacion se realiza desde los controles y el expediente de la paciente.
+
+Los resultados sensibles de VIH permanecen sujetos a los permisos vigentes de acceso a datos sensibles.
 
 ## Embarazos
 

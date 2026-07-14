@@ -73,7 +73,7 @@ Los siguientes modulos ya tienen separacion en controller/service/repository/val
 - PDF
 - chatbot
 
-Nota sobre `laboratorio`: existen controller, service, repository, validation y `routes/laboratorio.js`, pero al momento de esta auditoria documental la ruta no esta montada en `index.js` ni en `routes/pacientes.js`. No tratarla como endpoint publico terminado hasta montar la ruta o confirmar que laboratorio seguira embebido en controles prenatales.
+Los resultados de laboratorio no constituyen un modulo HTTP independiente. Forman parte del modelo y flujo de controles prenatales: se capturan con cada control y se consultan desde los controles y el expediente. Los datos sensibles de VIH mantienen su filtrado por permisos.
 
 ## Modulo de referencia
 

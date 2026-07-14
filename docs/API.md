@@ -163,9 +163,9 @@ GET /pacientes/:pacienteId/riesgo/pdf?embarazo_id=:id
 
 ## Laboratorio
 
-Estado: pendiente de montaje como endpoint publico.
+Los resultados de laboratorio forman parte de cada control prenatal y se gestionan mediante los endpoints de `/pacientes/:pacienteId/controles`. No existe un endpoint independiente de laboratorio.
 
-Existe `backend/src/routes/laboratorio.js`, pero en esta revision no aparece montada en `index.js` ni en `routes/pacientes.js`. Por tanto, laboratorio no tiene contrato HTTP publico documentado aqui. No consumir una ruta de laboratorio hasta que se monte explicitamente o se decida que los laboratorios seguiran gestionandose dentro de controles prenatales.
+La lectura se realiza dentro del expediente y la creacion o actualizacion desde el formulario de controles. Los campos sensibles de VIH conservan la proteccion del permiso `controles.ver_vih` tanto en backend como en frontend.
 
 ## Vacunas
 
