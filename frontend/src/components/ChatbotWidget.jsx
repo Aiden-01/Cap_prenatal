@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Bot,
   HelpCircle,
@@ -10,6 +11,8 @@ import {
 } from "lucide-react";
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
+import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
+import { buildChatbotContext } from "../utils/chatbotContext";
 
 const ASSISTANT_NAME = "Lia";
 const MIN_RESPONSE_DELAY_MS = 850;
@@ -42,6 +45,8 @@ function buildWelcomeMessage(firstName) {
 
 export default function ChatbotWidget() {
   const { usuario } = useAuth();
+  const location = useLocation();
+  const { pregnancyStatus } = useChatbotScreenContext();
   const firstName = getFirstName(usuario);
   const identityKey = String(usuario?.id || usuario?.username || "anonymous");
   const [open, setOpen] = useState(false);
@@ -55,6 +60,12 @@ export default function ChatbotWidget() {
   const inputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const messageIdRef = useRef(0);
+  const safeContext = useMemo(() => buildChatbotContext({
+    pathname: location.pathname,
+    search: location.search,
+    usuario,
+    pregnancyStatus,
+  }), [location.pathname, location.search, pregnancyStatus, usuario]);
 
   const createMessageId = (prefix) => {
     messageIdRef.current += 1;
@@ -112,7 +123,7 @@ export default function ChatbotWidget() {
 
     try {
       const [{ data }] = await Promise.all([
-        api.post("/chatbot/mensaje", { mensaje: cleanText }),
+        api.post("/chatbot/mensaje", { mensaje: cleanText, context: safeContext }),
         wait(MIN_RESPONSE_DELAY_MS),
       ]);
       const botMessage = {

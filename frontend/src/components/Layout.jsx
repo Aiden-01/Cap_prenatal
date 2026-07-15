@@ -6,6 +6,7 @@ import Toast from "./Toast";
 import ChatbotWidget from "./ChatbotWidget";
 import api from "../api/axios";
 import { ToastContext } from "../context/ToastContext";
+import { ChatbotScreenProvider } from "../context/ChatbotScreenContext";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { useFieldErrors } from "../hooks/useFieldErrors";
@@ -104,7 +105,8 @@ export default function Layout() {
 
   return (
     <ToastContext.Provider value={toast}>
-      <div className="app-shell" style={{ minHeight: "100vh" }}>
+      <ChatbotScreenProvider>
+        <div className="app-shell" style={{ minHeight: "100vh" }}>
 
         {/* Botón hamburguesa — solo móvil */}
         {isMobile && (
@@ -247,7 +249,8 @@ export default function Layout() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </ChatbotScreenProvider>
     </ToastContext.Provider>
   );
 }

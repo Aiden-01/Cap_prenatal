@@ -164,6 +164,63 @@ test('/mensaje con autenticacion, CSRF y payload valido devuelve 200', async () 
   assert.equal(response.payload.intent, 'registrar_paciente');
 });
 
+test('/mensaje acepta contexto seguro valido', async () => {
+  const response = await post(contractServer, '/api/chatbot/mensaje', {
+    mensaje: '¿Cómo agrego un control?',
+    context: {
+      route: '/pacientes/:id/expediente',
+      module: 'expediente',
+      hasPatientContext: true,
+      hasPregnancyContext: true,
+      pregnancyStatus: 'cerrado',
+      permissions: ['controles.crear'],
+    },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.payload.intent, 'control_prenatal');
+  assert.match(response.payload.answer, /solo lectura/);
+});
+
+test('/mensaje rechaza contexto con datos clinicos adicionales', async () => {
+  const privateText = 'diagnostico-privado-no-debe-aparecer';
+  const response = await post(contractServer, '/api/chatbot/mensaje', {
+    mensaje: 'Hola',
+    context: {
+      route: '/dashboard',
+      module: 'dashboard',
+      hasPatientContext: false,
+      hasPregnancyContext: false,
+      pregnancyStatus: null,
+      permissions: [],
+      diagnostico: privateText,
+    },
+  });
+
+  assertSafeError(response, 400, 'VALIDATION_ERROR', privateText);
+});
+
+test('contexto declarado no permite saltarse autenticacion', async () => {
+  const response = await post(
+    contractServer,
+    '/api/chatbot/mensaje',
+    {
+      mensaje: '¿Cómo creo un usuario?',
+      context: {
+        route: '/usuarios',
+        module: 'usuarios',
+        hasPatientContext: false,
+        hasPregnancyContext: false,
+        pregnancyStatus: null,
+        permissions: ['usuarios.gestionar'],
+      },
+    },
+    { authenticated: false }
+  );
+
+  assertSafeError(response, 401, 'TOKEN_REQUIRED');
+});
+
 test('/mensaje con payload invalido devuelve 400 VALIDATION_ERROR sin exponerlo', async () => {
   const privateText = 'dato-privado-no-debe-aparecer';
   const response = await post(contractServer, '/api/chatbot/mensaje', {

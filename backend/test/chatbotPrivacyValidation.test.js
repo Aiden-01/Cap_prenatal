@@ -267,6 +267,49 @@ test('controller recorta el mensaje y no entrega texto crudo ni identidad al log
   assert.deepEqual(response, expectedResult);
 });
 
+test('controller entrega contexto solo al clasificador y nunca al logger', async () => {
+  const safeContext = {
+    route: '/pacientes/:id/expediente',
+    module: 'expediente',
+    hasPatientContext: true,
+    hasPregnancyContext: true,
+    pregnancyStatus: 'activo',
+    permissions: ['pacientes.editar'],
+  };
+  let classifiedContext;
+  let loggedMetadata;
+  const { preguntar } = createChatbotController({
+    answerQuestionFn(_message, context) {
+      classifiedContext = context;
+      return {
+        recognized: false,
+        intent: 'no_reconocida',
+        answer: 'Respuesta segura',
+      };
+    },
+    logger: {
+      async logUnrecognized(metadata) {
+        loggedMetadata = metadata;
+      },
+      async logFeedback() {},
+    },
+  });
+
+  await invoke(preguntar, {
+    body: { mensaje: 'consulta segura', context: safeContext },
+    usuario: { id: 9 },
+  });
+
+  assert.strictEqual(classifiedContext, safeContext);
+  assert.deepEqual(loggedMetadata, {
+    messageLength: 'consulta segura'.length,
+    intent: 'no_reconocida',
+    confidence: undefined,
+  });
+  assert.equal(JSON.stringify(loggedMetadata).includes('context'), false);
+  assert.equal(JSON.stringify(loggedMetadata).includes('/pacientes'), false);
+});
+
 test('feedback descarta respuesta adicional e identidad antes del logger', async () => {
   let loggedMetadata;
   const { registrarFeedback } = createChatbotController({

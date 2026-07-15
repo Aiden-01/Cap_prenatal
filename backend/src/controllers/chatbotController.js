@@ -8,7 +8,7 @@ function createChatbotController({
 } = {}) {
   const preguntar = asyncHandler(async (req, res) => {
     const message = req.body.mensaje.trim();
-    const result = answerQuestionFn(message);
+    const result = answerQuestionFn(message, req.body.context);
 
     if (!result.recognized) {
       await logger.logUnrecognized({

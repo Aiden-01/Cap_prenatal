@@ -5,6 +5,7 @@ const {
 } = require('../config/chatbotKnowledge');
 const {
   CLINICAL_DISCLAIMER,
+  CONTEXT_RESPONSES,
   DEFAULT_CLOSING,
   DEFAULT_OPENING,
   FRIENDLY_CLOSINGS,
@@ -225,13 +226,100 @@ function isClinicalAdviceRequest(message) {
   ].some((pattern) => pattern.test(normalized));
 }
 
-function buildOperationalGuardResponse(intent, message) {
+function hasContextPermission(context, permission) {
+  return Array.isArray(context?.permissions) && context.permissions.includes(permission);
+}
+
+function adaptAnswerToContext(intent, baseAnswer, context) {
+  if (!context) return baseAnswer;
+
+  if (intent === 'secciones_expediente' && context.module === 'expediente') {
+    return CONTEXT_RESPONSES.expedienteOverview;
+  }
+
+  if (intent === 'control_prenatal') {
+    if (!context.hasPatientContext || !context.hasPregnancyContext) {
+      return CONTEXT_RESPONSES.controlMissingContext;
+    }
+    if (context.pregnancyStatus === 'cerrado') return CONTEXT_RESPONSES.controlReadOnly;
+    if (context.pregnancyStatus === 'puerperio') return CONTEXT_RESPONSES.controlNotActive;
+    if (context.pregnancyStatus === null) return CONTEXT_RESPONSES.controlUnknownStatus;
+    if (!hasContextPermission(context, 'controles.crear')) {
+      return CONTEXT_RESPONSES.controlMissingPermission;
+    }
+  }
+
+  if (intent === 'vacunas') {
+    if (!context.hasPatientContext || !context.hasPregnancyContext) {
+      return CONTEXT_RESPONSES.vaccineMissingContext;
+    }
+    if (context.pregnancyStatus === 'cerrado') return CONTEXT_RESPONSES.vaccineReadOnly;
+    if (!hasContextPermission(context, 'controles.crear')) {
+      return CONTEXT_RESPONSES.vaccineMissingPermission;
+    }
+  }
+
+  if (intent === 'cerrar_embarazo') {
+    if (!context.hasPregnancyContext) return CONTEXT_RESPONSES.closeMissingPregnancy;
+    if (context.pregnancyStatus === 'cerrado') return CONTEXT_RESPONSES.closeAlreadyClosed;
+    if (!hasContextPermission(context, 'pacientes.editar')) {
+      return CONTEXT_RESPONSES.closeMissingPermission;
+    }
+  }
+
+  if (intent === 'usuarios') {
+    return hasContextPermission(context, 'usuarios.gestionar')
+      ? CONTEXT_RESPONSES.usersAllowed
+      : CONTEXT_RESPONSES.usersRestricted;
+  }
+
+  return baseAnswer;
+}
+
+function buildContextualEditResponse(message, context) {
+  if (!context) return null;
+  const normalized = withoutSocialLeadIn(message);
+  const isEditButtonQuestion = [
+    /^no encuentro el boton para editar$/,
+    /^el boton de editar no aparece$/,
+    /^donde esta el boton para editar$/,
+  ].some((pattern) => pattern.test(normalized));
+
+  if (!isEditButtonQuestion) return null;
+
+  let answer = CONTEXT_RESPONSES.editClarification;
+  if (context.pregnancyStatus === 'cerrado') {
+    answer = CONTEXT_RESPONSES.editReadOnly;
+  } else if (!hasContextPermission(context, 'pacientes.editar')) {
+    answer = CONTEXT_RESPONSES.editMissingPermission;
+  }
+
+  return {
+    recognized: true,
+    intent: 'secciones_expediente',
+    title: 'Edición en el expediente',
+    answer,
+    confidence: 1,
+    disclaimer: CLINICAL_DISCLAIMER,
+  };
+}
+
+function buildContextualCloseResponse(message, context) {
+  if (!context) return null;
+  const normalized = withoutSocialLeadIn(message);
+  if (!/^como (?:cierro|cerrar) el embarazo$/.test(normalized)) return null;
+
+  return buildOperationalGuardResponse('cerrar_embarazo', message, context);
+}
+
+function buildOperationalGuardResponse(intent, message, context) {
   const item = chatbotKnowledge.find((candidate) => candidate.id === intent);
   if (!item) return null;
 
-  const answer = item.id === 'calcular_fpp'
+  const baseAnswer = item.id === 'calcular_fpp'
     ? buildFppResponse(message, item.answer)
     : item.answer;
+  const answer = adaptAnswerToContext(item.id, baseAnswer, context);
 
   return {
     recognized: true,
@@ -283,7 +371,7 @@ function humanizeAnswer(intent, answer) {
   return [opening, body, closing].filter(Boolean).join('\n\n');
 }
 
-function answerQuestion(message) {
+function answerQuestion(message, context) {
   const text = String(message || '').trim();
   if (!text) {
     return {
@@ -321,7 +409,7 @@ function answerQuestion(message) {
 
   const operationalException = findOperationalSafetyException(text);
   if (operationalException) {
-    return buildOperationalGuardResponse(operationalException, text);
+    return buildOperationalGuardResponse(operationalException, text, context);
   }
 
   const clinicalDataRequest = getClinicalDataRequest(text);
@@ -345,12 +433,18 @@ function answerQuestion(message) {
     };
   }
 
+  const contextualEditResponse = buildContextualEditResponse(text, context);
+  if (contextualEditResponse) return contextualEditResponse;
+
+  const contextualCloseResponse = buildContextualCloseResponse(text, context);
+  if (contextualCloseResponse) return contextualCloseResponse;
+
   const operationalPriority = findOperationalPriority(text);
   if (operationalPriority?.clarification) {
     return buildOperationalClarificationResponse();
   }
   if (operationalPriority?.intent) {
-    return buildOperationalGuardResponse(operationalPriority.intent, text);
+    return buildOperationalGuardResponse(operationalPriority.intent, text, context);
   }
 
   const bestIntent = findBestIntent(text);
@@ -371,6 +465,7 @@ function answerQuestion(message) {
     answer = SPECIAL_RESPONSES.laboratoryView;
     humanizedIntent = 'laboratorio_visualizacion';
   }
+  answer = adaptAnswerToContext(bestIntent.id, answer, context);
 
   return {
     recognized: true,

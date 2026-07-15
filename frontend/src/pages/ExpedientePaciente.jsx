@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
+import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
 import SemaforoCompletitud from "../components/SemaforoCompletitud";
 import TimelineControles from "../components/TimelineControles";
 import {
@@ -621,6 +622,7 @@ export default function ExpedientePaciente() {
   const [searchParams, setSearchParams] = useSearchParams();
   const toast      = useGlobalToast();
   const { usuario } = useAuth();
+  const { setPregnancyStatus } = useChatbotScreenContext();
   const [exp, setExp]       = useState(null);
   const [loadedRequestKey, setLoadedRequestKey] = useState("");
   const [loadError, setLoadError] = useState("");
@@ -692,8 +694,19 @@ export default function ExpedientePaciente() {
 
   const embarazoSeleccionado = exp?.embarazo_seleccionado || exp?.embarazo_activo;
   const embarazoSeleccionadoId = embarazoSeleccionado?.id ? String(embarazoSeleccionado.id) : "";
+  const estadoEmbarazo = embarazoSeleccionado?.estado;
   const isReadOnly = exp?.is_read_only ?? embarazoSeleccionado?.estado === "cerrado";
   const isEmbarazoActual = exp?.is_embarazo_actual ?? embarazoSeleccionadoId === String(exp?.embarazo_actual?.id || "");
+  const expedienteDesactualizado = Boolean(
+    exp && selectedEmbarazoId &&
+    String(exp.embarazo_seleccionado?.id || exp.embarazo_activo?.id || '') !== String(selectedEmbarazoId)
+  );
+
+  useEffect(() => {
+    if (loading || expedienteDesactualizado) setPregnancyStatus(null);
+    else setPregnancyStatus(estadoEmbarazo);
+    return () => setPregnancyStatus(null);
+  }, [estadoEmbarazo, expedienteDesactualizado, loading, setPregnancyStatus]);
 
   useEffect(() => {
     if (!exp || isReadOnly || !embarazoSeleccionado?.id) return;
@@ -708,11 +721,6 @@ export default function ExpedientePaciente() {
       });
     return () => controller.abort();
   }, [id, exp, isReadOnly, embarazoSeleccionado?.id]);
-
-  const expedienteDesactualizado = Boolean(
-    exp && selectedEmbarazoId &&
-    String(exp.embarazo_seleccionado?.id || exp.embarazo_activo?.id || '') !== String(selectedEmbarazoId)
-  );
 
   if (loading || expedienteDesactualizado) return (
     <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
@@ -734,7 +742,6 @@ export default function ExpedientePaciente() {
       : nombreCompleto.length > 24
         ? "is-medium"
       : "";
-  const estadoEmbarazo = embarazoSeleccionado?.estado;
   const puedeRegistrarPrenatal = estadoEmbarazo === "activo";
   const puedeRegistrarPuerperio = estadoEmbarazo === "activo" || estadoEmbarazo === "puerperio";
   const riskTotalCriteria = riskTotalCount();

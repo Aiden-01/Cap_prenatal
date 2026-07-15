@@ -47,6 +47,26 @@ const SPECIAL_RESPONSES = {
   laboratoryView: 'Para ver los laboratorios guardados:\n1. Abre el expediente de la paciente.\n2. Entra en la pestaña "Laboratorios".\n3. Selecciona el control que deseas revisar para ver sus resultados por grupo de estudio.\n\nLos resultados se capturan al crear o editar un control prenatal, pero se consultan desde esta pestaña del expediente. La visibilidad de VIH depende del permiso correspondiente de la cuenta.',
 };
 
+const CONTEXT_RESPONSES = {
+  expedienteOverview: 'Ya estás dentro del expediente. Puedes moverte entre Datos generales, Controles, Puerperio, Morbilidad, Riesgo obstétrico, Plan de parto, Vacunas y Laboratorios. Las acciones más comunes son revisar el embarazo seleccionado, agregar un control cuando está activo, registrar seguimientos y corregir registros desde su sección.',
+  editMissingPermission: 'Según el contexto informativo de tu sesión, no aparece el permiso pacientes.editar. Por eso el botón de edición puede no estar disponible. La autorización real siempre la confirma el backend; si necesitas acceso, consúltalo con la persona responsable de permisos.',
+  editReadOnly: 'El embarazo seleccionado está cerrado y el expediente se muestra en modo de solo lectura. Por eso no aparecen acciones para editar registros de ese embarazo.',
+  editClarification: 'El contexto indica un embarazo editable y el permiso pacientes.editar cargado en sesión. ¿Qué sección deseas editar: datos de paciente, control, vacuna, puerperio, morbilidad, riesgo o plan de parto? La autorización real se verificará al usar la acción.',
+  controlMissingContext: 'Primero abre el expediente de una paciente y selecciona un embarazo activo. Sin contexto de paciente y embarazo, Lia no puede ubicar el botón correcto para agregar el control.',
+  controlReadOnly: 'El embarazo seleccionado está cerrado y permanece en solo lectura; no se pueden agregar controles prenatales a ese embarazo.',
+  controlNotActive: 'Los controles prenatales nuevos solo se agregan al embarazo activo. El embarazo seleccionado está en puerperio, por lo que debes seleccionar un embarazo activo si corresponde.',
+  controlUnknownStatus: 'Antes de agregar el control, confirma en el expediente que el embarazo seleccionado esté activo.',
+  controlMissingPermission: 'Según el contexto informativo de tu sesión, no aparece el permiso controles.crear. La cuenta puede no mostrar la acción para agregar controles; la autorización real la confirma el backend.',
+  vaccineMissingContext: 'Primero abre el expediente de una paciente y selecciona el embarazo al que corresponde la vacuna.',
+  vaccineReadOnly: 'El embarazo seleccionado está cerrado y permanece en solo lectura; no se pueden registrar vacunas nuevas en ese embarazo.',
+  vaccineMissingPermission: 'Según el contexto informativo de tu sesión, no aparece el permiso controles.crear, que es el requerido por la ruta de registro de vacunas. La autorización real la confirma el backend.',
+  closeMissingPregnancy: 'Primero abre el expediente y selecciona el embarazo que deseas revisar. Lia no ejecutará el cierre; solo puede explicarte el flujo cuando existe un embarazo seleccionado.',
+  closeAlreadyClosed: 'El embarazo seleccionado ya está cerrado y el expediente está en modo de solo lectura. No es necesario volver a cerrarlo.',
+  closeMissingPermission: 'Según el contexto informativo de tu sesión, no aparece el permiso pacientes.editar. Por eso la acción "Cerrar embarazo" puede no estar disponible; la autorización real la confirma el backend.',
+  usersRestricted: 'La gestión de usuarios está restringida a cuentas con función de administrador o director. Si tu sesión no tiene esa capacidad, la opción "Usuarios" no estará disponible. El backend confirma la autorización real.',
+  usersAllowed: 'Las cuentas con función de administrador o director pueden gestionar usuarios. Entra en "Usuarios", presiona "Nuevo usuario", completa nombre, usuario, contraseña y rol, y guarda. Algunas operaciones sensibles de permisos continúan reservadas al director y siempre son verificadas por el backend.',
+};
+
 const SPECIAL_SUGGESTIONS = {
   emptyMessage: chatbotKnowledge.slice(0, 4).map((item) => item.title),
   greeting: [
@@ -72,6 +92,7 @@ const STEP_CONNECTORS = [
 Object.freeze(FRIENDLY_OPENINGS);
 Object.freeze(FRIENDLY_CLOSINGS);
 Object.freeze(SPECIAL_RESPONSES);
+Object.freeze(CONTEXT_RESPONSES);
 Object.freeze(SPECIAL_SUGGESTIONS.emptyMessage);
 Object.freeze(SPECIAL_SUGGESTIONS.greeting);
 Object.freeze(SPECIAL_SUGGESTIONS.fallback);
@@ -80,6 +101,7 @@ Object.freeze(STEP_CONNECTORS);
 
 module.exports = {
   CLINICAL_DISCLAIMER,
+  CONTEXT_RESPONSES,
   DEFAULT_CLOSING,
   DEFAULT_OPENING,
   FRIENDLY_CLOSINGS,

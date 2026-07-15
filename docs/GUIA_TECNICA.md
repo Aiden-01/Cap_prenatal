@@ -103,13 +103,86 @@ Los endpoints autenticados son `POST /api/chatbot/mensaje` y
 `POST /api/chatbot/feedback`. Ambos usan schemas Zod y devuelven HTTP 400 con
 el codigo estable `VALIDATION_ERROR` cuando el payload no cumple el contrato.
 
-`/mensaje` solo acepta `mensaje` como string. El backend aplica `trim`, exige
-entre 1 y 500 caracteres y rechaza valores ausentes, `null`, numeros, objetos,
-arreglos, espacios vacios y textos que excedan el limite.
+`/mensaje` exige `mensaje` como string y acepta un `context` seguro opcional.
+El backend aplica `trim` al mensaje, exige entre 1 y 500 caracteres y rechaza
+valores ausentes, `null`, numeros, objetos, arreglos, espacios vacios y textos
+que excedan el limite. Los clientes que envian unicamente `mensaje` conservan
+exactamente el comportamiento anterior.
 
 `/feedback` exige `helpful` como booleano JSON real e `intent` como string no
 vacio de hasta 100 caracteres. Para mantener compatibilidad, `mensaje` y
 `message` pueden llegar en el payload, pero se descartan y nunca se registran.
+
+#### Contexto seguro de pantalla y permisos
+
+El frontend puede adjuntar a `/mensaje` este contrato exacto y minimo:
+
+```json
+{
+  "route": "/pacientes/:id/expediente",
+  "module": "expediente",
+  "hasPatientContext": true,
+  "hasPregnancyContext": true,
+  "pregnancyStatus": "activo",
+  "permissions": ["pacientes.editar", "controles.crear"]
+}
+```
+
+`context` es opcional, no se conserva entre turnos y se valida estrictamente.
+Sus unicos campos son:
+
+- `route`: una ruta normalizada de la lista cerrada indicada abajo. Nunca lleva
+  query string ni los IDs reales de paciente, embarazo o registro.
+- `module`: `dashboard`, `pacientes`, `expediente`, `reportes`, `usuarios`,
+  `mapa_riesgo`, `comunidades` u `otro`.
+- `hasPatientContext` y `hasPregnancyContext`: booleanos. Un embarazo solo
+  puede declararse cuando existe contexto de paciente.
+- `pregnancyStatus`: `activo`, `puerperio`, `cerrado` o `null`; un estado no
+  nulo requiere un embarazo seleccionado.
+- `permissions`: hasta 50 codigos unicos, de 3 a 80 caracteres, con formato
+  `modulo.accion` en minusculas. Sirven unicamente para orientar la respuesta.
+
+Campos adicionales dentro de `context` se rechazan con HTTP 400 y
+`VALIDATION_ERROR`. En particular, nunca se envian ni aceptan nombre de
+paciente, CUI, numero de expediente, telefono, diagnosticos, resultados de
+laboratorio, VIH, otros datos clinicos o texto visible de formularios. El
+frontend construye el objeto desde React Router, la sesion ya cargada y el
+estado del embarazo ya obtenido por el expediente; no realiza una solicitud
+adicional ni inspecciona controles del DOM.
+
+El contexto personaliza explicaciones, pero no autoriza operaciones. Un
+cliente puede declarar cualquier permiso en el payload y Lia podra usarlo para
+orientar, pero las rutas clinicas y administrativas siguen aplicando JWT,
+CSRF, roles y permisos cargados por el backend. Para explicar la gestion de
+usuarios, el frontend deriva el indicador informativo `usuarios.gestionar`
+cuando el rol de sesion es `admin` o `director`; este indicador tampoco
+reemplaza `permitirRoles` ni otra verificacion del servidor.
+
+El mapeo normalizado es:
+
+| Ruta React | `route` enviado | `module` |
+| --- | --- | --- |
+| `/dashboard` | `/dashboard` | `dashboard` |
+| `/pacientes`, `/nuevo` | la misma ruta | `pacientes` |
+| `/pacientes/:id` | `/pacientes/:id/expediente` | `expediente` |
+| Edicion, controles, riesgo, plan de parto, puerperio, morbilidad y vacunas bajo `/pacientes/:id/...` | patron equivalente con `:id` | `expediente` |
+| `/reportes` | `/reportes` | `reportes` |
+| `/usuarios` | `/usuarios` | `usuarios` |
+| `/mapa-riesgo` | `/mapa-riesgo` | `mapa_riesgo` |
+| `/comunidades` | `/comunidades` | `comunidades` |
+| Cualquier otra ruta | `/otro` | `otro` |
+
+Con este contexto, Lia puede resumir las secciones del expediente ya abierto;
+explicar ausencia del boton de edicion por permiso o modo de solo lectura;
+comprobar contexto, estado y permiso informativo antes de explicar controles o
+vacunas; distinguir un embarazo ya cerrado al explicar el cierre; y aclarar
+que la gestion de usuarios corresponde a administrador o director. Lia nunca
+ejecuta esas acciones ni consulta datos clinicos.
+
+El contexto se entrega solo al motor durante esa solicitud. No se agrega a
+`chatbot_unrecognized.jsonl`, a feedback ni al logging de la ruta completa.
+Las guardas de privacidad para VIH, datos clinicos y medicamentos se evaluan
+antes de estas adaptaciones y conservan sus respuestas.
 
 #### Alcance operativo y guardas de comportamiento
 
