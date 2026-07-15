@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { AppError } = require('../utils/appError');
+const { ConfigError, getJwtConfig } = require('../config/env');
 
 const AUTH_COOKIE_NAME = 'cap_prenatal_token';
 const CSRF_COOKIE_NAME = 'cap_prenatal_csrf';
@@ -26,10 +27,12 @@ function authMiddleware(req, _res, next) {
   }
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const { secret } = getJwtConfig();
+    const payload = jwt.verify(token, secret);
     req.usuario = payload;
     return next();
-  } catch {
+  } catch (error) {
+    if (error instanceof ConfigError) return next(error);
     return next(new AppError(401, 'Token invalido o expirado', { code: 'TOKEN_INVALID' }));
   }
 }

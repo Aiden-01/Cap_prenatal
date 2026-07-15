@@ -1,10 +1,9 @@
 const crypto = require('crypto');
-const path = require('path');
 const express = require('express');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const reportesService = require('../services/reportesService');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { AppError } = require('../utils/appError');
+const { getAutomationSecret } = require('../config/env');
 
 const router = express.Router();
 
@@ -17,7 +16,7 @@ function safeEqual(a, b) {
 }
 
 function automationSecretMiddleware(req, _res, next) {
-  const expected = process.env.AUTOMATION_SECRET;
+  const expected = getAutomationSecret();
   const received = req.headers['x-cap-prenatal-secret'];
 
   if (!expected) {

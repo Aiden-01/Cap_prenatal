@@ -41,6 +41,12 @@ npm run db:seed-bi
 npm run test:vistas-bi
 ```
 
+`db:seed` requiere `SEED_DIRECTOR_NAME`, `SEED_DIRECTOR_USERNAME` y
+`SEED_DIRECTOR_PASSWORD`. No existen credenciales predeterminadas. El seed crea
+como maximo la cuenta director indicada y no cambia su contrasena si ya existe.
+En produccion exige una confirmacion adicional documentada en
+`docs/ROTACION_SECRETOS.md`.
+
 ## Modelo conceptual
 
 ```text

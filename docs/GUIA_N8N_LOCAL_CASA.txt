@@ -57,29 +57,10 @@ Regresar a la raiz:
 3. Crear backend/.env
 ---------------------
 
-Crear archivo:
-
-  backend/.env
-
-Ejemplo para entorno local:
-
-  DB_HOST=localhost
-  DB_PORT=5432
-  DB_NAME=cap_prenatal
-  DB_USER=postgres
-  DB_PASSWORD=TU_PASSWORD_POSTGRES
-
-  JWT_SECRET=cap_el_chal_jwt_secret_local
-  JWT_EXPIRES_IN=8h
-
-  PORT=3001
-  NODE_ENV=development
-  PDF_EXCEL_ENGINE=auto
-  LIBREOFFICE_PATH=/usr/bin/soffice
-  GENERIC_TIMEZONE=America/Guatemala
-  TZ=America/Guatemala
-
-  AUTOMATION_SECRET=change_me_to_a_long_random_automation_secret
+Copiar manualmente backend/.env.example a backend/.env. Completar los campos
+vacios DB_PASSWORD, JWT_SECRET y AUTOMATION_SECRET con tres valores aleatorios,
+distintos y generados fuera del repositorio. El archivo de ejemplo contiene
+comandos estandar para generarlos y enumera las variables obligatorias.
 
 Importante:
 
@@ -143,7 +124,7 @@ Esto es necesario para que el endpoint devuelva:
 
 Desde la raiz del proyecto:
 
-  $secret = "change_me_to_a_long_random_automation_secret"
+  $secret = $env:AUTOMATION_SECRET
   Invoke-RestMethod `
     -Uri "http://localhost:3001/api/automatizaciones/proximas-citas?dias=1" `
     -Headers @{ "x-cap-prenatal-secret" = $secret } `
@@ -212,10 +193,6 @@ Configuracion:
 Header:
 
   Name: x-cap-prenatal-secret
-  Value: change_me_to_a_long_random_automation_secret
-
-Tambien puedes usar variable:
-
   Value: {{$env.AUTOMATION_SECRET}}
 
 Pero para que funcione con variable debes iniciar n8n con:

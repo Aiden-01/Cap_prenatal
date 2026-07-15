@@ -35,10 +35,13 @@ http://localhost:5678
 Si backend corre fuera de Docker, configura estas variables en `backend/.env` o en tu terminal antes de iniciar el backend:
 
 ```env
-AUTOMATION_SECRET=change_me_to_a_long_random_automation_secret
+AUTOMATION_SECRET=
 GENERIC_TIMEZONE=America/Guatemala
 TZ=America/Guatemala
 ```
+
+El campo vacio debe completarse localmente con un valor aleatorio generado fuera
+del repositorio. No reutilice `JWT_SECRET` ni la contrasena de PostgreSQL.
 
 Para el flujo de citas de manana, la variable indispensable es `AUTOMATION_SECRET`.
 Para que el horario sea Guatemala, n8n debe iniciar con `GENERIC_TIMEZONE=America/Guatemala` y `TZ=America/Guatemala`. Si ya estaba abierto, cierralo y vuelve a iniciar con `npm run n8n:local`.
@@ -62,7 +65,7 @@ http://localhost:3001/api/automatizaciones/proximas-citas?dias=1
 Header:
 
 ```txt
-x-cap-prenatal-secret: TU_AUTOMATION_SECRET
+x-cap-prenatal-secret: {{$env.AUTOMATION_SECRET}}
 ```
 
 ## Servicios Docker
@@ -83,11 +86,8 @@ http://localhost:5678
 
 El endpoint de automatizaciones usa un secreto compartido entre backend y n8n.
 
-```env
-AUTOMATION_SECRET=change_me_to_a_long_random_automation_secret
-```
-
-En produccion cambia `AUTOMATION_SECRET` por un valor largo y privado.
+La variable `AUTOMATION_SECRET` debe inyectarse desde el entorno o un gestor de
+secretos. Los archivos de ejemplo la dejan vacia deliberadamente.
 
 ## Workflow recomendado: citas de manana
 
@@ -114,7 +114,7 @@ http://backend:3001/api/automatizaciones/proximas-citas?dias=1
 7. Header:
 
 ```txt
-x-cap-prenatal-secret: TU_AUTOMATION_SECRET
+x-cap-prenatal-secret: {{$env.AUTOMATION_SECRET}}
 ```
 
 8. Agregar un nodo `IF` antes de enviar el mensaje.

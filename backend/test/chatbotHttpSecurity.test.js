@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 
 const previousJwtSecret = process.env.JWT_SECRET;
 const previousLoggingEnabled = process.env.CHATBOT_LOGGING_ENABLED;
-process.env.JWT_SECRET = 'chatbot-http-security-test-secret';
+process.env.JWT_SECRET = '8vR2mK7pT9zW3cF6hJ1sL5yB0dG4qN8xA2uE';
 process.env.CHATBOT_LOGGING_ENABLED = 'false';
 
 const { createChatbotController } = require('../src/controllers/chatbotController');

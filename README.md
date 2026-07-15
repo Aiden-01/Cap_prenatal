@@ -19,6 +19,7 @@ La solucion esta pensada para el flujo operativo del CAP El Chal. No es una plat
 - `backend/src/AUDITORIA.md`: politica de auditoria y trazabilidad.
 - `DOCKER.md`: ejecucion con Docker y notas de despliegue.
 - `docs/N8N.md`: integracion con n8n para automatizaciones.
+- `docs/ROTACION_SECRETOS.md`: procedimiento manual de rotacion y riesgo historico.
 
 ## Tecnologias principales
 
@@ -53,22 +54,10 @@ cd ../frontend
 npm install
 ```
 
-Crear `backend/.env`:
-
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=cap_prenatal
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_SSL=false
-JWT_SECRET=cambiar_por_una_clave_larga_y_segura
-JWT_EXPIRES_IN=8h
-PORT=3001
-FRONTEND_URL=http://localhost:5173
-COOKIE_SAMESITE=lax
-AUTOMATION_SECRET=cambiar_por_un_secreto_largo_para_n8n
-```
+Copiar `backend/.env.example` a `backend/.env`, completar todos los campos
+obligatorios y generar valores aleatorios distintos para cada secreto. El archivo
+real esta ignorado por Git y nunca debe versionarse. Los comandos de generacion
+estan documentados dentro del archivo de ejemplo.
 
 Crear base de datos:
 
@@ -83,7 +72,9 @@ cd backend
 npm run db:migrate
 ```
 
-Opcional para datos iniciales:
+Opcional: crear la unica cuenta inicial necesaria para administrar el sistema.
+Antes hay que completar `SEED_DIRECTOR_NAME`, `SEED_DIRECTOR_USERNAME` y
+`SEED_DIRECTOR_PASSWORD` en `backend/.env`:
 
 ```bash
 npm run db:seed
@@ -135,7 +126,7 @@ Backend:
 | `npm run dev` | Servidor Express con nodemon. |
 | `npm start` | Servidor Express sin recarga automatica. |
 | `npm run db:migrate` | Aplica `backend/src/db/schema.sql`. |
-| `npm run db:seed` | Crea datos iniciales de desarrollo. |
+| `npm run db:seed` | Inicializa catalogos y, si no existe, una cuenta director configurada por entorno. |
 | `npm run db:seed-demo-patients` | Crea pacientes demo. |
 | `npm run test:embarazo-activo` | Validacion manual del flujo de embarazo activo. |
 
@@ -214,9 +205,15 @@ cap_prenatal/
 
 Para levantar PostgreSQL, backend, frontend y n8n:
 
+1. Copiar `.env.example` a `.env` en la raiz.
+2. Generar y completar los tres secretos vacios.
+3. Ejecutar Compose solo en una maquina local de desarrollo.
+
 ```bash
 docker compose up --build
 ```
+
+`docker-compose.yml` publica puertos locales y no es una configuracion de produccion.
 
 Servicios:
 

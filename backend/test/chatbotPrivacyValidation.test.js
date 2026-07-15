@@ -8,7 +8,7 @@ const jwt = require('jsonwebtoken');
 
 const previousJwtSecret = process.env.JWT_SECRET;
 const previousLoggingEnabled = process.env.CHATBOT_LOGGING_ENABLED;
-process.env.JWT_SECRET = 'chatbot-privacy-test-secret';
+process.env.JWT_SECRET = '9xK4pT8zN3cF6hJ1sL5yB0dG7wE2uA9iQ4mR';
 process.env.CHATBOT_LOGGING_ENABLED = 'false';
 
 const chatbotRoutes = require('../src/routes/chatbot');

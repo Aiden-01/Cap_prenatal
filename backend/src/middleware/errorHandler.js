@@ -1,5 +1,6 @@
 const { ZodError } = require('zod');
 const { AppError } = require('../utils/appError');
+const { nodeEnvForValidation } = require('../config/env');
 
 function formatZodIssue(issue) {
   return {
@@ -9,7 +10,7 @@ function formatZodIssue(issue) {
 }
 
 function isProduction() {
-  return process.env.NODE_ENV === 'production';
+  return nodeEnvForValidation(process.env) === 'production';
 }
 
 function uniqueMessage(err) {

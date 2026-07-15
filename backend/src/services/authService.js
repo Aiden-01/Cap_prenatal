@@ -5,6 +5,7 @@ const authRepository = require('../repositories/authRepository');
 const permisosRepository = require('../repositories/permisosRepository');
 const { registrarAuditoria } = require('../utils/auditoria');
 const { HttpError } = require('../utils/httpError');
+const { getJwtConfig } = require('../config/env');
 
 async function auditarLoginFallido(req, { username, usuario = null, accion = 'login_fallido', motivo }) {
   await registrarAuditoria(req, {
@@ -23,10 +24,7 @@ async function auditarLoginFallido(req, { username, usuario = null, accion = 'lo
 }
 
 async function login({ username, password, req }) {
-  if (!process.env.JWT_SECRET) {
-    console.error('JWT_SECRET no configurado');
-    throw new HttpError(500, 'Error interno del servidor');
-  }
+  const jwtConfig = getJwtConfig();
 
   const usuario = await authRepository.obtenerUsuarioPorUsername(username);
   if (!usuario) {
@@ -59,8 +57,8 @@ async function login({ username, password, req }) {
 
   const token = jwt.sign(
     { id: usuario.id, username: usuario.username, rol: usuario.rol },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
+    jwtConfig.secret,
+    { expiresIn: jwtConfig.expiresIn }
   );
   const csrfToken = crypto.randomBytes(32).toString('hex');
 

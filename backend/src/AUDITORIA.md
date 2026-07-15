@@ -113,11 +113,16 @@ El permiso `controles.ver_vih` se reserva para visualizar resultados VIH ya regi
 
 En `PUT` y en `POST` con upsert sobre un control existente, si el usuario no tiene `controles.ver_vih`, los campos VIH recibidos se ignoran sin sobrescribir valores existentes.
 
-## Credenciales iniciales de seed
+## Cuenta inicial de seed
 
-El usuario `director` creado por `db/seed.js` con contrasena `Director2024*` es una credencial temporal de desarrollo y primer arranque.
+`db/seed.js` no contiene usuarios ni contrasenas predeterminados. Para ejecutarlo
+se deben proporcionar explicitamente el nombre, usuario y contrasena de una cuenta
+director mediante variables de entorno. Si la cuenta ya existe, el seed conserva
+su hash y no modifica silenciosamente sus credenciales.
 
-Debe cambiarse antes de usar el sistema en produccion.
+El esquema actual no tiene un campo para exigir cambio de contrasena en el primer
+acceso. Esa capacidad queda pendiente para el sprint de sesiones y politica de
+contrasenas; no se agrega una migracion exclusivamente para ello en este sprint.
 
 ## Ejemplo: crear paciente
 

@@ -1,371 +1,133 @@
-GUIA DE DESPLIEGUE EN AWS CON N8N
+GUIA PROVISIONAL DE DESPLIEGUE EN AWS CON N8N
 Proyecto: CAP Prenatal - CAP El Chal
 
-Objetivo
---------
-Desplegar el sistema en un servidor AWS EC2 usando Docker Compose e incluir n8n
-para automatizar recordatorios diarios de citas prenatales por correo.
-
-
-1. Arquitectura recomendada
----------------------------
-
-Servidor AWS EC2 Ubuntu:
-
-  - frontend
-  - backend
-  - postgres
-  - n8n
-  - nginx o caddy para HTTPS
-
-Flujo de automatizacion:
-
-  n8n Schedule Trigger diario
-    -> HTTP Request al backend
-    -> IF debe_enviar = true
-    -> Send Email
-
-Subdominios sugeridos:
-
-  app.tudominio.com   -> frontend
-  n8n.tudominio.com   -> panel n8n
-
-El backend puede quedar interno en Docker y no exponerse publicamente.
-
-
-2. Crear servidor en AWS
-------------------------
-
-1. Entrar a AWS Console.
-2. Ir a EC2.
-3. Crear una instancia Ubuntu LTS.
-4. Tipo sugerido para pruebas: t3.small o t3.medium.
-5. Crear o seleccionar una llave SSH.
-6. Security Group:
-
-   Abrir:
-     - 22 SSH, idealmente solo desde tu IP
-     - 80 HTTP
-     - 443 HTTPS
-
-   No exponer publicamente:
-     - 3001 backend
-     - 5432 postgres
-     - 5678 n8n
-
-
-3. Instalar Docker en EC2
--------------------------
-
-Conectarse por SSH:
-
-  ssh -i tu_llave.pem ubuntu@IP_DEL_SERVIDOR
-
-Actualizar paquetes:
-
-  sudo apt update
-  sudo apt upgrade -y
-
-Instalar Docker:
-
-  sudo apt install -y ca-certificates curl gnupg
-  sudo install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  sudo chmod a+r /etc/apt/keyrings/docker.gpg
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-  sudo apt update
-  sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-Permitir usar Docker sin sudo:
-
-  sudo usermod -aG docker ubuntu
-
-Cerrar sesion SSH y volver a entrar.
-
-
-4. Subir el proyecto
---------------------
-
-Opcion A: clonar desde GitHub:
-
-  git clone URL_DEL_REPOSITORIO cap_prenatal
-  cd cap_prenatal
-
-Opcion B: subir por SCP/SFTP si aun no esta en GitHub.
-
-
-5. Variables de entorno
------------------------
-
-Crear archivo backend/.env en el servidor.
-
-Ejemplo:
-
-  DB_HOST=postgres
-  DB_PORT=5432
-  DB_NAME=cap_prenatal
-  DB_USER=postgres
-  DB_PASSWORD=CAMBIAR_PASSWORD_DB
-
-  JWT_SECRET=CAMBIAR_POR_SECRETO_LARGO
-  JWT_EXPIRES_IN=8h
-
-  PORT=3001
-  NODE_ENV=production
-  FRONTEND_URL=https://app.tudominio.com
-  GENERIC_TIMEZONE=America/Guatemala
-  TZ=America/Guatemala
-
-  PDF_EXCEL_ENGINE=libreoffice
-  LIBREOFFICE_PATH=/usr/bin/soffice
-
-  AUTOMATION_SECRET=CAMBIAR_POR_SECRETO_LARGO_AUTOMATIZACIONES
-
-Notas:
-
-  - No subir backend/.env a GitHub.
-  - Usar secretos largos y diferentes.
-  - Las credenciales SMTP deben guardarse en n8n o en un gestor de secretos.
-  - Para Gmail, usar contrasena de aplicacion, no la contrasena normal.
-  - No escribir contrasenas SMTP en archivos versionados.
-
-
-6. Configurar n8n en Docker Compose
------------------------------------
-
-El docker-compose.yml ya incluye el servicio n8n.
-
-Variables recomendadas para n8n en produccion:
-
-  GENERIC_TIMEZONE=America/Guatemala
-  TZ=America/Guatemala
-  N8N_HOST=n8n.tudominio.com
-  N8N_PROTOCOL=https
-  WEBHOOK_URL=https://n8n.tudominio.com/
-  N8N_ENCRYPTION_KEY=CAMBIAR_POR_CLAVE_LARGA_FIJA
-  N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
-  N8N_RUNNERS_ENABLED=true
-
-Importante:
-
-  - N8N_ENCRYPTION_KEY debe mantenerse fija.
-  - Si cambia, n8n puede perder acceso a credenciales guardadas.
-
-
-7. Levantar servicios
----------------------
-
-Desde la carpeta del proyecto:
-
-  docker compose up -d --build
-
-Ver estado:
-
-  docker compose ps
-
-Ver logs:
-
-  docker compose logs -f backend
-  docker compose logs -f frontend
-  docker compose logs -f n8n
-
-
-8. Migrar base de datos
------------------------
-
-Ejecutar migraciones dentro del contenedor backend:
-
-  docker compose exec backend npm run db:migrate
-
-Si hay datos demo:
-
-  docker compose exec backend npm run db:seed
-
-
-9. HTTPS con Nginx o Caddy
---------------------------
-
-Opcion simple recomendada: Caddy.
-
-Instalar Caddy:
-
-  sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
-  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-  sudo apt update
-  sudo apt install caddy
-
-Ejemplo de Caddyfile:
-
-  app.tudominio.com {
-    reverse_proxy localhost:8080
-  }
-
-  n8n.tudominio.com {
-    reverse_proxy localhost:5678
-  }
-
-Recargar Caddy:
-
-  sudo systemctl reload caddy
-
-
-10. Configurar n8n
-------------------
-
-Entrar a:
-
-  https://n8n.tudominio.com
-
-Crear cuenta owner.
-
-Crear workflow:
-
-  1. Schedule Trigger
-     - Cada dia
-     - Hora sugerida: 06:00
-
-  2. HTTP Request
-     - Method: GET
-     - URL si n8n esta en el mismo Docker Compose:
-
-       http://backend:3001/api/automatizaciones/proximas-citas?dias=1
-
-     - Header:
-
-       x-cap-prenatal-secret: VALOR_DE_AUTOMATION_SECRET
-
-  3. IF
-     - Condicion:
-
-       debe_enviar is true
-
-  4. Send Email
-     - To: correo del personal o correo institucional
-     - Subject: CAP El Chal - Recordatorio de citas prenatales
-     - Email Format: HTML
-     - HTML:
-
-       <p><strong>CAP El Chal - Recordatorio de citas prenatales</strong></p>
-       <p>Se informa que las siguientes pacientes tienen cita prenatal programada para el dia de manana, {{$json.fecha_objetivo}}:</p>
-       {{$json.tabla_html}}
-       <p>Se recomienda verificar asistencia y actualizar el expediente correspondiente.</p>
-
-
-11. Prueba del endpoint
------------------------
-
-Desde el servidor:
-
-  curl -H "x-cap-prenatal-secret: VALOR_DE_AUTOMATION_SECRET" \
-    "http://localhost:3001/api/automatizaciones/proximas-citas?dias=1"
-
-Respuesta esperada si hay citas:
-
-  {
-    "total": 1,
-    "debe_enviar": true,
-    "mensaje_resumen": "...",
-    "tabla_html": "..."
-  }
-
-Si no hay citas:
-
-  {
-    "total": 0,
-    "debe_enviar": false
-  }
-
-En n8n, si debe_enviar = false, el workflow no debe enviar correo.
-
-
-12. Backups
------------
-
-Recomendacion minima:
-
-  - Backup diario de PostgreSQL.
-  - Backup del volumen n8n_data.
-  - Backup del archivo backend/.env en lugar seguro.
-
-Backup manual PostgreSQL:
-
-  docker compose exec postgres pg_dump -U postgres cap_prenatal > backup_cap_prenatal.sql
-
-Restaurar:
-
-  cat backup_cap_prenatal.sql | docker compose exec -T postgres psql -U postgres cap_prenatal
-
-
-13. Seguridad
--------------
-
-Checklist:
-
-  - No exponer puerto 5432.
-  - No exponer puerto 3001 directamente si no es necesario.
-  - Proteger n8n con usuario fuerte.
-  - Usar HTTPS.
-  - Usar secretos largos.
-  - No subir .env a GitHub.
-  - Revocar contrasenas de aplicacion si se filtran.
-  - En mensajes no incluir datos clinicos sensibles innecesarios.
-
-
-14. Futuro: WhatsApp
---------------------
-
-La arquitectura queda lista para WhatsApp.
-
-El cambio seria sustituir:
-
-  Send Email
-
-por:
-
-  HTTP Request a WhatsApp Cloud API
-
-o por un nodo/proveedor compatible.
-
-Para WhatsApp oficial se requiere:
-
-  - Meta Business
-  - WhatsApp Business Platform / Cloud API
-  - Numero autorizado
-  - Token
-  - Plantillas aprobadas
-  - Consentimiento de pacientes
-
-Para pruebas y tesis, correo electronico es suficiente para demostrar la automatizacion.
-
-
-15. Comandos utiles
+ESTADO DE ESTA GUIA
 -------------------
 
-Ver contenedores:
+El repositorio no contiene todavia una configuracion de produccion. El archivo
+docker-compose.yml es exclusivamente local: publica puertos, fija
+NODE_ENV=development y no debe exponerse a Internet ni ejecutarse en un servidor
+productivo.
 
-  docker compose ps
+No seguir versiones anteriores de esta guia que indicaban crear backend/.env y
+levantar el Compose local en AWS. El archivo backend/.env no se copia a la imagen
+y no sustituye la inyeccion segura de variables al contenedor.
 
-Reiniciar backend:
-
-  docker compose restart backend
-
-Reiniciar n8n:
-
-  docker compose restart n8n
-
-Ver logs backend:
-
-  docker compose logs -f backend
-
-Ver logs n8n:
-
-  docker compose logs -f n8n
-
-Actualizar imagenes:
-
-  docker compose pull
-  docker compose up -d --build
+El despliegue productivo queda bloqueado hasta un sprint posterior que incorpore
+la topologia, TLS, redes privadas, usuarios no privilegiados y configuracion de
+n8n apropiados para produccion.
 
 
-Fin de la guia.
+1. Arquitectura futura minima
+-----------------------------
+
+  - Frontend detras de HTTPS.
+  - Backend en red privada, sin publicar directamente el puerto de la API.
+  - PostgreSQL en red privada y con credenciales propias del entorno.
+  - n8n protegido y separado de la exposicion publica innecesaria.
+  - Gestor de secretos o variables protegidas del proveedor.
+  - Solo 80/443 publicos; SSH restringido a direcciones administradas.
+
+
+2. Variables que debera inyectar el entorno
+--------------------------------------------
+
+Backend:
+
+  NODE_ENV
+  JWT_SECRET
+  JWT_EXPIRES_IN
+  FRONTEND_URL
+  COOKIE_SAMESITE
+  DB_SSL
+  DB_SSL_REJECT_UNAUTHORIZED
+
+Conexion PostgreSQL, una de estas dos modalidades:
+
+  DATABASE_URL
+
+o todas las siguientes:
+
+  DB_HOST
+  DB_PORT
+  DB_NAME
+  DB_USER
+  DB_PASSWORD
+
+Integraciones opcionales:
+
+  AUTOMATION_SECRET
+
+No escribir valores en esta guia, Compose, Dockerfile, comandos de shell, tickets
+o logs. JWT, PostgreSQL y automatizacion deben usar valores aleatorios distintos.
+
+
+3. Validacion del backend
+-------------------------
+
+El backend valida la configuracion antes de cargar rutas. En produccion rechaza:
+
+  - NODE_ENV ausente o desconocido.
+  - JWT_SECRET ausente, corto o con marcadores de ejemplo/desarrollo.
+  - Configuracion PostgreSQL incompleta o predecible.
+  - DB_SSL con un valor distinto de true/false.
+  - FRONTEND_URL con HTTP, loopback, comodines, credenciales, rutas, query o
+    fragmentos.
+  - COOKIE_SAMESITE fuera de los valores admitidos.
+  - AUTOMATION_SECRET inseguro cuando se configura.
+
+Los errores identifican la variable invalida sin imprimir su valor.
+
+Un despliegue institucional interno puede usar un nombre DNS interno o una IP
+privada en FRONTEND_URL, siempre mediante HTTPS. El certificado debe ser confiable
+en todos los equipos que usen el sistema; se recomienda un nombre DNS interno en
+lugar de una IP para facilitar certificados y mantenimiento. Permitir una direccion
+privada concreta no equivale a permitir cualquier origen: CORS compara solamente
+los origenes exactos configurados.
+
+
+4. Cuenta inicial
+-----------------
+
+El seed ya no contiene cuentas ni contrasenas conocidas. Solo crea, si no existe,
+una cuenta director definida mediante:
+
+  SEED_DIRECTOR_NAME
+  SEED_DIRECTOR_USERNAME
+  SEED_DIRECTOR_PASSWORD
+
+En produccion se requiere ademas SEED_CONFIRM_PRODUCTION con la confirmacion
+deliberada documentada en docs/ROTACION_SECRETOS.md. Una cuenta existente no
+recibe una contrasena nueva al volver a ejecutar el seed.
+
+
+5. Rotacion obligatoria antes del futuro despliegue
+---------------------------------------------------
+
+Seguir docs/ROTACION_SECRETOS.md. Los secretos usados anteriormente estuvieron
+presentes en el historial Git y deben rotarse aunque el repositorio sea privado.
+Eliminar el archivo del ultimo commit no elimina sus versiones historicas.
+
+
+6. n8n
+------
+
+Este sprint no cambia n8n. La configuracion funcional local sigue documentada en
+docs/N8N.md. Antes de produccion se deberan definir por separado cifrado, retencion,
+autenticacion, red y rotacion de AUTOMATION_SECRET.
+
+
+7. Criterio de habilitacion futuro
+----------------------------------
+
+Antes de publicar el sistema se debera verificar, como minimo:
+
+  - Imagenes y configuracion productivas revisadas.
+  - Secretos inyectados desde un canal protegido.
+  - JWT antiguos rechazados despues de la rotacion.
+  - PostgreSQL, backend y n8n no expuestos directamente.
+  - HTTPS y origen CORS productivo confirmados.
+  - Migracion y seed ejecutados como tareas deliberadas, no al arrancar.
+  - Pruebas y restauracion operativa aprobadas.
+
+Fin de la guia provisional.

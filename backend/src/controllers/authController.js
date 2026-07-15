@@ -1,6 +1,7 @@
 const authService = require('../services/authService');
 const { AUTH_COOKIE_NAME, CSRF_COOKIE_NAME } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/asyncHandler');
+const { getCookieConfig } = require('../config/env');
 
 function parseDurationMs(value = '8h') {
   const match = String(value).trim().match(/^(\d+)([smhd])$/i);
@@ -19,25 +20,25 @@ function parseDurationMs(value = '8h') {
 }
 
 function authCookieOptions() {
-  const sameSite = (process.env.COOKIE_SAMESITE || 'lax').toLowerCase();
+  const { nodeEnv, sameSite, expiresIn } = getCookieConfig();
 
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: nodeEnv === 'production',
     sameSite,
-    maxAge: parseDurationMs(process.env.JWT_EXPIRES_IN || '8h'),
+    maxAge: parseDurationMs(expiresIn),
     path: '/',
   };
 }
 
 function csrfCookieOptions() {
-  const sameSite = (process.env.COOKIE_SAMESITE || 'lax').toLowerCase();
+  const { nodeEnv, sameSite, expiresIn } = getCookieConfig();
 
   return {
     httpOnly: false,
-    secure: process.env.NODE_ENV === 'production',
+    secure: nodeEnv === 'production',
     sameSite,
-    maxAge: parseDurationMs(process.env.JWT_EXPIRES_IN || '8h'),
+    maxAge: parseDurationMs(expiresIn),
     path: '/',
   };
 }

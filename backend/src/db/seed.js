@@ -1,12 +1,24 @@
 const bcrypt = require('bcryptjs');
 const pool = require('./pool');
+const {
+  loadEnvironmentFile,
+  validateSeedConfig,
+} = require('../config/env');
 
-async function seed() {
-  const client = await pool.connect();
+async function seed({
+  db = pool,
+  env = process.env,
+  logger = console,
+  hashPassword = (password) => bcrypt.hash(password, 12),
+} = {}) {
+  const config = validateSeedConfig(env);
+  let client = null;
+  let accountCreated = false;
+
   try {
+    client = await db.connect();
     await client.query('BEGIN');
 
-    // Roles
     await client.query(`
       INSERT INTO roles (nombre, descripcion) VALUES
         ('director', 'Director del sistema - administracion total y datos sensibles'),
@@ -32,44 +44,27 @@ async function seed() {
         categoria = EXCLUDED.categoria
     `);
 
-    // Usuario admin por defecto
-    const hash = await bcrypt.hash('Admin2024*', 12);
-    await client.query(`
-      INSERT INTO usuarios (nombre_completo, username, password_hash, rol_id)
-      VALUES (
-        'Administrador CAP El Chal',
-        'admin',
-        $1,
-        (SELECT id FROM roles WHERE nombre = 'admin')
-      )
-      ON CONFLICT (username) DO NOTHING
-    `, [hash]);
+    const existing = await client.query(
+      `SELECT u.id, r.nombre AS rol
+       FROM usuarios u
+       JOIN roles r ON r.id = u.rol_id
+       WHERE u.username = $1`,
+      [config.username]
+    );
 
-    // Usuario director por defecto
-    const directorHash = await bcrypt.hash('Director2024*', 12);
-    await client.query(`
-      INSERT INTO usuarios (nombre_completo, username, password_hash, rol_id)
-      VALUES (
-        'Director CAP El Chal',
-        'director',
-        $1,
-        (SELECT id FROM roles WHERE nombre = 'director')
-      )
-      ON CONFLICT (username) DO NOTHING
-    `, [directorHash]);
+    if (existing.rowCount > 0 && existing.rows[0].rol !== 'director') {
+      throw new Error('La cuenta inicial ya existe con un rol diferente');
+    }
 
-    // Usuario de ejemplo para personal de salud
-    const hash2 = await bcrypt.hash('Personal2024*', 12);
-    await client.query(`
-      INSERT INTO usuarios (nombre_completo, username, password_hash, rol_id)
-      VALUES (
-        'Enfermera Ejemplo',
-        'enfermera01',
-        $1,
-        (SELECT id FROM roles WHERE nombre = 'personal_salud')
-      )
-      ON CONFLICT (username) DO NOTHING
-    `, [hash2]);
+    if (existing.rowCount === 0) {
+      const passwordHash = await hashPassword(config.password);
+      const inserted = await client.query(`
+        INSERT INTO usuarios (nombre_completo, username, password_hash, rol_id)
+        VALUES ($1, $2, $3, (SELECT id FROM roles WHERE nombre = 'director'))
+        ON CONFLICT (username) DO NOTHING
+      `, [config.nombreCompleto, config.username, passwordHash]);
+      accountCreated = inserted.rowCount === 1;
+    }
 
     await client.query(`
       INSERT INTO usuario_permisos (usuario_id, permiso_id)
@@ -100,17 +95,26 @@ async function seed() {
     `);
 
     await client.query('COMMIT');
-    console.log('✅ Seed completado');
-    console.log('   👤 director / Director2024*  (rol: director)');
-    console.log('   👤 admin / Admin2024*  (rol: admin)');
-    console.log('   👤 enfermera01 / Personal2024*  (rol: personal_salud)');
-  } catch (err) {
-    await client.query('ROLLBACK');
-    console.error('❌ Error en seed:', err.message);
+    logger.log(accountCreated
+      ? 'Seed completado; cuenta inicial creada'
+      : 'Seed completado; la cuenta inicial ya existia y no fue modificada');
+    return { ok: true, accountCreated };
+  } catch (error) {
+    if (client) await client.query('ROLLBACK');
+    logger.error('Error en seed:', error.message);
+    throw error;
   } finally {
-    client.release();
-    await pool.end();
+    if (client) client.release();
+    await db.end();
   }
 }
 
-seed();
+if (require.main === module) {
+  loadEnvironmentFile();
+  seed().catch((error) => {
+    console.error('Seed no ejecutado:', error.message);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { seed };

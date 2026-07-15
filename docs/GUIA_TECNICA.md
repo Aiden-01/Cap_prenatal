@@ -39,7 +39,8 @@ backend/src/index.js
 
 Responsabilidades:
 
-- Cargar variables de entorno desde `backend/.env`.
+- Cargar y validar variables mediante `backend/src/config/env.js`; en desarrollo
+  puede leer `backend/.env`, que nunca debe versionarse.
 - Configurar Helmet, CORS, JSON body limit y CSRF.
 - Montar rutas bajo `/api`.
 - Exponer `/api/health`.
@@ -835,6 +836,14 @@ Fuera de alcance actual:
 | `PDF_EXCEL_ENGINE` | `auto`, `excel` o `libreoffice`. |
 | `LIBREOFFICE_PATH` | Ruta a `soffice` cuando se usa LibreOffice. |
 | `VITE_API_URL` | Base URL del API en frontend. |
+
+`NODE_ENV`, JWT, PostgreSQL, `FRONTEND_URL`, `COOKIE_SAMESITE` y `DB_SSL`
+se validan antes de montar rutas. Produccion rechaza secretos cortos o marcados
+como ejemplos y exige un origen frontend HTTPS exacto, sin loopback, comodines,
+credenciales, rutas, query ni fragmentos. Se permiten DNS internos e IP privadas
+con HTTPS; los equipos deben confiar en el certificado y se recomienda DNS interno
+en lugar de IP. Permitir una direccion privada concreta no habilita otros origenes.
+Las variables `SEED_*` se validan exclusivamente al ejecutar `npm run db:seed`.
 
 ## Checklist para cambios futuros
 

@@ -22,7 +22,7 @@ function invoke(middleware, req) {
 
 async function runAuthorizationChain({ permisos, permisoRequerido }) {
   const previousSecret = process.env.JWT_SECRET;
-  process.env.JWT_SECRET = 'authorization-test-secret';
+  process.env.JWT_SECRET = '7mQ2vR9xK4pT8zN3cF6hJ1sL5yB0dG7wE2';
   const token = jwt.sign(
     { id: 99, username: 'test-user', rol: 'personal_salud' },
     process.env.JWT_SECRET,

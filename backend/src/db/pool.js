@@ -1,31 +1,41 @@
 const { Pool } = require('pg');
-require('dotenv').config();
+const {
+  loadEnvironmentFile,
+  nodeEnvForValidation,
+  validateDatabaseConfig,
+} = require('../config/env');
 
-const useSsl = process.env.DB_SSL === 'true';
-const ssl = useSsl ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true' } : false;
+let activePool = null;
 
-const dbConfig = process.env.DATABASE_URL ? {
-  connectionString: process.env.DATABASE_URL,
-  ssl,
-} : {
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'cap_prenatal',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD,
-  ssl,
+function getPool() {
+  if (activePool) return activePool;
+
+  loadEnvironmentFile();
+  const nodeEnv = nodeEnvForValidation(process.env);
+  const dbConfig = validateDatabaseConfig(process.env, { nodeEnv });
+  activePool = new Pool(dbConfig);
+
+  activePool.on('connect', () => {
+    if (nodeEnv !== 'test') console.log('Conectado a PostgreSQL');
+  });
+  activePool.on('error', (error) => {
+    console.error('Error en pool de PostgreSQL:', error.message);
+  });
+
+  return activePool;
+}
+
+module.exports = {
+  query(...args) {
+    return getPool().query(...args);
+  },
+  connect(...args) {
+    return getPool().connect(...args);
+  },
+  async end() {
+    if (!activePool) return;
+    const pool = activePool;
+    activePool = null;
+    await pool.end();
+  },
 };
-
-const pool = new Pool(dbConfig);
-
-pool.on('connect', () => {
-  if (process.env.NODE_ENV !== 'test') {
-    console.log('✅ Conectado a PostgreSQL');
-  }
-});
-
-pool.on('error', (err) => {
-  console.error('❌ Error en pool de PostgreSQL:', err.message);
-});
-
-module.exports = pool;

@@ -13,6 +13,7 @@
     "test:chatbot:privacy": "node --test test/chatbotPrivacyValidation.test.js",
     "test:chatbot:http": "node --test test/chatbotHttpSecurity.test.js",
     "test:authorization": "node --test test/authorization.test.js",
+    "test:security-config": "node --test test/securityConfig.test.js test/seedSecurity.test.js",
     "test:migrate": "node --test test/migrate.test.js",
     "test:permissions-audit": "node --test test/permissionsAudit.test.js",
     "test:role-permissions-audit": "node --test test/rolePermissionsAudit.test.js",
