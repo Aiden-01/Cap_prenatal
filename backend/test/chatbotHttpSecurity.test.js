@@ -182,6 +182,29 @@ test('/mensaje acepta contexto seguro valido', async () => {
   assert.match(response.payload.answer, /solo lectura/);
 });
 
+test('/mensaje agrega quickActions validas sin retirar suggestions heredadas', async () => {
+  const response = await post(contractServer, '/api/chatbot/mensaje', {
+    mensaje: 'Hola',
+    context: {
+      route: '/dashboard',
+      module: 'dashboard',
+      hasPatientContext: false,
+      hasPregnancyContext: false,
+      pregnancyStatus: null,
+      permissions: ['pacientes.ver', 'pacientes.crear', 'reportes.ver'],
+    },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.payload.intent, 'saludo');
+  assert.ok(Array.isArray(response.payload.suggestions));
+  assert.deepEqual(response.payload.quickActions.map((action) => action.target), [
+    'pacientes',
+    'nueva_paciente',
+    'reportes',
+  ]);
+});
+
 test('/mensaje inicia y continua una guia con conversation valido', async () => {
   const context = {
     route: '/pacientes/:id/expediente',

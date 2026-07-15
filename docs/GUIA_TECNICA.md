@@ -262,6 +262,132 @@ formularios. Solo contiene IDs cerrados y contadores. El frontend mantiene un
 cerrojo de solicitud y deshabilita chips mientras Lia responde para impedir que
 un doble clic avance dos pasos.
 
+#### Sugerencias y acciones rapidas contextuales
+
+`POST /api/chatbot/mensaje` conserva el campo legado `suggestions` y puede
+agregar `quickActions`. Los clientes anteriores pueden ignorar el campo nuevo;
+el widget actual prefiere acciones rapidas validas y usa `suggestions` solo
+cuando la respuesta no contiene ese contrato.
+
+Ejemplo:
+
+```json
+{
+  "intent": "control_prenatal",
+  "answer": "...",
+  "suggestions": ["Guiame paso a paso"],
+  "quickActions": [
+    {
+      "id": "start-control-guide",
+      "label": "Guiame con el control",
+      "type": "message",
+      "message": "Guiame para registrar un control prenatal"
+    },
+    {
+      "id": "open-current-record",
+      "label": "Ir al expediente actual",
+      "type": "navigate",
+      "target": "expediente_actual"
+    }
+  ]
+}
+```
+
+Solo existen dos tipos discriminados:
+
+- `message`: contiene exactamente `id`, `label`, `type` y `message`. El
+  frontend envia `message` mediante el flujo normal de Lia, con el mismo
+  `AbortController` y cerrojo contra doble envio.
+- `navigate`: contiene exactamente `id`, `label`, `type` y `target`. El
+  frontend resuelve el target mediante React Router; no envia un mensaje, no
+  llama al API y no cambia `conversation`.
+
+Cada respuesta contiene como maximo cuatro acciones. Sus IDs y etiquetas son
+unicos; tampoco se repiten mensajes o destinos. `label` admite de 1 a 60
+caracteres. La validacion rechaza propiedades adicionales y cualquier tipo que
+no sea `message` o `navigate`.
+
+La lista cerrada de targets es:
+
+| Target | Ruta resuelta por el frontend | Condicion informativa |
+| --- | --- | --- |
+| `dashboard` | `/dashboard` | Siempre segura dentro del shell autenticado |
+| `pacientes` | `/pacientes` | `pacientes.ver` |
+| `nueva_paciente` | `/nuevo` | `pacientes.crear` |
+| `reportes` | `/reportes` | `reportes.ver` |
+| `usuarios` | `/usuarios` | Capacidad funcional `usuarios.gestionar` |
+| `mapa_riesgo` | `/mapa-riesgo` | `mapa_riesgo.ver` |
+| `comunidades` | `/comunidades` | Capacidad funcional explicita `comunidades.gestionar` |
+| `expediente_actual` | Ubicacion actual, incluido su query existente | Contexto de paciente y `pacientes.ver` |
+
+`expediente_actual` nunca recibe una ruta o ID desde Lia. El navegador conserva
+la ubicacion que ya tiene abierta; no extrae identificadores del texto de la
+conversacion. No se admiten URLs arbitrarias ni acciones `submit`, `delete`,
+`update`, `confirm`, `api` o `external_url`.
+
+La generacion se centraliza en:
+
+```text
+backend/src/config/chatbotQuickActions.js
+backend/src/services/chatbotQuickActionsService.js
+backend/src/validations/chatbotQuickActions.schemas.js
+```
+
+El catalogo declara solo textos y targets estaticos e inmutables. El generador
+recibe `{ intent, conversation, context }`, no modifica sus entradas y valida
+el arreglo final antes de entregarlo al controller. La intencion prioriza
+acciones relacionadas, pero las reglas de guia, estado y permisos se aplican
+antes de mostrar cualquier escritura posible.
+
+Reglas principales:
+
+- En el primer paso de una guia se muestran `Siguiente`, `Repetir` y
+  `Cancelar`; en pasos intermedios tambien `Anterior`; en el ultimo,
+  `Finalizar`, `Anterior`, `Repetir` y `Cancelar`. `Finalizar` envia la frase
+  reconocida `Siguiente`. Al terminar se ofrecen entre dos y cuatro acciones
+  relacionadas sin reiniciar la misma guia.
+- Dashboard y lista de pacientes priorizan busqueda, alta si existe
+  `pacientes.crear`, reportes si existe `reportes.ver`, apertura de expediente
+  y ayuda del sistema.
+- Un embarazo activo puede ofrecer control, vacuna, riesgo, plan de parto o
+  cierre, siempre filtrados por sus permisos informativos. En puerperio no se
+  ofrece crear un control prenatal. Un embarazo cerrado solo ofrece historial,
+  secciones y navegacion de lectura; no ofrece registrar, editar, agregar
+  vacuna o cerrar nuevamente.
+- Ante una intencion que requiere embarazo sin contexto seleccionado, Lia
+  ofrece buscar una paciente, abrir su expediente y aprender a iniciar o
+  seleccionar un embarazo. Ninguna accion simula la seleccion.
+- Saludos usan entre dos y tres opciones del modulo actual. Agradecimientos
+  conservan una accion relacionada o los controles de la guia y permiten
+  terminar. Una despedida ofrece como maximo una nueva consulta.
+- `solicitud_dato_clinico` nunca revela resultados: solo puede orientar al
+  expediente, la busqueda o el permiso de VIH. `solicitud_consejo_clinico`
+  ofrece orientacion de sistema sobre referencias y morbilidad; la respuesta
+  conserva la remision a protocolos institucionales. Nunca propone
+  medicamentos, dosis, diagnosticos o tratamientos.
+- La ficha MSPAS ofrece como generar la ficha y, cuando corresponde, volver al
+  expediente actual; no navega a reportes. Cambio de contrasena solo muestra
+  instrucciones y un olvido de acceso no navega a pantallas que requieran otra
+  sesion.
+
+Los permisos de estas acciones son solo presentacion. Una accion nunca concede
+acceso ni sustituye la autenticacion, CSRF o autorizacion del endpoint de
+destino.
+
+El frontend guarda las acciones solo en el estado React del historial visible.
+No se escriben en cookies, storage, base de datos, JSONL ni feedback. Cada
+mensaje registra una huella formada por `module`, `hasPatientContext`,
+`hasPregnancyContext` y `pregnancyStatus`. Si cambia cualquiera de esos datos,
+las acciones `navigate` anteriores dejan de mostrarse sin realizar solicitudes
+automaticas. Una accion `message` de guia solo puede permanecer si esa misma
+guia continua activa. El `key` de `ChatbotWidget` limpia historial y acciones
+al cambiar de usuario.
+
+Los botones son elementos `button` reales, se deshabilitan durante una
+solicitud, admiten teclado y foco visible, envuelven etiquetas largas y nunca
+exceden cuatro opciones. Las etiquetas se renderizan como texto de React, no
+como HTML enviado por el backend.
+
 #### Alcance operativo y guardas de comportamiento
 
 Lia orienta sobre el uso del sistema: donde encontrar pantallas, como registrar
@@ -361,6 +487,10 @@ El conocimiento estatico ya no vive dentro del motor de clasificacion:
 - `backend/src/config/chatbotGuides.js` define las seis guias, deriva sus pasos
   numerados desde el catalogo y agrega modulo, requisitos informativos,
   relaciones, finalizacion y sugerencias permitidas.
+- `backend/src/config/chatbotQuickActions.js` declara los dos tipos de accion,
+  sus textos estaticos y la lista cerrada de destinos. El servicio
+  `chatbotQuickActionsService.js` aplica contexto, permisos, estado y guia sin
+  modificar el catalogo ni el motor de clasificacion.
 - `backend/src/services/chatbotService.js` conserva normalizacion,
   tokenizacion, scoring, guardas sociales y clinicas, negacion limitada,
   resolucion de prioridades, calculo de FPP, humanizacion, navegacion efimera de

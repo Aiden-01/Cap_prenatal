@@ -5575,7 +5575,7 @@ html.dark .badge-yellow { background: var(--warn-lt); color: var(--warn); }
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.26);
   overflow: hidden;
   display: grid;
-  grid-template-rows: auto 1fr auto auto auto;
+  grid-template-rows: auto 1fr auto auto;
   transform-origin: bottom right;
   animation: chatbotPanelIn 0.24s ease both;
 }
@@ -5724,8 +5724,7 @@ html.dark .badge-yellow { background: var(--warn-lt); color: var(--warn); }
   margin-top: 0.65rem;
 }
 
-.chatbot-suggestions button,
-.chatbot-quick button {
+.chatbot-suggestions button {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -5734,15 +5733,28 @@ html.dark .badge-yellow { background: var(--warn-lt); color: var(--warn); }
   font-size: 0.74rem;
   font-weight: 700;
   cursor: pointer;
-  white-space: nowrap;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+  line-height: 1.25;
   transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
 }
 
-.chatbot-suggestions button:hover,
-.chatbot-quick button:hover {
+.chatbot-suggestions button:not(:disabled):hover {
   background: var(--primary-lt);
   border-color: var(--primary);
   transform: translateY(-1px);
+}
+
+.chatbot-suggestions button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.chatbot-suggestions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .chatbot-loading {
@@ -5785,19 +5797,6 @@ html.dark .badge-yellow { background: var(--warn-lt); color: var(--warn); }
 .chatbot-scroll-anchor {
   width: 100%;
   height: 1px;
-}
-
-.chatbot-quick {
-  padding: 0.7rem 0.85rem 0.35rem;
-  display: flex;
-  gap: 0.45rem;
-  overflow-x: auto;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-}
-
-.chatbot-quick button {
-  flex: 0 0 auto;
 }
 
 .chatbot-feedback {
@@ -5887,8 +5886,7 @@ html.dark .badge-yellow { background: var(--warn-lt); color: var(--warn); }
 
 html.dark .chatbot-message.is-bot,
 html.dark .chatbot-loading,
-html.dark .chatbot-suggestions button,
-html.dark .chatbot-quick button {
+html.dark .chatbot-suggestions button {
   background: var(--surface2);
 }
 
@@ -5949,7 +5947,7 @@ html.dark .chatbot-quick button {
     height: calc(100dvh - 1.5rem);
     max-height: calc(100dvh - 1.5rem);
     border-radius: 10px;
-    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
     transform-origin: bottom center;
   }
 
@@ -5977,10 +5975,6 @@ html.dark .chatbot-quick button {
   .chatbot-message {
     max-width: 94%;
     font-size: 0.84rem;
-  }
-
-  .chatbot-quick {
-    padding: 0.65rem 0.75rem 0.25rem;
   }
 
   .chatbot-feedback {

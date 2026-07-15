@@ -1,9 +1,11 @@
 const { answerQuestion } = require('../services/chatbotService');
 const { chatbotLogger } = require('../services/chatbotLoggingService');
+const { generateQuickActions } = require('../services/chatbotQuickActionsService');
 const { asyncHandler } = require('../middleware/asyncHandler');
 
 function createChatbotController({
   answerQuestionFn = answerQuestion,
+  quickActionsFn = generateQuickActions,
   logger = chatbotLogger,
 } = {}) {
   const preguntar = asyncHandler(async (req, res) => {
@@ -18,7 +20,16 @@ function createChatbotController({
       });
     }
 
-    return res.json(result);
+    const quickActions = quickActionsFn({
+      intent: result.intent,
+      conversation: result.conversation || req.body.conversation,
+      context: req.body.context,
+    });
+    const response = quickActions.length > 0
+      ? { ...result, quickActions }
+      : result;
+
+    return res.json(response);
   });
 
   const registrarFeedback = asyncHandler(async (req, res) => {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Bot,
   HelpCircle,
@@ -18,16 +18,15 @@ import {
   createConversationMemory,
   createEmptyConversation,
 } from "../utils/chatbotConversation";
+import {
+  chatbotContextKey,
+  normalizeQuickActions,
+  resolveQuickActionTarget,
+  visibleQuickActions,
+} from "../utils/chatbotQuickActions";
 
 const ASSISTANT_NAME = "Lia";
 const MIN_RESPONSE_DELAY_MS = 850;
-
-const QUICK_PROMPTS = [
-  "Quiero registrar una paciente",
-  "Necesito agregar un control prenatal",
-  "Ayúdame con ficha de riesgo",
-  "¿Cómo funciona el mapa de riesgo?",
-];
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -51,6 +50,7 @@ function buildWelcomeMessage(firstName) {
 export default function ChatbotWidget() {
   const { usuario } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const { pregnancyStatus } = useChatbotScreenContext();
   const firstName = getFirstName(usuario);
   const identityKey = String(usuario?.id || usuario?.username || "anonymous");
@@ -76,6 +76,7 @@ export default function ChatbotWidget() {
   const messageIdRef = useRef(0);
   const requestInFlightRef = useRef(false);
   const activeRequestRef = useRef(null);
+  const lastNavigationRef = useRef(null);
   const safeContext = useMemo(() => buildChatbotContext({
     pathname: location.pathname,
     search: location.search,
@@ -83,6 +84,7 @@ export default function ChatbotWidget() {
     pregnancyStatus,
   }), [location.pathname, location.search, pregnancyStatus, usuario]);
   const safeConversation = conversationForIdentity(conversationMemory, identityKey);
+  const currentContextKey = chatbotContextKey(safeContext);
   const input = inputState.identityKey === identityKey ? inputState.value : "";
   const loading = requestUiState.identityKey === identityKey && requestUiState.loading;
   const feedbackSent = feedbackState.identityKey === identityKey ? feedbackState.sent : {};
@@ -171,6 +173,7 @@ export default function ChatbotWidget() {
 
       const nextConversation = createConversationMemory(requestIdentity, data.conversation);
       setConversationMemory(nextConversation);
+      const responseQuickActions = normalizeQuickActions(data.quickActions);
       const botMessage = {
         id: createMessageId("bot"),
         from: "bot",
@@ -180,6 +183,10 @@ export default function ChatbotWidget() {
         recognized: data.recognized,
         disclaimer: data.disclaimer,
         suggestions: data.suggestions || [],
+        quickActions: responseQuickActions,
+        usesQuickActions: responseQuickActions.length > 0,
+        quickActionsContextKey: currentContextKey,
+        quickActionsGuide: data.conversation?.activeGuide || null,
         guideProgress: data.conversation?.activeGuide
           ? {
               currentStep: data.conversation.currentStep,
@@ -210,6 +217,24 @@ export default function ChatbotWidget() {
         setTimeout(() => inputRef.current?.focus(), 80);
       }
     }
+  };
+
+  const handleQuickAction = (action) => {
+    if (loading) return;
+    if (action.type === "message") {
+      sendMessage(action.message);
+      return;
+    }
+
+    const destination = resolveQuickActionTarget(action, location, safeContext);
+    if (!destination) return;
+    const navigationKey = `${action.id}|${destination}`;
+    if (lastNavigationRef.current === navigationKey) return;
+    lastNavigationRef.current = navigationKey;
+    navigate(destination);
+    window.setTimeout(() => {
+      if (lastNavigationRef.current === navigationKey) lastNavigationRef.current = null;
+    }, 600);
   };
 
   const sendFeedback = async (helpful) => {
@@ -263,35 +288,57 @@ export default function ChatbotWidget() {
           </header>
 
           <div className="chatbot-messages">
-            {messages.map((message) => (
-              <article
-                key={message.id}
-                className={`chatbot-message ${message.from === "user" ? "is-user" : "is-bot"}`}
-              >
-                {message.title && <strong>{message.title}</strong>}
-                {message.guideProgress && (
-                  <span className="chatbot-step-progress">
-                    Paso {message.guideProgress.currentStep} de {message.guideProgress.totalSteps}
-                  </span>
-                )}
-                <p>{message.text}</p>
-                {message.disclaimer && <small>{message.disclaimer}</small>}
-                {message.suggestions?.length > 0 && (
-                  <div className="chatbot-suggestions">
-                    {message.suggestions.slice(0, 4).map((suggestion) => (
-                      <button
-                        key={suggestion}
-                        type="button"
-                        disabled={loading}
-                        onClick={() => sendMessage(suggestion)}
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </article>
-            ))}
+            {messages.map((message) => {
+              const quickActions = visibleQuickActions(
+                message,
+                currentContextKey,
+                safeConversation.activeGuide
+              );
+              const legacySuggestions = message.usesQuickActions
+                ? []
+                : (message.suggestions || []).slice(0, 4);
+
+              return (
+                <article
+                  key={message.id}
+                  className={`chatbot-message ${message.from === "user" ? "is-user" : "is-bot"}`}
+                >
+                  {message.title && <strong>{message.title}</strong>}
+                  {message.guideProgress && (
+                    <span className="chatbot-step-progress">
+                      Paso {message.guideProgress.currentStep} de {message.guideProgress.totalSteps}
+                    </span>
+                  )}
+                  <p>{message.text}</p>
+                  {message.disclaimer && <small>{message.disclaimer}</small>}
+                  {(quickActions.length > 0 || legacySuggestions.length > 0) && (
+                    <div className="chatbot-suggestions">
+                      {quickActions.map((action) => (
+                        <button
+                          key={action.id}
+                          type="button"
+                          disabled={loading}
+                          aria-label={action.label}
+                          onClick={() => handleQuickAction(action)}
+                        >
+                          {action.label}
+                        </button>
+                      ))}
+                      {legacySuggestions.map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          disabled={loading}
+                          onClick={() => sendMessage(suggestion)}
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
 
             {loading && (
               <div className="chatbot-loading">
@@ -304,14 +351,6 @@ export default function ChatbotWidget() {
               </div>
             )}
             <div ref={messagesEndRef} className="chatbot-scroll-anchor" />
-          </div>
-
-          <div className="chatbot-quick">
-            {QUICK_PROMPTS.map((prompt) => (
-              <button key={prompt} type="button" disabled={loading} onClick={() => sendMessage(prompt)}>
-                {prompt}
-              </button>
-            ))}
           </div>
 
           <div className="chatbot-feedback">
