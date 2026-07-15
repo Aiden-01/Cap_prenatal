@@ -5675,6 +5675,18 @@ html.dark .badge-yellow { background: var(--warn-lt); color: var(--warn); }
   font-weight: 800;
 }
 
+.chatbot-step-progress {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 0.35rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 .chatbot-message p {
   margin: 0;
   color: inherit;

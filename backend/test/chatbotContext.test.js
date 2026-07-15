@@ -294,7 +294,7 @@ test('integracion frontend no agrega consultas ni lee contenido de formularios',
 
   assert.doesNotMatch(`${widget}\n${builder}\n${provider}`, /api\.get\s*\(/);
   assert.equal((widget.match(/api\.post\s*\(/g) || []).length, 2);
-  assert.match(widget, /\{ mensaje: cleanText, context: safeContext \}/);
+  assert.match(widget, /mensaje:\s*cleanText[\s\S]*context:\s*safeContext[\s\S]*conversation:\s*safeConversation/);
   assert.match(expediente, /setPregnancyStatus\(estadoEmbarazo\)/);
   assert.doesNotMatch(builder, /querySelector|FormData|innerText|textContent/);
 });

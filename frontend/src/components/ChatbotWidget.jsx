@@ -13,6 +13,11 @@ import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
 import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
 import { buildChatbotContext } from "../utils/chatbotContext";
+import {
+  conversationForIdentity,
+  createConversationMemory,
+  createEmptyConversation,
+} from "../utils/chatbotConversation";
 
 const ASSISTANT_NAME = "Lia";
 const MIN_RESPONSE_DELAY_MS = 850;
@@ -50,22 +55,37 @@ export default function ChatbotWidget() {
   const firstName = getFirstName(usuario);
   const identityKey = String(usuario?.id || usuario?.username || "anonymous");
   const [open, setOpen] = useState(false);
-  const [conversation, setConversation] = useState(() => ({
+  const [chatHistory, setChatHistory] = useState(() => ({
     identityKey,
     messages: [],
   }));
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [feedbackSent, setFeedbackSent] = useState({});
+  const [conversationMemory, setConversationMemory] = useState(() => (
+    createConversationMemory(identityKey, createEmptyConversation())
+  ));
+  const [inputState, setInputState] = useState(() => ({ identityKey, value: "" }));
+  const [requestUiState, setRequestUiState] = useState(() => ({
+    identityKey,
+    loading: false,
+  }));
+  const [feedbackState, setFeedbackState] = useState(() => ({
+    identityKey,
+    sent: {},
+  }));
   const inputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const messageIdRef = useRef(0);
+  const requestInFlightRef = useRef(false);
+  const activeRequestRef = useRef(null);
   const safeContext = useMemo(() => buildChatbotContext({
     pathname: location.pathname,
     search: location.search,
     usuario,
     pregnancyStatus,
   }), [location.pathname, location.search, pregnancyStatus, usuario]);
+  const safeConversation = conversationForIdentity(conversationMemory, identityKey);
+  const input = inputState.identityKey === identityKey ? inputState.value : "";
+  const loading = requestUiState.identityKey === identityKey && requestUiState.loading;
+  const feedbackSent = feedbackState.identityKey === identityKey ? feedbackState.sent : {};
 
   const createMessageId = (prefix) => {
     messageIdRef.current += 1;
@@ -73,7 +93,7 @@ export default function ChatbotWidget() {
   };
 
   const updateMessages = (updater) => {
-    setConversation((current) => {
+    setChatHistory((current) => {
       const currentMessages = current.identityKey === identityKey ? current.messages : [];
       return {
         identityKey,
@@ -83,11 +103,11 @@ export default function ChatbotWidget() {
   };
 
   const messages = useMemo(() => {
-    const currentMessages = conversation.identityKey === identityKey
-      ? conversation.messages
+    const currentMessages = chatHistory.identityKey === identityKey
+      ? chatHistory.messages
       : [];
     return [buildWelcomeMessage(firstName), ...currentMessages];
-  }, [conversation, firstName, identityKey]);
+  }, [chatHistory, firstName, identityKey]);
 
   const lastBotMessage = useMemo(
     () => [...messages].reverse().find((message) => message.from === "bot"),
@@ -99,6 +119,10 @@ export default function ChatbotWidget() {
     setTimeout(() => inputRef.current?.focus(), 120);
   };
 
+  useEffect(() => () => {
+    activeRequestRef.current?.controller.abort();
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     messagesEndRef.current?.scrollIntoView({
@@ -109,7 +133,20 @@ export default function ChatbotWidget() {
 
   const sendMessage = async (text = input) => {
     const cleanText = text.trim();
-    if (!cleanText || loading) return;
+    if (activeRequestRef.current?.identityKey !== identityKey) {
+      activeRequestRef.current?.controller.abort();
+      activeRequestRef.current = null;
+      requestInFlightRef.current = false;
+    }
+    if (!cleanText || loading || requestInFlightRef.current) return;
+
+    const requestIdentity = identityKey;
+    const requestController = new AbortController();
+    requestInFlightRef.current = true;
+    activeRequestRef.current = {
+      controller: requestController,
+      identityKey: requestIdentity,
+    };
 
     const userMessage = {
       id: createMessageId("user"),
@@ -118,14 +155,22 @@ export default function ChatbotWidget() {
     };
 
     updateMessages((current) => [...current, userMessage]);
-    setInput("");
-    setLoading(true);
+    setInputState({ identityKey: requestIdentity, value: "" });
+    setRequestUiState({ identityKey: requestIdentity, loading: true });
 
     try {
       const [{ data }] = await Promise.all([
-        api.post("/chatbot/mensaje", { mensaje: cleanText, context: safeContext }),
+        api.post("/chatbot/mensaje", {
+          mensaje: cleanText,
+          context: safeContext,
+          conversation: safeConversation,
+        }, { signal: requestController.signal }),
         wait(MIN_RESPONSE_DELAY_MS),
       ]);
+      if (activeRequestRef.current?.identityKey !== requestIdentity) return;
+
+      const nextConversation = createConversationMemory(requestIdentity, data.conversation);
+      setConversationMemory(nextConversation);
       const botMessage = {
         id: createMessageId("bot"),
         from: "bot",
@@ -135,9 +180,19 @@ export default function ChatbotWidget() {
         recognized: data.recognized,
         disclaimer: data.disclaimer,
         suggestions: data.suggestions || [],
+        guideProgress: data.conversation?.activeGuide
+          ? {
+              currentStep: data.conversation.currentStep,
+              totalSteps: data.conversation.totalSteps,
+            }
+          : null,
       };
       updateMessages((current) => [...current, botMessage]);
-    } catch {
+    } catch (error) {
+      if (
+        error?.code === "ERR_CANCELED"
+        || activeRequestRef.current?.identityKey !== requestIdentity
+      ) return;
       updateMessages((current) => [
         ...current,
         {
@@ -148,23 +203,38 @@ export default function ChatbotWidget() {
         },
       ]);
     } finally {
-      setLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 80);
+      if (activeRequestRef.current?.controller === requestController) {
+        activeRequestRef.current = null;
+        requestInFlightRef.current = false;
+        setRequestUiState({ identityKey: requestIdentity, loading: false });
+        setTimeout(() => inputRef.current?.focus(), 80);
+      }
     }
   };
 
   const sendFeedback = async (helpful) => {
     if (!lastBotMessage || feedbackSent[lastBotMessage.id]) return;
-    setFeedbackSent((current) => ({ ...current, [lastBotMessage.id]: true }));
+    setFeedbackState((current) => ({
+      identityKey,
+      sent: {
+        ...(current.identityKey === identityKey ? current.sent : {}),
+        [lastBotMessage.id]: true,
+      },
+    }));
 
     try {
       await api.post("/chatbot/feedback", {
         helpful,
         intent: lastBotMessage.intent,
-        mensaje: lastBotMessage.text,
       });
     } catch {
-      setFeedbackSent((current) => ({ ...current, [lastBotMessage.id]: false }));
+      setFeedbackState((current) => ({
+        identityKey,
+        sent: {
+          ...(current.identityKey === identityKey ? current.sent : {}),
+          [lastBotMessage.id]: false,
+        },
+      }));
     }
   };
 
@@ -199,6 +269,11 @@ export default function ChatbotWidget() {
                 className={`chatbot-message ${message.from === "user" ? "is-user" : "is-bot"}`}
               >
                 {message.title && <strong>{message.title}</strong>}
+                {message.guideProgress && (
+                  <span className="chatbot-step-progress">
+                    Paso {message.guideProgress.currentStep} de {message.guideProgress.totalSteps}
+                  </span>
+                )}
                 <p>{message.text}</p>
                 {message.disclaimer && <small>{message.disclaimer}</small>}
                 {message.suggestions?.length > 0 && (
@@ -207,6 +282,7 @@ export default function ChatbotWidget() {
                       <button
                         key={suggestion}
                         type="button"
+                        disabled={loading}
                         onClick={() => sendMessage(suggestion)}
                       >
                         {suggestion}
@@ -232,7 +308,7 @@ export default function ChatbotWidget() {
 
           <div className="chatbot-quick">
             {QUICK_PROMPTS.map((prompt) => (
-              <button key={prompt} type="button" onClick={() => sendMessage(prompt)}>
+              <button key={prompt} type="button" disabled={loading} onClick={() => sendMessage(prompt)}>
                 {prompt}
               </button>
             ))}
@@ -268,7 +344,10 @@ export default function ChatbotWidget() {
             <input
               ref={inputRef}
               value={input}
-              onChange={(event) => setInput(event.target.value)}
+              onChange={(event) => setInputState({
+                identityKey,
+                value: event.target.value,
+              })}
               placeholder={`Escríbele a ${ASSISTANT_NAME}...`}
               aria-label="Mensaje para el asistente"
             />

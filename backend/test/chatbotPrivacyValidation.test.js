@@ -267,7 +267,7 @@ test('controller recorta el mensaje y no entrega texto crudo ni identidad al log
   assert.deepEqual(response, expectedResult);
 });
 
-test('controller entrega contexto solo al clasificador y nunca al logger', async () => {
+test('controller entrega contexto y memoria solo al clasificador y nunca al logger', async () => {
   const safeContext = {
     route: '/pacientes/:id/expediente',
     module: 'expediente',
@@ -277,10 +277,12 @@ test('controller entrega contexto solo al clasificador y nunca al logger', async
     permissions: ['pacientes.editar'],
   };
   let classifiedContext;
+  let classifiedConversation;
   let loggedMetadata;
   const { preguntar } = createChatbotController({
-    answerQuestionFn(_message, context) {
+    answerQuestionFn(_message, context, conversation) {
       classifiedContext = context;
+      classifiedConversation = conversation;
       return {
         recognized: false,
         intent: 'no_reconocida',
@@ -296,11 +298,26 @@ test('controller entrega contexto solo al clasificador y nunca al logger', async
   });
 
   await invoke(preguntar, {
-    body: { mensaje: 'consulta segura', context: safeContext },
+    body: {
+      mensaje: 'consulta segura',
+      context: safeContext,
+      conversation: {
+        lastIntent: 'control_prenatal',
+        activeGuide: 'control_prenatal',
+        currentStep: 2,
+        totalSteps: 7,
+      },
+    },
     usuario: { id: 9 },
   });
 
   assert.strictEqual(classifiedContext, safeContext);
+  assert.deepEqual(classifiedConversation, {
+    lastIntent: 'control_prenatal',
+    activeGuide: 'control_prenatal',
+    currentStep: 2,
+    totalSteps: 7,
+  });
   assert.deepEqual(loggedMetadata, {
     messageLength: 'consulta segura'.length,
     intent: 'no_reconocida',
@@ -308,6 +325,7 @@ test('controller entrega contexto solo al clasificador y nunca al logger', async
   });
   assert.equal(JSON.stringify(loggedMetadata).includes('context'), false);
   assert.equal(JSON.stringify(loggedMetadata).includes('/pacientes'), false);
+  assert.equal(JSON.stringify(loggedMetadata).includes('currentStep'), false);
 });
 
 test('feedback descarta respuesta adicional e identidad antes del logger', async () => {

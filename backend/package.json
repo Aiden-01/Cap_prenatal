@@ -9,7 +9,7 @@
     "db:migrate": "node src/db/migrate.js",
     "db:migrate-bi": "node src/db/migrateBiViews.js",
     "db:seed": "node src/db/seed.js",
-    "test:chatbot": "node --test test/chatbotService.test.js test/chatbotPrivacyValidation.test.js test/chatbotHttpSecurity.test.js test/chatbotContext.test.js",
+    "test:chatbot": "node --test test/chatbotService.test.js test/chatbotPrivacyValidation.test.js test/chatbotHttpSecurity.test.js test/chatbotContext.test.js test/chatbotGuides.test.js",
     "test:chatbot:privacy": "node --test test/chatbotPrivacyValidation.test.js",
     "test:chatbot:http": "node --test test/chatbotHttpSecurity.test.js",
     "test:authorization": "node --test test/authorization.test.js",

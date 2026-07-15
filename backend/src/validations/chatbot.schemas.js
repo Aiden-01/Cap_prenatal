@@ -5,6 +5,12 @@ const {
   CHATBOT_MAX_PERMISSIONS,
   CHATBOT_ROUTE_MODULES,
 } = require('../config/chatbotContext');
+const { chatbotKnowledge } = require('../config/chatbotKnowledge');
+const {
+  CHATBOT_GUIDE_IDS,
+  CHATBOT_MAX_GUIDE_STEPS,
+  chatbotGuides,
+} = require('../config/chatbotGuides');
 
 const permissionCodeSchema = z.string({ error: 'Codigo de permiso invalido' })
   .min(3, 'Codigo de permiso invalido')
@@ -60,12 +66,83 @@ const chatbotContextSchema = z.object({
   }
 });
 
+const knownIntentIds = Object.freeze(chatbotKnowledge.map((item) => item.id));
+
+const chatbotConversationSchema = z.object({
+  lastIntent: z.enum(knownIntentIds, { error: 'Ultima intencion invalida' }).nullable(),
+  activeGuide: z.enum(CHATBOT_GUIDE_IDS, { error: 'Guia activa invalida' }).nullable(),
+  currentStep: z.number({ error: 'Paso actual invalido' })
+    .int('Paso actual invalido')
+    .min(1, 'El paso actual debe ser positivo')
+    .max(CHATBOT_MAX_GUIDE_STEPS, 'Paso actual fuera del limite')
+    .nullable(),
+  totalSteps: z.number({ error: 'Total de pasos invalido' })
+    .int('Total de pasos invalido')
+    .min(1, 'Total de pasos invalido')
+    .max(CHATBOT_MAX_GUIDE_STEPS, 'Total de pasos fuera del limite')
+    .nullable()
+    .optional(),
+}).strict().superRefine((conversation, refinement) => {
+  if (conversation.activeGuide === null) {
+    if (conversation.currentStep !== null) {
+      refinement.addIssue({
+        code: 'custom',
+        path: ['currentStep'],
+        message: 'No puede existir un paso sin guia activa',
+      });
+    }
+    if (conversation.totalSteps !== undefined && conversation.totalSteps !== null) {
+      refinement.addIssue({
+        code: 'custom',
+        path: ['totalSteps'],
+        message: 'No puede existir total de pasos sin guia activa',
+      });
+    }
+    return;
+  }
+
+  const guide = chatbotGuides[conversation.activeGuide];
+  if (conversation.currentStep === null) {
+    refinement.addIssue({
+      code: 'custom',
+      path: ['currentStep'],
+      message: 'Una guia activa requiere paso actual',
+    });
+  } else if (conversation.currentStep > guide.steps.length) {
+    refinement.addIssue({
+      code: 'custom',
+      path: ['currentStep'],
+      message: 'El paso actual excede la guia',
+    });
+  }
+
+  if (conversation.lastIntent !== conversation.activeGuide) {
+    refinement.addIssue({
+      code: 'custom',
+      path: ['lastIntent'],
+      message: 'La ultima intencion debe corresponder a la guia activa',
+    });
+  }
+
+  if (
+    conversation.totalSteps !== undefined
+    && conversation.totalSteps !== guide.steps.length
+  ) {
+    refinement.addIssue({
+      code: 'custom',
+      path: ['totalSteps'],
+      message: 'El total de pasos no corresponde a la guia',
+    });
+  }
+});
+
 const chatbotMessageSchema = z.object({
   mensaje: z.string({ error: 'Mensaje requerido' })
     .trim()
     .min(1, 'Mensaje requerido')
     .max(500, 'El mensaje debe tener 500 caracteres o menos'),
   context: chatbotContextSchema.optional(),
+  conversation: chatbotConversationSchema.optional(),
 }).strip();
 
 const chatbotFeedbackSchema = z.object({
@@ -81,6 +158,7 @@ const chatbotFeedbackSchema = z.object({
 }).strip();
 
 module.exports = {
+  chatbotConversationSchema,
   chatbotContextSchema,
   chatbotFeedbackSchema,
   chatbotMessageSchema,

@@ -182,6 +182,73 @@ test('/mensaje acepta contexto seguro valido', async () => {
   assert.match(response.payload.answer, /solo lectura/);
 });
 
+test('/mensaje inicia y continua una guia con conversation valido', async () => {
+  const context = {
+    route: '/pacientes/:id/expediente',
+    module: 'expediente',
+    hasPatientContext: true,
+    hasPregnancyContext: true,
+    pregnancyStatus: 'activo',
+    permissions: ['controles.crear'],
+  };
+  const started = await post(contractServer, '/api/chatbot/mensaje', {
+    mensaje: 'Guíame para agregar un control prenatal',
+    context,
+    conversation: {
+      lastIntent: null,
+      activeGuide: null,
+      currentStep: null,
+      totalSteps: null,
+    },
+  });
+
+  assert.equal(started.status, 200);
+  assert.equal(started.payload.conversation.currentStep, 1);
+  assert.equal(started.payload.conversation.totalSteps, 7);
+
+  const continued = await post(contractServer, '/api/chatbot/mensaje', {
+    mensaje: 'Siguiente',
+    context,
+    conversation: started.payload.conversation,
+  });
+
+  assert.equal(continued.status, 200);
+  assert.equal(continued.payload.intent, 'guia_siguiente');
+  assert.equal(continued.payload.conversation.currentStep, 2);
+});
+
+test('/mensaje rechaza conversation inventado o fuera de rango', async () => {
+  const invalidConversations = [
+    {
+      lastIntent: 'control_prenatal',
+      activeGuide: 'guia_inventada',
+      currentStep: 1,
+      totalSteps: 7,
+    },
+    {
+      lastIntent: 'control_prenatal',
+      activeGuide: 'control_prenatal',
+      currentStep: 8,
+      totalSteps: 7,
+    },
+    {
+      lastIntent: null,
+      activeGuide: null,
+      currentStep: null,
+      totalSteps: null,
+      previousQuestion: 'dato privado',
+    },
+  ];
+
+  for (const conversation of invalidConversations) {
+    const response = await post(contractServer, '/api/chatbot/mensaje', {
+      mensaje: 'Siguiente',
+      conversation,
+    });
+    assertSafeError(response, 400, 'VALIDATION_ERROR', 'dato privado');
+  }
+});
+
 test('/mensaje rechaza contexto con datos clinicos adicionales', async () => {
   const privateText = 'diagnostico-privado-no-debe-aparecer';
   const response = await post(contractServer, '/api/chatbot/mensaje', {

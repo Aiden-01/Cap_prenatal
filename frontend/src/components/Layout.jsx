@@ -152,7 +152,7 @@ export default function Layout() {
         </main>
 
         <Toast toasts={toasts} />
-        <ChatbotWidget />
+        <ChatbotWidget key={String(usuario?.id || usuario?.username || "anonymous")} />
 
         {passwordOpen && (
           <div className="modal-backdrop">

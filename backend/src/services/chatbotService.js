@@ -4,6 +4,10 @@ const {
   operationalPriorityRules,
 } = require('../config/chatbotKnowledge');
 const {
+  CHATBOT_GUIDE_IDS,
+  chatbotGuides,
+} = require('../config/chatbotGuides');
+const {
   CLINICAL_DISCLAIMER,
   CONTEXT_RESPONSES,
   DEFAULT_CLOSING,
@@ -16,6 +20,13 @@ const {
 } = require('../config/chatbotSpecialResponses');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const KNOWN_INTENT_IDS = new Set(chatbotKnowledge.map((item) => item.id));
+const GUIDE_ID_SET = new Set(CHATBOT_GUIDE_IDS);
+const GUIDE_RESUME_SUGGESTIONS = Object.freeze([
+  'Continuar guía',
+  'Repetir paso',
+  'Cancelar',
+]);
 
 // Export legado: conserva la forma pública previa sin duplicar el catálogo canónico.
 const knowledgeBase = chatbotKnowledge.map(({ id, suggestions, ...item }) => ({
@@ -371,7 +382,7 @@ function humanizeAnswer(intent, answer) {
   return [opening, body, closing].filter(Boolean).join('\n\n');
 }
 
-function answerQuestion(message, context) {
+function answerQuestionWithoutConversation(message, context) {
   const text = String(message || '').trim();
   if (!text) {
     return {
@@ -474,6 +485,308 @@ function answerQuestion(message, context) {
     answer: humanizeAnswer(humanizedIntent, answer),
     confidence: Number(Math.min(bestIntent.score / 6, 1).toFixed(2)),
     disclaimer: CLINICAL_DISCLAIMER,
+  };
+}
+
+function createConversationState(lastIntent = null, activeGuide = null, currentStep = null) {
+  return {
+    lastIntent,
+    activeGuide,
+    currentStep,
+    totalSteps: activeGuide ? chatbotGuides[activeGuide].steps.length : null,
+  };
+}
+
+function getGuideAction(message) {
+  const normalized = normalizeText(message);
+  if (/^(?:siguiente|continuar(?: guia)?|ya lo hice|y despues)$/.test(normalized)) {
+    return 'next';
+  }
+  if (/^(?:anterior|volver|volver al paso anterior)$/.test(normalized)) {
+    return 'previous';
+  }
+  if (/^(?:repite|repetir|repetir paso|no entendi)$/.test(normalized)) {
+    return 'repeat';
+  }
+  if (/^(?:cancelar|dejemoslo|empecemos de nuevo)$/.test(normalized)) {
+    return 'cancel';
+  }
+  return null;
+}
+
+function isGuideStartRequest(message) {
+  const normalized = normalizeText(message);
+  return /\b(?:guiame|acompaname)\b/.test(normalized)
+    || /\bpaso a paso\b/.test(normalized);
+}
+
+function isEditFollowup(message) {
+  return /^(?:y )?(?:como |para )?editarlo$/.test(normalizeText(message));
+}
+
+function guideStepSuggestions(step) {
+  return step > 1
+    ? ['Siguiente', 'Anterior', 'Repetir', 'Cancelar']
+    : ['Siguiente', 'Repetir', 'Cancelar'];
+}
+
+function buildGuideBlocker(guide, context) {
+  const requirements = guide.requirements;
+  if (!context) {
+    return 'No puedo iniciar o continuar esta guía sin el contexto seguro de pantalla y permisos. Abre la pantalla correspondiente e inténtalo de nuevo.';
+  }
+
+  if (requirements.hasPatientContext && !context.hasPatientContext) {
+    return 'Primero abre el expediente de una paciente. Lia no ejecutará cambios ni buscará datos clínicos por su cuenta.';
+  }
+  if (requirements.hasPregnancyContext && !context.hasPregnancyContext) {
+    return 'Primero selecciona un embarazo dentro del expediente para usar esta guía.';
+  }
+
+  if (
+    requirements.allowedStatuses
+    && !requirements.allowedStatuses.includes(context.pregnancyStatus)
+  ) {
+    if (context.pregnancyStatus === 'cerrado') {
+      return 'El embarazo seleccionado está cerrado y permanece en solo lectura; esta guía no puede continuar.';
+    }
+    if (context.pregnancyStatus === 'puerperio') {
+      return 'Esta guía requiere un embarazo activo; el embarazo seleccionado está en puerperio.';
+    }
+    return 'Confirma en el expediente el estado del embarazo antes de continuar esta guía.';
+  }
+
+  if (requirements.blockedStatuses?.includes(context.pregnancyStatus)) {
+    return 'El embarazo seleccionado está cerrado y permanece en solo lectura; esta guía no puede continuar.';
+  }
+
+  const permissions = Array.isArray(context.permissions) ? context.permissions : [];
+  const missingAll = requirements.permissionsAll?.filter(
+    (permission) => !permissions.includes(permission)
+  ) || [];
+  if (missingAll.length) {
+    return `Según el contexto informativo de tu sesión, no aparece ${missingAll.length === 1 ? 'el permiso' : 'alguno de los permisos'} ${missingAll.join(', ')}. La autorización real siempre la confirma el backend.`;
+  }
+
+  if (
+    requirements.permissionsAny?.length
+    && !requirements.permissionsAny.some((permission) => permissions.includes(permission))
+  ) {
+    return `Según el contexto informativo de tu sesión, no aparece ninguno de estos permisos: ${requirements.permissionsAny.join(', ')}. La autorización real siempre la confirma el backend.`;
+  }
+
+  return null;
+}
+
+function buildGuideStepResponse(guide, step, {
+  intent,
+  lead = '',
+  prefix = '',
+} = {}) {
+  const totalSteps = guide.steps.length;
+  const parts = [prefix, lead, `Paso ${step} de ${totalSteps}: ${guide.steps[step - 1]}`]
+    .filter(Boolean);
+
+  return {
+    recognized: true,
+    intent: intent || guide.id,
+    title: `Guía: ${guide.title}`,
+    answer: parts.join('\n\n'),
+    confidence: 1,
+    disclaimer: CLINICAL_DISCLAIMER,
+    suggestions: guideStepSuggestions(step),
+    conversation: createConversationState(guide.id, guide.id, step),
+  };
+}
+
+function startGuide(guideId, context, prefix = '') {
+  const guide = chatbotGuides[guideId];
+  const blocker = buildGuideBlocker(guide, context);
+  if (blocker) {
+    return {
+      recognized: true,
+      intent: guide.id,
+      title: `Guía: ${guide.title}`,
+      answer: [prefix, blocker].filter(Boolean).join('\n\n'),
+      confidence: 1,
+      disclaimer: CLINICAL_DISCLAIMER,
+      suggestions: [...guide.completionSuggestions],
+      conversation: createConversationState(guide.id),
+    };
+  }
+
+  return buildGuideStepResponse(guide, 1, {
+    lead: guide.intro,
+    prefix,
+  });
+}
+
+function handleGuideAction(action, conversation, context) {
+  const guide = chatbotGuides[conversation.activeGuide];
+  const step = conversation.currentStep;
+
+  if (action === 'cancel') {
+    return {
+      recognized: true,
+      intent: 'guia_cancelada',
+      answer: `Cancelé la guía de ${guide.title}. El historial visible permanece en este chat.`,
+      suggestions: [...guide.completionSuggestions],
+      conversation: createConversationState(guide.id),
+    };
+  }
+
+  const blocker = buildGuideBlocker(guide, context);
+  if (blocker) {
+    return {
+      recognized: true,
+      intent: 'guia_bloqueada',
+      answer: `Detuve la guía de ${guide.title}. ${blocker}`,
+      suggestions: [...guide.completionSuggestions],
+      conversation: createConversationState(guide.id),
+    };
+  }
+
+  if (action === 'next' && step === guide.steps.length) {
+    return {
+      recognized: true,
+      intent: 'guia_finalizada',
+      title: `Guía completada: ${guide.title}`,
+      answer: `Terminaste los ${guide.steps.length} pasos. ${guide.completionMessage}`,
+      suggestions: [...guide.completionSuggestions],
+      conversation: createConversationState(guide.id),
+    };
+  }
+
+  if (action === 'next') {
+    return buildGuideStepResponse(guide, step + 1, { intent: 'guia_siguiente' });
+  }
+
+  if (action === 'previous') {
+    const previousStep = Math.max(1, step - 1);
+    const lead = step === 1 ? 'Ya estás en el primer paso.' : 'Volvemos un paso.';
+    return buildGuideStepResponse(guide, previousStep, {
+      intent: 'guia_anterior',
+      lead,
+    });
+  }
+
+  return buildGuideStepResponse(guide, step, {
+    intent: 'guia_repetir',
+    lead: 'Repetimos el paso actual.',
+  });
+}
+
+function buildEditFollowupResponse(sourceIntent, message, context) {
+  const editFollowup = chatbotGuides[sourceIntent]?.editFollowup;
+  if (!editFollowup) {
+    return {
+      recognized: false,
+      intent: 'no_reconocida',
+      answer: 'Indícame qué registro deseas editar para orientarte sin asumir un módulo.',
+    };
+  }
+
+  if (context?.pregnancyStatus === 'cerrado' && chatbotGuides[sourceIntent].module === 'expediente') {
+    return {
+      recognized: true,
+      intent: editFollowup.intent,
+      answer: 'El embarazo seleccionado está cerrado y permanece en solo lectura; no se pueden editar sus registros.',
+    };
+  }
+
+  if (!hasContextPermission(context, editFollowup.permission)) {
+    return {
+      recognized: true,
+      intent: editFollowup.intent,
+      answer: `Según el contexto informativo de tu sesión, no aparece el permiso ${editFollowup.permission} para editar ${editFollowup.label}. La autorización real la confirma el backend.`,
+    };
+  }
+
+  return buildOperationalGuardResponse(editFollowup.intent, message, context);
+}
+
+function preserveActiveGuide(result, conversation) {
+  return {
+    ...result,
+    suggestions: [...GUIDE_RESUME_SUGGESTIONS],
+    conversation: createConversationState(
+      conversation.activeGuide,
+      conversation.activeGuide,
+      conversation.currentStep
+    ),
+  };
+}
+
+function answerQuestion(message, context, conversation) {
+  const text = String(message || '').trim();
+  const wantsGuide = isGuideStartRequest(text);
+
+  // Compatibilidad estricta: clientes que no usan memoria conservan la forma
+  // previa, salvo cuando solicitan explicitamente una guia nueva.
+  if (conversation === undefined && !wantsGuide) {
+    return answerQuestionWithoutConversation(text, context);
+  }
+
+  const state = conversation || createConversationState();
+  const action = getGuideAction(text);
+
+  if (state.activeGuide && action) {
+    return handleGuideAction(action, state, context);
+  }
+
+  if (!state.activeGuide && action) {
+    return {
+      recognized: true,
+      intent: 'guia_sin_activa',
+      answer: 'No hay una guía activa. Dime qué proceso deseas hacer paso a paso.',
+      conversation: createConversationState(state.lastIntent),
+    };
+  }
+
+  if (isEditFollowup(text) && (state.activeGuide || GUIDE_ID_SET.has(state.lastIntent))) {
+    const sourceIntent = state.activeGuide || state.lastIntent;
+    const result = buildEditFollowupResponse(sourceIntent, text, context);
+    if (state.activeGuide) return preserveActiveGuide(result, state);
+
+    const nextIntent = KNOWN_INTENT_IDS.has(result.intent) ? result.intent : state.lastIntent;
+    return {
+      ...result,
+      conversation: createConversationState(nextIntent),
+    };
+  }
+
+  const result = answerQuestionWithoutConversation(text, context);
+
+  if (wantsGuide && GUIDE_ID_SET.has(result.intent)) {
+    const prefix = state.activeGuide
+      ? state.activeGuide === result.intent
+        ? `Reiniciamos la guía de ${chatbotGuides[result.intent].title}.`
+        : `Cambiamos de tema y cierro la guía de ${chatbotGuides[state.activeGuide].title}.`
+      : '';
+    return startGuide(result.intent, context, prefix);
+  }
+
+  if (state.activeGuide) {
+    const guide = chatbotGuides[state.activeGuide];
+    const preservesGuide = !result.recognized
+      || guide.relatedIntents.includes(result.intent)
+      || ['saludo', 'agradecimiento', 'despedida', 'solicitud_dato_clinico', 'solicitud_consejo_clinico']
+        .includes(result.intent);
+
+    if (preservesGuide) return preserveActiveGuide(result, state);
+
+    const nextIntent = KNOWN_INTENT_IDS.has(result.intent) ? result.intent : guide.id;
+    return {
+      ...result,
+      answer: `Cambiamos de tema y cierro la guía de ${guide.title}.\n\n${result.answer}`,
+      conversation: createConversationState(nextIntent),
+    };
+  }
+
+  const nextIntent = KNOWN_INTENT_IDS.has(result.intent) ? result.intent : state.lastIntent;
+  return {
+    ...result,
+    conversation: createConversationState(nextIntent),
   };
 }
 

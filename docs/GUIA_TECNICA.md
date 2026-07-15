@@ -103,7 +103,8 @@ Los endpoints autenticados son `POST /api/chatbot/mensaje` y
 `POST /api/chatbot/feedback`. Ambos usan schemas Zod y devuelven HTTP 400 con
 el codigo estable `VALIDATION_ERROR` cuando el payload no cumple el contrato.
 
-`/mensaje` exige `mensaje` como string y acepta un `context` seguro opcional.
+`/mensaje` exige `mensaje` como string y acepta `context` y `conversation` como
+objetos seguros opcionales.
 El backend aplica `trim` al mensaje, exige entre 1 y 500 caracteres y rechaza
 valores ausentes, `null`, numeros, objetos, arreglos, espacios vacios y textos
 que excedan el limite. Los clientes que envian unicamente `mensaje` conservan
@@ -183,6 +184,83 @@ El contexto se entrega solo al motor durante esa solicitud. No se agrega a
 `chatbot_unrecognized.jsonl`, a feedback ni al logging de la ruta completa.
 Las guardas de privacidad para VIH, datos clinicos y medicamentos se evaluan
 antes de estas adaptaciones y conservan sus respuestas.
+
+#### Memoria corta y guias paso a paso
+
+El backend no mantiene sesiones conversacionales. El frontend conserva en
+memoria React unicamente el ultimo estado seguro devuelto por `/mensaje` y lo
+envia en la solicitud siguiente:
+
+```json
+{
+  "conversation": {
+    "lastIntent": "control_prenatal",
+    "activeGuide": "control_prenatal",
+    "currentStep": 2,
+    "totalSteps": 7
+  }
+}
+```
+
+El contrato estricto de `conversation` contiene:
+
+- `lastIntent`: ID de una de las 39 intenciones operativas o `null`.
+- `activeGuide`: uno de los seis IDs de guia indicados abajo o `null`.
+- `currentStep`: entero positivo o `null`. Debe existir solo con una guia
+  activa y no puede exceder su cantidad real de pasos.
+- `totalSteps`: opcional al iniciar, entero positivo o `null`. Cuando se envia,
+  debe coincidir exactamente con el total calculado por el backend; el cliente
+  no puede inventarlo.
+
+Una guia activa exige que `lastIntent` coincida con `activeGuide`. Propiedades
+adicionales, IDs desconocidos, texto libre y estados incoherentes producen HTTP
+400 con `VALIDATION_ERROR`. La respuesta del backend normaliza siempre los
+cuatro campos. El modulo se deriva de la intencion o guia conocida y no necesita
+otro texto en memoria.
+
+Las guias iniciales se derivan de los pasos numerados ya existentes en
+`chatbotKnowledge.js`; no duplican ni reescriben las instrucciones operativas:
+
+| Guia | Pasos | Contexto o permisos informativos |
+| --- | ---: | --- |
+| `registrar_paciente` | 5 | `pacientes.crear` |
+| `control_prenatal` | 7 | Paciente, embarazo activo y `controles.crear` |
+| `ficha_riesgo` | 7 | Paciente, embarazo no cerrado, `controles.crear` y `controles.editar` |
+| `vacunas` | 7 | Paciente, embarazo no cerrado y `controles.crear` |
+| `plan_parto` | 7 | Paciente, embarazo no cerrado, `controles.crear` y `controles.editar` |
+| `cerrar_embarazo` | 5 | Embarazo activo o en puerperio y `pacientes.editar` |
+
+Estos permisos solo adaptan la explicacion. Las operaciones reales siguen
+protegidas por las rutas backend y Lia nunca ejecuta una accion.
+
+El ciclo de vida es determinista:
+
+1. `Guiame`, `acompaname` o `paso a paso` inicia una de las seis guias y muestra
+   solo el primer paso.
+2. `Siguiente`, `Continuar`, `Ya lo hice` y `Y despues` avanzan un paso.
+   `Anterior` o `Volver` retroceden sin bajar de 1. `Repite` y `No entendi`
+   conservan el paso.
+3. Una duda relacionada responde con el clasificador operativo y conserva la
+   guia, ofreciendo `Continuar guia`, `Repetir paso` y `Cancelar`.
+4. Un cambio claro de tema cierra expresamente la guia anterior. Si el mensaje
+   solicita otra guia, la sustituye y comienza en su paso 1.
+5. `Cancelar`, `Dejemoslo` o `Empecemos de nuevo` limpian guia y paso, pero no
+   eliminan el historial visual. Al avanzar desde el ultimo paso se finaliza la
+   guia, se conserva `lastIntent` y se ofrecen de dos a cuatro acciones
+   relacionadas.
+
+Cerrar y volver a abrir el widget conserva la guia porque `Layout` sigue
+montado. Cambiar `identityKey` muestra inmediatamente una memoria vacia y no
+reutiliza historial, input, feedback ni solicitudes del usuario anterior.
+Recargar la pagina reinicia todo el estado. No se usa base de datos, archivos,
+cookies, `localStorage`, `sessionStorage` ni logging para esta memoria.
+
+El historial visual puede seguir mostrando los mensajes de la sesion actual,
+pero `conversation` nunca contiene ni reenvia preguntas o respuestas completas,
+nombres, CUI, expedientes, identificadores, resultados clinicos o datos de
+formularios. Solo contiene IDs cerrados y contadores. El frontend mantiene un
+cerrojo de solicitud y deshabilita chips mientras Lia responde para impedir que
+un doble clic avance dos pasos.
 
 #### Alcance operativo y guardas de comportamiento
 
@@ -280,10 +358,13 @@ El conocimiento estatico ya no vive dentro del motor de clasificacion:
 - `backend/src/config/chatbotSpecialResponses.js` contiene aperturas, cierres,
   disclaimer, respuestas sociales, clinicas y de fallback, sugerencias
   especiales y conectores de pasos.
+- `backend/src/config/chatbotGuides.js` define las seis guias, deriva sus pasos
+  numerados desde el catalogo y agrega modulo, requisitos informativos,
+  relaciones, finalizacion y sugerencias permitidas.
 - `backend/src/services/chatbotService.js` conserva normalizacion,
   tokenizacion, scoring, guardas sociales y clinicas, negacion limitada,
-  resolucion de prioridades, calculo de FPP, humanizacion y coordinacion de la
-  respuesta final.
+  resolucion de prioridades, calculo de FPP, humanizacion, navegacion efimera de
+  guias y coordinacion de la respuesta final.
 
 El catalogo y sus arreglos internos se congelan al cargar el modulo para evitar
 mutaciones accidentales durante la clasificacion. `chatbotService.js` mantiene
