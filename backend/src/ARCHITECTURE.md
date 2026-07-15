@@ -99,11 +99,15 @@ Las reglas de embarazo viven en services y utils, no en controllers:
 
 ## Seguridad
 
-- Login usa JWT firmado y cookies.
-- `csrfMiddleware` protege escrituras.
-- `cargarPermisos` agrega permisos al usuario autenticado.
-- `verificarPermiso` bloquea endpoints sin permiso.
-- El rol `director` se usa para administracion de permisos.
+- Login crea `auth_sessions`, access JWT corto y refresh rotativo en cookies HttpOnly.
+- Solo el hash del refresh se persiste; el access JWT no se almacena.
+- `middleware/auth.js` valida algoritmo, issuer, audience, `sid`, sesion, usuario activo y limites temporal/absoluto.
+- Username y rol siempre proceden de PostgreSQL; el JWT no es fuente definitiva de autorizacion.
+- `csrfMiddleware` protege refresh, actividad y todas las escrituras.
+- `cargarPermisos` consulta permisos actuales y `verificarPermiso` bloquea endpoints sin permiso.
+- Contraseña, estado, rol, permisos y eliminacion revocan sesiones dentro de la transaccion critica.
+- `sessionService.js` concentra generacion, rotacion, comparacion segura, revocacion y metadata.
+- `authSessionsRepository.js` concentra SQL y bloqueos de la tabla de sesiones.
 
 ## Auditoria
 

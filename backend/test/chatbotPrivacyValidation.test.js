@@ -12,6 +12,7 @@ process.env.JWT_SECRET = '9xK4pT8zN3cF6hJ1sL5yB0dG7wE2uA9iQ4mR';
 process.env.CHATBOT_LOGGING_ENABLED = 'false';
 
 const chatbotRoutes = require('../src/routes/chatbot');
+const { createAuthMiddleware } = require('../src/middleware/auth');
 const { createChatbotController } = require('../src/controllers/chatbotController');
 const { normalizeError } = require('../src/middleware/errorHandler');
 const {
@@ -20,11 +21,38 @@ const {
 } = require('../src/services/chatbotLoggingService');
 
 const REPOSITORY_ROOT = path.resolve(__dirname, '..', '..');
+const SESSION_ID = '39af8d20-b772-46e7-a777-8243f6100294';
+const TEST_JWT_CONFIG = {
+  secret: process.env.JWT_SECRET,
+  algorithm: 'HS256',
+  issuer: 'cap-prenatal-api',
+  audience: 'cap-prenatal-web',
+  accessTokenTtlMinutes: 10,
+};
 const AUTH_TOKEN = jwt.sign(
-  { id: 77, username: 'usuario-de-prueba' },
+  { sid: SESSION_ID },
   process.env.JWT_SECRET,
-  { expiresIn: '5m' }
+  { algorithm: 'HS256', issuer: TEST_JWT_CONFIG.issuer, audience: TEST_JWT_CONFIG.audience, subject: '77', jwtid: 'ad452670-ea20-4a8a-b6b7-40a713a169ab', expiresIn: '5m' }
 );
+const TEST_AUTH = createAuthMiddleware({
+  repository: {
+    async obtenerConUsuarioPorId() {
+      return {
+        id: SESSION_ID,
+        usuario_id: 77,
+        nombre_completo: 'Usuario de prueba',
+        username: 'usuario-de-prueba',
+        rol: 'personal_salud',
+        activo: true,
+        created_at: new Date(),
+        last_activity_at: new Date(),
+        absolute_expires_at: new Date(Date.now() + 60 * 60 * 1000),
+        revoked_at: null,
+      };
+    },
+  },
+  getJwt: () => TEST_JWT_CONFIG,
+});
 
 let server;
 let baseUrl;
@@ -32,7 +60,7 @@ let baseUrl;
 before(async () => {
   const app = express();
   app.use(express.json());
-  app.use('/api/chatbot', chatbotRoutes);
+  app.use('/api/chatbot', chatbotRoutes.createChatbotRouter({ auth: TEST_AUTH }));
   app.use((error, _req, res, _next) => {
     const normalized = normalizeError(error);
     res.status(normalized.statusCode).json({

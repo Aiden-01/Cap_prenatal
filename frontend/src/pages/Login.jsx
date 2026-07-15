@@ -1,5 +1,5 @@
 ﻿import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3,
   CalendarDays,
@@ -15,7 +15,7 @@ import {
   Users,
 } from "lucide-react";
 import api from "../api/axios";
-import { useAuth } from "../hooks/useAuth";
+import { consumeAuthNotice, useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessage";
 import { useFieldErrors } from "../hooks/useFieldErrors";
 
@@ -32,6 +32,10 @@ export default function Login() {
   const fieldErrors = useFieldErrors(FIELD_LABELS);
   const { login }  = useAuth();
   const navigate   = useNavigate();
+  const location   = useLocation();
+  const [sessionMessage] = useState(
+    () => location.state?.sessionMessage || consumeAuthNotice()
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -245,6 +249,12 @@ export default function Login() {
           {error && (
             <div className="login-error">
               {error}
+            </div>
+          )}
+
+          {!error && sessionMessage && (
+            <div className="login-error" role="status">
+              {sessionMessage}
             </div>
           )}
 

@@ -10,6 +10,7 @@ function crearEscenario({
   usuarioExiste = true,
   fallaReemplazo = false,
   fallaAuditoria = false,
+  fallaRevocacion = false,
   actorId = 7,
   usuarioId = 12,
 } = {}) {
@@ -68,6 +69,15 @@ function crearEscenario({
     },
   };
 
+  const sessionService = {
+    async revokeAllInTransaction({ usuarioId: affectedId, db: conexion }) {
+      assert.equal(conexion, db);
+      assert.equal(String(affectedId), String(usuarioId));
+      llamadas.push('REVOKE_SESSIONS');
+      if (fallaRevocacion) throw new Error('fallo al revocar sesiones');
+    },
+  };
+
   async function registrarAuditoria(req, evento, opciones) {
     llamadas.push('AUDIT');
     assert.equal(opciones.db, db);
@@ -91,6 +101,8 @@ function crearEscenario({
         permisosRepository,
         usuariosRepository,
         registrarEvento: registrarAuditoria,
+        sessionService,
+        authSessionsRepository: {},
       },
     });
   }
@@ -119,6 +131,27 @@ test('agregar permisos registra estado anterior, nuevo y agregados', async () =>
   assert.deepEqual(evento.datosNuevos.permisos, ['controles.crear', 'pacientes.ver']);
   assert.deepEqual(evento.datosNuevos.permisos_agregados, ['controles.crear']);
   assert.deepEqual(evento.datosNuevos.permisos_retirados, []);
+  assert.equal(escenario.llamadas.includes('REVOKE_SESSIONS'), true);
+});
+
+test('un actor que cambia sus propios permisos revoca sus propias sesiones', async () => {
+  const escenario = crearEscenario({
+    actorId: 12,
+    usuarioId: 12,
+    permisosIniciales: ['pacientes.ver'],
+  });
+  await escenario.ejecutar(['pacientes.ver', 'controles.crear']);
+  assert.equal(escenario.llamadas.includes('REVOKE_SESSIONS'), true);
+});
+
+test('un fallo al revocar sesiones revierte el reemplazo de permisos', async () => {
+  const escenario = crearEscenario({
+    permisosIniciales: ['pacientes.ver'],
+    fallaRevocacion: true,
+  });
+  await assert.rejects(escenario.ejecutar(['controles.crear']), /fallo al revocar sesiones/);
+  assert.deepEqual(escenario.estado(), ['pacientes.ver']);
+  assert.equal(escenario.llamadas.at(-1), 'ROLLBACK');
 });
 
 test('retirar permisos registra solamente los codigos retirados', async () => {

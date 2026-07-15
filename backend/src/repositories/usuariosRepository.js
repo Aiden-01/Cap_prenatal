@@ -122,8 +122,8 @@ async function actualizar({ id, nombreCompleto, activo, rol, passwordHash, updat
   return rows[0] || null;
 }
 
-async function eliminar(id) {
-  await pool.query('DELETE FROM usuarios WHERE id = $1', [id]);
+async function eliminar(id, db = pool) {
+  await db.query('DELETE FROM usuarios WHERE id = $1', [id]);
 }
 
 module.exports = {

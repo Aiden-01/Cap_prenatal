@@ -20,6 +20,7 @@ function crearEscenario({
   permisosIniciales = ADMIN,
   usuarioExiste = true,
   fallaAuditoriaEn = null,
+  fallaRevocacion = false,
   actorId = 7,
   usuarioId = 12,
   actorRol = 'director',
@@ -119,6 +120,15 @@ function crearEscenario({
     },
   };
 
+  const sessionService = {
+    async revokeAllInTransaction({ usuarioId: affectedId, db: conexion }) {
+      assert.equal(conexion, db);
+      assert.equal(String(affectedId), String(usuarioId));
+      llamadas.push('REVOKE_SESSIONS');
+      if (fallaRevocacion) throw new Error('fallo al revocar sesiones');
+    },
+  };
+
   async function registrarEvento(req, evento, opciones) {
     assert.equal(opciones.db, db);
     assert.equal(opciones.obligatorio, true);
@@ -158,6 +168,8 @@ function crearEscenario({
         permisosService,
         registrarAuditoria,
         registrarEvento,
+        sessionService,
+        authSessionsRepository: {},
       },
     });
   }
@@ -188,6 +200,33 @@ test('cambio de rol agrega los permisos predeterminados faltantes', async () => 
   assert.equal(evento.datosNuevos.origen, 'cambio_rol');
   assert.equal(evento.datosNuevos.rol_anterior, 'admin');
   assert.equal(evento.datosNuevos.rol_nuevo, 'personal_salud');
+  assert.equal(escenario.llamadas.includes('REVOKE_SESSIONS'), true);
+});
+
+test('reinicio administrativo de password revoca sesiones', async () => {
+  const escenario = crearEscenario();
+  await escenario.ejecutar({
+    nombre_completo: 'Usuario objetivo',
+    activo: true,
+    rol: 'admin',
+    password: 'NuevaClaveSegura123!',
+  });
+  assert.equal(escenario.llamadas.includes('REVOKE_SESSIONS'), true);
+});
+
+test('desactivar usuario revoca sesiones', async () => {
+  const escenario = crearEscenario();
+  await escenario.ejecutar({ nombre_completo: 'Usuario objetivo', activo: false, rol: 'admin' });
+  assert.equal(escenario.llamadas.includes('REVOKE_SESSIONS'), true);
+  assert.equal(escenario.usuario().activo, false);
+});
+
+test('fallo de revocacion revierte cambio critico de rol', async () => {
+  const escenario = crearEscenario({ fallaRevocacion: true });
+  await assert.rejects(escenario.ejecutar('personal_salud'), /fallo al revocar sesiones/);
+  assert.equal(escenario.usuario().rol, 'admin');
+  assert.deepEqual(escenario.permisos(), ADMIN);
+  assert.equal(escenario.llamadas.at(-1), 'ROLLBACK');
 });
 
 test('cambio de rol retira permisos que no pertenecen al nuevo rol', async () => {
@@ -258,6 +297,7 @@ test('actor y usuario afectado pueden ser el mismo', async () => {
   const evento = eventoPermisos(escenario);
   assert.equal(evento.usuarioId, 12);
   assert.equal(evento.datosNuevos.usuario_afectado_id, 12);
+  assert.equal(escenario.llamadas.includes('REVOKE_SESSIONS'), true);
 });
 
 test('actualizacion sin rol conserva permisos y auditoria normal de usuario', async () => {

@@ -28,7 +28,7 @@ La solucion esta pensada para el flujo operativo del CAP El Chal. No es una plat
 | Frontend | React 19, Vite 8, React Router | Interfaz web |
 | UI | CSS propio, Tailwind CSS, Lucide React | Estilos e iconos |
 | Backend | Node.js, Express 4 | API REST |
-| Seguridad | JWT en cookie httpOnly, CSRF, bcryptjs, permisos por codigo | Autenticacion y autorizacion |
+| Seguridad | Sesiones revocables, JWT corto, refresh rotativo, CSRF, bcryptjs | Autenticacion y autorizacion |
 | Base de datos | PostgreSQL 14+ | Persistencia clinica |
 | Validacion | Zod | Validacion de body, params y query |
 | PDF/reportes | pdf-lib, Puppeteer, ExcelJS, LibreOffice/Excel | Documentos institucionales y exportaciones |
@@ -125,7 +125,7 @@ Backend:
 | --- | --- |
 | `npm run dev` | Servidor Express con nodemon. |
 | `npm start` | Servidor Express sin recarga automatica. |
-| `npm run db:migrate` | Aplica `backend/src/db/schema.sql`. |
+| `npm run db:migrate` | Aplica `schema.sql` y las migraciones versionadas pendientes, incluida `007_auth_sessions.sql`. |
 | `npm run db:seed` | Inicializa catalogos y, si no existe, una cuenta director configurada por entorno. |
 | `npm run db:seed-demo-patients` | Crea pacientes demo. |
 | `npm run test:embarazo-activo` | Validacion manual del flujo de embarazo activo. |
@@ -200,6 +200,28 @@ cap_prenatal/
 - Los endpoints de escritura deben validar permisos y registrar auditoria cuando modifican estado.
 - La auditoria no debe guardar contrasenas, tokens ni snapshots clinicos innecesariamente grandes.
 - Los campos sensibles de VIH se filtran segun permisos.
+
+## Sesiones de seguridad
+
+El login crea una fila en PostgreSQL (`auth_sessions`), un access JWT de 10
+minutos y un refresh aleatorio rotativo. Solo el hash SHA-256 del refresh se
+persiste; las credenciales viajan en cookies HttpOnly y nunca se guardan en el
+almacenamiento web. Cada solicitud protegida valida la sesion, la cuenta activa
+y el rol vigente en PostgreSQL.
+
+Por defecto, la sesion se cierra tras 15 minutos sin interaccion real y tiene un
+limite absoluto de 8 horas. El frontend advierte a los 13 minutos, coordina el
+cierre entre pestanas y no usa polling para mantener una sesion viva. Ocho horas
+es un limite por sesion, no una prohibicion de acceso fuera del horario laboral;
+el usuario puede iniciar sesion nuevamente de inmediato.
+
+Contraseña, desactivacion, rol, permisos, eliminacion, logout y logout-all
+revocan las sesiones correspondientes. Antes de desplegar se debe ejecutar
+`npm run db:migrate` desde `backend`: el comando descubre y registra por checksum
+las migraciones versionadas pendientes, incluida `007_auth_sessions.sql`. No se
+ejecuta automaticamente al arrancar ni debe apuntarse a una base real sin el plan
+operativo correspondiente. La limpieza futura/manual se ejecuta con
+`npm run sessions:cleanup` desde `backend` y nunca elimina sesiones activas.
 
 ## Docker
 

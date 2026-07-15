@@ -3,6 +3,8 @@ const usuariosRepository = require('../repositories/usuariosRepository');
 const permisosRepository = require('../repositories/permisosRepository');
 const permisosService = require('./permisosService');
 const auditService = require('./auditService');
+const sessionService = require('./sessionService');
+const authSessionsRepository = require('../repositories/authSessionsRepository');
 const { registrarAuditoria } = require('../utils/auditoria');
 const { HttpError } = require('../utils/httpError');
 
@@ -99,6 +101,8 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
   const permisosLogic = dependencies.permisosService || permisosService;
   const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
   const registrarAuditoriaNormal = dependencies.registrarAuditoria || registrarAuditoria;
+  const sessions = dependencies.sessionService || sessionService;
+  const sessionsRepo = dependencies.authSessionsRepository || authSessionsRepository;
   const before = await obtenerTargetVisible({ id, req, repository: usuariosRepo });
   const nextRol = body.rol ?? before.rol;
   assertPuedeAsignarRol({ rol: nextRol, actorRol: req.usuario.rol });
@@ -127,7 +131,12 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
     updatedBy: req.usuario.id,
   }, db || undefined);
 
-  if (before.rol !== nextRol) {
+  const roleChanged = before.rol !== nextRol;
+  const deactivated = before.activo === true && body.activo === false;
+  const passwordReset = Boolean(body.password);
+  const criticalChange = roleChanged || deactivated || passwordReset;
+
+  if (criticalChange) {
     await permisosRepo.enTransaccion(async (db) => {
       const bloqueado = await permisosRepo.bloquearUsuarioPermisos(id, db);
       if (!bloqueado) throw new HttpError(404, 'Usuario no encontrado');
@@ -155,12 +164,30 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
             rol_anterior: estadoAnterior.rol,
             rol_nuevo: nextRol,
           },
+          revocarSesiones: false,
           dependencies: {
             permisosRepository: permisosRepo,
             registrarEvento,
+            sessionService: sessions,
+            authSessionsRepository: sessionsRepo,
           },
         });
       }
+
+      const reasons = [];
+      if (passwordReset) reasons.push('password_reset');
+      if (deactivated) reasons.push('user_deactivated');
+      if (roleChanged) reasons.push('role_changed');
+      await sessions.revokeAllInTransaction({
+        usuarioId: id,
+        reason: reasons.join('+'),
+        req,
+        db,
+        dependencies: {
+          repository: sessionsRepo,
+          registrarEvento,
+        },
+      });
 
       await registrarEvento(req, {
         accion: 'actualizar',
@@ -189,21 +216,27 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
   return { message: 'Usuario actualizado' };
 }
 
-async function eliminarUsuario({ id, req }) {
+async function eliminarUsuario({ id, req, dependencies = {} }) {
+  const usuariosRepo = dependencies.usuariosRepository || usuariosRepository;
+  const permisosRepo = dependencies.permisosRepository || permisosRepository;
+  const sessions = dependencies.sessionService || sessionService;
+  const sessionsRepo = dependencies.authSessionsRepository || authSessionsRepository;
+  const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
+  const registrarAuditoriaNormal = dependencies.registrarAuditoria || registrarAuditoria;
   const esSelf = String(id) === String(req.usuario.id);
   if (esSelf) throw new HttpError(403, 'No puedes eliminar tu propia cuenta');
 
-  const target = await obtenerTargetVisible({ id, req });
+  const target = await obtenerTargetVisible({ id, req, repository: usuariosRepo });
 
   if (target.rol === 'admin') {
-    const adminsActivos = await usuariosRepository.contarAdminsActivos();
+    const adminsActivos = await usuariosRepo.contarAdminsActivos();
     if (adminsActivos <= 1) {
       throw new HttpError(403, 'No puedes eliminar al unico administrador activo del sistema');
     }
   }
 
   if (target.rol === 'director' && target.activo) {
-    const directoresActivos = await usuariosRepository.contarDirectoresActivos();
+    const directoresActivos = await usuariosRepo.contarDirectoresActivos();
     if (directoresActivos <= 1) {
       throw new HttpError(403, 'No puedes eliminar al unico director activo del sistema');
     }
@@ -215,8 +248,17 @@ async function eliminarUsuario({ id, req }) {
     });
   }
 
-  await usuariosRepository.eliminar(id);
-  await registrarAuditoria(req, {
+  await permisosRepo.enTransaccion(async (db) => {
+    await sessions.revokeAllInTransaction({
+      usuarioId: id,
+      reason: 'user_deleted',
+      req,
+      db,
+      dependencies: { repository: sessionsRepo, registrarEvento },
+    });
+    await usuariosRepo.eliminar(id, db);
+  });
+  await registrarAuditoriaNormal(req, {
     accion: 'eliminar',
     tabla: 'usuarios',
     registroId: id,

@@ -1,5 +1,5 @@
 ﻿import { Outlet, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Eye, EyeOff, KeyRound, Menu, X } from "lucide-react";
 import Sidebar from "./Sidebar";
 import Toast from "./Toast";
@@ -10,6 +10,8 @@ import { ChatbotScreenProvider } from "../context/ChatbotScreenContext";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { useFieldErrors } from "../hooks/useFieldErrors";
+import { useSessionManager } from "../hooks/useSessionManager";
+import SessionTimeoutModal from "./SessionTimeoutModal";
 
 const PASSWORD_FIELD_LABELS = {
   current_password: "Contraseña actual",
@@ -44,13 +46,23 @@ export default function Layout() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login", { replace: true });
-    api.post("/auth/logout").catch(() => {
-      // La sesión local ya quedó cerrada; el servidor puede fallar sin bloquear la UI.
+  const endLocalSession = useCallback((message = "", broadcastType = "logout") => {
+    logout({ reason: message, broadcastType });
+    navigate("/login", {
+      replace: true,
+      state: message ? { sessionMessage: message } : undefined,
     });
-  };
+  }, [logout, navigate]);
+
+  const handleLogout = useCallback(() => {
+    api.post("/auth/logout", {}, { skipAuthRefresh: true, skipAuthRedirect: true }).catch(() => {});
+    endLocalSession();
+  }, [endLocalSession]);
+
+  const sessionManager = useSessionManager({
+    usuario,
+    onSessionEnd: endLocalSession,
+  });
 
   const resetPasswordForm = () => {
     setShowPasswords(false);
@@ -86,9 +98,12 @@ export default function Layout() {
       await api.post("/auth/cambiar-password", passwordForm, {
         skipAuthRedirect: true,
       });
-      toast("Contraseña actualizada correctamente", "success");
       setPasswordOpen(false);
       resetPasswordForm();
+      endLocalSession(
+        "La contraseña se actualizó y todas tus sesiones fueron cerradas. Inicia sesión nuevamente.",
+        "session-expired"
+      );
     } catch (err) {
       toast(passwordFieldErrors.setErrorsFromResponse(err, "Error al cambiar contraseña").message, "error");
     } finally {
@@ -153,6 +168,15 @@ export default function Layout() {
 
         <Toast toasts={toasts} />
         <ChatbotWidget key={String(usuario?.id || usuario?.username || "anonymous")} />
+
+        {sessionManager.visible && (
+          <SessionTimeoutModal
+            remainingSeconds={sessionManager.remainingSeconds}
+            continuing={sessionManager.continuing}
+            onContinue={sessionManager.continueSession}
+            onLogout={handleLogout}
+          />
+        )}
 
         {passwordOpen && (
           <div className="modal-backdrop">

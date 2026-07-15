@@ -4,7 +4,7 @@ const path = require('node:path');
 const test = require('node:test');
 const jwt = require('jsonwebtoken');
 
-const { authMiddleware } = require('../src/middleware/auth');
+const { authMiddleware, createAuthMiddleware } = require('../src/middleware/auth');
 const { verificarPermiso } = require('../src/middleware/permisos');
 
 function invoke(middleware, req) {
@@ -23,16 +23,42 @@ function invoke(middleware, req) {
 async function runAuthorizationChain({ permisos, permisoRequerido }) {
   const previousSecret = process.env.JWT_SECRET;
   process.env.JWT_SECRET = '7mQ2vR9xK4pT8zN3cF6hJ1sL5yB0dG7wE2';
+  const sessionId = '5ecde8e8-b0b7-4db6-96d4-9b013b1f7b34';
   const token = jwt.sign(
-    { id: 99, username: 'test-user', rol: 'personal_salud' },
+    { sid: sessionId },
     process.env.JWT_SECRET,
-    { expiresIn: '5m' }
+    {
+      algorithm: 'HS256',
+      issuer: 'cap-prenatal-api',
+      audience: 'cap-prenatal-web',
+      subject: '99',
+      jwtid: '03cae1d2-f50c-4f63-af6e-4f256f81b966',
+      expiresIn: '5m',
+    }
   );
   const req = { headers: { authorization: `Bearer ${token}` } };
+  const middleware = createAuthMiddleware({
+    repository: {
+      async obtenerConUsuarioPorId() {
+        return {
+          id: sessionId,
+          usuario_id: 99,
+          username: 'test-user',
+          nombre_completo: 'Test User',
+          activo: true,
+          rol: 'personal_salud',
+          created_at: new Date(),
+          last_activity_at: new Date(),
+          absolute_expires_at: new Date(Date.now() + 60 * 60 * 1000),
+          revoked_at: null,
+        };
+      },
+    },
+  });
   let controllerReached = false;
 
   try {
-    await invoke(authMiddleware, req);
+    await invoke(middleware, req);
     req.usuario.permisos = permisos;
     await invoke(verificarPermiso(permisoRequerido), req);
     controllerReached = true;
@@ -47,7 +73,7 @@ async function runAuthorizationChain({ permisos, permisoRequerido }) {
 test('usuario no autenticado recibe 401', async () => {
   await assert.rejects(
     invoke(authMiddleware, { headers: {} }),
-    (error) => error.statusCode === 401 && error.code === 'TOKEN_REQUIRED'
+    (error) => error.statusCode === 401 && error.code === 'AUTHENTICATION_REQUIRED'
   );
 });
 

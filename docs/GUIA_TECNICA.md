@@ -820,7 +820,12 @@ Fuera de alcance actual:
 | `DB_SSL` | Activa SSL para base de datos. |
 | `DB_SSL_REJECT_UNAUTHORIZED` | Controla validacion de certificado SSL. |
 | `JWT_SECRET` | Firma de JWT. Obligatoria. |
-| `JWT_EXPIRES_IN` | Duracion de sesion. Default `8h`. |
+| `ACCESS_TOKEN_TTL_MINUTES` | Vida del access JWT. Default `10`. |
+| `SESSION_IDLE_TIMEOUT_MINUTES` | Inactividad maxima validada por backend. Default `15`. |
+| `SESSION_WARNING_MINUTES` | Momento de advertencia visual. Default `13`; menor que idle. |
+| `SESSION_ABSOLUTE_HOURS` | Vida maxima inmutable de una sesion. Default `8`. |
+| `SESSION_ACTIVITY_UPDATE_SECONDS` | Throttling minimo de actividad real. Default `60`. |
+| `SESSION_RETENTION_DAYS` | Retencion usada solo por la limpieza manual. Default `30`. |
 | `PORT` | Puerto backend. Default `3001`. |
 | `FRONTEND_URL` | Origenes permitidos por CORS, separados por coma. |
 | `COOKIE_SAMESITE` | Politica SameSite de cookies. Default `lax`. |
@@ -844,6 +849,40 @@ credenciales, rutas, query ni fragmentos. Se permiten DNS internos e IP privadas
 con HTTPS; los equipos deben confiar en el certificado y se recomienda DNS interno
 en lugar de IP. Permitir una direccion privada concreta no habilita otros origenes.
 Las variables `SEED_*` se validan exclusivamente al ejecutar `npm run db:seed`.
+
+## Autenticacion revocable
+
+`auth_sessions` es la fuente de verdad de cada sesion. El access JWT contiene
+`sid`, `sub` y `jti`, usa HS256 con issuer/audience fijos y expira en 10 minutos;
+no contiene rol ni permisos. El middleware verifica la firma y luego une sesion,
+usuario y rol actuales. Los permisos granulares continúan consultandose en
+PostgreSQL.
+
+Antes del despliegue, `npm run db:migrate` desde `backend` aplica el schema base y
+las migraciones versionadas pendientes en orden. Cada archivo queda registrado
+por nombre y checksum en `schema_migrations`; `007_auth_sessions.sql` forma parte
+de este flujo y no debe ejecutarse manualmente por separado.
+
+El refresh tiene 48 bytes aleatorios, se guarda solo como SHA-256 y rota bajo
+bloqueo transaccional. Reutilizar un valor anterior revoca la sesion. La cookie
+refresh usa path `/api/auth`: se limita al modulo de autenticacion y permite que
+`/auth/logout` cierre realmente la sesion aunque el access cookie ya haya
+expirado. Refresh y `/auth/me` no actualizan actividad.
+
+Solo `POST /auth/activity`, originado por teclado, pointer, touch o rueda real,
+actualiza `last_activity_at`, como maximo una vez por minuto. A los 15 minutos la
+sesion queda invalida; a las 8 horas vence aunque exista actividad. La advertencia
+local de 13 minutos ayuda al usuario, pero el backend siempre decide. Cambiar la
+contraseña propia o administrativa, desactivar, cambiar rol/permisos o eliminar
+un usuario revoca todas sus sesiones en la misma transaccion critica.
+
+Las pestanas se coordinan con `BroadcastChannel` sin transmitir credenciales. La
+renovacion usa Web Locks en Chrome/Edge y un marcador local no sensible que solo
+indica exito o fallo: una pestana que encontro el cerrojo ocupado espera y no
+realiza una segunda rotacion. La UI no guarda automaticamente formularios
+clinicos. Para purgar filas revocadas o expiradas antiguas, ejecutar
+deliberadamente `npm run sessions:cleanup`; no hay scheduler de produccion en
+este sprint.
 
 ## Checklist para cambios futuros
 

@@ -1,11 +1,14 @@
 import axios from "axios";
+import {
+  createRefreshCoordinator,
+  mayRetryAfterRefresh,
+  SESSION_INVALID_CODES,
+} from "../utils/sessionSecurity";
 
+export const AUTH_SESSION_INVALID_EVENT = "cap-auth-session-invalid";
 const apiHost = import.meta.env.VITE_API_URL || "/api";
 
-const api = axios.create({
-  baseURL: apiHost,
-  withCredentials: true,
-});
+const api = axios.create({ baseURL: apiHost, withCredentials: true });
 
 function readCookie(name) {
   return document.cookie
@@ -19,23 +22,61 @@ api.interceptors.request.use((config) => {
   const method = (config.method || "get").toLowerCase();
   if (["post", "put", "patch", "delete"].includes(method)) {
     const csrfToken = readCookie("cap_prenatal_csrf");
-    if (csrfToken) {
-      config.headers["X-CSRF-Token"] = decodeURIComponent(csrfToken);
-    }
+    if (csrfToken) config.headers["X-CSRF-Token"] = decodeURIComponent(csrfToken);
   }
   return config;
 });
 
-// Si el token expira, redirigir al login
+const REFRESH_STATE_KEY = "cap_prenatal_refresh_state";
+
+const refreshAccess = createRefreshCoordinator({
+  executeRefresh: () => api.post("/auth/refresh", {}, {
+    skipAuthRefresh: true,
+    skipAuthRedirect: true,
+  }),
+  lockManager: navigator.locks,
+  readState: () => localStorage.getItem(REFRESH_STATE_KEY),
+  writeState: (state) => localStorage.setItem(REFRESH_STATE_KEY, JSON.stringify(state)),
+  createStateId: () => crypto.randomUUID(),
+});
+
+function notifyInvalidSession(code) {
+  window.dispatchEvent(new CustomEvent(AUTH_SESSION_INVALID_EVENT, { detail: { code } }));
+}
+
 api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (err.response?.status === 401 && !err.config?.skipAuthRedirect) {
-      localStorage.removeItem("usuario");
-      window.location.href = "/login";
+  (response) => {
+    if (String(response.config?.url || "").includes("/auth/login")) {
+      try {
+        localStorage.removeItem(REFRESH_STATE_KEY);
+      } catch {
+        // La sesion nueva sigue siendo valida aunque el marcador no este disponible.
+      }
     }
-    return Promise.reject(err);
+    return response;
+  },
+  async (error) => {
+    const config = error.config || {};
+    if (mayRetryAfterRefresh(error, config)) {
+      config._authRetry = true;
+      try {
+        await refreshAccess();
+        return api.request(config);
+      } catch (refreshError) {
+        notifyInvalidSession(refreshError.response?.data?.code || "AUTHENTICATION_REQUIRED");
+        return Promise.reject(refreshError);
+      }
+    }
+
+    const code = error.response?.data?.code;
+    if (error.response?.status === 401
+      && SESSION_INVALID_CODES.has(code)
+      && !config.skipAuthRedirect) {
+      notifyInvalidSession(code);
+    }
+    return Promise.reject(error);
   }
 );
 
+export { refreshAccess };
 export default api;

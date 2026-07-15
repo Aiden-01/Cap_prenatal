@@ -1,156 +1,179 @@
 const assert = require('node:assert/strict');
+const path = require('node:path');
 const test = require('node:test');
 
-const { migrate } = require('../src/db/migrate');
+const {
+  checksum,
+  discoverMigrationFiles,
+  migrate,
+} = require('../src/db/migrate');
 
-function createLogger() {
-  const entries = { log: [], error: [] };
-  return {
-    entries,
-    logger: {
-      log: (...args) => entries.log.push(args),
-      error: (...args) => entries.error.push(args),
-    },
-  };
-}
-
-function createDb({ queryError = null, closeError = null } = {}) {
+function createHarness({ query = null, closeError = null } = {}) {
   const calls = { query: [], end: 0 };
+  const entries = { log: [], error: [] };
+  const codes = [];
   return {
     calls,
+    codes,
+    entries,
     db: {
-      query: async (sql) => {
-        calls.query.push(sql);
-        if (queryError) throw queryError;
+      async query(sql, params) {
+        calls.query.push({ sql, params });
+        if (query) return query(sql, params);
+        return { rows: [], rowCount: 0 };
       },
-      end: async () => {
+      async end() {
         calls.end += 1;
         if (closeError) throw closeError;
       },
     },
-  };
-}
-
-function createExitCodeRecorder() {
-  const codes = [];
-  return {
-    codes,
+    logger: {
+      log: (...args) => entries.log.push(args),
+      error: (...args) => entries.error.push(args),
+    },
     setExitCode: (code) => codes.push(code),
   };
 }
 
-test('migracion exitosa ejecuta SQL, cierra el pool y no marca error', async () => {
-  const { db, calls } = createDb();
-  const { logger, entries } = createLogger();
-  const { setExitCode, codes } = createExitCodeRecorder();
-  const readCalls = [];
+test('descubre migraciones versionadas en orden e incluye 007_auth_sessions', () => {
+  const files = discoverMigrationFiles({
+    migrationsDir: 'migrations-test',
+    readDirectory: () => [
+      '007_auth_sessions.sql',
+      'README.md',
+      '005_bi_views.sql',
+      '006_usuarios_updated_by.sql',
+      '004_permissions_audit.sql',
+      '008-NO-VALIDA.sql',
+    ],
+  });
+  assert.deepEqual(files.map(({ filename }) => filename), [
+    '004_permissions_audit.sql',
+    '005_bi_views.sql',
+    '006_usuarios_updated_by.sql',
+    '007_auth_sessions.sql',
+  ]);
+  assert.equal(files.at(-1).path, path.join('migrations-test', '007_auth_sessions.sql'));
+  assert.equal(
+    discoverMigrationFiles().some(({ filename }) => filename === '007_auth_sessions.sql'),
+    true
+  );
+});
 
+test('aplica schema y registra 007 en transacciones independientes', async () => {
+  const harness = createHarness();
   const result = await migrate({
-    db,
-    readSchema: (schemaPath, encoding) => {
-      readCalls.push({ schemaPath, encoding });
-      return 'SELECT 1;';
-    },
-    schemaPath: 'schema-test.sql',
-    logger,
-    setExitCode,
+    ...harness,
+    readSchema: () => 'SELECT schema_base;',
+    readDirectory: () => ['007_auth_sessions.sql'],
+    readMigration: () => 'CREATE TABLE IF NOT EXISTS auth_sessions (id UUID);',
+    migrationsDir: 'migrations-test',
   });
 
-  assert.deepEqual(readCalls, [{ schemaPath: 'schema-test.sql', encoding: 'utf8' }]);
-  assert.deepEqual(calls.query, ['SELECT 1;']);
-  assert.equal(calls.end, 1);
-  assert.deepEqual(codes, []);
   assert.equal(result.ok, true);
-  assert.equal(result.error, null);
-  assert.equal(entries.log.length, 1);
-  assert.equal(entries.error.length, 0);
+  assert.equal(harness.calls.end, 1);
+  assert.deepEqual(harness.codes, []);
+  const querySql = harness.calls.query.map(({ sql }) => sql);
+  assert.deepEqual(querySql.slice(0, 3), ['BEGIN', 'SELECT schema_base;', 'COMMIT']);
+  assert.match(harness.calls.query[3].sql, /CREATE TABLE IF NOT EXISTS schema_migrations/);
+  assert.deepEqual(querySql.slice(4), [
+    'BEGIN',
+    'SELECT pg_advisory_xact_lock(hashtext($1))',
+    'SELECT checksum FROM schema_migrations WHERE filename = $1',
+    'CREATE TABLE IF NOT EXISTS auth_sessions (id UUID);',
+    'INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2)',
+    'COMMIT',
+  ]);
+  const insert = harness.calls.query.find(({ sql }) => sql.startsWith('INSERT INTO schema_migrations'));
+  assert.equal(insert.params[0], '007_auth_sessions.sql');
+  assert.equal(insert.params[1].length, 64);
 });
 
-test('error SQL registra el fallo, cierra el pool y marca codigo 1', async () => {
-  const queryError = new Error('SQL invalido');
-  const { db, calls } = createDb({ queryError });
-  const { logger, entries } = createLogger();
-  const { setExitCode, codes } = createExitCodeRecorder();
-
+test('omite una migracion ya registrada con el mismo checksum', async () => {
+  const migrationSql = 'SELECT migration_007;';
+  const harness = createHarness({
+    query: async (sql) => sql.startsWith('SELECT checksum FROM schema_migrations')
+      ? { rows: [{ checksum: checksum(migrationSql) }] }
+      : { rows: [] },
+  });
   const result = await migrate({
-    db,
-    readSchema: () => 'SQL INVALIDO;',
-    logger,
-    setExitCode,
+    ...harness,
+    readSchema: () => 'SELECT schema_base;',
+    readDirectory: () => ['007_auth_sessions.sql'],
+    readMigration: () => migrationSql,
   });
 
-  assert.deepEqual(calls.query, ['SQL INVALIDO;']);
-  assert.equal(calls.end, 1);
-  assert.deepEqual(codes, [1]);
-  assert.equal(result.ok, false);
-  assert.equal(result.error, queryError);
-  assert.equal(entries.error.length, 1);
-  assert.match(entries.error[0].join(' '), /SQL invalido/);
+  assert.equal(result.ok, true);
+  assert.equal(harness.calls.query.some(({ sql }) => sql === migrationSql), false);
+  assert.equal(harness.calls.query.some(({ sql }) => sql.startsWith('INSERT INTO schema_migrations')), false);
+  assert.match(harness.entries.log[0].join(' '), /0 aplicada\(s\), 1 omitida\(s\)/);
 });
 
-test('error leyendo schema no ejecuta SQL, cierra el pool y marca codigo 1', async () => {
-  const readError = new Error('No se pudo leer schema.sql');
-  const { db, calls } = createDb();
-  const { logger, entries } = createLogger();
-  const { setExitCode, codes } = createExitCodeRecorder();
-
+test('rechaza una migracion aplicada cuyo archivo fue modificado y revierte', async () => {
+  const harness = createHarness({
+    query: async (sql) => sql.startsWith('SELECT checksum FROM schema_migrations')
+      ? { rows: [{ checksum: '0'.repeat(64) }] }
+      : { rows: [] },
+  });
   const result = await migrate({
-    db,
-    readSchema: () => {
-      throw readError;
+    ...harness,
+    readSchema: () => 'SELECT schema_base;',
+    readDirectory: () => ['007_auth_sessions.sql'],
+    readMigration: () => 'SELECT version_nueva;',
+  });
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(harness.codes, [1]);
+  assert.equal(harness.calls.query.at(-1).sql, 'ROLLBACK');
+  assert.match(result.error.message, /fue modificada: 007_auth_sessions\.sql/);
+});
+
+test('un error SQL revierte, cierra el pool y marca codigo 1', async () => {
+  const sqlError = new Error('SQL invalido');
+  const harness = createHarness({
+    query: async (sql) => {
+      if (sql === 'SQL INVALIDO;') throw sqlError;
+      return { rows: [] };
     },
-    logger,
-    setExitCode,
+  });
+  const result = await migrate({
+    ...harness,
+    readSchema: () => 'SQL INVALIDO;',
+    readDirectory: () => [],
   });
 
-  assert.deepEqual(calls.query, []);
-  assert.equal(calls.end, 1);
-  assert.deepEqual(codes, [1]);
   assert.equal(result.ok, false);
-  assert.equal(result.error, readError);
-  assert.equal(entries.error.length, 1);
-  assert.match(entries.error[0].join(' '), /No se pudo leer schema\.sql/);
+  assert.equal(result.error, sqlError);
+  assert.deepEqual(harness.calls.query.map(({ sql }) => sql), ['BEGIN', 'SQL INVALIDO;', 'ROLLBACK']);
+  assert.equal(harness.calls.end, 1);
+  assert.deepEqual(harness.codes, [1]);
 });
 
-test('error cerrando el pool despues de exito tambien marca fallo', async () => {
-  const closeError = new Error('Fallo cerrando pool');
-  const { db, calls } = createDb({ closeError });
-  const { logger, entries } = createLogger();
-  const { setExitCode, codes } = createExitCodeRecorder();
-
+test('un error leyendo schema no ejecuta SQL y siempre cierra el pool', async () => {
+  const readError = new Error('No se pudo leer schema.sql');
+  const harness = createHarness();
   const result = await migrate({
-    db,
-    readSchema: () => 'SELECT 1;',
-    logger,
-    setExitCode,
+    ...harness,
+    readSchema: () => { throw readError; },
   });
 
-  assert.equal(calls.query.length, 1);
-  assert.equal(calls.end, 1);
-  assert.deepEqual(codes, [1]);
+  assert.equal(result.error, readError);
+  assert.deepEqual(harness.calls.query, []);
+  assert.equal(harness.calls.end, 1);
+  assert.deepEqual(harness.codes, [1]);
+});
+
+test('un error cerrando el pool despues del exito marca fallo', async () => {
+  const closeError = new Error('Fallo cerrando pool');
+  const harness = createHarness({ closeError });
+  const result = await migrate({
+    ...harness,
+    readSchema: () => 'SELECT schema_base;',
+    readDirectory: () => [],
+  });
+
   assert.equal(result.ok, false);
   assert.equal(result.error, closeError);
-  assert.match(entries.error[0].join(' '), /Fallo cerrando pool/);
-});
-
-test('error de cierre no oculta el error SQL original', async () => {
-  const queryError = new Error('Fallo SQL original');
-  const closeError = new Error('Fallo secundario de cierre');
-  const { db, calls } = createDb({ queryError, closeError });
-  const { logger, entries } = createLogger();
-  const { setExitCode, codes } = createExitCodeRecorder();
-
-  const result = await migrate({
-    db,
-    readSchema: () => 'SQL INVALIDO;',
-    logger,
-    setExitCode,
-  });
-
-  assert.equal(calls.end, 1);
-  assert.deepEqual(codes, [1, 1]);
-  assert.equal(result.error, queryError);
-  assert.equal(entries.error.length, 2);
-  assert.match(entries.error[0].join(' '), /Fallo SQL original/);
-  assert.match(entries.error[1].join(' '), /Fallo secundario de cierre/);
+  assert.equal(harness.calls.end, 1);
+  assert.deepEqual(harness.codes, [1]);
 });

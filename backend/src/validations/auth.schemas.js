@@ -14,7 +14,10 @@ const changePasswordSchema = z.object({
   message: 'La confirmacion no coincide con la nueva contrasena',
 }).passthrough();
 
+const emptyBodySchema = z.object({}).strict();
+
 module.exports = {
   loginSchema,
   changePasswordSchema,
+  emptyBodySchema,
 };

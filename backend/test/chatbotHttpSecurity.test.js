@@ -10,7 +10,7 @@ process.env.JWT_SECRET = '8vR2mK7pT9zW3cF6hJ1sL5yB0dG4qN8xA2uE';
 process.env.CHATBOT_LOGGING_ENABLED = 'false';
 
 const { createChatbotController } = require('../src/controllers/chatbotController');
-const { csrfMiddleware } = require('../src/middleware/auth');
+const { createAuthMiddleware, csrfMiddleware } = require('../src/middleware/auth');
 const {
   DEFAULT_CHATBOT_FEEDBACK_RATE_LIMIT,
   DEFAULT_CHATBOT_MESSAGE_RATE_LIMIT,
@@ -23,16 +23,45 @@ const chatbotRoutes = require('../src/routes/chatbot');
 
 const { createChatbotRouter } = chatbotRoutes;
 const CSRF_TOKEN = 'chatbot-http-csrf-token';
+const SESSION_ONE = '102c6ec4-1c15-4d67-b6f5-d1ac334ca106';
+const SESSION_TWO = '78b1dc72-d32a-4ef8-b8be-c1c92e2eca14';
+const TEST_JWT_CONFIG = {
+  secret: process.env.JWT_SECRET,
+  algorithm: 'HS256',
+  issuer: 'cap-prenatal-api',
+  audience: 'cap-prenatal-web',
+  accessTokenTtlMinutes: 10,
+};
 const AUTH_TOKEN = jwt.sign(
-  { id: 501, username: 'chatbot-http-user' },
+  { sid: SESSION_ONE },
   process.env.JWT_SECRET,
-  { expiresIn: '5m' }
+  { algorithm: 'HS256', issuer: TEST_JWT_CONFIG.issuer, audience: TEST_JWT_CONFIG.audience, subject: '501', jwtid: '64b524bb-7e21-4b27-a6c7-8141b7ec1c84', expiresIn: '5m' }
 );
 const SECOND_AUTH_TOKEN = jwt.sign(
-  { id: 502, username: 'chatbot-http-user-2' },
+  { sid: SESSION_TWO },
   process.env.JWT_SECRET,
-  { expiresIn: '5m' }
+  { algorithm: 'HS256', issuer: TEST_JWT_CONFIG.issuer, audience: TEST_JWT_CONFIG.audience, subject: '502', jwtid: '7530ae42-da44-4823-8288-76371263fd44', expiresIn: '5m' }
 );
+const TEST_AUTH = createAuthMiddleware({
+  repository: {
+    async obtenerConUsuarioPorId(id) {
+      const usuarioId = id === SESSION_TWO ? 502 : 501;
+      return {
+        id,
+        usuario_id: usuarioId,
+        nombre_completo: 'Chatbot Test',
+        username: `chatbot-http-user-${usuarioId}`,
+        rol: 'personal_salud',
+        activo: true,
+        created_at: new Date(),
+        last_activity_at: new Date(),
+        absolute_expires_at: new Date(Date.now() + 60 * 60 * 1000),
+        revoked_at: null,
+      };
+    },
+  },
+  getJwt: () => TEST_JWT_CONFIG,
+});
 
 let contractServer;
 let originalConsoleError;
@@ -53,6 +82,7 @@ function buildApp({
   app.use(express.json());
   app.use('/api', csrfMiddleware);
   app.use('/api/chatbot', createChatbotRouter({
+    auth: TEST_AUTH,
     controllers,
     feedbackRateLimiter: feedbackLimiter,
     messageRateLimiter: messageLimiter,
@@ -141,7 +171,7 @@ test('/mensaje sin autenticacion devuelve 401 cuando CSRF es valido', async () =
     { authenticated: false }
   );
 
-  assertSafeError(response, 401, 'TOKEN_REQUIRED');
+  assertSafeError(response, 401, 'AUTHENTICATION_REQUIRED');
 });
 
 test('/mensaje autenticado sin CSRF conserva el rechazo 403', async () => {
@@ -308,7 +338,7 @@ test('contexto declarado no permite saltarse autenticacion', async () => {
     { authenticated: false }
   );
 
-  assertSafeError(response, 401, 'TOKEN_REQUIRED');
+  assertSafeError(response, 401, 'AUTHENTICATION_REQUIRED');
 });
 
 test('/mensaje con payload invalido devuelve 400 VALIDATION_ERROR sin exponerlo', async () => {
@@ -367,7 +397,7 @@ test('/feedback tambien exige autenticacion', async () => {
     { authenticated: false }
   );
 
-  assertSafeError(response, 401, 'TOKEN_REQUIRED');
+  assertSafeError(response, 401, 'AUTHENTICATION_REQUIRED');
 });
 
 test('/feedback tambien exige CSRF', async () => {

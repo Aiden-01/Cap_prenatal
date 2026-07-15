@@ -1,6 +1,7 @@
 const permisosRepository = require('../repositories/permisosRepository');
 const usuariosRepository = require('../repositories/usuariosRepository');
 const auditService = require('./auditService');
+const sessionService = require('./sessionService');
 const { HttpError } = require('../utils/httpError');
 
 function requireDirector(req) {
@@ -49,10 +50,12 @@ async function reemplazarPermisosEnTransaccion({
   req,
   db,
   contexto = {},
+  revocarSesiones = true,
   dependencies = {},
 }) {
   const permisosRepo = dependencies.permisosRepository || permisosRepository;
   const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
+  const sessions = dependencies.sessionService || sessionService;
   const nuevos = normalizarCodigos(codigos);
   const existentes = await permisosRepo.existenCodigos(nuevos, db, true);
   const faltantes = nuevos.filter((codigo) => !existentes.includes(codigo));
@@ -82,6 +85,19 @@ async function reemplazarPermisosEnTransaccion({
     otorgadoPor: req.usuario.id,
   }, db);
   const { agregados, retirados } = calcularDiferenciasPermisos(anteriores, nuevos);
+
+  if (revocarSesiones) {
+    await sessions.revokeAllInTransaction({
+      usuarioId,
+      reason: 'permissions_changed',
+      req,
+      db,
+      dependencies: {
+        repository: dependencies.authSessionsRepository,
+        registrarEvento,
+      },
+    });
+  }
 
   await registrarEvento(req, {
     usuarioId: req.usuario.id,

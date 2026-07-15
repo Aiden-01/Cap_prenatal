@@ -8,9 +8,11 @@ http://localhost:3001/api
 
 ## Autenticacion
 
-El login devuelve el usuario en JSON y escribe cookies:
+El login devuelve el usuario en JSON y crea una sesion revocable en PostgreSQL.
+Escribe tres cookies:
 
-- `cap_prenatal_token`: JWT httpOnly.
+- `cap_prenatal_token`: access JWT httpOnly, corto y con path `/`.
+- `cap_prenatal_refresh`: valor aleatorio httpOnly, rotativo y con path `/api/auth`.
 - `cap_prenatal_csrf`: token CSRF legible por frontend.
 
 Para `POST`, `PUT`, `PATCH` y `DELETE`, enviar:
@@ -19,7 +21,24 @@ Para `POST`, `PUT`, `PATCH` y `DELETE`, enviar:
 X-CSRF-Token: <valor de cookie cap_prenatal_csrf>
 ```
 
-Las rutas protegidas requieren cookie de sesion valida.
+Las rutas protegidas requieren access JWT y sesion vigente. El middleware carga
+usuario y rol actuales desde PostgreSQL; `/auth/me` y refresh no cuentan como
+actividad.
+
+| Metodo | Ruta | Descripcion |
+| --- | --- | --- |
+| `POST` | `/auth/login` | Valida credenciales, crea sesion y cookies. |
+| `POST` | `/auth/refresh` | Rota refresh y access sin extender inactividad ni limite absoluto. |
+| `POST` | `/auth/activity` | Registra interaccion real con throttling; body estrictamente vacio. |
+| `GET` | `/auth/me` | Usuario, rol, permisos y metadata no sensible actuales. |
+| `POST` | `/auth/logout` | Revoca la sesion actual y limpia cookies. |
+| `POST` | `/auth/logout-all` | Revoca solo todas las sesiones del usuario autenticado. |
+| `POST` | `/auth/cambiar-password` | Cambia contraseña y revoca todas sus sesiones. |
+
+Refresh, activity, logout y logout-all requieren `X-CSRF-Token`. Los codigos de
+401 incluyen `ACCESS_TOKEN_EXPIRED`, `SESSION_REVOKED`, `SESSION_INACTIVE`,
+`SESSION_EXPIRED`, `USER_INACTIVE` o `AUTHENTICATION_REQUIRED` sin exponer
+credenciales ni detalles internos.
 
 ## Formato de error
 

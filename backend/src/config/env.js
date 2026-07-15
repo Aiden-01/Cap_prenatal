@@ -7,6 +7,9 @@ const COOKIE_SAMESITE_VALUES = new Set(['lax', 'strict', 'none']);
 const MIN_JWT_SECRET_BYTES = 32;
 const MIN_PRODUCTION_PASSWORD_BYTES = 16;
 const PRODUCTION_SEED_CONFIRMATION = 'CREATE_INITIAL_PRIVILEGED_ACCOUNT';
+const JWT_ALGORITHM = 'HS256';
+const JWT_ISSUER = 'cap-prenatal-api';
+const JWT_AUDIENCE = 'cap-prenatal-web';
 let environmentFileLoaded = false;
 const UNSAFE_SECRET_MARKERS = [
   /change[\s_-]*me/i,
@@ -106,13 +109,61 @@ function validateSecret(variable, value, {
 
 function validateJwtConfig(env = process.env, options = {}) {
   const nodeEnv = options.nodeEnv || nodeEnvForValidation(env);
+  const session = options.session || validateSessionConfig(env);
   const secret = validateSecret('JWT_SECRET', readRequired(env, 'JWT_SECRET'), {
     nodeEnv,
     minBytes: MIN_JWT_SECRET_BYTES,
   });
-  const expiresIn = readOptional(env, 'JWT_EXPIRES_IN', '8h');
-  if (!/^\d+[smhd]$/i.test(expiresIn)) invalid('JWT_EXPIRES_IN');
-  return Object.freeze({ secret, expiresIn });
+  return Object.freeze({
+    secret,
+    expiresIn: `${session.accessTokenTtlMinutes}m`,
+    accessTokenTtlMinutes: session.accessTokenTtlMinutes,
+    algorithm: JWT_ALGORITHM,
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
+  });
+}
+
+function validateSessionConfig(env = process.env) {
+  const accessTokenTtlMinutes = parseInteger(env, 'ACCESS_TOKEN_TTL_MINUTES', {
+    fallback: 10,
+    min: 1,
+    max: 60,
+  });
+  const idleTimeoutMinutes = parseInteger(env, 'SESSION_IDLE_TIMEOUT_MINUTES', {
+    fallback: 15,
+    min: 2,
+    max: 1440,
+  });
+  const warningMinutes = parseInteger(env, 'SESSION_WARNING_MINUTES', {
+    fallback: 13,
+    min: 1,
+    max: 1439,
+  });
+  const absoluteHours = parseInteger(env, 'SESSION_ABSOLUTE_HOURS', {
+    fallback: 8,
+    min: 1,
+    max: 168,
+  });
+  const activityUpdateSeconds = parseInteger(env, 'SESSION_ACTIVITY_UPDATE_SECONDS', {
+    fallback: 60,
+    min: 10,
+    max: 3600,
+  });
+
+  if (warningMinutes >= idleTimeoutMinutes) invalid('SESSION_WARNING_MINUTES');
+  if (accessTokenTtlMinutes >= absoluteHours * 60) invalid('ACCESS_TOKEN_TTL_MINUTES');
+  if (activityUpdateSeconds >= idleTimeoutMinutes * 60) {
+    invalid('SESSION_ACTIVITY_UPDATE_SECONDS');
+  }
+
+  return Object.freeze({
+    accessTokenTtlMinutes,
+    idleTimeoutMinutes,
+    warningMinutes,
+    absoluteHours,
+    activityUpdateSeconds,
+  });
 }
 
 function databaseSslConfig(env) {
@@ -242,7 +293,8 @@ function validateOptionalAutomationSecret(env, { nodeEnv }) {
 
 function validateAppConfig(env = process.env) {
   const nodeEnv = nodeEnvForValidation(env, { required: true });
-  const jwt = validateJwtConfig(env, { nodeEnv });
+  const session = validateSessionConfig(env);
+  const jwt = validateJwtConfig(env, { nodeEnv, session });
   const database = validateDatabaseConfig(env, { nodeEnv });
   const frontendOrigins = validateFrontendOrigins(env, { nodeEnv });
   const cookieSameSite = validateCookieSameSite(env);
@@ -254,6 +306,7 @@ function validateAppConfig(env = process.env) {
   return Object.freeze({
     nodeEnv,
     jwt,
+    session,
     database,
     frontendOrigins,
     cookieSameSite,
@@ -306,8 +359,13 @@ function getCookieConfig() {
   const nodeEnv = nodeEnvForValidation(process.env);
   const sameSite = readOptional(process.env, 'COOKIE_SAMESITE', 'lax').toLowerCase();
   if (!COOKIE_SAMESITE_VALUES.has(sameSite)) invalid('COOKIE_SAMESITE');
-  const { expiresIn } = validateJwtConfig(process.env, { nodeEnv });
-  return Object.freeze({ nodeEnv, sameSite, expiresIn });
+  const session = validateSessionConfig(process.env);
+  return Object.freeze({ nodeEnv, sameSite, session });
+}
+
+function getSessionConfig() {
+  loadEnvironmentFile();
+  return validateSessionConfig(process.env);
 }
 
 function getAutomationSecret() {
@@ -324,10 +382,12 @@ module.exports = {
   getAutomationSecret,
   getCookieConfig,
   getJwtConfig,
+  getSessionConfig,
   loadEnvironmentFile,
   nodeEnvForValidation,
   validateAppConfig,
   validateDatabaseConfig,
   validateJwtConfig,
+  validateSessionConfig,
   validateSeedConfig,
 };

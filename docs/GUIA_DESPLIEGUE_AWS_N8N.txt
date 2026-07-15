@@ -36,7 +36,11 @@ Backend:
 
   NODE_ENV
   JWT_SECRET
-  JWT_EXPIRES_IN
+  ACCESS_TOKEN_TTL_MINUTES
+  SESSION_IDLE_TIMEOUT_MINUTES
+  SESSION_WARNING_MINUTES
+  SESSION_ABSOLUTE_HOURS
+  SESSION_ACTIVITY_UPDATE_SECONDS
   FRONTEND_URL
   COOKIE_SAMESITE
   DB_SSL
@@ -77,6 +81,22 @@ El backend valida la configuracion antes de cargar rutas. En produccion rechaza:
   - AUTOMATION_SECRET inseguro cuando se configura.
 
 Los errores identifican la variable invalida sin imprimir su valor.
+
+Antes de iniciar la nueva version se debe ejecutar deliberadamente, desde backend:
+
+  npm run db:migrate
+
+El ejecutor aplica schema.sql, descubre en orden las migraciones versionadas
+pendientes y registra su checksum en schema_migrations; esto incluye
+007_auth_sessions.sql. No ejecutar el comando contra una base real sin respaldo,
+ventana y validacion del entorno. Los JWT anteriores, que no contienen sid, dejan
+de ser compatibles y los usuarios deben autenticarse otra vez. La limpieza manual
+de sesiones antiguas puede ejecutarse posteriormente con npm run sessions:cleanup
+desde backend; no es requisito para autenticar.
+
+El access dura 10 minutos por defecto, la inactividad 15 minutos y la sesion
+absoluta 8 horas. Este ultimo valor no restringe horarios laborales: al vencer,
+el usuario puede iniciar una sesion nueva inmediatamente.
 
 Un despliegue institucional interno puede usar un nombre DNS interno o una IP
 privada en FRONTEND_URL, siempre mediante HTTPS. El certificado debe ser confiable

@@ -6001,3 +6001,36 @@ html.dark .chatbot-suggestions button {
     bottom: 0.65rem;
   }
 }
+.session-timeout-modal {
+  max-width: 480px;
+  text-align: center;
+  padding: 2rem;
+}
+
+.session-timeout-icon {
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #9a5b00;
+  background: #fff3cd;
+}
+
+.session-timeout-modal h2 {
+  margin: 0 0 0.75rem;
+}
+
+.session-timeout-modal p {
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.session-timeout-countdown {
+  margin: 1.25rem auto;
+  font-size: 2rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary);
+}
