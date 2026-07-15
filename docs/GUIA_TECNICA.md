@@ -111,6 +111,49 @@ arreglos, espacios vacios y textos que excedan el limite.
 vacio de hasta 100 caracteres. Para mantener compatibilidad, `mensaje` y
 `message` pueden llegar en el payload, pero se descartan y nunca se registran.
 
+#### Alcance operativo y guardas de comportamiento
+
+Lia orienta sobre el uso del sistema: donde encontrar pantallas, como registrar
+informacion y como completar flujos existentes. No consulta expedientes por el
+usuario, no revela resultados de pacientes y no toma decisiones clinicas.
+
+Antes del clasificador de las 38 intenciones operativas se aplican guardas
+deterministas en este orden:
+
+1. Mensaje vacio.
+2. Saludo breve.
+3. Agradecimiento breve.
+4. Despedida breve.
+5. Excepciones operativas explicitas para no bloquear preguntas sobre donde
+   registrar tratamiento o medicamento indicado.
+6. Solicitud de datos clinicos de una paciente.
+7. Solicitud de medicamento, dosis, diagnostico, tratamiento o valoracion de
+   gravedad.
+8. Clasificador operativo existente y fallback.
+
+Las guardas sociales toleran mayusculas, acentos, puntuacion y el nombre Lia.
+Solo interceptan expresiones breves. Si el mensaje contiene una solicitud
+operativa, por ejemplo `Hola Lia, como registro una paciente`, continua hacia
+el clasificador y conserva la respuesta util.
+
+Las consultas sobre resultados, diagnosticos, presion, laboratorios u otros
+datos de una paciente devuelven `solicitud_dato_clinico`. Lia explica que la
+informacion debe revisarse dentro del expediente con los permisos
+correspondientes. En solicitudes sobre VIH menciona que el acceso depende de
+`controles.ver_vih`, sin afirmar que la cuenta actual posea el permiso ni
+confirmar resultado alguno.
+
+Las solicitudes de medicamentos, dosis, diagnosticos, tratamientos, gravedad o
+decision de referencia devuelven `solicitud_consejo_clinico`. La respuesta no
+prescribe ni diagnostica: remite al profesional responsable y a los protocolos
+vigentes del MSPAS con un tono no alarmista.
+
+La forma de la pregunta determina si es clinica u operativa. `Esta paciente
+tiene VIH` intenta consultar un dato y activa la guarda de privacidad; `Donde
+ingreso el resultado de VIH` pregunta como usar el sistema y continua a
+`laboratorio`. Del mismo modo, `Que tratamiento le pongo` activa la guarda
+clinica, mientras `Donde escribo el tratamiento` orienta a `morbilidad`.
+
 Ambos endpoints conservan la proteccion global CSRF y la autenticacion JWT. Una
 vez autenticada la solicitud, Lia aplica rate limits independientes por usuario
 (`id`, o `username`) y usa la IP como respaldo cuando no hay identidad:

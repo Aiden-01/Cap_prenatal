@@ -143,27 +143,153 @@ for (const greeting of ['Hola.', 'Buenos días.', 'Buenas tardes.', 'Hey.', 'Qu�
   });
 }
 
-test('KNOWN_TO_IMPROVE: Hola Lia conserva el fallback actual', () => {
+test('Hola Lia se reconoce como saludo sin ejecutar fallback', () => {
   assertCurrentClassification({
     input: 'Hola Lia.',
-    intent: 'no_reconocida',
-    fallback: true,
+    intent: 'saludo',
+    fallback: false,
     score: 0,
     confidence: undefined,
+    answerIncludes: /Aquí estoy/,
   });
 });
 
-for (const courtesy of ['Gracias.', 'Muchas gracias.', 'Adiós.', 'Hasta luego.']) {
-  test(`KNOWN_TO_IMPROVE: cortesía conserva fallback actual: ${courtesy}`, () => {
-    assertCurrentClassification({
-      input: courtesy,
-      intent: 'no_reconocida',
-      fallback: true,
-      score: 0,
-      confidence: undefined,
-    });
+for (const thanks of ['Gracias.', 'Muchas gracias.']) {
+  test(`agradecimiento reconocido: ${thanks}`, () => {
+    const result = answerQuestion(thanks);
+    assert.equal(result.intent, 'agradecimiento');
+    assert.equal(result.recognized, true);
+    assert.match(result.answer, /Con gusto/);
+    assert.equal(result.confidence, undefined);
+    assert.equal(result.disclaimer, undefined);
   });
 }
+
+for (const farewell of ['Adiós.', 'Hasta luego.']) {
+  test(`despedida reconocida: ${farewell}`, () => {
+    const result = answerQuestion(farewell);
+    assert.equal(result.intent, 'despedida');
+    assert.equal(result.recognized, true);
+    assert.match(result.answer, /Hasta luego/);
+    assert.equal(result.confidence, undefined);
+    assert.equal(result.suggestions, undefined);
+  });
+}
+
+const SOCIAL_GUARD_CASES = [
+  ['Hola, Lia.', 'saludo'],
+  ['Buenos días Lia.', 'saludo'],
+  ['Hey Lia.', 'saludo'],
+  ['Holi.', 'saludo'],
+  ['Cómo estás.', 'saludo'],
+  ['Hola Lia necesito ayuda.', 'saludo'],
+  ['Gracias Lia.', 'agradecimiento'],
+  ['Te lo agradezco.', 'agradecimiento'],
+  ['Perfecto, gracias.', 'agradecimiento'],
+  ['Buena onda.', 'agradecimiento'],
+  ['Listo, gracias.', 'agradecimiento'],
+  ['Nos vemos.', 'despedida'],
+  ['Chao.', 'despedida'],
+  ['Hasta mañana.', 'despedida'],
+  ['Eso es todo.', 'despedida'],
+  ['Ya terminé.', 'despedida'],
+];
+
+for (const [input, intent] of SOCIAL_GUARD_CASES) {
+  test(`guarda social determinista: ${input}`, () => {
+    const result = answerQuestion(input);
+    assert.equal(result.intent, intent);
+    assert.equal(result.recognized, true);
+    assert.equal(result.confidence, undefined);
+  });
+}
+
+for (const [input, intent] of [
+  ['Hola Lia, registrar paciente.', 'registrar_paciente'],
+  ['Hola Lia, ¿cómo registro una paciente?', 'registrar_paciente'],
+  ['Buenos días, necesito agregar un control prenatal.', 'control_prenatal'],
+  ['Gracias, ¿cómo agrego un control?', 'control_prenatal'],
+]) {
+  test(`una apertura social no intercepta la solicitud operativa: ${input}`, () => {
+    const result = answerQuestion(input);
+    assert.equal(result.intent, intent);
+    assert.equal(result.recognized, true);
+    assert.equal(typeof result.confidence, 'number');
+  });
+}
+
+const CLINICAL_DATA_CASES = [
+  '¿Esta paciente tiene VIH?',
+  'Quiero saber el resultado de VIH de esta paciente.',
+  '¿Cuál es su diagnóstico?',
+  'Dime los laboratorios de esta paciente.',
+  '¿Qué enfermedad tiene?',
+  '¿Cuál es su presión?',
+  'Muéstrame sus datos clínicos.',
+];
+
+for (const input of CLINICAL_DATA_CASES) {
+  test(`solicitud de dato clínico protegida: ${input}`, () => {
+    const result = answerQuestion(input);
+    assert.equal(result.intent, 'solicitud_dato_clinico');
+    assert.equal(result.recognized, true);
+    assert.match(result.answer, /No consulto ni revelo expedientes o resultados clínicos/);
+    assert.equal(result.confidence, undefined);
+  });
+}
+
+test('solicitud de VIH explica el permiso sin afirmar que el usuario lo posee', () => {
+  const result = answerQuestion('¿Esta paciente tiene VIH?');
+  assert.match(result.answer, /controles\.ver_vih/);
+  assert.match(result.answer, /no puedo afirmar si tu cuenta lo tiene/i);
+});
+
+const CLINICAL_ADVICE_CASES = [
+  '¿Qué medicamento debo darle?',
+  '¿Qué tratamiento le pongo?',
+  '¿Cuál es el diagnóstico?',
+  '¿Qué dosis debo usar?',
+  '¿Qué hago si tiene presión alta?',
+  'Recomiéndame un medicamento.',
+  '¿Es peligroso este resultado?',
+  '¿Debe ser referida?',
+];
+
+for (const input of CLINICAL_ADVICE_CASES) {
+  test(`solicitud de consejo clínico protegida: ${input}`, () => {
+    const result = answerQuestion(input);
+    assert.equal(result.intent, 'solicitud_consejo_clinico');
+    assert.equal(result.recognized, true);
+    assert.match(result.answer, /profesional responsable/);
+    assert.match(result.answer, /protocolos vigentes del MSPAS/);
+    assert.equal(result.confidence, undefined);
+  });
+}
+
+for (const [input, intent] of [
+  ['¿Dónde ingreso VIH?', 'laboratorio'],
+  ['¿Dónde ingreso el resultado de VIH?', 'laboratorio'],
+  ['¿Dónde registro el medicamento indicado?', 'morbilidad'],
+  ['¿Dónde registro el tratamiento?', 'morbilidad'],
+  ['¿Dónde escribo el tratamiento?', 'morbilidad'],
+  ['¿Cómo registro una referencia?', 'referencias'],
+]) {
+  test(`pregunta operativa clínica no es bloqueada: ${input}`, () => {
+    const result = answerQuestion(input);
+    assert.equal(result.intent, intent);
+    assert.equal(result.recognized, true);
+    assert.equal(typeof result.confidence, 'number');
+  });
+}
+
+test('guardas clínicas no inventan resultados, diagnósticos, medicamentos ni dosis', () => {
+  for (const input of [...CLINICAL_DATA_CASES, ...CLINICAL_ADVICE_CASES]) {
+    const { answer } = answerQuestion(input);
+    assert.doesNotMatch(answer, /\b(?:positivo|negativo|reactivo|paracetamol|aspirina|amoxicilina)\b/i);
+    assert.doesNotMatch(answer, /\b\d+(?:\.\d+)?\s*(?:mg|ml)\b/i);
+    assert.doesNotMatch(answer, /la paciente (?:tiene|presenta|padece)/i);
+  }
+});
 
 const CURRENT_INTENT_CASES = [
   {
@@ -294,27 +420,33 @@ for (const currentCase of CURRENT_INTENT_CASES) {
 const KNOWN_PROBLEM_CASES = [
   {
     input: 'Hola Lia.',
-    intent: 'no_reconocida',
-    fallback: true,
+    intent: 'saludo',
+    fallback: false,
     score: 0,
     confidence: undefined,
-    expectedCurrentResult: 'Fallback estándar en vez de saludo.',
+    answerIncludes: /Aquí estoy/,
+    resolved: true,
+    expectedCurrentResult: 'Ahora se reconoce como saludo.',
   },
   {
     input: 'Gracias.',
-    intent: 'no_reconocida',
-    fallback: true,
+    intent: 'agradecimiento',
+    fallback: false,
     score: 0,
     confidence: undefined,
-    expectedCurrentResult: 'Fallback estándar en vez de cortesía.',
+    answerIncludes: /Con gusto/,
+    resolved: true,
+    expectedCurrentResult: 'Ahora responde como agradecimiento.',
   },
   {
     input: 'Adiós.',
-    intent: 'no_reconocida',
-    fallback: true,
+    intent: 'despedida',
+    fallback: false,
     score: 0,
     confidence: undefined,
-    expectedCurrentResult: 'Fallback estándar en vez de despedida.',
+    answerIncludes: /Hasta luego/,
+    resolved: true,
+    expectedCurrentResult: 'Ahora responde como despedida.',
   },
   {
     input: 'Quiero imprimir la ficha MSPAS.',
@@ -345,20 +477,23 @@ const KNOWN_PROBLEM_CASES = [
   },
   {
     input: 'Quiero saber si esta paciente tiene VIH.',
-    intent: 'laboratorio',
+    intent: 'solicitud_dato_clinico',
     fallback: false,
     score: 7,
-    confidence: 1,
-    answerIncludes: /registrar laboratorios/,
-    expectedCurrentResult: 'Guía de laboratorio ante una solicitud sensible.',
+    confidence: undefined,
+    answerIncludes: /controles\.ver_vih/,
+    resolved: true,
+    expectedCurrentResult: 'Ahora protege el dato clínico y explica el permiso VIH.',
   },
   {
     input: '¿Qué medicamento debo darle?',
-    intent: 'no_reconocida',
-    fallback: true,
+    intent: 'solicitud_consejo_clinico',
+    fallback: false,
     score: 1,
     confidence: undefined,
-    expectedCurrentResult: 'Fallback genérico sin rechazo clínico específico.',
+    answerIncludes: /protocolos vigentes del MSPAS/,
+    resolved: true,
+    expectedCurrentResult: 'Ahora aplica la guarda de consejo clínico.',
   },
   {
     input: 'asdfgh.',
@@ -371,7 +506,8 @@ const KNOWN_PROBLEM_CASES = [
 ];
 
 for (const problem of KNOWN_PROBLEM_CASES) {
-  test(`KNOWN_TO_IMPROVE: ${problem.input} — ${problem.expectedCurrentResult}`, () => {
+  const marker = problem.resolved ? 'CORREGIDO' : 'KNOWN_TO_IMPROVE';
+  test(`${marker}: ${problem.input} — ${problem.expectedCurrentResult}`, () => {
     assert.equal(typeof problem.expectedCurrentResult, 'string');
     assert.ok(problem.expectedCurrentResult.length > 0);
     assertCurrentClassification(problem);
@@ -435,10 +571,10 @@ test('colisión vacunas vs editar_vacuna conserva el empate resuelto por orden',
   assert.equal(answerQuestion(input).intent, 'vacunas');
 });
 
-test('colisión laboratorio vs solicitud sensible de VIH conserva laboratorio', () => {
+test('guarda de datos clínicos precede la coincidencia operativa de VIH', () => {
   const input = 'Quiero saber si esta paciente tiene VIH.';
   assert.equal(scoreIntent(input, getIntent('laboratorio')), 7);
-  assert.equal(answerQuestion(input).intent, 'laboratorio');
+  assert.equal(answerQuestion(input).intent, 'solicitud_dato_clinico');
 });
 
 test('colisión reportes vs impresión MSPAS conserva reportes', () => {

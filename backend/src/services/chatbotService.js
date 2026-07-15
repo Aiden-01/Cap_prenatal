@@ -746,7 +746,95 @@ function findBestIntent(message) {
 
 function isSimpleGreeting(message) {
   const normalized = normalizeText(message);
-  return /^(hola|buen dia|buenos dias|buenas|buenas tardes|buenas noches|hey|holi|que tal|como estas)$/.test(normalized);
+  return [
+    /^hola(?: lia)?(?: necesito ayuda| ayudame| puedes ayudarme)?$/,
+    /^buen(?:os)? dias?(?: lia)?$/,
+    /^buenas(?: tardes| noches)?(?: lia)?$/,
+    /^hey(?: lia)?$/,
+    /^holi(?: lia)?$/,
+    /^que tal(?: lia)?$/,
+    /^como estas(?: lia)?$/,
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function isSimpleThanks(message) {
+  const normalized = normalizeText(message);
+  return [
+    /^(?:muchas )?gracias(?: lia)?$/,
+    /^te lo agradezco(?: lia)?$/,
+    /^(?:perfecto|listo) gracias(?: lia)?$/,
+    /^buena onda(?: gracias)?$/,
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function isSimpleFarewell(message) {
+  const normalized = normalizeText(message);
+  return /^(?:adios|hasta luego|nos vemos|chao|hasta manana|eso es todo|ya termine)(?: lia)?$/.test(normalized);
+}
+
+function withoutSocialLeadIn(message) {
+  return normalizeText(message).replace(
+    /^(?:(?:hola|hey|holi)(?: lia)?|buen(?:os)? dias?(?: lia)?|buenas(?: tardes| noches)?(?: lia)?|(?:muchas )?gracias(?: lia)?)\s+/,
+    ''
+  );
+}
+
+function findOperationalSafetyException(message) {
+  const normalized = withoutSocialLeadIn(message);
+  const treatmentRegistration = /^(?:donde|en donde|como) (?:registro|registrar|escribo|ingreso|anoto|documento) (?:el |un )?(?:medicamento|tratamiento)(?: indicado)?(?: en el sistema)?$/;
+
+  if (treatmentRegistration.test(normalized)) return 'morbilidad';
+  return null;
+}
+
+function getClinicalDataRequest(message) {
+  const normalized = withoutSocialLeadIn(message);
+  const patterns = [
+    /^(?:esta|la) paciente tiene vih$/,
+    /^quiero saber si (?:esta|la) paciente tiene vih$/,
+    /^quiero saber (?:el )?resultado (?:de )?vih de (?:esta|la) paciente$/,
+    /^(?:cual|que) es (?:el )?resultado (?:de )?vih(?: de (?:esta|la) paciente)?$/,
+    /^(?:cual|que) es su diagnostico$/,
+    /^dime (?:los|sus) laboratorios de (?:esta|la) paciente$/,
+    /^que enfermedad tiene(?: (?:esta|la) paciente)?$/,
+    /^cual es su presion$/,
+    /^muestrame (?:sus|los) datos clinicos(?: de (?:esta|la) paciente)?$/,
+  ];
+
+  if (!patterns.some((pattern) => pattern.test(normalized))) return null;
+  return { mentionsVih: /\bvih\b/.test(normalized) };
+}
+
+function isClinicalAdviceRequest(message) {
+  const normalized = withoutSocialLeadIn(message);
+  return [
+    /^que medicamento (?:debo darle|le doy|puedo darle|debo usar|recomiendas)$/,
+    /^recomiendame (?:un )?medicamento$/,
+    /^que tratamiento (?:le pongo|le doy|debo darle|debo usar|puedo darle|recomiendas)$/,
+    /^(?:cual|que) es el diagnostico$/,
+    /^que dosis (?:debo|puedo) (?:usar|dar|darle|indicar)$/,
+    /^que hago si (?:la paciente )?tiene presion alta$/,
+    /^es peligroso (?:este|ese) resultado$/,
+    /^(?:debe|deberia) ser referida(?: la paciente)?$/,
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function buildOperationalGuardResponse(intent, message) {
+  const item = knowledgeBase.find((candidate) => candidate.intent === intent);
+  if (!item) return null;
+
+  const answer = item.intent === 'calcular_fpp'
+    ? buildFppResponse(message, item.answer)
+    : item.answer;
+
+  return {
+    recognized: true,
+    intent: item.intent,
+    title: item.title,
+    answer: humanizeAnswer(item.intent, answer),
+    confidence: 1,
+    disclaimer: CLINICAL_DISCLAIMER,
+  };
 }
 
 function conversationalizeSteps(answer) {
@@ -808,6 +896,48 @@ function answerQuestion(message) {
         'Revisar una ficha de riesgo',
         'Generar un reporte',
       ],
+    };
+  }
+
+  if (isSimpleThanks(text)) {
+    return {
+      recognized: true,
+      intent: 'agradecimiento',
+      answer: '¡Con gusto! Si necesitas algo más del sistema, aquí estoy para ayudarte.',
+    };
+  }
+
+  if (isSimpleFarewell(text)) {
+    return {
+      recognized: true,
+      intent: 'despedida',
+      answer: '¡Hasta luego! Cuando necesites ayuda con el sistema, aquí estaré.',
+    };
+  }
+
+  const operationalException = findOperationalSafetyException(text);
+  if (operationalException) {
+    return buildOperationalGuardResponse(operationalException, text);
+  }
+
+  const clinicalDataRequest = getClinicalDataRequest(text);
+  if (clinicalDataRequest) {
+    const permissionGuidance = clinicalDataRequest.mentionsVih
+      ? ' El acceso a resultados de VIH depende del permiso controles.ver_vih; no puedo afirmar si tu cuenta lo tiene.'
+      : '';
+
+    return {
+      recognized: true,
+      intent: 'solicitud_dato_clinico',
+      answer: `No consulto ni revelo expedientes o resultados clínicos de pacientes. Revisa esa información dentro del expediente, con los permisos correspondientes.${permissionGuidance}`,
+    };
+  }
+
+  if (isClinicalAdviceRequest(text)) {
+    return {
+      recognized: true,
+      intent: 'solicitud_consejo_clinico',
+      answer: 'Puedo orientarte sobre cómo usar el sistema, pero no puedo indicar medicamentos, dosis, diagnósticos o tratamientos ni clasificar la gravedad. Consulta al profesional responsable y los protocolos vigentes del MSPAS para decidir la conducta.',
     };
   }
 
