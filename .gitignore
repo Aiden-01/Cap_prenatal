@@ -9,6 +9,10 @@ ocr-service/tessdata/
 __pycache__/
 *.pyc
 
+# Metadata efimera del chatbot (nunca contiene texto crudo ni identidad)
+backend/runtime/
+backend/src/logs/chatbot_*.jsonl
+
 # Archivos temporales generados localmente
 tmp_*/
 tmp_*.pdf

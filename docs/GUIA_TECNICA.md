@@ -97,6 +97,49 @@ Respuesta de error esperada:
 }
 ```
 
+### Chatbot Lia: privacidad y validacion
+
+Los endpoints autenticados son `POST /api/chatbot/mensaje` y
+`POST /api/chatbot/feedback`. Ambos usan schemas Zod y devuelven HTTP 400 con
+el codigo estable `VALIDATION_ERROR` cuando el payload no cumple el contrato.
+
+`/mensaje` solo acepta `mensaje` como string. El backend aplica `trim`, exige
+entre 1 y 500 caracteres y rechaza valores ausentes, `null`, numeros, objetos,
+arreglos, espacios vacios y textos que excedan el limite.
+
+`/feedback` exige `helpful` como booleano JSON real e `intent` como string no
+vacio de hasta 100 caracteres. Para mantener compatibilidad, `mensaje` y
+`message` pueden llegar en el payload, pero se descartan y nunca se registran.
+
+El logging del chatbot es local, opcional y best-effort:
+
+- Esta desactivado por defecto. Solo se activa con
+  `CHATBOT_LOGGING_ENABLED=true`.
+- La ruta por defecto es `backend/runtime/chatbot/`, ignorada por Git. Puede
+  cambiarse con `CHATBOT_RUNTIME_DIR` para un volumen privado del despliegue.
+- `chatbot_unrecognized.jsonl` registra unicamente `createdAt`,
+  `messageLength`, `intent` y, si existen, `confidence` y `rulesVersion`.
+- `chatbot_feedback.jsonl` registra unicamente `createdAt`, `helpful`, `intent`
+  y, si existe, `classifierVersion`.
+- `CHATBOT_RULES_VERSION` y `CHATBOT_CLASSIFIER_VERSION` permiten declarar las
+  versiones opcionales sin modificar el clasificador ni su catalogo.
+- Nunca se registran el mensaje o respuesta completos, pregunta original,
+  username, userId, nombres, CUI, expediente, telefonos ni identificadores
+  clinicos. Tampoco se crean hashes del texto.
+- Si crear el directorio o anexar una linea falla, Lia conserva su respuesta
+  normal. La consola solo recibe el tipo de evento y un codigo tecnico, nunca
+  el mensaje crudo.
+
+Retencion: estos archivos contienen telemetria temporal y no son una fuente de
+auditoria. Cuando el logging se habilite, el responsable del despliegue debe
+eliminarlos en un maximo de 30 dias o configurar una politica de rotacion con
+ese limite. La aplicacion no realiza purga automatica en este sprint.
+
+Los JSONL heredados estuvieron rastreados en commits anteriores. Se ignoran y
+se retiran del seguimiento actual, pero sus versiones historicas continuan en
+Git. Limpiar o reescribir ese historial requiere una tarea separada y
+coordinada, porque afecta clones y ramas existentes.
+
 ## Frontend
 
 Ruta principal:
@@ -343,6 +386,10 @@ Fuera de alcance actual:
 | `FRONTEND_URL` | Origenes permitidos por CORS, separados por coma. |
 | `COOKIE_SAMESITE` | Politica SameSite de cookies. Default `lax`. |
 | `JSON_BODY_LIMIT` | Limite del body JSON. Default `1mb`. |
+| `CHATBOT_LOGGING_ENABLED` | Activa metadata JSONL de Lia solo con `true`. Default desactivado. |
+| `CHATBOT_RUNTIME_DIR` | Directorio privado de runtime de Lia. Default `backend/runtime/chatbot/`. |
+| `CHATBOT_RULES_VERSION` | Version opcional de reglas incluida en eventos no reconocidos. |
+| `CHATBOT_CLASSIFIER_VERSION` | Version opcional incluida en feedback. |
 | `AUTOMATION_SECRET` | Secreto para endpoints n8n. |
 | `PDF_EXCEL_ENGINE` | `auto`, `excel` o `libreoffice`. |
 | `LIBREOFFICE_PATH` | Ruta a `soffice` cuando se usa LibreOffice. |
