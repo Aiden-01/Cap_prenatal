@@ -1,10 +1,17 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
+
+const {
+  chatbotKnowledge,
+  laboratoryViewPatterns,
+  operationalPriorityRules,
+} = require('../src/config/chatbotKnowledge');
 
 const {
   answerQuestion,
   calculateFpp,
-  knowledgeBase,
   normalizeText,
   parseFurDate,
   scoreIntent,
@@ -59,14 +66,21 @@ const EXPECTED_INTENTS = [
   'primeros_pasos',
 ];
 
+const EXPECTED_KEYWORD_COUNTS = [
+  9, 12, 7, 10, 7, 7, 13, 9, 6, 7,
+  8, 6, 13, 9, 8, 7, 7, 10, 7, 7,
+  10, 7, 9, 18, 11, 7, 7, 6, 6, 6,
+  6, 6, 7, 7, 12, 8, 8, 7, 6,
+];
+
 function getIntent(intent) {
-  const item = knowledgeBase.find((candidate) => candidate.intent === intent);
+  const item = chatbotKnowledge.find((candidate) => candidate.id === intent);
   assert.ok(item, `No existe la intención ${intent}`);
   return item;
 }
 
 function maxScore(message) {
-  return Math.max(...knowledgeBase.map((item) => scoreIntent(message, item)));
+  return Math.max(...chatbotKnowledge.map((item) => scoreIntent(message, item)));
 }
 
 function isFallback(result) {
@@ -785,32 +799,119 @@ for (const input of [
 }
 
 test('catálogo conserva las 38 intenciones previas y añade cerrar_embarazo', () => {
-  assert.equal(knowledgeBase.length, 39);
-  assert.deepEqual(knowledgeBase.map((item) => item.intent), EXPECTED_INTENTS);
+  assert.equal(chatbotKnowledge.length, 39);
+  assert.deepEqual(chatbotKnowledge.map((item) => item.id), EXPECTED_INTENTS);
   assert.equal(EXPECTED_INTENTS.filter((intent) => intent !== 'cerrar_embarazo').length, 38);
 });
 
 test('IDs de intención del catálogo son únicos', () => {
-  const ids = knowledgeBase.map((item) => item.intent);
+  const ids = chatbotKnowledge.map((item) => item.id);
   assert.equal(new Set(ids).size, ids.length);
 });
 
-test('cada intención tiene título, respuesta y al menos una keyword no vacía', () => {
-  for (const item of knowledgeBase) {
-    assert.equal(typeof item.intent, 'string');
-    assert.ok(item.intent.trim().length > 0, 'ID de intención vacío');
+test('snapshot estructural conserva orden e inventario de keywords del catálogo extraído', () => {
+  const expectedStructure = EXPECTED_INTENTS.map((id, index) => ({
+    id,
+    keywordCount: EXPECTED_KEYWORD_COUNTS[index],
+  }));
+  const actualStructure = chatbotKnowledge.map(({ id, keywords }) => ({
+    id,
+    keywordCount: keywords.length,
+  }));
+
+  assert.deepEqual(actualStructure, expectedStructure);
+});
+
+test('cada intención tiene estructura, respuesta, keywords y sugerencias válidas', () => {
+  for (const item of chatbotKnowledge) {
+    assert.deepEqual(Object.keys(item), ['id', 'title', 'keywords', 'answer', 'suggestions']);
+    assert.equal(typeof item.id, 'string');
+    assert.ok(item.id.trim().length > 0, 'ID de intención vacío');
     assert.equal(typeof item.title, 'string');
-    assert.ok(item.title.trim().length > 0, `Título vacío en ${item.intent}`);
+    assert.ok(item.title.trim().length > 0, `Título vacío en ${item.id}`);
     assert.equal(typeof item.answer, 'string');
-    assert.ok(item.answer.trim().length > 0, `Respuesta vacía en ${item.intent}`);
-    assert.ok(Array.isArray(item.keywords), `Keywords inválidas en ${item.intent}`);
-    assert.ok(item.keywords.length > 0, `Sin keywords en ${item.intent}`);
+    assert.ok(item.answer.trim().length > 0, `Respuesta vacía en ${item.id}`);
+    assert.ok(Array.isArray(item.keywords), `Keywords inválidas en ${item.id}`);
+    assert.ok(item.keywords.length > 0, `Sin keywords en ${item.id}`);
+    assert.ok(Array.isArray(item.suggestions), `Sugerencias inválidas en ${item.id}`);
 
     for (const keyword of item.keywords) {
       assert.equal(typeof keyword, 'string');
-      assert.ok(keyword.trim().length > 0, `Keyword vacía en ${item.intent}`);
+      assert.ok(keyword.trim().length > 0, `Keyword vacía en ${item.id}`);
+    }
+
+    for (const suggestion of item.suggestions) {
+      assert.equal(typeof suggestion, 'string');
+      assert.ok(suggestion.trim().length > 0, `Sugerencia vacía en ${item.id}`);
     }
   }
+});
+
+test('prioridades exactas tienen orden, IDs y patterns válidos', () => {
+  const catalogIds = new Set(chatbotKnowledge.map(({ id }) => id));
+  assert.deepEqual(
+    operationalPriorityRules.map(({ priority }) => priority),
+    [1, 2, 3, 4, 5, 6, 7, 8]
+  );
+
+  for (const rule of operationalPriorityRules) {
+    assert.ok(catalogIds.has(rule.id), `Prioridad para ID desconocido: ${rule.id}`);
+    assert.ok(Number.isInteger(rule.priority) && rule.priority > 0);
+    assert.ok(Array.isArray(rule.patterns) && rule.patterns.length > 0);
+    assert.ok(rule.patterns.every((pattern) => pattern instanceof RegExp));
+  }
+
+  assert.ok(laboratoryViewPatterns.length > 0);
+  assert.ok(laboratoryViewPatterns.every((pattern) => pattern instanceof RegExp));
+});
+
+test('clasificar repetidamente no modifica catálogo, keywords, respuestas ni sugerencias', () => {
+  const catalogBefore = structuredClone(chatbotKnowledge);
+  const inputs = [
+    'Quiero registrar una paciente.',
+    'Quiero imprimir la ficha MSPAS.',
+    'No deseo borrar el control, solo corregirlo.',
+    '¿Dónde veo los laboratorios?',
+    '¿Esta paciente tiene VIH?',
+    'asdfgh.',
+  ];
+  const resultsBefore = inputs.map((input) => answerQuestion(input));
+
+  for (let repetition = 0; repetition < 10; repetition += 1) {
+    inputs.forEach((input) => answerQuestion(input));
+  }
+
+  assert.deepEqual(chatbotKnowledge, catalogBefore);
+  assert.deepEqual(inputs.map((input) => answerQuestion(input)), resultsBefore);
+  assert.ok(Object.isFrozen(chatbotKnowledge));
+  for (const item of chatbotKnowledge) {
+    assert.ok(Object.isFrozen(item));
+    assert.ok(Object.isFrozen(item.keywords));
+    assert.ok(Object.isFrozen(item.suggestions));
+  }
+});
+
+test('consumidores productivos no importan el catálogo desde chatbotService', () => {
+  const srcRoot = path.resolve(__dirname, '../src');
+  const pending = [srcRoot];
+  const invalidConsumers = [];
+
+  while (pending.length > 0) {
+    const current = pending.pop();
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        pending.push(fullPath);
+      } else if (entry.name.endsWith('.js') && entry.name !== 'chatbotService.js') {
+        const source = fs.readFileSync(fullPath, 'utf8');
+        if (source.includes('chatbotService') && source.includes('knowledgeBase')) {
+          invalidConsumers.push(path.relative(srcRoot, fullPath));
+        }
+      }
+    }
+  }
+
+  assert.deepEqual(invalidConsumers, []);
 });
 
 test('contrato siempre devuelve intención y respuesta no vacías', () => {
@@ -856,7 +957,7 @@ test('fallback devuelve las seis sugerencias actuales en orden', () => {
   assert.equal(result.intent, 'no_reconocida');
   assert.deepEqual(
     result.suggestions,
-    knowledgeBase.slice(0, 6).map((item) => item.title)
+    chatbotKnowledge.slice(0, 6).map((item) => item.title)
   );
 });
 
@@ -866,7 +967,7 @@ test('mensaje vacío devuelve las cuatro sugerencias actuales', () => {
   assert.equal(result.recognized, false);
   assert.deepEqual(
     result.suggestions,
-    knowledgeBase.slice(0, 4).map((item) => item.title)
+    chatbotKnowledge.slice(0, 4).map((item) => item.title)
   );
 });
 

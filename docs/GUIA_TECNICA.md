@@ -196,6 +196,50 @@ control o buscar la paciente, se usa esa intencion. Si solo dice `quiero
 editar` sin indicar el registro, Lia reutiliza `no_reconocida` con una pregunta
 de aclaracion; no supone un modulo ni crea una intencion de catalogo adicional.
 
+#### Arquitectura del catalogo de Lia
+
+El conocimiento estatico ya no vive dentro del motor de clasificacion:
+
+- `backend/src/config/chatbotKnowledge.js` contiene las 39 intenciones
+  operativas en orden estable. Cada entrada declara `id`, `title`, `keywords`,
+  `answer` y `suggestions`. Tambien contiene las reglas de prioridad exacta y
+  los patterns que distinguen la visualizacion de laboratorios.
+- `backend/src/config/chatbotSpecialResponses.js` contiene aperturas, cierres,
+  disclaimer, respuestas sociales, clinicas y de fallback, sugerencias
+  especiales y conectores de pasos.
+- `backend/src/services/chatbotService.js` conserva normalizacion,
+  tokenizacion, scoring, guardas sociales y clinicas, negacion limitada,
+  resolucion de prioridades, calculo de FPP, humanizacion y coordinacion de la
+  respuesta final.
+
+El catalogo y sus arreglos internos se congelan al cargar el modulo para evitar
+mutaciones accidentales durante la clasificacion. `chatbotService.js` mantiene
+el export legado `knowledgeBase` con la forma anterior por compatibilidad, pero
+los consumidores nuevos deben importar el catalogo canonico desde
+`config/chatbotKnowledge.js`.
+
+Para agregar una intencion operativa:
+
+1. Agrega una entrada en `chatbotKnowledge` con un `id` unico, titulo, keywords
+   no vacias, respuesta y `suggestions` como arreglo, aunque quede vacio.
+2. Colocala conscientemente en el orden del catalogo. El orden aun resuelve
+   empates que no tengan una prioridad explicita y define las sugerencias
+   iniciales y de fallback.
+3. No agregues `priority` a la intencion si no existe una regla funcional. Si
+   una colision confirmada requiere prioridad exacta, agrega una regla con ID,
+   numero y patterns en `operationalPriorityRules` y cubrela con pruebas
+   positivas y negativas.
+4. Coloca textos sociales, clinicos o de fallback reutilizables en
+   `chatbotSpecialResponses.js`; no los mezcles con el algoritmo de scoring.
+5. Ejecuta `npm run test:chatbot` antes y despues de cambiar keywords,
+   respuestas, orden o prioridades, y luego ejecuta todas las pruebas del
+   backend.
+
+La suite valida cantidad y orden exactos, IDs unicos, estructura, keywords,
+respuestas, sugerencias, prioridades, snapshot estructural e inmutabilidad del
+catalogo. Tambien comprueba que los consumidores productivos no necesiten
+obtener el catalogo desde el servicio legado.
+
 Ambos endpoints conservan la proteccion global CSRF y la autenticacion JWT. Una
 vez autenticada la solicitud, Lia aplica rate limits independientes por usuario
 (`id`, o `username`) y usa la IP como respaldo cuando no hay identidad:
