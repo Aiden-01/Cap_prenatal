@@ -117,7 +117,7 @@ Lia orienta sobre el uso del sistema: donde encontrar pantallas, como registrar
 informacion y como completar flujos existentes. No consulta expedientes por el
 usuario, no revela resultados de pacientes y no toma decisiones clinicas.
 
-Antes del clasificador de las 38 intenciones operativas se aplican guardas
+Antes del clasificador de las 39 intenciones operativas se aplican guardas
 deterministas en este orden:
 
 1. Mensaje vacio.
@@ -129,7 +129,8 @@ deterministas en este orden:
 6. Solicitud de datos clinicos de una paciente.
 7. Solicitud de medicamento, dosis, diagnostico, tratamiento o valoracion de
    gravedad.
-8. Clasificador operativo existente y fallback.
+8. Prioridades operativas exactas para las colisiones confirmadas.
+9. Clasificador operativo existente y fallback.
 
 Las guardas sociales toleran mayusculas, acentos, puntuacion y el nombre Lia.
 Solo interceptan expresiones breves. Si el mensaje contiene una solicitud
@@ -153,6 +154,47 @@ tiene VIH` intenta consultar un dato y activa la guarda de privacidad; `Donde
 ingreso el resultado de VIH` pregunta como usar el sistema y continua a
 `laboratorio`. Del mismo modo, `Que tratamiento le pongo` activa la guarda
 clinica, mientras `Donde escribo el tratamiento` orienta a `morbilidad`.
+
+#### Precision operativa y colisiones confirmadas
+
+El clasificador conserva su puntuacion determinista, pero una frase completa
+solo recibe la puntuacion fuerte cuando aparece con limites de palabra. Esto
+evita que `bot` coincida dentro de `boton`; `bot` y `chatbot` siguen activando
+`ayuda_bot`. No se agrego coincidencia difusa ni analisis linguistico general.
+
+Despues de las guardas clinicas se aplican prioridades exactas y acotadas para
+los casos confirmados por pruebas:
+
+- Las solicitudes de imprimir, descargar o generar la ficha MSPAS usan la
+  impresion del expediente y no `reportes`, que continua reservado para censos
+  e indicadores. Se conserva el identificador legado
+  `impresion_no_disponible` por compatibilidad con feedback y registros, aunque
+  su respuesta ya describe desde antes la funcion real disponible.
+- `cerrar_embarazo` es la unica intencion nueva. Se separo de
+  `embarazo_activo` porque esta ultima explica como crear otra gestacion. La
+  nueva respuesta diferencia pasar un embarazo activo a puerperio mediante
+  `Registrar puerperio` de finalizar el seguimiento con `Cerrar embarazo`.
+- El cambio voluntario desde una sesion activa usa `cambiar_password`; una
+  clave que no funciona, la imposibilidad de entrar o el olvido usan
+  `olvido_contrasena`. Ninguno de esos casos cae en la gestion general de
+  `usuarios`.
+- Si el usuario ya abrio el expediente, Lia orienta a
+  `secciones_expediente`; las frases posteriores al parto priorizan
+  `puerperio` sobre citas prenatales.
+- Registrar una vacuna conserva `vacunas`, mientras editarla o corregir su
+  dosis usa `editar_vacuna` sin depender de un empate por orden del catalogo.
+- `laboratorio` conserva un solo ID. Las preguntas con `ver` o `donde estan`
+  reciben pasos para consultar la pestana Laboratorios; `registrar` o
+  `ingresar` mantienen los pasos de captura dentro del control prenatal. La
+  guarda `solicitud_dato_clinico` continua evaluandose antes.
+
+La negacion se trata de forma deliberadamente limitada. Solo se reconocen los
+prefijos `no quiero`, `no deseo`, `no necesito` y `no voy a`, y unicamente se
+descarta la accion inmediatamente relacionada en los patrones operativos
+probados. Si la accion positiva identifica el modulo, por ejemplo corregir el
+control o buscar la paciente, se usa esa intencion. Si solo dice `quiero
+editar` sin indicar el registro, Lia reutiliza `no_reconocida` con una pregunta
+de aclaracion; no supone un modulo ni crea una intencion de catalogo adicional.
 
 Ambos endpoints conservan la proteccion global CSRF y la autenticacion JWT. Una
 vez autenticada la solicitud, Lia aplica rate limits independientes por usuario

@@ -121,6 +121,21 @@ const knowledgeBase = [
       'El sistema trabaja con el embarazo activo de la paciente. Para crear un nuevo embarazo:\n1. Abre el expediente de la paciente.\n2. Presiona "Nuevo embarazo".\n3. Confirma que deseas cerrar el embarazo activo.\n4. Ingresa la FUR y FPP del nuevo embarazo si las tienes.\n5. Guarda y verifica que aparezca como embarazo activo.\n\nUsa esta opción solo cuando realmente inicia una nueva gestación.',
   },
   {
+    intent: 'cerrar_embarazo',
+    title: 'Cerrar embarazo',
+    keywords: [
+      'cerrar embarazo',
+      'cerrar el embarazo',
+      'finalizar embarazo',
+      'finalizar el embarazo',
+      'pasar embarazo a puerperio',
+      'pasar el embarazo a puerperio',
+      'registrar que termino el embarazo',
+    ],
+    answer:
+      'Para actualizar o cerrar el seguimiento de un embarazo:\n1. Abre el expediente de la paciente y entra en "Datos generales".\n2. En "Historial de embarazos", selecciona el embarazo actual.\n3. Si el parto ya ocurrió y registrarás atenciones posteriores, entra en "Puerperio" y presiona "Registrar puerperio"; al confirmar, el sistema cambia el embarazo activo a puerperio.\n4. Cuando corresponda finalizar todo el seguimiento, vuelve a "Historial de embarazos" y presiona "Cerrar embarazo" en el embarazo seleccionado.\n5. Confirma la acción. El embarazo quedará en el historial como cerrado y en modo de solo lectura.\n\nNo uses "Nuevo embarazo" únicamente para cerrar el seguimiento actual.',
+  },
+  {
     intent: 'control_prenatal',
     title: 'Control prenatal',
     keywords: [
@@ -246,7 +261,6 @@ const knowledgeBase = [
       'vacunas',
       'inmunización',
       'registrar vacuna',
-      'editar vacuna',
       'tdap',
       'influenza',
       'toxide',
@@ -266,6 +280,8 @@ const knowledgeBase = [
       'actualizar vacuna',
       'vacuna incorrecta',
       'me equivoque en vacuna',
+      'corregir dosis de una vacuna',
+      'vacuna quedo incorrecta',
     ],
     answer:
       'Para editar una vacuna:\n1. Abre el expediente de la paciente.\n2. Entra en la pestaña "Vacunas".\n3. Busca la vacuna registrada.\n4. Presiona "Editar".\n5. Corrige tipo, momento, dosis o fecha.\n6. Presiona "Guardar".\n\nVerifica fecha, tipo de vacuna y dosis antes de guardar.',
@@ -305,6 +321,7 @@ const knowledgeBase = [
     title: 'Laboratorio',
     keywords: [
       'laboratorio',
+      'laboratorios',
       'examen',
       'exámenes',
       'hemoglobina',
@@ -562,6 +579,7 @@ const knowledgeBase = [
     title: 'Ayuda del asistente',
     keywords: [
       'ayuda',
+      'ayudame',
       'que puedes hacer',
       'como funciona',
       'asistente',
@@ -678,7 +696,8 @@ function scoreIntent(message, item) {
     const normalizedKeyword = normalizeText(keyword);
     const keywordTokens = tokenize(normalizedKeyword);
 
-    if (normalizedMessage.includes(normalizedKeyword)) {
+    const containsWholePhrase = (` ${normalizedMessage} `).includes(` ${normalizedKeyword} `);
+    if (containsWholePhrase) {
       return Math.max(bestScore, 6 + keywordTokens.length);
     }
 
@@ -787,6 +806,110 @@ function findOperationalSafetyException(message) {
   return null;
 }
 
+function findNegatedOperationalRequest(message) {
+  const normalized = withoutSocialLeadIn(message);
+  const limitedNegation = '(?:no quiero|no deseo|no necesito|no voy a)';
+
+  const editControl = new RegExp(
+    `^${limitedNegation} (?:eliminar|borrar) (?:el )?control(?: prenatal)? (?:pero )?(?:solo )?(?:quiero |deseo |necesito )?(?:editarlo|corregirlo|editar(?: el control)?|corregir(?: el control)?)$`
+  );
+  if (editControl.test(normalized)) return { intent: 'editar_control_prenatal' };
+
+  const searchPatient = new RegExp(
+    `^${limitedNegation} (?:crear|registrar) (?:otra )?paciente (?:pero )?(?:solo )?(?:quiero |deseo |necesito )?(?:buscarla|encontrarla|buscar(?: la paciente)?)$`
+  );
+  if (searchPatient.test(normalized)) return { intent: 'buscar_paciente' };
+
+  const ambiguousEdit = new RegExp(
+    `^${limitedNegation} (?:eliminar|borrar)(?: (?:el |la |un |una )?[a-z0-9]+)? (?:pero )?(?:solo )?(?:quiero |deseo |necesito )?(?:editar|corregir)(?:lo|la)?$`
+  );
+  if (ambiguousEdit.test(normalized)) return { clarification: true };
+
+  return null;
+}
+
+function findOperationalPriority(message) {
+  const normalized = withoutSocialLeadIn(message);
+
+  const negatedRequest = findNegatedOperationalRequest(normalized);
+  if (negatedRequest) return negatedRequest;
+
+  const exactPriorities = [
+    {
+      intent: 'impresion_no_disponible',
+      patterns: [
+        /^quiero imprimir la ficha mspas$/,
+        /^necesito descargar la ficha mspas$/,
+        /^quiero sacar el pdf (?:del|de el) expediente$/,
+        /^donde genero la ficha prenatal mspas$/,
+      ],
+    },
+    {
+      intent: 'cerrar_embarazo',
+      patterns: [
+        /^como cierro un embarazo$/,
+        /^quiero cerrar el embarazo actual$/,
+        /^finalizar (?:el )?embarazo$/,
+        /^pasar el embarazo a puerperio$/,
+        /^registrar que termino el embarazo$/,
+      ],
+    },
+    {
+      intent: 'cambiar_password',
+      patterns: [
+        /^como cambio mi (?:contrasena|clave|password)$/,
+        /^quiero cambiar mi (?:contrasena|clave|password)$/,
+      ],
+    },
+    {
+      intent: 'olvido_contrasena',
+      patterns: [
+        /^mi (?:contrasena|clave|password) no funciona$/,
+        /^no puedo entrar con mi (?:contrasena|clave|password)$/,
+        /^olvide mi (?:contrasena|clave|password)$/,
+      ],
+    },
+    {
+      intent: 'secciones_expediente',
+      patterns: [
+        /^estoy en el expediente y no se que hacer$/,
+        /^ya abri el expediente que sigue$/,
+        /^que secciones tiene el expediente$/,
+        /^donde estan las pestanas del expediente$/,
+      ],
+    },
+    {
+      intent: 'puerperio',
+      patterns: [
+        /^seguimiento (?:de la madre )?despues de dar a luz$/,
+        /^control despues del parto$/,
+        /^atencion postparto$/,
+        /^registrar seguimiento de la madre despues del parto$/,
+      ],
+    },
+    {
+      intent: 'editar_vacuna',
+      patterns: [
+        /^quiero editar una vacuna$/,
+        /^corregir la dosis de una vacuna$/,
+        /^la vacuna quedo incorrecta$/,
+      ],
+    },
+    {
+      intent: 'vacunas',
+      patterns: [/^quiero registrar una vacuna$/],
+    },
+  ];
+
+  for (const priority of exactPriorities) {
+    if (priority.patterns.some((pattern) => pattern.test(normalized))) {
+      return { intent: priority.intent };
+    }
+  }
+
+  return null;
+}
+
 function getClinicalDataRequest(message) {
   const normalized = withoutSocialLeadIn(message);
   const patterns = [
@@ -835,6 +958,27 @@ function buildOperationalGuardResponse(intent, message) {
     confidence: 1,
     disclaimer: CLINICAL_DISCLAIMER,
   };
+}
+
+function buildOperationalClarificationResponse() {
+  return {
+    recognized: false,
+    intent: 'no_reconocida',
+    answer: 'Entiendo que no quieres eliminar el registro. ¿Qué necesitas editar: los datos de la paciente, un control prenatal, una vacuna, una atención de puerperio, una morbilidad, la ficha de riesgo o el plan de parto?',
+  };
+}
+
+function isLaboratoryViewRequest(message) {
+  const normalized = withoutSocialLeadIn(message);
+  return [
+    /^donde veo (?:los )?laboratorios$/,
+    /^donde estan (?:los )?resultados (?:de |del )?laboratorio$/,
+    /^quiero ver (?:los )?(?:resultados de )?laboratorios$/,
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function buildLaboratoryViewResponse() {
+  return 'Para ver los laboratorios guardados:\n1. Abre el expediente de la paciente.\n2. Entra en la pestaña "Laboratorios".\n3. Selecciona el control que deseas revisar para ver sus resultados por grupo de estudio.\n\nLos resultados se capturan al crear o editar un control prenatal, pero se consultan desde esta pestaña del expediente. La visibilidad de VIH depende del permiso correspondiente de la cuenta.';
 }
 
 function conversationalizeSteps(answer) {
@@ -941,6 +1085,14 @@ function answerQuestion(message) {
     };
   }
 
+  const operationalPriority = findOperationalPriority(text);
+  if (operationalPriority?.clarification) {
+    return buildOperationalClarificationResponse();
+  }
+  if (operationalPriority?.intent) {
+    return buildOperationalGuardResponse(operationalPriority.intent, text);
+  }
+
   const bestIntent = findBestIntent(text);
   if (!bestIntent) {
     return {
@@ -952,15 +1104,20 @@ function answerQuestion(message) {
     };
   }
 
-  const answer = bestIntent.intent === 'calcular_fpp'
-    ? buildFppResponse(text, bestIntent.answer)
-    : bestIntent.answer;
+  let answer = bestIntent.answer;
+  let humanizedIntent = bestIntent.intent;
+  if (bestIntent.intent === 'calcular_fpp') {
+    answer = buildFppResponse(text, bestIntent.answer);
+  } else if (bestIntent.intent === 'laboratorio' && isLaboratoryViewRequest(text)) {
+    answer = buildLaboratoryViewResponse();
+    humanizedIntent = 'laboratorio_visualizacion';
+  }
 
   return {
     recognized: true,
     intent: bestIntent.intent,
     title: bestIntent.title,
-    answer: humanizeAnswer(bestIntent.intent, answer),
+    answer: humanizeAnswer(humanizedIntent, answer),
     confidence: Number(Math.min(bestIntent.score / 6, 1).toFixed(2)),
     disclaimer: CLINICAL_DISCLAIMER,
   };

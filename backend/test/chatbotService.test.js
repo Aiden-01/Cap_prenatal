@@ -23,6 +23,7 @@ const EXPECTED_INTENTS = [
   'buscar_paciente',
   'editar_paciente',
   'embarazo_activo',
+  'cerrar_embarazo',
   'control_prenatal',
   'impresion_no_disponible',
   'editar_control_prenatal',
@@ -339,23 +340,21 @@ const CURRENT_INTENT_CASES = [
     intent: 'laboratorio',
     score: 7,
     confidence: 1,
-    answerIncludes: /registrar laboratorios/,
+    answerIncludes: /ver los laboratorios guardados/,
   },
   {
     input: 'Quiero imprimir la ficha MSPAS.',
-    intent: 'reportes',
+    intent: 'impresion_no_disponible',
     score: 7,
     confidence: 1,
-    answerIncludes: /Generar censo mensual/,
-    knownToImprove: 'MSPAS domina la coincidencia parcial de imprimir ficha.',
+    answerIncludes: /PDF MSPAS/,
   },
   {
     input: '¿Cómo cierro un embarazo?',
-    intent: 'no_reconocida',
+    intent: 'cerrar_embarazo',
     score: 1.5,
-    confidence: undefined,
-    fallback: true,
-    knownToImprove: 'Cerrar embarazo es una función real sin regla actual.',
+    confidence: 1,
+    answerIncludes: /Cerrar embarazo/,
   },
   {
     input: 'Ayúdame.',
@@ -366,11 +365,10 @@ const CURRENT_INTENT_CASES = [
   },
   {
     input: '¿Cómo cambio mi contraseña?',
-    intent: 'usuarios',
+    intent: 'cambiar_password',
     score: 7,
     confidence: 1,
-    answerIncludes: /gestionar usuarios/,
-    knownToImprove: 'La conjugación cambio no coincide con cambiar_password.',
+    answerIncludes: /cambiar tu contraseña/,
   },
   {
     input: '¿Cómo activo el modo oscuro?',
@@ -450,30 +448,32 @@ const KNOWN_PROBLEM_CASES = [
   },
   {
     input: 'Quiero imprimir la ficha MSPAS.',
-    intent: 'reportes',
+    intent: 'impresion_no_disponible',
     fallback: false,
     score: 7,
     confidence: 1,
-    answerIncludes: /Generar censo mensual/,
-    expectedCurrentResult: 'Guía de reportes en vez de impresión de expediente.',
+    answerIncludes: /PDF MSPAS/,
+    resolved: true,
+    expectedCurrentResult: 'Ahora dirige a la impresión real del expediente MSPAS.',
   },
   {
     input: 'Estoy en el expediente y no sé qué hacer.',
-    intent: 'buscar_paciente',
+    intent: 'secciones_expediente',
     fallback: false,
     score: 7,
     confidence: 1,
-    answerIncludes: /buscar una paciente/,
-    expectedCurrentResult: 'Guía para buscar aunque el usuario ya está dentro.',
+    answerIncludes: /se organiza por pestañas/,
+    resolved: true,
+    expectedCurrentResult: 'Ahora orienta sobre las secciones del expediente ya abierto.',
   },
   {
     input: 'No encuentro el botón para editar.',
-    intent: 'ayuda_bot',
-    fallback: false,
-    score: 7,
-    confidence: 1,
-    answerIncludes: /ayudarte con el sistema/,
-    expectedCurrentResult: 'bot coincide como subcadena dentro de botón.',
+    intent: 'no_reconocida',
+    fallback: true,
+    score: 1.5,
+    confidence: undefined,
+    resolved: true,
+    expectedCurrentResult: 'Botón ya no coincide como subcadena con bot; solicita contexto útil.',
   },
   {
     input: 'Quiero saber si esta paciente tiene VIH.',
@@ -564,11 +564,11 @@ test('una fecha no agrega cálculo FPP cuando gana otra intención', () => {
   assert.equal(Object.hasOwn(result, 'fpp'), false);
 });
 
-test('colisión vacunas vs editar_vacuna conserva el empate resuelto por orden', () => {
+test('editar vacuna supera a vacunas sin depender de un empate por orden', () => {
   const input = 'Editar vacuna';
-  assert.equal(scoreIntent(input, getIntent('vacunas')), 8);
+  assert.equal(scoreIntent(input, getIntent('vacunas')), 7);
   assert.equal(scoreIntent(input, getIntent('editar_vacuna')), 8);
-  assert.equal(answerQuestion(input).intent, 'vacunas');
+  assert.equal(answerQuestion(input).intent, 'editar_vacuna');
 });
 
 test('guarda de datos clínicos precede la coincidencia operativa de VIH', () => {
@@ -577,11 +577,11 @@ test('guarda de datos clínicos precede la coincidencia operativa de VIH', () =>
   assert.equal(answerQuestion(input).intent, 'solicitud_dato_clinico');
 });
 
-test('colisión reportes vs impresión MSPAS conserva reportes', () => {
+test('prioridad exacta de impresión MSPAS supera la keyword general de reportes', () => {
   const input = 'Quiero imprimir la ficha MSPAS.';
   assert.equal(scoreIntent(input, getIntent('reportes')), 7);
   assert.equal(scoreIntent(input, getIntent('impresion_no_disponible')), 3);
-  assert.equal(answerQuestion(input).intent, 'reportes');
+  assert.equal(answerQuestion(input).intent, 'impresion_no_disponible');
 });
 
 test('colisión usuarios vs contraseña olvidada favorece la frase específica', () => {
@@ -591,37 +591,203 @@ test('colisión usuarios vs contraseña olvidada favorece la frase específica',
   assert.equal(answerQuestion(input).intent, 'olvido_contrasena');
 });
 
-test('KNOWN_TO_IMPROVE: una clave que no funciona cae en usuarios', () => {
+test('una clave que no funciona se trata como problema de acceso', () => {
   const input = 'Mi clave no funciona';
   assert.equal(scoreIntent(input, getIntent('usuarios')), 7);
   assert.equal(scoreIntent(input, getIntent('olvido_contrasena')), 1.5);
-  assert.equal(answerQuestion(input).intent, 'usuarios');
+  assert.equal(answerQuestion(input).intent, 'olvido_contrasena');
 });
 
-test('colisión buscar_paciente vs estar dentro del expediente conserva búsqueda', () => {
+test('estar dentro del expediente prioriza sus secciones sobre buscar paciente', () => {
   const input = 'Estoy en el expediente y no sé qué hacer.';
   assert.equal(scoreIntent(input, getIntent('buscar_paciente')), 7);
   assert.equal(scoreIntent(input, getIntent('secciones_expediente')), 2);
-  assert.equal(answerQuestion(input).intent, 'buscar_paciente');
+  assert.equal(answerQuestion(input).intent, 'secciones_expediente');
 });
 
-test('KNOWN_TO_IMPROVE: seguimiento postparto cae en citas_seguimiento', () => {
+test('seguimiento postparto prioriza puerperio sobre citas prenatales', () => {
   const input = 'Seguimiento de la madre después de dar a luz';
   assert.equal(scoreIntent(input, getIntent('citas_seguimiento')), 7);
   assert.equal(scoreIntent(input, getIntent('puerperio')), 1);
-  assert.equal(answerQuestion(input).intent, 'citas_seguimiento');
+  assert.equal(answerQuestion(input).intent, 'puerperio');
 });
 
-test('KNOWN_TO_IMPROVE: eliminar domina a editar aunque esté negado', () => {
+test('una acción negada no domina y la edición ambigua pide el módulo', () => {
   const input = 'No quiero eliminar, quiero editar.';
   assert.equal(scoreIntent(input, getIntent('eliminar_registro')), 7);
   assert.equal(scoreIntent(input, getIntent('editar_paciente')), 1.5);
-  assert.equal(answerQuestion(input).intent, 'eliminar_registro');
+  const result = answerQuestion(input);
+  assert.equal(result.intent, 'no_reconocida');
+  assert.equal(result.recognized, false);
+  assert.match(result.answer, /Qué necesitas editar/);
 });
 
-test('catálogo conserva exactamente las 38 intenciones actuales y su orden', () => {
-  assert.equal(knowledgeBase.length, 38);
+for (const input of [
+  'Quiero imprimir la ficha MSPAS.',
+  'Necesito descargar la ficha MSPAS.',
+  'Quiero sacar el PDF del expediente.',
+  '¿Dónde genero la ficha prenatal MSPAS?',
+]) {
+  test(`impresión MSPAS usa la función del expediente: ${input}`, () => {
+    const result = answerQuestion(input);
+    assert.equal(result.intent, 'impresion_no_disponible');
+    assert.match(result.answer, /botón "Expediente"/);
+    assert.doesNotMatch(result.answer, /Generar censo mensual/);
+  });
+}
+
+for (const input of [
+  '¿Cómo cierro un embarazo?',
+  'Quiero cerrar el embarazo actual.',
+  'Finalizar embarazo.',
+  'Pasar el embarazo a puerperio.',
+  'Registrar que terminó el embarazo.',
+]) {
+  test(`cierre de embarazo describe las transiciones reales: ${input}`, () => {
+    const result = answerQuestion(input);
+    assert.equal(result.intent, 'cerrar_embarazo');
+    assert.match(result.answer, /Registrar puerperio/);
+    assert.match(result.answer, /Cerrar embarazo/);
+    assert.doesNotMatch(result.answer, /no lo manejo bien todavía/);
+  });
+}
+
+for (const input of ['¿Cómo cambio mi contraseña?', 'Quiero cambiar mi clave.']) {
+  test(`cambio voluntario de contraseña no cae en usuarios: ${input}`, () => {
+    const result = answerQuestion(input);
+    assert.equal(result.intent, 'cambiar_password');
+    assert.match(result.answer, /contraseña actual/);
+  });
+}
+
+for (const input of [
+  'Mi clave no funciona.',
+  'No puedo entrar con mi contraseña.',
+  'Olvidé mi contraseña.',
+]) {
+  test(`problema de acceso usa recuperación de contraseña: ${input}`, () => {
+    const result = answerQuestion(input);
+    assert.equal(result.intent, 'olvido_contrasena');
+    assert.doesNotMatch(result.answer, /gestionar usuarios/);
+  });
+}
+
+for (const input of [
+  'No encuentro el botón para editar.',
+  'El botón de guardar no aparece.',
+  '¿Dónde está el botón de imprimir?',
+]) {
+  test(`botón no activa ayuda_bot por subcadena: ${input}`, () => {
+    assert.notEqual(answerQuestion(input).intent, 'ayuda_bot');
+  });
+}
+
+for (const input of ['bot', 'chatbot']) {
+  test(`${input} conserva la intención ayuda_bot`, () => {
+    assert.equal(answerQuestion(input).intent, 'ayuda_bot');
+  });
+}
+
+for (const input of [
+  'Estoy en el expediente y no sé qué hacer.',
+  'Ya abrí el expediente, ¿qué sigue?',
+  '¿Qué secciones tiene el expediente?',
+  '¿Dónde están las pestañas del expediente?',
+]) {
+  test(`expediente ya abierto orienta a sus secciones: ${input}`, () => {
+    const result = answerQuestion(input);
+    assert.equal(result.intent, 'secciones_expediente');
+    assert.match(result.answer, /se organiza por pestañas/);
+    assert.doesNotMatch(result.answer, /Para buscar una paciente/);
+  });
+}
+
+for (const input of [
+  'Seguimiento después de dar a luz.',
+  'Control después del parto.',
+  'Atención postparto.',
+  'Registrar seguimiento de la madre después del parto.',
+]) {
+  test(`seguimiento posterior al parto usa puerperio: ${input}`, () => {
+    const result = answerQuestion(input);
+    assert.equal(result.intent, 'puerperio');
+    assert.match(result.answer, /registrar puerperio/);
+    assert.doesNotMatch(result.answer, /Cita siguiente/);
+  });
+}
+
+for (const input of [
+  'No quiero eliminar, quiero editar.',
+  'No necesito eliminar, quiero editar.',
+]) {
+  test(`edición sin módulo tras negación pide aclaración: ${input}`, () => {
+    const result = answerQuestion(input);
+    assert.equal(result.intent, 'no_reconocida');
+    assert.equal(result.recognized, false);
+    assert.match(result.answer, /Qué necesitas editar/);
+    assert.notEqual(result.intent, 'eliminar_registro');
+  });
+}
+
+for (const input of [
+  'No deseo borrar el control, solo corregirlo.',
+  'No voy a borrar el control, solo corregirlo.',
+]) {
+  test(`negación limitada conserva la acción positiva sobre control: ${input}`, () => {
+    assert.equal(answerQuestion(input).intent, 'editar_control_prenatal');
+  });
+}
+
+test('negación de crear paciente conserva la acción positiva de buscarla', () => {
+  assert.equal(
+    answerQuestion('No quiero crear otra paciente, quiero buscarla.').intent,
+    'buscar_paciente'
+  );
+});
+
+test('sin negación, eliminar registro continúa funcionando', () => {
+  assert.equal(answerQuestion('Quiero eliminar un control.').intent, 'eliminar_registro');
+});
+
+for (const [input, intent] of [
+  ['Quiero registrar una vacuna.', 'vacunas'],
+  ['Quiero editar una vacuna.', 'editar_vacuna'],
+  ['Corregir la dosis de una vacuna.', 'editar_vacuna'],
+  ['La vacuna quedó incorrecta.', 'editar_vacuna'],
+]) {
+  test(`vacunas diferencia registro y edición: ${input}`, () => {
+    assert.equal(answerQuestion(input).intent, intent);
+  });
+}
+
+for (const input of [
+  '¿Dónde veo los laboratorios?',
+  '¿Dónde están los resultados de laboratorio?',
+]) {
+  test(`laboratorio adapta la respuesta para visualización: ${input}`, () => {
+    const result = answerQuestion(input);
+    assert.equal(result.intent, 'laboratorio');
+    assert.match(result.answer, /ver los laboratorios guardados/);
+    assert.match(result.answer, /pestaña "Laboratorios"/);
+  });
+}
+
+for (const input of [
+  'Quiero registrar un laboratorio.',
+  '¿Dónde ingreso el resultado de VIH?',
+]) {
+  test(`laboratorio conserva la respuesta de registro: ${input}`, () => {
+    const result = answerQuestion(input);
+    assert.equal(result.intent, 'laboratorio');
+    assert.match(result.answer, /registrar laboratorios/);
+    assert.match(result.answer, /formulario del control/);
+  });
+}
+
+test('catálogo conserva las 38 intenciones previas y añade cerrar_embarazo', () => {
+  assert.equal(knowledgeBase.length, 39);
   assert.deepEqual(knowledgeBase.map((item) => item.intent), EXPECTED_INTENTS);
+  assert.equal(EXPECTED_INTENTS.filter((intent) => intent !== 'cerrar_embarazo').length, 38);
 });
 
 test('IDs de intención del catálogo son únicos', () => {
