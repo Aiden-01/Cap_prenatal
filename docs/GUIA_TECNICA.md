@@ -111,6 +111,31 @@ arreglos, espacios vacios y textos que excedan el limite.
 vacio de hasta 100 caracteres. Para mantener compatibilidad, `mensaje` y
 `message` pueden llegar en el payload, pero se descartan y nunca se registran.
 
+Ambos endpoints conservan la proteccion global CSRF y la autenticacion JWT. Una
+vez autenticada la solicitud, Lia aplica rate limits independientes por usuario
+(`id`, o `username`) y usa la IP como respaldo cuando no hay identidad:
+
+- `/mensaje`: 30 solicitudes por ventana de 60 segundos.
+- `/feedback`: 20 solicitudes por ventana de 60 segundos.
+
+Los limites se ejecutan antes de validar el payload y antes del controller. Al
+superarlos, la solicitud no clasifica el mensaje ni intenta registrar logging;
+responde HTTP 429 mediante el manejador global con el codigo estable
+`CHATBOT_RATE_LIMITED`. Se envian headers estandar `RateLimit-*` y `Retry-After`
+cuando corresponde. Los dos limitadores usan contadores separados, por lo que
+agotar mensajes no consume la cuota de feedback.
+
+`CHATBOT_RATE_LIMIT_WINDOW_MS`, `CHATBOT_MESSAGE_RATE_LIMIT` y
+`CHATBOT_FEEDBACK_RATE_LIMIT` permiten ajustar la ventana y las cuotas. Solo se
+aceptan enteros positivos; valores ausentes, vacios, decimales, cero, negativos
+o no numericos recuperan los defaults seguros de 60000 ms, 30 y 20. No existe
+una configuracion que desactive los limites por defecto.
+
+El almacenamiento de contadores es el `MemoryStore` local del proceso. En un
+despliegue con varias instancias, cada proceso mantiene su propia cuota; antes
+de escalar horizontalmente debe configurarse un store compartido compatible
+con `express-rate-limit`.
+
 El logging del chatbot es local, opcional y best-effort:
 
 - Esta desactivado por defecto. Solo se activa con
@@ -390,6 +415,9 @@ Fuera de alcance actual:
 | `CHATBOT_RUNTIME_DIR` | Directorio privado de runtime de Lia. Default `backend/runtime/chatbot/`. |
 | `CHATBOT_RULES_VERSION` | Version opcional de reglas incluida en eventos no reconocidos. |
 | `CHATBOT_CLASSIFIER_VERSION` | Version opcional incluida en feedback. |
+| `CHATBOT_RATE_LIMIT_WINDOW_MS` | Ventana de rate limit de Lia en ms. Default `60000`. |
+| `CHATBOT_MESSAGE_RATE_LIMIT` | Solicitudes de `/mensaje` por ventana y usuario/IP. Default `30`. |
+| `CHATBOT_FEEDBACK_RATE_LIMIT` | Solicitudes de `/feedback` por ventana y usuario/IP. Default `20`. |
 | `AUTOMATION_SECRET` | Secreto para endpoints n8n. |
 | `PDF_EXCEL_ENGINE` | `auto`, `excel` o `libreoffice`. |
 | `LIBREOFFICE_PATH` | Ruta a `soffice` cuando se usa LibreOffice. |
