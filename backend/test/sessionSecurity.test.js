@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const authService = require('../src/services/authService');
+const authSessionsRepository = require('../src/repositories/authSessionsRepository');
 const usuariosService = require('../src/services/usuariosService');
 const sessionService = require('../src/services/sessionService');
 const {
@@ -14,6 +15,7 @@ const {
 } = require('../src/middleware/auth');
 const {
   accessCookieOptions,
+  activity: activityController,
   clearAuthCookies,
   csrfCookieOptions,
   REFRESH_COOKIE_PATH,
@@ -398,6 +400,8 @@ test('actividad usa throttling SQL configurado y me no escribe actividad', async
     },
   });
   assert.equal(updateArgs.minIntervalSeconds, 60);
+  assert.equal(Number.isInteger(updateArgs.minIntervalSeconds), true);
+  assert.equal(updateArgs.now instanceof Date, true);
   let permissionReads = 0;
   const me = await authService.me({
     usuario: activeRecord(),
@@ -408,6 +412,120 @@ test('actividad usa throttling SQL configurado y me no escribe actividad', async
   });
   assert.equal(permissionReads, 1);
   assert.equal(me.idleTimeoutSeconds, 900);
+});
+
+test('repositorio de actividad compara TIMESTAMPTZ contra TIMESTAMPTZ con intervalo entero', async () => {
+  let captured;
+  const now = new Date('2026-07-15T12:00:00.000Z');
+  const result = await authSessionsRepository.actualizarActividad({
+    id: SESSION_ID,
+    usuarioId: 9,
+    now,
+    minIntervalSeconds: 60,
+  }, {
+    async query(sql, params) {
+      captured = { sql, params };
+      return { rows: [] };
+    },
+  });
+
+  assert.equal(result, null);
+  assert.deepEqual(captured.params, [now, SESSION_ID, 9, 60]);
+  assert.equal(Number.isInteger(captured.params[3]), true);
+  assert.match(
+    captured.sql,
+    /last_activity_at <= CURRENT_TIMESTAMP - make_interval\(secs => \$4::integer\)/
+  );
+  assert.match(captured.sql, /absolute_expires_at > CURRENT_TIMESTAMP/);
+  assert.doesNotMatch(captured.sql, /last_activity_at <= make_interval/);
+  assert.doesNotMatch(captured.sql, /\$4\s*\*\s*INTERVAL/);
+});
+
+test('throttling sin filas actualizadas sigue siendo exito y errores PostgreSQL se propagan', async () => {
+  let calls = 0;
+  const req = {
+    authSession: { id: SESSION_ID },
+    usuario: { id: 9 },
+  };
+
+  const noOp = await authService.activity({
+    req,
+    dependencies: {
+      sessionService: {
+        async registerActivity(args) {
+          calls += 1;
+          assert.equal(args.sessionId, SESSION_ID);
+          assert.equal(args.usuarioId, 9);
+          return null;
+        },
+      },
+    },
+  });
+  assert.equal(noOp, undefined);
+  assert.equal(calls, 1);
+
+  const pgError = Object.assign(new Error('fallo PostgreSQL real'), { code: 'XX000' });
+  await assert.rejects(
+    authService.activity({
+      req,
+      dependencies: {
+        sessionService: {
+          async registerActivity() { throw pgError; },
+        },
+      },
+    }),
+    (error) => error === pgError
+  );
+});
+
+test('controlador POST activity responde 204 en exito y delega errores reales', async () => {
+  const routeSource = fs.readFileSync(path.join(__dirname, '../src/routes/auth.js'), 'utf8');
+  assert.match(
+    routeSource,
+    /router\.post\('\/activity', authMiddleware, validateBody\(emptyBodySchema\), activity\)/
+  );
+  const originalActivity = authService.activity;
+  const req = {
+    authSession: { id: SESSION_ID },
+    usuario: { id: 9 },
+  };
+  let statusCode;
+  let endCalls = 0;
+  const res = {
+    status(code) {
+      statusCode = code;
+      return this;
+    },
+    end() {
+      endCalls += 1;
+      return this;
+    },
+  };
+
+  try {
+    let serviceCalls = 0;
+    authService.activity = async ({ req: serviceReq }) => {
+      serviceCalls += 1;
+      assert.equal(serviceReq, req);
+      return null;
+    };
+    await activityController(req, res, (error) => { throw error; });
+    assert.equal(serviceCalls, 1);
+    assert.equal(statusCode, 204);
+    assert.equal(endCalls, 1);
+
+    const pgError = Object.assign(new Error('fallo PostgreSQL real'), { code: 'XX000' });
+    let delegatedError;
+    statusCode = undefined;
+    endCalls = 0;
+    authService.activity = async () => { throw pgError; };
+    await activityController(req, res, (error) => { delegatedError = error; });
+    assert.equal(delegatedError, pgError);
+    assert.equal(statusCode, undefined);
+    assert.equal(endCalls, 0);
+  } finally {
+    authService.activity = originalActivity;
+  }
 });
 
 test('sesion ya inactiva se rechaza antes de cualquier escritura de actividad', async () => {
@@ -620,7 +738,9 @@ test('SQL de actividad y limpieza no mantiene viva ni elimina una sesion activa 
     path.join(__dirname, '../src/repositories/authSessionsRepository.js'),
     'utf8'
   );
-  assert.match(repositorySource, /SET last_activity_at = \$1[\s\S]*last_activity_at <= \$1 - \(\$4 \* INTERVAL '1 second'\)/);
+  assert.match(repositorySource, /SET last_activity_at = \$1[\s\S]*absolute_expires_at > CURRENT_TIMESTAMP/);
+  assert.match(repositorySource, /last_activity_at <= CURRENT_TIMESTAMP - make_interval\(secs => \$4::integer\)/);
+  assert.doesNotMatch(repositorySource, /last_activity_at <= make_interval/);
   assert.match(repositorySource, /revoked_at IS NOT NULL AND revoked_at < \$1/);
   assert.match(repositorySource, /absolute_expires_at < \$1/);
   assert.doesNotMatch(repositorySource, /DELETE FROM auth_sessions\s+WHERE created_at/);

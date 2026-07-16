@@ -97,7 +97,8 @@ async function actualizarActividad({ id, usuarioId, now, minIntervalSeconds }, d
      WHERE id = $2
        AND usuario_id = $3
        AND revoked_at IS NULL
-       AND last_activity_at <= $1 - ($4 * INTERVAL '1 second')
+       AND absolute_expires_at > CURRENT_TIMESTAMP
+       AND last_activity_at <= CURRENT_TIMESTAMP - make_interval(secs => $4::integer)
      RETURNING last_activity_at`,
     [now, id, usuarioId, minIntervalSeconds]
   );
