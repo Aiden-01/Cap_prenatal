@@ -6,7 +6,7 @@ function formatCountdown(seconds) {
   return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
 }
 
-export default function SessionTimeoutModal({ remainingSeconds, continuing, onContinue, onLogout }) {
+export default function SessionTimeoutModal({ remainingSeconds, continuing, error, onContinue, onLogout }) {
   const continueRef = useRef(null);
   const logoutRef = useRef(null);
 
@@ -24,7 +24,7 @@ export default function SessionTimeoutModal({ remainingSeconds, continuing, onCo
   };
 
   return (
-    <div className="modal-backdrop">
+    <div className="modal-backdrop" data-session-timeout-modal>
       <div
         className="card modal-card session-timeout-modal"
         role="dialog"
@@ -41,11 +41,23 @@ export default function SessionTimeoutModal({ remainingSeconds, continuing, onCo
         <div className="session-timeout-countdown" aria-live="polite" aria-label={`${remainingSeconds} segundos restantes`}>
           {formatCountdown(remainingSeconds)}
         </div>
+        {error && (
+          <p className="field-error" role="alert">
+            {error}
+          </p>
+        )}
         <div className="action-row">
           <button ref={logoutRef} type="button" className="btn-secondary" onClick={onLogout} disabled={continuing}>
             <LogOut size={16} /> Cerrar sesión
           </button>
-          <button ref={continueRef} type="button" className="btn-primary" onClick={onContinue} disabled={continuing}>
+          <button
+            ref={continueRef}
+            type="button"
+            className="btn-primary"
+            onClick={onContinue}
+            disabled={continuing}
+            aria-busy={continuing}
+          >
             <ShieldCheck size={16} /> {continuing ? "Validando…" : "Continuar sesión"}
           </button>
         </div>

@@ -1,8 +1,7 @@
 import axios from "axios";
 import {
   createRefreshCoordinator,
-  mayRetryAfterRefresh,
-  SESSION_INVALID_CODES,
+  handleAuthResponseError,
 } from "../utils/sessionSecurity";
 
 export const AUTH_SESSION_INVALID_EVENT = "cap-auth-session-invalid";
@@ -33,6 +32,7 @@ const refreshAccess = createRefreshCoordinator({
   executeRefresh: () => api.post("/auth/refresh", {}, {
     skipAuthRefresh: true,
     skipAuthRedirect: true,
+    timeout: 15_000,
   }),
   lockManager: navigator.locks,
   readState: () => localStorage.getItem(REFRESH_STATE_KEY),
@@ -55,27 +55,11 @@ api.interceptors.response.use(
     }
     return response;
   },
-  async (error) => {
-    const config = error.config || {};
-    if (mayRetryAfterRefresh(error, config)) {
-      config._authRetry = true;
-      try {
-        await refreshAccess();
-        return api.request(config);
-      } catch (refreshError) {
-        notifyInvalidSession(refreshError.response?.data?.code || "AUTHENTICATION_REQUIRED");
-        return Promise.reject(refreshError);
-      }
-    }
-
-    const code = error.response?.data?.code;
-    if (error.response?.status === 401
-      && SESSION_INVALID_CODES.has(code)
-      && !config.skipAuthRedirect) {
-      notifyInvalidSession(code);
-    }
-    return Promise.reject(error);
-  }
+  (error) => handleAuthResponseError(error, {
+    refresh: refreshAccess,
+    retry: (config) => api.request(config),
+    notifyInvalid: notifyInvalidSession,
+  })
 );
 
 export { refreshAccess };

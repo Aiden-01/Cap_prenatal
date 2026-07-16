@@ -46,8 +46,13 @@ export default function Layout() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const endLocalSession = useCallback((message = "", broadcastType = "logout") => {
-    logout({ reason: message, broadcastType });
+  const endLocalSession = useCallback((
+    message = "",
+    broadcastType = "logout",
+    broadcastMetadata = {},
+    { localOnly = false } = {}
+  ) => {
+    logout({ reason: message, broadcastType, broadcastMetadata, localOnly });
     navigate("/login", {
       replace: true,
       state: message ? { sessionMessage: message } : undefined,
@@ -173,6 +178,7 @@ export default function Layout() {
           <SessionTimeoutModal
             remainingSeconds={sessionManager.remainingSeconds}
             continuing={sessionManager.continuing}
+            error={sessionManager.error}
             onContinue={sessionManager.continueSession}
             onLogout={handleLogout}
           />
