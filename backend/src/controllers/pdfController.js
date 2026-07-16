@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 const puppeteer = require('puppeteer');
 const ExcelJS = require('exceljs');
 const { execFile } = require('child_process');
@@ -9,27 +8,59 @@ const pdfService = require('../services/pdfService');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { AppError } = require('../utils/appError');
 const { registrarAuditoria } = require('../utils/auditoria');
+const { consumePdfQuota } = require('../middleware/pdfRateLimit');
 const { generarFichaClinicaPrenatalPdf } = require('../services/fichaClinicaPrenatalPdf');
+const { sendPdfResponse } = require('../utils/pdfResponse');
+const { randomTempBase, withPdfTempDir } = require('../utils/pdfTemp');
 
 const execFileAsync = promisify(execFile);
 const TEXT_FORMAT_CELLS = new Set(['T8', 'V8', 'AE8:AN8', 'F61', 'G19:J19', 'P19:S19', 'Q19:T19', 'AK19:AN19']);
 const CENTER_FORMAT_RE = /^(N6|O6|P6|Q6|S6|T6|U6|V6|Y6|Z6|AA6|AB6|AA7:AB7|AA13:AB13|AE8:AN8|K18|X18|X19|E20|K20|Q20|X20|F21|M21)$/;
 
-async function pdfControl(req, res) {
-  const { id } = req.params;
+async function renderControlPdf(html, puppeteerClient) {
+  let browser = null;
 
   try {
-    const c = await pdfService.obtenerControlConPaciente({
+    browser = await puppeteerClient.launch({
+      headless: 'new',
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    return await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '0mm',
+        right: '0mm',
+        bottom: '0mm',
+        left: '0mm',
+      },
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+}
+
+async function pdfControlHandler(req, res, dependencies) {
+  const id = Number(req.params.controlId ?? req.params.id);
+  const pacienteId = Number(req.params.pacienteId);
+  const embarazoId = req.query.embarazo_id ? Number(req.query.embarazo_id) : null;
+
+  try {
+    const c = await dependencies.pdfService.obtenerControlConPaciente({
       id,
-      pacienteId: req.params.pacienteId,
-      embarazoId: req.query.embarazo_id || null,
+      pacienteId,
+      embarazoId,
     });
 
     if (!c) {
       throw new AppError(404, 'Control no encontrado', { code: 'CONTROL_NOT_FOUND' });
     }
 
-    let html = fs.readFileSync(
+    let html = dependencies.fsApi.readFileSync(
       path.join(__dirname, '../templates/control.html'),
       'utf8'
     );
@@ -54,34 +85,14 @@ async function pdfControl(req, res) {
       .replace('{{consejeria}}', esc(c.consejeria || ''))
       .replace('{{personal}}', esc(c.personal_atendio || ''));
 
-    const browser = await puppeteer.launch({
-      headless: "new",
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    dependencies.consumePdfQuota(req);
+    const pdf = await renderControlPdf(html, dependencies.puppeteerClient);
 
-    const page = await browser.newPage();
-
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-
-    const pdf = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '0mm',
-        right: '0mm',
-        bottom: '0mm',
-        left: '0mm'
-      }
-    });
-
-    await browser.close();
-
-    await registrarAuditoria(req, {
+    await dependencies.registrarAuditoria(req, {
       accion: 'generar_pdf',
       tabla: 'documentos',
       registroId: id,
-      pacienteId: c.paciente_id || req.params.pacienteId || null,
+      pacienteId: c.paciente_id || pacienteId,
       embarazoId: c.embarazo_id || null,
       datosNuevos: {
         tipo_documento: 'control_prenatal',
@@ -90,12 +101,7 @@ async function pdfControl(req, res) {
       descripcion: 'PDF de control prenatal generado',
     });
 
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename=control-${id}.pdf`
-    });
-
-    return res.send(Buffer.from(pdf));
+    return dependencies.sendPdfResponse(res, pdf, `control-${id}.pdf`);
 
   } catch (err) {
     if (err.status) throw err;
@@ -636,10 +642,9 @@ function libreOfficeExecutable() {
   return process.env.LIBREOFFICE_PATH || (process.platform === 'win32' ? 'soffice.exe' : 'soffice');
 }
 
-async function exportWithLibreOffice(templatePath, cellMap, pdfFileName, tempDir) {
-  const tempXlsx = path.join(tempDir, 'template.xlsx');
-  const generatedPdf = path.join(tempDir, 'template.pdf');
-  const tempPdf = path.join(tempDir, pdfFileName);
+async function exportWithLibreOffice(templatePath, cellMap, tempDir, tempBase) {
+  const tempXlsx = path.join(tempDir, `${tempBase}.xlsx`);
+  const generatedPdf = path.join(tempDir, `${tempBase}.pdf`);
 
   await writeExcelTemplate(templatePath, tempXlsx, cellMap);
   await execFileAsync(libreOfficeExecutable(), [
@@ -657,17 +662,13 @@ async function exportWithLibreOffice(templatePath, cellMap, pdfFileName, tempDir
     throw new Error('LibreOffice no genero el PDF esperado');
   }
 
-  if (generatedPdf !== tempPdf) {
-    fs.renameSync(generatedPdf, tempPdf);
-  }
-
-  return fs.readFileSync(tempPdf);
+  return fs.readFileSync(generatedPdf);
 }
 
-async function exportWithExcelCom(templatePath, cellMap, pdfFileName, tempDir) {
-  const tempXlsx = path.join(tempDir, 'template.xlsx');
-  const tempPdf = path.join(tempDir, pdfFileName);
-  const tempJson = path.join(tempDir, 'cells.json');
+async function exportWithExcelCom(templatePath, cellMap, tempDir, tempBase) {
+  const tempXlsx = path.join(tempDir, `${tempBase}.xlsx`);
+  const tempPdf = path.join(tempDir, `${tempBase}.pdf`);
+  const tempJson = path.join(tempDir, `${tempBase}.json`);
 
   fs.copyFileSync(templatePath, tempXlsx);
   fs.writeFileSync(tempJson, JSON.stringify(cellMap), 'utf8');
@@ -725,19 +726,17 @@ finally {
   return fs.readFileSync(tempPdf);
 }
 
-async function exportExcelTemplateToPdf(templatePath, cellMap, pdfFileName) {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cap-prenatal-'));
+async function exportExcelTemplateToPdf(templatePath, cellMap) {
   const engine = (process.env.PDF_EXCEL_ENGINE || 'auto').toLowerCase();
 
-  try {
+  return withPdfTempDir(async (tempDir) => {
+    const tempBase = randomTempBase();
     if (engine === 'excel' || (engine === 'auto' && process.platform === 'win32')) {
-      return await exportWithExcelCom(templatePath, cellMap, pdfFileName, tempDir);
+      return exportWithExcelCom(templatePath, cellMap, tempDir, tempBase);
     }
 
-    return await exportWithLibreOffice(templatePath, cellMap, pdfFileName, tempDir);
-  } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
-  }
+    return exportWithLibreOffice(templatePath, cellMap, tempDir, tempBase);
+  });
 }
 
 function formatDate(value) {
@@ -1159,19 +1158,21 @@ function buildMspasHtml({ paciente, embarazo, controles }) {
   </html>`;
 }
 
-async function pdfMspas(req, res) {
-  const { pacienteId } = req.params;
+async function pdfMspasHandler(req, res, dependencies) {
+  const pacienteId = Number(req.params.pacienteId);
+  const embarazoId = req.query.embarazo_id ? Number(req.query.embarazo_id) : null;
 
   try {
-    const data = await pdfService.obtenerFichaMspasData(pacienteId, req.query.embarazo_id || null);
+    const data = await dependencies.pdfService.obtenerFichaMspasData(pacienteId, embarazoId);
 
     if (!data.paciente) {
       throw new AppError(404, 'Paciente no encontrada', { code: 'PATIENT_NOT_FOUND' });
     }
 
-    const pdf = await generarFichaClinicaPrenatalPdf(data);
+    dependencies.consumePdfQuota(req);
+    const pdf = await dependencies.generarFichaClinicaPrenatalPdf(data);
 
-    await registrarAuditoria(req, {
+    await dependencies.registrarAuditoria(req, {
       accion: 'generar_pdf',
       tabla: 'documentos',
       registroId: pacienteId,
@@ -1183,24 +1184,21 @@ async function pdfMspas(req, res) {
       descripcion: 'PDF MSPAS prenatal generado',
     });
 
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': 'inline; filename="ficha-prenatal.pdf"',
-    });
-    return res.send(Buffer.from(pdf));
+    return dependencies.sendPdfResponse(res, pdf, 'ficha-prenatal.pdf');
   } catch (err) {
     if (err.status) throw err;
     throw new AppError(500, 'Error al generar PDF MSPAS', { code: 'MSPAS_PDF_GENERATION_ERROR' });
   }
 }
 
-async function pdfRiesgoObstetrico(req, res) {
-  const { pacienteId } = req.params;
+async function pdfRiesgoObstetricoHandler(req, res, dependencies) {
+  const pacienteId = Number(req.params.pacienteId);
+  const embarazoId = req.query.embarazo_id ? Number(req.query.embarazo_id) : null;
 
   try {
-    const { paciente, embarazo, riesgo } = await pdfService.obtenerFichaRiesgoData(
+    const { paciente, embarazo, riesgo } = await dependencies.pdfService.obtenerFichaRiesgoData(
       pacienteId,
-      req.query.embarazo_id || null
+      embarazoId
     );
 
     if (!paciente) {
@@ -1216,9 +1214,10 @@ async function pdfRiesgoObstetrico(req, res) {
       riesgo,
     });
     const templatePath = path.join(__dirname, '../assets/official_forms/riesgo_oficial.xlsx');
-    const pdf = await exportExcelTemplateToPdf(templatePath, cellMap, `ficha-riesgo-${pacienteId}.pdf`);
+    dependencies.consumePdfQuota(req);
+    const pdf = await dependencies.exportExcelTemplateToPdf(templatePath, cellMap);
 
-    await registrarAuditoria(req, {
+    await dependencies.registrarAuditoria(req, {
       accion: 'generar_pdf',
       tabla: 'documentos',
       registroId: riesgo.id,
@@ -1231,24 +1230,21 @@ async function pdfRiesgoObstetrico(req, res) {
       descripcion: 'PDF de ficha de riesgo obstetrico generado',
     });
 
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename=ficha-riesgo-${pacienteId}.pdf`,
-    });
-    return res.send(Buffer.from(pdf));
+    return dependencies.sendPdfResponse(res, pdf, `ficha-riesgo-${pacienteId}.pdf`);
   } catch (err) {
     if (err.status) throw err;
     throw new AppError(500, 'Error al generar PDF de ficha de riesgo', { code: 'RISK_PDF_GENERATION_ERROR' });
   }
 }
 
-async function pdfPlanParto(req, res) {
-  const { pacienteId } = req.params;
+async function pdfPlanPartoHandler(req, res, dependencies) {
+  const pacienteId = Number(req.params.pacienteId);
+  const embarazoId = req.query.embarazo_id ? Number(req.query.embarazo_id) : null;
 
   try {
-    const { paciente, plan } = await pdfService.obtenerPlanPartoData(
+    const { paciente, embarazo, plan } = await dependencies.pdfService.obtenerPlanPartoData(
       pacienteId,
-      req.query.embarazo_id || null
+      embarazoId
     );
 
     if (!paciente) {
@@ -1260,14 +1256,15 @@ async function pdfPlanParto(req, res) {
 
     const cellMap = buildPlanPartoCellMap({ paciente, plan });
     const templatePath = path.join(__dirname, '../assets/official_forms/plan_parto_oficial.xlsx');
-    const pdf = await exportExcelTemplateToPdf(templatePath, cellMap, `plan-parto-${pacienteId}.pdf`);
+    dependencies.consumePdfQuota(req);
+    const pdf = await dependencies.exportExcelTemplateToPdf(templatePath, cellMap);
 
-    await registrarAuditoria(req, {
+    await dependencies.registrarAuditoria(req, {
       accion: 'generar_pdf',
       tabla: 'documentos',
       registroId: plan.id,
       pacienteId,
-      embarazoId: plan.embarazo_id || null,
+      embarazoId: embarazo?.id || plan.embarazo_id || null,
       datosNuevos: {
         tipo_documento: 'plan_parto',
         plan_parto_id: plan.id,
@@ -1275,20 +1272,40 @@ async function pdfPlanParto(req, res) {
       descripcion: 'PDF de plan de parto generado',
     });
 
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename=plan-parto-${pacienteId}.pdf`,
-    });
-    return res.send(Buffer.from(pdf));
+    return dependencies.sendPdfResponse(res, pdf, `plan-parto-${pacienteId}.pdf`);
   } catch (err) {
     if (err.status) throw err;
     throw new AppError(500, 'Error al generar PDF de plan de parto', { code: 'BIRTH_PLAN_PDF_GENERATION_ERROR' });
   }
 }
 
+function createPdfController(overrides = {}) {
+  const dependencies = {
+    consumePdfQuota,
+    exportExcelTemplateToPdf,
+    fsApi: fs,
+    generarFichaClinicaPrenatalPdf,
+    pdfService,
+    puppeteerClient: puppeteer,
+    registrarAuditoria,
+    sendPdfResponse,
+    ...overrides,
+  };
+
+  return {
+    pdfControl: (req, res) => pdfControlHandler(req, res, dependencies),
+    pdfMspas: (req, res) => pdfMspasHandler(req, res, dependencies),
+    pdfPlanParto: (req, res) => pdfPlanPartoHandler(req, res, dependencies),
+    pdfRiesgoObstetrico: (req, res) => pdfRiesgoObstetricoHandler(req, res, dependencies),
+  };
+}
+
+const pdfController = createPdfController();
+
 module.exports = {
-  pdfControl: asyncHandler(pdfControl),
-  pdfMspas: asyncHandler(pdfMspas),
-  pdfRiesgoObstetrico: asyncHandler(pdfRiesgoObstetrico),
-  pdfPlanParto: asyncHandler(pdfPlanParto),
+  createPdfController,
+  pdfControl: asyncHandler(pdfController.pdfControl),
+  pdfMspas: asyncHandler(pdfController.pdfMspas),
+  pdfPlanParto: asyncHandler(pdfController.pdfPlanParto),
+  pdfRiesgoObstetrico: asyncHandler(pdfController.pdfRiesgoObstetrico),
 };

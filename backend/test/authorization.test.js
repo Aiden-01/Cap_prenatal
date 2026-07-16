@@ -4,7 +4,7 @@ const path = require('node:path');
 const test = require('node:test');
 const jwt = require('jsonwebtoken');
 
-const { authMiddleware, createAuthMiddleware } = require('../src/middleware/auth');
+const { authMiddleware, createAuthMiddleware, csrfMiddleware } = require('../src/middleware/auth');
 const { verificarPermiso } = require('../src/middleware/permisos');
 
 function invoke(middleware, req) {
@@ -98,6 +98,50 @@ test('usuario con permiso de creacion conserva acceso a una escritura', async ()
     permisoRequerido: 'controles.crear',
   });
   assert.equal(reached, true);
+});
+
+test('creacion explicita de embarazo exige pacientes.editar y CSRF', async () => {
+  await assert.rejects(
+    runAuthorizationChain({ permisos: ['pacientes.ver'], permisoRequerido: 'pacientes.editar' }),
+    (error) => error.statusCode === 403 && error.code === 'PERMISO_REQUERIDO'
+  );
+
+  assert.equal(await runAuthorizationChain({
+    permisos: ['pacientes.editar'],
+    permisoRequerido: 'pacientes.editar',
+  }), true);
+
+  await assert.rejects(
+    invoke(csrfMiddleware, {
+      method: 'POST',
+      originalUrl: '/api/pacientes/41/embarazos',
+      path: '/pacientes/41/embarazos',
+      headers: {},
+    }),
+    (error) => error.statusCode === 403 && error.code === 'CSRF_INVALID'
+  );
+
+  await invoke(csrfMiddleware, {
+    method: 'POST',
+    originalUrl: '/api/pacientes/41/embarazos',
+    path: '/pacientes/41/embarazos',
+    headers: {
+      cookie: 'cap_prenatal_csrf=embarazo-seguro',
+      'x-csrf-token': 'embarazo-seguro',
+    },
+  });
+});
+
+test('rutas de expediente y embarazo conservan sus permisos declarados', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../src/routes/pacientes.js'),
+    'utf8'
+  );
+
+  assert.ok(source.includes('router.use(authMiddleware)'));
+  assert.ok(source.includes('router.use(cargarPermisos)'));
+  assert.ok(source.includes("router.get('/:id/expediente', verificarPermiso('pacientes.ver')"));
+  assert.ok(source.includes("router.post('/:id/embarazos', verificarPermiso('pacientes.editar')"));
 });
 
 test('embarazo cerrado continua rechazando escrituras', async () => {

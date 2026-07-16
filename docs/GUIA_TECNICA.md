@@ -644,6 +644,8 @@ Reglas:
 - Sin `embarazo_id`, el backend selecciona el embarazo visible preferente: activo, luego puerperio, luego cerrado mas reciente.
 - Con `embarazo_id`, el backend valida que el embarazo exista y pertenezca a la paciente.
 - La respuesta incluye `embarazo_seleccionado`, `embarazo_actual`, `embarazo_activo`, `is_read_only` e `is_embarazo_actual`.
+- El GET es exclusivamente de lectura y nunca inicializa un embarazo ni actualiza timestamps.
+- Si no hay embarazo, devuelve listas clinicas vacias, objetos clinicos y campos de embarazo en `null`, y ambos indicadores en `false`.
 - El frontend debe comparar IDs como string porque la URL siempre entrega strings.
 - Si el usuario selecciona el mismo embarazo, no debe limpiar estado ni recargar.
 - Si selecciona otro embarazo, se actualiza `?embarazo_id=` y se recarga el expediente.
@@ -678,11 +680,26 @@ Estados de embarazo:
 ### Nuevo embarazo
 
 1. `POST /api/pacientes/:id/embarazos`.
-2. Se cierran embarazos en seguimiento.
-3. Se valida que no quede otro embarazo activo.
-4. Se crea un nuevo embarazo activo con numero consecutivo.
-5. Se sincroniza FUR/FPP en paciente.
-6. Se audita cierre anterior, nuevo embarazo y paciente actualizado.
+2. Requiere sesion, `pacientes.editar` y token CSRF.
+3. Dentro de una transaccion se bloquea la fila de la paciente con `FOR UPDATE`.
+4. Se rechaza cualquier embarazo `activo` o en `puerperio`; no se cierra ninguno automaticamente.
+5. Se crea un nuevo embarazo activo con numero consecutivo y se sincroniza FUR/FPP.
+6. Se auditan el embarazo y la paciente dentro de la misma transaccion.
+7. La fila bloqueada serializa dos POST concurrentes. El indice parcial `ux_embarazo_activo_paciente` refuerza solo el estado `activo`.
+
+Cuando el GET devuelve un expediente sin embarazo, el frontend muestra un
+estado vacio. Solo una accion explicita `Iniciar embarazo`, visible para quien
+tenga `pacientes.editar`, ejecuta el POST y recarga el expediente al confirmar
+la respuesta. La accion se oculta si cualquier embarazo esta `activo` o en
+`puerperio`; en este ultimo caso se indica que primero debe completarse y
+cerrarse el puerperio. Un fallo no debe simular un embarazo en la interfaz.
+
+El backend responde `ACTIVE_PREGNANCY_EXISTS` para un conflicto activo y
+`PUERPERIUM_PREGNANCY_EXISTS` para uno en puerperio. La base solo tiene una
+unicidad parcial para `activo`; escritores ajenos a este POST podrian evadir la
+regla de puerperio si no toman el mismo bloqueo de paciente. Un indice futuro
+para ambos estados exige auditar antes los datos existentes y no se incorpora
+en este cierre.
 
 ### Pasar a puerperio
 
@@ -729,6 +746,28 @@ PDF institucionales:
 - Ficha de riesgo obstetrico.
 - Plan de parto.
 - Control prenatal individual.
+
+Las cuatro rutas conservan sus URLs `GET`, pero requieren sesion valida y el
+permiso `pacientes.ver`. Ese permiso autoriza consultar pacientes e imprimir
+el formato oficial completo. No se exige `controles.ver_vih`: el resultado de
+VIH permanece en el documento por politica clinica confirmada por el CAP.
+
+La autorizacion, la existencia de la paciente y la pertenencia de
+`embarazo_id`/`control_id` se resuelven antes de iniciar cualquier generador.
+Una respuesta valida aplica cabeceras privadas `no-store`, nombre de archivo
+sanitizado y auditoria minima del tipo de documento, usuario, paciente y
+embarazo, sin guardar el binario ni el contenido clinico.
+
+El limite permite 20 inicios de generacion por usuario autenticado cada 5
+minutos. Solo se incrementa despues de autenticacion, autorizacion, validacion
+de IDs, existencia y pertenencia, inmediatamente antes de invocar el generador.
+Por ello un rechazo anterior no consume; si Puppeteer, ExcelJS, Excel,
+LibreOffice o el generador MSPAS ya fue invocado, el consumo se conserva aunque
+la respuesta termine en error. El intento 21 devuelve `429` sin ejecutar el
+generador. El limite usa memoria local, apropiada mientras el sistema opere en
+una sola instancia, y no depende solo de la IP compartida del CAP. Los
+auxiliares de Excel/LibreOffice se crean en el directorio temporal del sistema
+con nombres aleatorios y se eliminan en `finally`.
 
 La pagina 3 de la ficha MSPAS prenatal se completa con `pdf-lib` sobre la plantilla oficial:
 
@@ -838,6 +877,8 @@ Fuera de alcance actual:
 | `CHATBOT_MESSAGE_RATE_LIMIT` | Solicitudes de `/mensaje` por ventana y usuario/IP. Default `30`. |
 | `CHATBOT_FEEDBACK_RATE_LIMIT` | Solicitudes de `/feedback` por ventana y usuario/IP. Default `20`. |
 | `AUTOMATION_SECRET` | Secreto para endpoints n8n. |
+| `PDF_RATE_LIMIT_WINDOW_MS` | Ventana por usuario para PDF clinico. Default `300000`. |
+| `PDF_RATE_LIMIT` | Generaciones PDF permitidas por ventana. Default `20`. |
 | `PDF_EXCEL_ENGINE` | `auto`, `excel` o `libreoffice`. |
 | `LIBREOFFICE_PATH` | Ruta a `soffice` cuando se usa LibreOffice. |
 | `VITE_API_URL` | Base URL del API en frontend. |

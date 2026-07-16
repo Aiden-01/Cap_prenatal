@@ -14,6 +14,16 @@ import {
   PackageCheck, ClipboardCheck, MapPin, PenLine, Clock, UserRound
 } from "lucide-react";
 import { getErrorMessage } from "../utils/errorMessage";
+import {
+  canCreatePregnancy,
+  hasPregnancyBlockingCreation,
+  hasPuerperiumPregnancy,
+  hasSelectedPregnancy,
+  isValidPregnancyId,
+  pregnancyActionConfirmation,
+  pregnancyActionLabel,
+  selectedPregnancy,
+} from "../utils/pregnancyState";
 
 // ─── HELPERS ────────────────────────────────────────────────
 function Row({ label, value }) {
@@ -627,6 +637,7 @@ export default function ExpedientePaciente() {
   const [loadedRequestKey, setLoadedRequestKey] = useState("");
   const [loadError, setLoadError] = useState("");
   const [printing, setPrinting] = useState(false);
+  const [creatingPregnancy, setCreatingPregnancy] = useState(false);
   const [antecedentesVacunas, setAntecedentesVacunas] = useState([]);
   const [selectedLabControlId, setSelectedLabControlId] = useState(null);
   const [selectedPlanSectionId, setSelectedPlanSectionId] = useState("generales");
@@ -692,11 +703,20 @@ export default function ExpedientePaciente() {
     setSearchParams(next, { replace: true });
   };
 
-  const embarazoSeleccionado = exp?.embarazo_seleccionado || exp?.embarazo_activo;
+  const embarazoSeleccionado = selectedPregnancy(exp);
+  const hasEmbarazo = hasSelectedPregnancy(exp);
+  const tieneEmbarazoQueBloqueaCreacion = hasPregnancyBlockingCreation(exp);
+  const tieneEmbarazoEnPuerperio = hasPuerperiumPregnancy(exp);
+  const puedeEditarPacientes = Boolean(usuario?.permisos?.includes("pacientes.editar"));
+  const puedeCrearEmbarazo = canCreatePregnancy(exp, puedeEditarPacientes);
+  const etiquetaCrearEmbarazo = pregnancyActionLabel(exp);
   const embarazoSeleccionadoId = embarazoSeleccionado?.id ? String(embarazoSeleccionado.id) : "";
   const estadoEmbarazo = embarazoSeleccionado?.estado;
-  const isReadOnly = exp?.is_read_only ?? embarazoSeleccionado?.estado === "cerrado";
-  const isEmbarazoActual = exp?.is_embarazo_actual ?? embarazoSeleccionadoId === String(exp?.embarazo_actual?.id || "");
+  const isReadOnly = hasEmbarazo && (exp?.is_read_only ?? embarazoSeleccionado?.estado === "cerrado");
+  const isEmbarazoActual = hasEmbarazo && (
+    exp?.is_embarazo_actual
+    ?? embarazoSeleccionadoId === String(exp?.embarazo_actual?.id || "")
+  );
   const expedienteDesactualizado = Boolean(
     exp && selectedEmbarazoId &&
     String(exp.embarazo_seleccionado?.id || exp.embarazo_activo?.id || '') !== String(selectedEmbarazoId)
@@ -847,20 +867,32 @@ export default function ExpedientePaciente() {
   };
 
   const crearNuevoEmbarazo = async () => {
-    if (!window.confirm("Esto cerrara el embarazo activo y creara un nuevo embarazo para esta paciente. ¿Continuar?")) return;
+    if (!puedeCrearEmbarazo || creatingPregnancy) return;
+    if (!window.confirm(pregnancyActionConfirmation(exp))) return;
     const fur = window.prompt("FUR del nuevo embarazo (AAAA-MM-DD). Puedes dejarlo vacio:");
     if (fur === null) return;
     const fpp = window.prompt("FPP del nuevo embarazo (AAAA-MM-DD). Puedes dejarlo vacio:");
     if (fpp === null) return;
 
+    setCreatingPregnancy(true);
     try {
-      const { data: nuevoEmbarazo } = await api.post(`/pacientes/${id}/embarazos`, { fur, fpp });
-      toast("Nuevo embarazo creado", "success");
+      const { data } = await api.post(`/pacientes/${id}/embarazos`, { fur, fpp });
+      const nuevoEmbarazo = data?.embarazo || data;
+      if (!isValidPregnancyId(nuevoEmbarazo?.id)) {
+        throw new Error("El servidor no devolvio el embarazo creado");
+      }
+
+      toast(
+        etiquetaCrearEmbarazo === "Iniciar embarazo" ? "Embarazo iniciado" : "Nuevo embarazo creado",
+        "success"
+      );
       const next = new URLSearchParams();
-      if (nuevoEmbarazo?.id) next.set("embarazo_id", String(nuevoEmbarazo.id));
+      next.set("embarazo_id", String(nuevoEmbarazo.id));
       setSearchParams(next);
     } catch (err) {
-      toast(getErrorMessage(err, "Error al crear nuevo embarazo"), "error");
+      toast(getErrorMessage(err, "Error al registrar embarazo"), "error");
+    } finally {
+      setCreatingPregnancy(false);
     }
   };
 
@@ -894,6 +926,10 @@ export default function ExpedientePaciente() {
   };
 
   const imprimirFichaMspas = async () => {
+    if (!hasEmbarazo) {
+      toast("Selecciona o inicia un embarazo antes de generar el PDF", "error");
+      return;
+    }
     setPrinting(true);
     try {
       const res = await api.get(`/pacientes/${id}/mspas/pdf`, {
@@ -934,6 +970,10 @@ export default function ExpedientePaciente() {
   };
 
   const imprimirFichaRiesgo = async () => {
+    if (!hasEmbarazo) {
+      toast("Selecciona un embarazo antes de generar la ficha de riesgo", "error");
+      return;
+    }
     setPrinting(true);
     try {
       const res = await api.get(`/pacientes/${id}/riesgo/pdf`, {
@@ -974,6 +1014,10 @@ export default function ExpedientePaciente() {
   };
 
   const imprimirPlanParto = async () => {
+    if (!hasEmbarazo) {
+      toast("Selecciona un embarazo antes de generar el plan de parto", "error");
+      return;
+    }
     setPrinting(true);
     try {
       const res = await api.get(`/pacientes/${id}/plan-parto/pdf`, {
@@ -1040,7 +1084,7 @@ export default function ExpedientePaciente() {
           </div>
           <div className="patient-hero-meta">
             <span className="badge badge-blue">Exp: {p.no_expediente}</span>
-            {embarazoSeleccionado && (
+            {hasEmbarazo && (
               <span className={`badge ${badgeEmbarazo}`}>
                 Embarazo {embarazoSeleccionado.numero_embarazo} {embarazoSeleccionado.estado}
               </span>
@@ -1062,44 +1106,83 @@ export default function ExpedientePaciente() {
               <Plus size={14} /> Control
             </button>
           )}
-          <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/editar`)}>
-            <Pencil size={14} /> Editar paciente
-          </button>
-          <button className="btn-secondary" onClick={imprimirFichaMspas} disabled={printing}>
+          {puedeEditarPacientes && (
+            <button className="btn-secondary" onClick={() => navigate(`/pacientes/${id}/editar`)}>
+              <Pencil size={14} /> Editar paciente
+            </button>
+          )}
+          <button
+            className="btn-secondary"
+            onClick={imprimirFichaMspas}
+            disabled={printing || !hasEmbarazo}
+            title={!hasEmbarazo ? "Inicia un embarazo antes de generar el PDF clinico" : undefined}
+          >
             <Printer size={14} /> {printing ? "Generando..." : "Expediente"}
           </button>
-          <button className="btn-create" onClick={crearNuevoEmbarazo}>
-            <Plus size={14} /> Nuevo embarazo
-          </button>
+          {hasEmbarazo && puedeCrearEmbarazo && (
+            <button className="btn-create" onClick={crearNuevoEmbarazo} disabled={creatingPregnancy}>
+              <Plus size={14} /> {creatingPregnancy ? "Registrando..." : etiquetaCrearEmbarazo}
+            </button>
+          )}
         </div>
       </div>
 
-      {isReadOnly && (
+      {!hasEmbarazo && (
+        <div
+          className="card empty-state"
+          style={{ marginTop: "1rem", display: "grid", justifyItems: "center", gap: "0.75rem" }}
+        >
+          <Baby size={30} style={{ color: "var(--primary)" }} />
+          <h3 style={{ margin: 0 }}>Sin embarazo registrado</h3>
+          <p style={{ margin: 0, color: "var(--text-muted)", textAlign: "center" }}>
+            El expediente puede consultarse sin crear registros. Inicia un embarazo solo cuando corresponda.
+          </p>
+          {puedeCrearEmbarazo && (
+            <button className="btn-primary" onClick={crearNuevoEmbarazo} disabled={creatingPregnancy}>
+              <Plus size={14} /> {creatingPregnancy ? "Iniciando..." : "Iniciar embarazo"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {hasEmbarazo && isReadOnly && (
         <div className="card" style={{ marginTop: "1rem", borderColor: "var(--warn)", background: "var(--warn-lt)", color: "var(--warn)", fontWeight: 800 }}>
           Embarazo cerrado · solo lectura
         </div>
       )}
 
-      {isEmbarazoActual && !isReadOnly && (
+      {hasEmbarazo && tieneEmbarazoQueBloqueaCreacion && tieneEmbarazoEnPuerperio && (
+        <div
+          className="card"
+          role="status"
+          style={{ marginTop: "1rem", borderColor: "var(--warn)", background: "var(--warn-lt)", color: "var(--warn)", fontWeight: 800 }}
+        >
+          Complete y cierre el puerperio antes de registrar un embarazo nuevo.
+        </div>
+      )}
+
+      {hasEmbarazo && isEmbarazoActual && !isReadOnly && (
         <SemaforoCompletitud pacienteId={id} initialData={buildCompletitudFromExp(exp, id)} />
       )}
 
       {/* ── TABS ── */}
-      <div className="content-tabs" style={{ marginBottom: "1.5rem", marginTop: "1.5rem" }}>
-        {TABS.map((t) => {
-          const Icon = t.icon;
-          return (
-            <button key={t.id} onClick={() => cambiarTab(t.id)} className={`content-tab ${tab === t.id ? "is-active" : ""}`}>
-              <Icon size={13} />{t.label}
-            </button>
-          );
-        })}
-      </div>
+      {hasEmbarazo && (
+        <div className="content-tabs" style={{ marginBottom: "1.5rem", marginTop: "1.5rem" }}>
+          {TABS.map((t) => {
+            const Icon = t.icon;
+            return (
+              <button key={t.id} onClick={() => cambiarTab(t.id)} className={`content-tab ${tab === t.id ? "is-active" : ""}`}>
+                <Icon size={13} />{t.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════
           TAB: DATOS GENERALES
       ══════════════════════════════════════════ */}
-      {tab === "general" && (
+      {hasEmbarazo && tab === "general" && (
         <div className="clinical-card-list">
 
           <div className="card">
@@ -1260,7 +1343,7 @@ export default function ExpedientePaciente() {
       {/* ══════════════════════════════════════════
           TAB: CONTROLES PRENATALES
       ══════════════════════════════════════════ */}
-      {tab === "controles" && (
+      {hasEmbarazo && tab === "controles" && (
         <div style={{ display: "grid", gap: "1rem" }}>
           {!isReadOnly && puedeRegistrarPrenatal && exp.controles_prenatales?.length > 0 && (
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -1276,7 +1359,7 @@ export default function ExpedientePaciente() {
       {/* ══════════════════════════════════════════
           TAB: PUERPERIO
       ══════════════════════════════════════════ */}
-      {tab === "puerperio" && (
+      {hasEmbarazo && tab === "puerperio" && (
         <div className="puerperium-module">
           {!isReadOnly && puedeRegistrarPuerperio && puerperioOrdenado.length > 0 && puerperioOrdenado.length < 2 && (
             <div className="puerperium-top-actions">
@@ -1403,7 +1486,7 @@ export default function ExpedientePaciente() {
       {/* ══════════════════════════════════════════
           TAB: MORBILIDAD
       ══════════════════════════════════════════ */}
-      {tab === "morbilidad" && (
+      {hasEmbarazo && tab === "morbilidad" && (
         <div className="morbidity-module">
           {!isReadOnly && (
             <div className="morbidity-top-actions">
@@ -1512,7 +1595,7 @@ export default function ExpedientePaciente() {
       {/* ══════════════════════════════════════════
           TAB: RIESGO OBSTÉTRICO
       ══════════════════════════════════════════ */}
-      {tab === "riesgo" && (
+      {hasEmbarazo && tab === "riesgo" && (
         <div className="risk-module-card">
           {!exp.ficha_riesgo ? (
             <div className="empty-state">
@@ -1598,7 +1681,7 @@ export default function ExpedientePaciente() {
         </div>
       )}
 
-      {tab === "plan" && (
+      {hasEmbarazo && tab === "plan" && (
         <div className="birth-plan-card">
           {!exp.plan_parto ? (
             <div className="empty-state">
@@ -1711,7 +1794,7 @@ export default function ExpedientePaciente() {
       {/* ══════════════════════════════════════════
           TAB: VACUNAS
       ══════════════════════════════════════════ */}
-      {tab === "vacunas" && (
+      {hasEmbarazo && tab === "vacunas" && (
         <div className="vaccines-module">
           {!isReadOnly && (
             <section className="vaccines-card">
@@ -1833,7 +1916,7 @@ export default function ExpedientePaciente() {
       {/* ══════════════════════════════════════════
           TAB: LABORATORIOS
       ══════════════════════════════════════════ */}
-      {tab === "laboratorio" && (
+      {hasEmbarazo && tab === "laboratorio" && (
         <div className="lab-explorer-shell">
           {!controlesLaboratorio.length ? (
             <div className="card empty-state">

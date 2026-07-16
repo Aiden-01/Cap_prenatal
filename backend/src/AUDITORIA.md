@@ -67,6 +67,11 @@ La auditoria debe responder:
 - Generacion exitosa de PDF.
 - Exportacion de reportes.
 
+La creacion explicita de un embarazo registra sus eventos con la misma
+conexion y transaccion que la insercion. Si esa auditoria obligatoria falla,
+se revierte la creacion para no dejar un embarazo sin trazabilidad. La consulta
+GET del expediente no registra un evento de creacion ni modifica datos.
+
 ## Datos que no deben auditarse
 
 Nunca guardar:
@@ -98,6 +103,12 @@ Como excepcion funcional, los PDF institucionales MSPAS/CAP conservan los marcad
 Ese dato representa tamizaje o registro inicial del control prenatal, no diagnostico confirmado de VIH. La confirmacion y seguimiento se realizan por otro procedimiento fuera del alcance actual del sistema.
 
 Por este motivo, la generacion del PDF institucional no se bloquea por falta de `controles.ver_vih` ni se eliminan automaticamente sus marcadores VIH del formato.
+
+La impresion requiere `pacientes.ver`, el mismo permiso usado para consultar
+pacientes. Cada generacion exitosa conserva solo metadata minima: tipo de
+documento, usuario e identificadores internos de paciente, embarazo y registro
+cuando correspondan. Nunca se guarda el PDF, su binario, el contenido clinico,
+cookies, tokens ni nombres de archivos temporales.
 
 ## Criterio funcional para captura VIH en controles
 

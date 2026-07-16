@@ -119,6 +119,8 @@ Reglas:
 - Los modulos clinicos deben escribir `embarazo_id`.
 - Las consultas historicas deben resolver por `embarazo_id` cuando venga en la URL.
 - Los registros de embarazo cerrado no deben editarse desde UI normal.
+- Consultar un expediente sin embarazo no crea filas ni cambia timestamps.
+- La creacion explicita bloquea la fila de paciente y se ejecuta en una transaccion.
 
 ## Relaciones por embarazo
 
@@ -152,6 +154,21 @@ Restricciones importantes que el backend traduce a mensajes claros:
 - Numero de control unico por embarazo.
 - Numero de atencion puerperio unico por embarazo.
 - Vacuna/dosis unica segun regla de negocio.
+
+La politica de aplicacion admite un embarazo nuevo solo si no existe otro en
+estado `activo` o `puerperio`. El POST bloquea la fila de la paciente con
+`SELECT ... FOR UPDATE` antes de comprobar ambos estados, por lo que dos POST
+concurrentes que usen el flujo normal quedan serializados. La restriccion
+`UNIQUE (paciente_id, numero_embarazo)` protege tambien la numeracion historica.
+
+El indice parcial existente `ux_embarazo_activo_paciente` cubre unicamente
+`WHERE estado = 'activo'`; no impide por si solo combinaciones con `puerperio`
+si un escritor omite el bloqueo transaccional. Un indice parcial futuro sobre
+`WHERE estado IN ('activo', 'puerperio')` seria compatible con el modelo, pero
+antes requeriria comprobar datos existentes por paciente —incluidos pares
+activo/puerperio o multiples puerperios— y coordinar todos los escritores. No
+se crea una migracion en este cierre; queda documentado el riesgo para accesos
+directos o flujos que no bloqueen la fila de paciente.
 
 ## Auditoria
 

@@ -15,7 +15,7 @@ function isProduction() {
 
 function uniqueMessage(err) {
   if (err.constraint === 'ux_embarazo_activo_paciente') {
-    return 'La paciente ya tiene un embarazo activo. Cierre o pase a puerperio el embarazo actual antes de crear otro.';
+    return 'La paciente ya tiene un embarazo activo. Complete el seguimiento y cierre el embarazo actual antes de registrar uno nuevo.';
   }
 
   if (err.constraint === 'ux_pacientes_cui_unico') {

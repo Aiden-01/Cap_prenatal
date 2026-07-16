@@ -106,9 +106,9 @@ Base: `/pacientes`
 | `POST` | `/` | `pacientes.crear` | Crea paciente y embarazo inicial. |
 | `GET` | `/:id` | `pacientes.ver` | Obtiene paciente. |
 | `PUT` | `/:id` | `pacientes.editar` | Actualiza paciente. |
-| `GET` | `/:id/expediente` | `pacientes.ver` | Expediente completo. Acepta `embarazo_id`. |
+| `GET` | `/:id/expediente` | `pacientes.ver` | Expediente completo de solo lectura. Acepta `embarazo_id` y nunca crea registros. |
 | `GET` | `/:id/completitud` | `pacientes.ver` | Estado de completitud del embarazo actual. |
-| `POST` | `/:id/embarazos` | `pacientes.editar` | Crea nuevo embarazo activo. |
+| `POST` | `/:id/embarazos` | `pacientes.editar` | Crea de forma explicita un embarazo activo solo si no existe otro activo o en puerperio. Requiere CSRF. |
 | `POST` | `/:id/embarazo/puerperio` | `pacientes.editar` | Pasa embarazo activo a puerperio. Requiere `embarazo_id`. |
 | `POST` | `/:id/embarazo/cerrar` | `pacientes.editar` | Cierra embarazo activo/puerperio. Requiere `embarazo_id`. |
 
@@ -117,6 +117,43 @@ Parametros importantes:
 - `GET /pacientes?buscar=&pagina=1&limite=20`.
 - `GET /pacientes/:id/expediente?embarazo_id=12`.
 - En rutas clinicas anidadas de escritura, `embarazo_id` es obligatorio y evita escribir en el embarazo equivocado.
+
+`GET /pacientes/:id/expediente` es idempotente. Si la paciente existe pero no
+tiene embarazos, responde `200` con el siguiente estado estable, sin ejecutar
+`INSERT`, `UPDATE` ni `DELETE`:
+
+```json
+{
+  "paciente": { "id": 42 },
+  "embarazos": [],
+  "embarazo_seleccionado": null,
+  "embarazo_actual": null,
+  "embarazo_activo": null,
+  "controles_prenatales": [],
+  "controles_puerperio": [],
+  "morbilidad": [],
+  "ficha_riesgo": null,
+  "plan_parto": null,
+  "vacunas": [],
+  "referencias": [],
+  "is_read_only": false,
+  "is_embarazo_actual": false
+}
+```
+
+La creacion requiere una accion del usuario mediante
+`POST /pacientes/:id/embarazos`. El backend bloquea la fila de la paciente y
+ejecuta comprobacion, insercion, sincronizacion y auditoria en una transaccion.
+No cierra automaticamente embarazos activos ni en puerperio. Si existe uno
+activo responde `409` con `ACTIVE_PREGNANCY_EXISTS`; si esta en puerperio,
+responde `409` con `PUERPERIUM_PREGNANCY_EXISTS` y solicita completar y cerrar
+el puerperio. Solo una paciente sin embarazos o con todos sus embarazos cerrados
+puede iniciar otro.
+
+El POST serializa la comprobacion con `SELECT ... FOR UPDATE` sobre la paciente.
+El indice parcial existente `ux_embarazo_activo_paciente` solo cubre
+`estado = 'activo'`; por ello la proteccion de `puerperio` depende de que todos
+los escritores usen este flujo transaccional.
 
 ## Controles prenatales
 
@@ -226,13 +263,30 @@ Base: `/pacientes/:pacienteId/referencias`
 
 Base: `/pacientes/:pacienteId`
 
-| Metodo | Ruta | Descripcion |
-| --- | --- | --- |
-| `GET` | `/mspas/pdf` | Ficha MSPAS prenatal completa. |
-| `GET` | `/riesgo/pdf` | Ficha de riesgo obstetrico. |
-| `GET` | `/plan-parto/pdf` | Plan de parto. |
+| Metodo | Ruta | Permiso | Descripcion |
+| --- | --- | --- | --- |
+| `GET` | `/mspas/pdf` | `pacientes.ver` | Ficha MSPAS prenatal completa. |
+| `GET` | `/riesgo/pdf` | `pacientes.ver` | Ficha de riesgo obstetrico. |
+| `GET` | `/plan-parto/pdf` | `pacientes.ver` | Plan de parto. |
+| `GET` | `/:controlId/pdf` | `pacientes.ver` | Control prenatal individual. |
 
-Todos aceptan `embarazo_id`.
+Todos aceptan `embarazo_id`. Antes de iniciar `pdf-lib`, Chromium, Excel o
+LibreOffice se valida la sesion, el permiso, la existencia de la paciente y la
+pertenencia de cada identificador. El PDF oficial no exige
+`controles.ver_vih`: por politica confirmada del CAP conserva el resultado de
+VIH y el resto del contenido clinico oficial completo.
+
+Las respuestas exitosas usan `application/pdf`, un nombre de archivo
+sanitizado y las cabeceras `Cache-Control: private, no-store, max-age=0`,
+`Pragma: no-cache`, `Expires: 0` y `X-Content-Type-Options: nosniff`.
+Se permiten 20 inicios de generacion PDF por usuario autenticado cada 5 minutos
+mediante memoria de la instancia. El contador se incrementa inmediatamente
+antes de invocar el generador, despues de autenticacion, permiso, existencia y
+pertenencia: los rechazos previos no consumen, pero cualquier intento que ya
+inicio el generador conserva el consumo aunque termine con error. El intento 21
+responde `429` sin invocar el generador. Los archivos auxiliares de los
+formatos Excel se crean con nombres aleatorios fuera del repositorio y se
+eliminan tanto en exito como en error.
 
 ## Reportes
 

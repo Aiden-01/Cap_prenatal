@@ -10,6 +10,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import api from "../api/axios";
+import { isValidPregnancyId } from "../utils/pregnancyState";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
 const MS_DAY = 86400000;
@@ -19,7 +20,7 @@ function formatDate(value) {
 }
 
 function titleCase(value) {
-  if (!value) return "Cerrado";
+  if (!value) return "Sin embarazo";
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
@@ -30,6 +31,14 @@ function getEstadoBadge(estado) {
 }
 
 function getFppInfo(paciente) {
+  if (!isValidPregnancyId(paciente.embarazo_id)) {
+    return {
+      label: "—",
+      color: "var(--text-muted)",
+      title: "Sin embarazo registrado",
+      urgent: false,
+    };
+  }
   const fppValue = paciente.embarazo_fpp || paciente.fpp;
   const furValue = paciente.embarazo_fur || paciente.fur;
   const fpp = fppValue
@@ -170,9 +179,10 @@ export default function Pacientes() {
               </thead>
               <tbody>
                 {pacientes.map((p) => {
+                  const hasEmbarazo = isValidPregnancyId(p.embarazo_id);
                   const fppInfo = getFppInfo(p);
                   const abierta = expandida === p.id;
-                  const estado = p.embarazo_estado || "cerrado";
+                  const estado = hasEmbarazo ? (p.embarazo_estado || "sin embarazo") : "sin embarazo";
 
                   return (
                     <Fragment key={p.id}>
@@ -193,7 +203,7 @@ export default function Pacientes() {
                           </div>
                         </td>
                         <td style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                          {formatDate(p.embarazo_fur || p.fur)}
+                          {formatDate(hasEmbarazo ? (p.embarazo_fur || p.fur) : null)}
                         </td>
                         <td>
                           <span

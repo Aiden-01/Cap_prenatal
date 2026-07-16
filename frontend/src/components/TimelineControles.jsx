@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Stethoscope,
 } from "lucide-react";
+import { isValidPregnancyId } from "../utils/pregnancyState";
 
 function fecha(value) {
   if (!value) return "-";
@@ -72,10 +73,11 @@ function ControlRow({ control, index, pacienteId, embarazoId, isReadOnly, isOpen
   const estadoClass = control.tiene_hallazgo ? "badge-red" : complete ? "badge-green" : "badge-orange";
   const estadoLabel = control.tiene_hallazgo ? "Hallazgo" : complete ? "Completo" : "Incompleto";
   const EstadoIcon = control.tiene_hallazgo ? AlertTriangle : complete ? CheckCircle2 : AlertTriangle;
+  const canEdit = !isReadOnly && isValidPregnancyId(embarazoId);
 
   const openControl = () => {
-    if (!isReadOnly) {
-      navigate(`/pacientes/${pacienteId}/controles/${control.id}/editar?embarazo_id=${embarazoId}`);
+    if (canEdit) {
+      navigate(`/pacientes/${pacienteId}/controles/${control.id}/editar?embarazo_id=${encodeURIComponent(embarazoId)}`);
       return;
     }
     onToggle();
@@ -135,6 +137,7 @@ function ControlRow({ control, index, pacienteId, embarazoId, isReadOnly, isOpen
 export default function TimelineControles({ pacienteId, embarazoId, controles = [], isReadOnly = false }) {
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState(null);
+  const hasEmbarazoId = isValidPregnancyId(embarazoId);
 
   const controlesOrdenados = Array.isArray(controles)
     ? [...controles].sort((a, b) => controlTime(b) - controlTime(a))
@@ -145,8 +148,8 @@ export default function TimelineControles({ pacienteId, embarazoId, controles = 
       <div className="card empty-state" style={{ display: "grid", justifyItems: "center", gap: "0.85rem" }}>
         <ClipboardList size={28} style={{ color: "var(--primary)" }} />
         <span>Sin controles registrados aun</span>
-        {!isReadOnly && (
-          <button className="btn-primary" onClick={() => navigate(`/pacientes/${pacienteId}/controles/nuevo?embarazo_id=${embarazoId}`)}>
+        {!isReadOnly && hasEmbarazoId && (
+          <button className="btn-primary" onClick={() => navigate(`/pacientes/${pacienteId}/controles/nuevo?embarazo_id=${encodeURIComponent(embarazoId)}`)}>
             Registrar primer control
           </button>
         )}

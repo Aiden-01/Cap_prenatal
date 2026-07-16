@@ -8,7 +8,8 @@ const { resolverEmbarazoParaLectura, requerirEmbarazoId, validarEmbarazoEditable
 const ESTADO_EMBARAZO_ACTIVO = 'activo';
 const ESTADO_EMBARAZO_PUERPERIO = 'puerperio';
 const ESTADO_EMBARAZO_CERRADO = 'cerrado';
-const MENSAJE_EMBARAZO_ACTIVO_DUPLICADO = 'La paciente ya tiene un embarazo activo. Cierre o pase a puerperio el embarazo actual antes de crear otro.';
+const MENSAJE_EMBARAZO_ACTIVO_DUPLICADO = 'La paciente ya tiene un embarazo activo. Complete el seguimiento y cierre el embarazo actual antes de registrar uno nuevo.';
+const MENSAJE_EMBARAZO_PUERPERIO_DUPLICADO = 'La paciente tiene un embarazo en puerperio. Complete y cierre el puerperio antes de registrar un embarazo nuevo.';
 const MUNICIPIO_EL_CHAL = 'el chal';
 
 const emptyToNull = (value) => value === '' ? null : value;
@@ -103,13 +104,32 @@ async function normalizarComunidadPaciente(data, actual = null) {
   return normalized;
 }
 
-async function validarPuedeActivarEmbarazo(pacienteId, embarazoIdExcluir = null) {
-  const tieneActivo = await pacientesRepository.existeEmbarazoActivo(pacienteId, embarazoIdExcluir);
-  if (tieneActivo) {
-    throw new HttpError(409, MENSAJE_EMBARAZO_ACTIVO_DUPLICADO, {
-      code: 'ACTIVE_PREGNANCY_EXISTS',
-    });
+function errorEmbarazoActivoDuplicado() {
+  return new HttpError(409, MENSAJE_EMBARAZO_ACTIVO_DUPLICADO, {
+    code: 'ACTIVE_PREGNANCY_EXISTS',
+  });
+}
+
+function errorEmbarazoPuerperioDuplicado() {
+  return new HttpError(409, MENSAJE_EMBARAZO_PUERPERIO_DUPLICADO, {
+    code: 'PUERPERIUM_PREGNANCY_EXISTS',
+  });
+}
+
+function esViolacionEmbarazoActivo(error) {
+  return error?.code === '23505' && error?.constraint === 'ux_embarazo_activo_paciente';
+}
+
+async function validarPuedeActivarEmbarazo(pacienteId, embarazoIdExcluir = null, db = undefined) {
+  const embarazoEnSeguimiento = await pacientesRepository.obtenerEmbarazoEnSeguimiento(
+    pacienteId,
+    embarazoIdExcluir,
+    db
+  );
+  if (embarazoEnSeguimiento?.estado === ESTADO_EMBARAZO_PUERPERIO) {
+    throw errorEmbarazoPuerperioDuplicado();
   }
+  if (embarazoEnSeguimiento) throw errorEmbarazoActivoDuplicado();
 }
 
 function buildPacienteInsertData(d, usuarioId) {
@@ -383,28 +403,27 @@ async function actualizarPaciente({ id, body, req }) {
 }
 
 async function expedienteCompleto(id, embarazoIdSolicitado = null) {
-  let embarazoSeleccionado = await resolverEmbarazoParaLectura({
+  const embarazoSeleccionado = await resolverEmbarazoParaLectura({
     pacienteId: id,
     embarazoId: embarazoIdSolicitado,
   });
-  if (!embarazoSeleccionado) {
-    await validarPuedeActivarEmbarazo(id);
-    const embarazoId = await pacientesRepository.crearEmbarazoDesdePaciente(id);
-    embarazoSeleccionado = await pacientesRepository.obtenerEmbarazoPorId(embarazoId);
-  }
 
   const [expediente, embarazoActual] = await Promise.all([
-    pacientesRepository.obtenerExpedienteCompleto(id, embarazoSeleccionado.id),
+    pacientesRepository.obtenerExpedienteCompleto(id, embarazoSeleccionado?.id || null),
     pacientesRepository.obtenerEmbarazoActual(id),
   ]);
   if (!expediente.paciente) throw new HttpError(404, 'Paciente no encontrado');
   return {
     ...expediente,
-    embarazo_seleccionado: embarazoSeleccionado,
-    embarazo_actual: embarazoActual,
-    embarazo_activo: embarazoSeleccionado,
-    is_read_only: embarazoSeleccionado.estado === ESTADO_EMBARAZO_CERRADO,
-    is_embarazo_actual: Boolean(embarazoActual && embarazoActual.id === embarazoSeleccionado.id),
+    embarazo_seleccionado: embarazoSeleccionado || null,
+    embarazo_actual: embarazoActual || null,
+    embarazo_activo: embarazoSeleccionado || null,
+    is_read_only: Boolean(embarazoSeleccionado?.estado === ESTADO_EMBARAZO_CERRADO),
+    is_embarazo_actual: Boolean(
+      embarazoSeleccionado
+      && embarazoActual
+      && String(embarazoActual.id) === String(embarazoSeleccionado.id)
+    ),
   };
 }
 
@@ -455,65 +474,58 @@ async function obtenerCompletitudExpediente(pacienteId) {
 }
 
 async function nuevoEmbarazo({ id, body, req }) {
-  const paciente = await pacientesRepository.obtenerPorId(id);
-  if (!paciente) throw new HttpError(404, 'Paciente no encontrado');
-
   const fpp = fppOrCalculated(body.fur, body.fpp);
-  const cerrados = await pacientesRepository.cerrarEmbarazosEnSeguimiento(
-    id,
-    emptyToNull(body.fecha_cierre),
-    req.usuario.id
-  );
-  await validarPuedeActivarEmbarazo(id);
-  const siguiente = await pacientesRepository.obtenerSiguienteNumeroEmbarazo(id);
-  const embarazo = await pacientesRepository.insertarNuevoEmbarazo({
-    pacienteId: id,
-    numeroEmbarazo: siguiente,
-    fur: emptyToNull(body.fur),
-    fpp,
-    observaciones: emptyToNull(body.observaciones),
-    usuarioId: req.usuario.id,
-  });
-  const pacienteActualizado = await pacientesRepository.sincronizarPacienteConEmbarazo({
-    pacienteId: id,
-    fur: emptyToNull(body.fur),
-    fpp,
-    updatedBy: req.usuario.id,
-  });
+  return pacientesRepository.enTransaccion(async (client) => {
+    const paciente = await pacientesRepository.obtenerPacienteParaActualizar(id, client);
+    if (!paciente) throw new HttpError(404, 'Paciente no encontrado');
 
-  for (const cerrado of cerrados) {
-    await registrarAuditoria(req, {
-      accion: 'estado',
-      tabla: 'embarazos',
-      registroId: cerrado.id,
+    await validarPuedeActivarEmbarazo(id, null, client);
+    const siguiente = await pacientesRepository.obtenerSiguienteNumeroEmbarazo(id, client);
+
+    let embarazo;
+    try {
+      embarazo = await pacientesRepository.insertarNuevoEmbarazo({
+        pacienteId: id,
+        numeroEmbarazo: siguiente,
+        fur: emptyToNull(body.fur),
+        fpp,
+        observaciones: emptyToNull(body.observaciones),
+        usuarioId: req.usuario.id,
+      }, client);
+    } catch (error) {
+      if (esViolacionEmbarazoActivo(error)) throw errorEmbarazoActivoDuplicado();
+      throw error;
+    }
+
+    const pacienteActualizado = await pacientesRepository.sincronizarPacienteConEmbarazo({
       pacienteId: id,
-      embarazoId: cerrado.id,
-      datosNuevos: cerrado,
-      descripcion: 'Embarazo anterior cerrado al iniciar nuevo embarazo',
-    });
-  }
+      fur: emptyToNull(body.fur),
+      fpp,
+      updatedBy: req.usuario.id,
+    }, client);
 
-  await registrarAuditoria(req, {
-    accion: 'crear',
-    tabla: 'embarazos',
-    registroId: embarazo.id,
-    pacienteId: id,
-    embarazoId: embarazo.id,
-    datosNuevos: embarazo,
-    descripcion: 'Nuevo embarazo creado',
+    await registrarAuditoria(req, {
+      accion: 'crear',
+      tabla: 'embarazos',
+      registroId: embarazo.id,
+      pacienteId: id,
+      embarazoId: embarazo.id,
+      datosNuevos: embarazo,
+      descripcion: 'Nuevo embarazo creado',
+    }, { db: client, obligatorio: true });
+
+    await registrarAuditoria(req, {
+      accion: 'actualizar',
+      tabla: 'pacientes',
+      registroId: id,
+      pacienteId: id,
+      datosAnteriores: paciente,
+      datosNuevos: pacienteActualizado,
+      descripcion: 'Paciente sincronizada con nuevo embarazo',
+    }, { db: client, obligatorio: true });
+
+    return embarazo;
   });
-
-  await registrarAuditoria(req, {
-    accion: 'actualizar',
-    tabla: 'pacientes',
-    registroId: id,
-    pacienteId: id,
-    datosAnteriores: paciente,
-    datosNuevos: pacienteActualizado,
-    descripcion: 'Paciente sincronizada con nuevo embarazo',
-  });
-
-  return embarazo;
 }
 
 async function pasarAPuerperio({ id, embarazoId, body, req }) {

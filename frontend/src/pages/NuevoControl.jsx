@@ -7,6 +7,7 @@ import { ChevronLeft, Save, Stethoscope, FlaskConical, Pill, BookOpen } from "lu
 import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
 import { calculateGestationalWeeks } from "../utils/gestationalAge";
 import { getErrorMessage, getFieldErrors } from "../utils/errorMessage";
+import { isValidPregnancyId } from "../utils/pregnancyState";
 
 // ─── HELPERS ────────────────────────────────────────────────
 function Field({ label, children, col, error }) {
@@ -293,7 +294,10 @@ export default function NuevoControl() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const embarazoId = searchParams.get("embarazo_id") || "";
-  const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=controles`;
+  const hasEmbarazoId = isValidPregnancyId(embarazoId);
+  const expedientePath = hasEmbarazoId
+    ? `/pacientes/${id}?embarazo_id=${encodeURIComponent(embarazoId)}&tab=controles`
+    : `/pacientes/${id}?tab=controles`;
   const toast    = useGlobalToast();
   const { usuario } = useAuth();
   const puedeVerVih = usuario?.permisos?.includes("controles.ver_vih");
@@ -326,7 +330,7 @@ export default function NuevoControl() {
   }));
 
   useEffect(() => {
-    if (!embarazoId) {
+    if (!hasEmbarazoId) {
       toast("Selecciona un embarazo antes de registrar controles", "error");
       navigate(`/pacientes/${id}?tab=controles`, { replace: true });
       return;
@@ -366,7 +370,7 @@ export default function NuevoControl() {
       })
       .catch(() => toast(editando ? "Error al cargar control" : "Error al calcular siguiente control", "error"))
       .finally(() => setLoadingData(false));
-  }, [id, controlId, editando, embarazoId, expedientePath, navigate, toast]);
+  }, [id, controlId, editando, embarazoId, expedientePath, hasEmbarazoId, navigate, toast]);
 
   const edadGestacionalSemanas = calculateGestationalWeeks(fur, form.fecha);
   const formConEdadGestacional = {
@@ -392,6 +396,10 @@ export default function NuevoControl() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!hasEmbarazoId) {
+      toast("Selecciona un embarazo antes de guardar el control", "error");
+      return;
+    }
     setLoading(true);
     setFieldErrors({});
     const payload = {

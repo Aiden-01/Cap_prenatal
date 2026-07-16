@@ -96,6 +96,10 @@ Las reglas de embarazo viven en services y utils, no en controllers:
 - Los modulos clinicos deben recibir o resolver `embarazo_id`.
 - Un embarazo cerrado debe tratarse como solo lectura.
 - La URL puede traer `?embarazo_id=`, pero la fuente de verdad es PostgreSQL.
+- Las lecturas GET nunca crean embarazos. La ausencia se representa con `null` y colecciones vacias.
+- Crear un embarazo requiere el POST explicito, una transaccion y bloqueo de la paciente.
+- Un embarazo nuevo exige que no exista otro `activo` ni en `puerperio`; el bloqueo `FOR UPDATE` de la paciente serializa los POST concurrentes.
+- `ux_embarazo_activo_paciente` refuerza solo el estado activo. La proteccion de puerperio depende del flujo transaccional hasta que se evalue una restriccion compatible con los datos existentes.
 
 ## Seguridad
 
@@ -105,6 +109,7 @@ Las reglas de embarazo viven en services y utils, no en controllers:
 - Username y rol siempre proceden de PostgreSQL; el JWT no es fuente definitiva de autorizacion.
 - `csrfMiddleware` protege refresh, actividad y todas las escrituras.
 - `cargarPermisos` consulta permisos actuales y `verificarPermiso` bloquea endpoints sin permiso.
+- Todos los PDF clinicos requieren `pacientes.ver`, validan pertenencia antes de generar y consumen el limite por usuario justo antes de invocar el generador.
 - Contraseña, estado, rol, permisos y eliminacion revocan sesiones dentro de la transaccion critica.
 - `sessionService.js` concentra generacion, rotacion, comparacion segura, revocacion y metadata.
 - `authSessionsRepository.js` concentra SQL y bloqueos de la tabla de sesiones.

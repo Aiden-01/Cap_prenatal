@@ -66,8 +66,7 @@ async function validarEmbarazoEditable({
   return embarazo;
 }
 
-async function obtenerEmbarazoActivoId(pacienteId, options = {}) {
-  const { crearSiNoExiste = false } = options;
+async function obtenerEmbarazoActivoId(pacienteId) {
   const { rows } = await pool.query(
     `SELECT id
      FROM embarazos
@@ -77,23 +76,11 @@ async function obtenerEmbarazoActivoId(pacienteId, options = {}) {
     [pacienteId]
   );
 
-  if (rows[0]) return rows[0].id;
-  if (!crearSiNoExiste) return null;
-
-  const creado = await pool.query(
-    `INSERT INTO embarazos (paciente_id, numero_embarazo, estado, fur, fpp, fecha_inicio)
-     SELECT id, 1, 'activo', fur, fpp, COALESCE(fur, CURRENT_DATE)
-     FROM pacientes
-     WHERE id = $1
-     RETURNING id`,
-    [pacienteId]
-  );
-
-  return creado.rows[0]?.id || null;
+  return rows[0]?.id || null;
 }
 
 async function obtenerEmbarazoActivoRequeridoId(pacienteId) {
-  const embarazoId = await obtenerEmbarazoActivoId(pacienteId, { crearSiNoExiste: false });
+  const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
   if (!embarazoId) {
     const error = new Error('No hay embarazo activo para registrar controles prenatales');
     error.status = 409;
@@ -137,8 +124,7 @@ async function obtenerEmbarazoVisibleId(pacienteId) {
     [pacienteId]
   );
 
-  if (rows[0]) return rows[0].id;
-  return obtenerEmbarazoActivoId(pacienteId, { crearSiNoExiste: true });
+  return rows[0]?.id || null;
 }
 
 module.exports = {

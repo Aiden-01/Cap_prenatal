@@ -18,6 +18,7 @@ Aplicacion React/Vite para el sistema de expedientes clinicos prenatales del CAP
 npm run dev
 npm run build
 npm run lint
+npm test
 npm run preview
 ```
 
@@ -99,7 +100,11 @@ El backend guarda el JWT en cookie httpOnly. El frontend no lee ese token.
 - Si la URL trae `?embarazo_id=`, lo envia al backend.
 - Si no hay `embarazo_id`, el backend decide el embarazo visible.
 - El embarazo actualmente mostrado es `embarazo_seleccionado` o `embarazo_activo`.
+- Si no existe embarazo, el GET devuelve un expediente de solo lectura con campos de embarazo en `null`; la pantalla muestra un estado vacio y no crea datos.
+- `Iniciar embarazo` o `Nuevo embarazo` ejecuta el POST explicito solo para usuarios con `pacientes.editar`; Axios adjunta CSRF.
+- La accion no se muestra si existe cualquier embarazo activo o en puerperio. En puerperio se solicita completarlo y cerrarlo; nunca se cierra automaticamente.
 - Al navegar a formularios clinicos se debe incluir `embarazo_id`.
+- No se deben renderizar acciones clinicas ni construir URLs con un `embarazo_id` ausente.
 - Comparar IDs como string, porque los query params son string.
 - Si el usuario clickea el embarazo ya seleccionado, no se debe limpiar estado ni recargar.
 

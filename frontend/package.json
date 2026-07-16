@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test": "node --test test/*.test.js",
+    "test:sprint3": "node --test test/pregnancyState.test.js test/securitySprint3Source.test.js",
     "test:session": "node --test test/sessionSecurity.test.js",
     "preview": "vite preview"
   },
