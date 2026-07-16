@@ -81,6 +81,27 @@ src/
 | `/mapa-riesgo` | `MapaRiesgo.jsx` |
 | `/usuarios` | `Usuarios.jsx` |
 
+## Modulo de reportes
+
+`/reportes` abre de forma predeterminada **Captadas en primer control** con el
+primer dia del mes y la fecha actual calculados en `America/Guatemala`. La
+pantalla ofrece seis vistas sin mezclar resultados entre cambios:
+
+- captadas en primer control;
+- embarazos activos al momento de consultar;
+- FPP en los proximos 30 dias;
+- sin control o con mas de 28 dias;
+- ficha de riesgo obstetrico positiva;
+- resumen por comunidad.
+
+La tabla principal incluye expediente, CUI, nombre, edad al primer control,
+etnia, comunidad, FUR, FPP, fecha y semanas del primer control, antecedentes,
+riesgo y estado actual. Sus indicadores alto/medio/bajo se calculan sobre las
+mismas filas. Excel y PDF solo se muestran si el usuario tiene
+`reportes.exportar`; ambos se descargan con el nombre seguro enviado por el
+backend. Los formatos usan oficio 8.5 x 13 horizontal y una sola pagina de
+ancho. El censo de activos es actual, no una reconstruccion historica.
+
 ## Autenticacion en frontend
 
 El backend guarda el JWT en cookie httpOnly. El frontend no lee ese token.

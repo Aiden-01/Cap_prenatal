@@ -1,6 +1,6 @@
 const GUATEMALA_TIME_ZONE = "America/Guatemala";
 
-function getGuatemalaParts() {
+function getGuatemalaParts(value = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: GUATEMALA_TIME_ZONE,
     year: "numeric",
@@ -9,17 +9,17 @@ function getGuatemalaParts() {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  }).formatToParts(new Date());
+  }).formatToParts(value);
 
   return Object.fromEntries(parts.map((part) => [part.type, part.value]));
 }
 
-export function getGuatemalaDateInputValue() {
-  const parts = getGuatemalaParts();
+export function getGuatemalaDateInputValue(value = new Date()) {
+  const parts = getGuatemalaParts(value);
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-export function getGuatemalaTimeInputValue() {
-  const parts = getGuatemalaParts();
+export function getGuatemalaTimeInputValue(value = new Date()) {
+  const parts = getGuatemalaParts(value);
   return `${parts.hour}:${parts.minute}`;
 }

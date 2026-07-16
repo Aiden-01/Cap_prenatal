@@ -14,6 +14,19 @@ function getGuatemalaParts() {
   return Object.fromEntries(parts.map((part) => [part.type, part.value]));
 }
 
+function formatGuatemalaDateTime(value = new Date()) {
+  return new Intl.DateTimeFormat('es-GT', {
+    timeZone: GUATEMALA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(value);
+}
+
 function getGuatemalaDateInputValue() {
   const parts = getGuatemalaParts();
   return `${parts.year}-${parts.month}-${parts.day}`;
@@ -32,6 +45,8 @@ function withGuatemalaTimeFallback(data, options = {}) {
 }
 
 module.exports = {
+  GUATEMALA_TIME_ZONE,
+  formatGuatemalaDateTime,
   getGuatemalaDateInputValue,
   getGuatemalaTimeInputValue,
   withGuatemalaTimeFallback,

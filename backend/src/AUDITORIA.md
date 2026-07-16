@@ -90,9 +90,14 @@ Para documentos y reportes guardar metadata minima:
 - tipo de reporte,
 - formato,
 - filtros,
+- cantidad de filas exportadas,
+- fecha de generacion,
 - paciente/embarazo si aplica.
 
 No copiar snapshots clinicos completos si no son necesarios para trazabilidad.
+Las exportaciones del censo de primer control registran `censo_primer_control`,
+formato `xlsx` o `pdf`, `desde`, `hasta`, cantidad de filas y fecha de
+generacion. No registran nombres, CUI, el archivo, binarios ni la tabla nominal.
 
 ## Criterio funcional para PDF institucional
 

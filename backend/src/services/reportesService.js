@@ -1,42 +1,29 @@
 const ExcelJS = require('exceljs');
 const reportesRepository = require('../repositories/reportesRepository');
+const reportesPdfService = require('./reportesPdfService');
+const {
+  formatGuatemalaDateTime,
+  getGuatemalaDateInputValue,
+} = require('../utils/guatemalaTime');
 
-async function censoMensual({ desde, hasta }) {
-  const rows = await reportesRepository.obtenerRowsCensoGeneral(desde, hasta);
-  return { desde, hasta, total: rows.length, pacientes: rows };
+function clasificarRiesgo(paciente) {
+  if (paciente.tiene_riesgo) return 'ALTO';
+  if (paciente.edad < 20 || paciente.edad > 35) return 'MEDIO';
+  return 'BAJO';
 }
 
-async function censoMensualPrimerControl({ desde, hasta }) {
-  const rows = await reportesRepository.obtenerRowsCensoPrimerControl(desde, hasta);
-  return {
-    desde,
-    hasta,
-    total: rows.length,
-    modo: 'primer_control',
-    pacientes: rows,
-  };
+function prepararFilasConRiesgo(rows) {
+  return rows.map((row) => ({ ...row, nivel_riesgo: clasificarRiesgo(row) }));
 }
 
-async function estadisticas() {
-  const data = await reportesRepository.obtenerEstadisticasBase();
-  return {
-    total_pacientes: parseInt(data.totalPacientes.count, 10),
-    pacientes_con_riesgo: parseInt(data.pacientesConRiesgo.count, 10),
-    controles_este_mes: parseInt(data.controlesEsteMes.count, 10),
-    proximas_citas: data.proximasCitas,
-  };
-}
-
-async function pacientesConRiesgo() {
-  return reportesRepository.obtenerPacientesConRiesgo();
-}
-
-async function proximasAParir() {
-  return reportesRepository.obtenerProximasAParir();
-}
-
-async function sinControlReciente() {
-  return reportesRepository.obtenerSinControlReciente();
+function indicadoresRiesgo(rows) {
+  return rows.reduce((total, row) => {
+    total.total += 1;
+    if (row.nivel_riesgo === 'ALTO') total.riesgo_alto += 1;
+    else if (row.nivel_riesgo === 'MEDIO') total.riesgo_medio += 1;
+    else total.riesgo_bajo += 1;
+    return total;
+  }, { total: 0, riesgo_alto: 0, riesgo_medio: 0, riesgo_bajo: 0 });
 }
 
 function formatDateOnly(value) {
@@ -51,10 +38,7 @@ function getRiskLabel(value) {
 }
 
 function buildCitasMarkdownTable(citas) {
-  if (citas.length === 0) {
-    return 'No hay pacientes con cita prenatal programada para manana.';
-  }
-
+  if (citas.length === 0) return 'No hay pacientes con cita prenatal programada para manana.';
   const rows = citas.map((cita, index) => [
     index + 1,
     cita.nombre || 'Paciente sin nombre',
@@ -63,7 +47,6 @@ function buildCitasMarkdownTable(citas) {
     cita.numero_control || 'N/A',
     getRiskLabel(cita.tiene_riesgo),
   ]);
-
   return [
     '| No. | Paciente | Expediente | Comunidad | Control | Riesgo |',
     '| --- | --- | --- | --- | --- | --- |',
@@ -71,279 +54,355 @@ function buildCitasMarkdownTable(citas) {
   ].join('\n');
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function buildCitasHtmlTable(citas) {
-  if (citas.length === 0) {
-    return '<p>No hay pacientes con cita prenatal programada para manana.</p>';
-  }
-
+  if (citas.length === 0) return '<p>No hay pacientes con cita prenatal programada para manana.</p>';
   const cells = citas.map((cita, index) => `
-    <tr>
-      <td>${index + 1}</td>
-      <td>${cita.nombre || 'Paciente sin nombre'}</td>
-      <td>${cita.no_expediente || 'Sin expediente'}</td>
-      <td>${cita.comunidad || 'No registrada'}</td>
-      <td>${cita.numero_control || 'N/A'}</td>
-      <td>${getRiskLabel(cita.tiene_riesgo)}</td>
-    </tr>
-  `).join('');
-
-  return `
-    <table border="1" cellpadding="6" cellspacing="0">
-      <thead>
-        <tr>
-          <th>No.</th>
-          <th>Paciente</th>
-          <th>Expediente</th>
-          <th>Comunidad</th>
-          <th>Control</th>
-          <th>Riesgo</th>
-        </tr>
-      </thead>
-      <tbody>${cells}</tbody>
-    </table>
-  `;
+    <tr><td>${index + 1}</td><td>${escapeHtml(cita.nombre || 'Paciente sin nombre')}</td>
+      <td>${escapeHtml(cita.no_expediente || 'Sin expediente')}</td>
+      <td>${escapeHtml(cita.comunidad || 'No registrada')}</td>
+      <td>${escapeHtml(cita.numero_control || 'N/A')}</td>
+      <td>${getRiskLabel(cita.tiene_riesgo)}</td></tr>`).join('');
+  return `<table border="1" cellpadding="6" cellspacing="0"><thead><tr>
+    <th>No.</th><th>Paciente</th><th>Expediente</th><th>Comunidad</th><th>Control</th><th>Riesgo</th>
+    </tr></thead><tbody>${cells}</tbody></table>`;
 }
 
-async function proximasCitasAutomatizacion({ dias = 1 } = {}) {
-  const citas = await reportesRepository.obtenerProximasCitasPorDias(dias);
-  const fechaObjetivo = citas[0]?.cita_siguiente
-    ? formatDateOnly(citas[0].cita_siguiente)
-    : formatDateOnly(new Date(Date.now() + dias * 24 * 60 * 60 * 1000));
-  const tablaMarkdown = buildCitasMarkdownTable(citas);
-  const tablaHtml = buildCitasHtmlTable(citas);
-  const encabezado = citas.length > 0
-    ? `CAP El Chal - Recordatorio de citas prenatales\n\nSe informa que las siguientes pacientes tienen cita prenatal programada para el dia de manana, ${fechaObjetivo}:`
-    : `CAP El Chal - Recordatorio de citas prenatales\n\nNo hay pacientes con cita prenatal programada para el dia de manana, ${fechaObjetivo}.`;
-
-  return {
-    dias,
-    total: citas.length,
-    debe_enviar: citas.length > 0,
-    fecha_objetivo: fechaObjetivo,
-    generated_at: new Date().toISOString(),
-    mensaje_resumen: citas.length > 0
-      ? `${encabezado}\n\n${tablaMarkdown}\n\nSe recomienda verificar asistencia y actualizar el expediente correspondiente.`
-      : encabezado,
-    tabla_markdown: tablaMarkdown,
-    tabla_html: tablaHtml,
-    citas: citas.map((cita) => ({
-      ...cita,
-      mensaje_sugerido: `Recordatorio: ${cita.nombre} tiene cita prenatal programada para ${formatDateOnly(cita.cita_siguiente)}. Expediente ${cita.no_expediente || 'sin numero'}.`,
-    })),
-  };
-}
-
-function getNivelRiesgo(paciente) {
-  if (paciente.riesgo) return 'ALTO';
-  if (paciente.edad < 20 || paciente.edad > 35) return 'MEDIO';
-  return 'BAJO';
-}
-
-function formatFecha(value) {
+function excelDate(value) {
   if (!value) return '';
-  return value instanceof Date ? value : new Date(value);
+  if (value instanceof Date) return value;
+  const iso = String(value).slice(0, 10);
+  const date = new Date(`${iso}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? String(value) : date;
 }
 
-function crearWorkbookCenso(rows, { desde, hasta, titulo }) {
+function crearWorkbookCenso(rows, {
+  desde,
+  hasta,
+  titulo,
+  incluirPrimerControl = false,
+  generadoEn = formatGuatemalaDateTime(),
+} = {}) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'CAP El Chal';
   workbook.created = new Date();
+  workbook.subject = 'Reporte nominal confidencial';
 
   const sheet = workbook.addWorksheet('Censo MSPAS', {
     views: [{ state: 'frozen', ySplit: 8 }],
     pageSetup: {
-      paperSize: 9,
+      paperSize: 14,
       orientation: 'landscape',
       fitToPage: true,
       fitToWidth: 1,
       fitToHeight: 0,
+      margins: { left: 0.2, right: 0.2, top: 0.35, bottom: 0.42, header: 0.1, footer: 0.18 },
+      printTitlesRow: '8:8',
     },
-    properties: { defaultRowHeight: 18 },
+    properties: { defaultRowHeight: 16 },
+    headerFooter: {
+      oddFooter: '&LConfidencial - uso institucional&C CAP El Chal&RPagina &P de &N',
+    },
   });
 
-  const colors = {
-    primary: 'FF1D6FA4',
-    primaryDark: 'FF155E8E',
-    surface: 'FFF8FBFD',
-    border: 'FF9FB6C8',
-    text: 'FF1A2535',
-    muted: 'FF5F7185',
-    dangerBg: 'FFF8D7DA',
-    dangerText: 'FFB4232F',
-    warnBg: 'FFFFF1D6',
-    warnText: 'FFB05A00',
-    okBg: 'FFDFF3EA',
-    okText: 'FF087A5B',
-  };
-
-  const thinBorder = {
-    top: { style: 'thin', color: { argb: colors.border } },
-    left: { style: 'thin', color: { argb: colors.border } },
-    bottom: { style: 'thin', color: { argb: colors.border } },
-    right: { style: 'thin', color: { argb: colors.border } },
-  };
-
-  sheet.columns = [
-    { key: 'no', width: 6 },
-    { key: 'exp', width: 18 },
-    { key: 'cui', width: 17 },
-    { key: 'nombre', width: 34 },
-    { key: 'edad', width: 8 },
-    { key: 'etnia', width: 16 },
-    { key: 'municipio', width: 18 },
-    { key: 'fur', width: 13 },
-    { key: 'fpp', width: 13 },
-    { key: 'sem', width: 10 },
-    { key: 'gestas', width: 9 },
-    { key: 'partos', width: 9 },
-    { key: 'abortos', width: 9 },
-    { key: 'riesgo', width: 12 },
+  const columns = [
+    { key: 'no', header: '#', width: 4 },
+    { key: 'expediente', header: 'No.\nExpediente', width: 12 },
+    { key: 'cui', header: 'CUI', width: 14 },
+    { key: 'nombre', header: 'Nombre completo', width: 27 },
+    { key: 'edad', header: 'Edad', width: 6 },
+    { key: 'etnia', header: 'Etnia', width: 10 },
+    { key: 'comunidad', header: 'Comunidad', width: 18 },
+    { key: 'fur', header: 'FUR', width: 11 },
+    { key: 'fpp', header: 'FPP', width: 11 },
+    ...(incluirPrimerControl
+      ? [{ key: 'primer_control', header: 'Fecha 1er\ncontrol', width: 12 }]
+      : []),
+    { key: 'semanas', header: 'Sem.', width: 6 },
+    { key: 'gestas', header: 'Gestas', width: 7 },
+    { key: 'partos', header: 'Partos', width: 7 },
+    { key: 'abortos', header: 'Abortos', width: 7 },
+    { key: 'riesgo', header: 'Riesgo', width: 9 },
+    { key: 'estado', header: 'Estado\nembarazo', width: 11 },
   ];
+  sheet.columns = columns.map(({ key, width }) => ({ key, width }));
 
-  sheet.mergeCells('A1:N1');
-  sheet.mergeCells('A2:N2');
-  sheet.mergeCells('A3:N3');
-  sheet.mergeCells('A5:C5');
-  sheet.mergeCells('D5:F5');
-  sheet.mergeCells('G5:I5');
-  sheet.mergeCells('J5:N5');
-
+  const lastColumn = sheet.getColumn(columns.length).letter;
+  sheet.mergeCells(`A1:${lastColumn}1`);
+  sheet.mergeCells(`A2:${lastColumn}2`);
+  sheet.mergeCells(`A3:${lastColumn}3`);
   sheet.getCell('A1').value = 'MINISTERIO DE SALUD PUBLICA Y ASISTENCIA SOCIAL';
   sheet.getCell('A2').value = 'CAP El Chal';
   sheet.getCell('A3').value = titulo;
-  sheet.getCell('A5').value = `Periodo: ${desde} al ${hasta}`;
-  sheet.getCell('D5').value = `Total pacientes: ${rows.length}`;
-  sheet.getCell('G5').value = `Fecha de emision: ${new Date().toLocaleDateString('es-GT')}`;
-  sheet.getCell('J5').value = 'Clasificacion de riesgo: Alto / Medio / Bajo';
 
-  ['A1', 'A2', 'A3'].forEach((cellRef, index) => {
+  for (const [cellRef, size, color] of [
+    ['A1', 13, 'FFFFFFFF'], ['A2', 11, 'FF172033'], ['A3', 11, 'FF172033'],
+  ]) {
     const cell = sheet.getCell(cellRef);
+    cell.font = { bold: true, size, color: { argb: color } };
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
-    cell.font = {
-      bold: true,
-      color: { argb: index === 0 ? 'FFFFFFFF' : colors.text },
-      size: index === 0 ? 14 : index === 1 ? 12 : 13,
-    };
-  });
-
-  sheet.getRow(1).height = 24;
-  sheet.getRow(2).height = 22;
-  sheet.getRow(3).height = 24;
-  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.primary } };
+  }
+  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D6FA4' } };
   sheet.getRow(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F3FB' } };
   sheet.getRow(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDFF3EA' } };
 
-  ['A5', 'D5', 'G5', 'J5'].forEach((cellRef) => {
-    const cell = sheet.getCell(cellRef);
-    cell.font = { bold: true, color: { argb: colors.primaryDark }, size: 10 };
-    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.surface } };
-    cell.border = thinBorder;
-  });
-
-  const headerRow = sheet.getRow(8);
-  headerRow.values = [
-    '#', 'No. Expediente', 'CUI', 'Nombre completo', 'Edad', 'Etnia',
-    'Municipio', 'FUR', 'FPP', 'Sem.', 'Gestas', 'Partos', 'Abortos', 'Riesgo',
+  const metaRanges = [
+    ['A5', Math.max(3, Math.floor(columns.length / 3)), `Periodo: ${desde} al ${hasta}`],
+    [null, Math.max(3, Math.floor(columns.length / 3)), `Total de captadas: ${rows.length}`],
   ];
-  headerRow.height = 24;
-  headerRow.eachCell((cell) => {
-    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+  let startIndex = 1;
+  for (const [explicitStart, span, value] of metaRanges) {
+    if (explicitStart) startIndex = 1;
+    const start = sheet.getColumn(startIndex).letter;
+    const end = sheet.getColumn(Math.min(columns.length, startIndex + span - 1)).letter;
+    sheet.mergeCells(`${start}5:${end}5`);
+    const cell = sheet.getCell(`${start}5`);
+    cell.value = value;
+    cell.font = { bold: true, color: { argb: 'FF155E8E' }, size: 9 };
     cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.primaryDark } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FBFD' } };
+    startIndex += span;
+  }
+  const emissionStart = sheet.getColumn(startIndex).letter;
+  sheet.mergeCells(`${emissionStart}5:${lastColumn}5`);
+  const emissionCell = sheet.getCell(`${emissionStart}5`);
+  emissionCell.value = `Emision en Guatemala: ${generadoEn}`;
+  emissionCell.font = { bold: true, color: { argb: 'FF155E8E' }, size: 9 };
+  emissionCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  emissionCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FBFD' } };
+
+  const thinBorder = {
+    top: { style: 'thin', color: { argb: 'FF9FB6C8' } },
+    left: { style: 'thin', color: { argb: 'FF9FB6C8' } },
+    bottom: { style: 'thin', color: { argb: 'FF9FB6C8' } },
+    right: { style: 'thin', color: { argb: 'FF9FB6C8' } },
+  };
+  const headerRow = sheet.getRow(8);
+  headerRow.values = columns.map((column) => column.header);
+  headerRow.height = 29;
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF155E8E' } };
     cell.border = thinBorder;
   });
 
-  rows.forEach((p, index) => {
-    const nivelRiesgo = getNivelRiesgo(p);
-    const row = sheet.addRow({
+  rows.forEach((row, index) => {
+    const added = sheet.addRow({
       no: index + 1,
-      exp: p.no_expediente || '',
-      cui: p.cui || '',
-      nombre: p.nombre_completo || '',
-      edad: p.edad ?? '',
-      etnia: p.etnia || '',
-      municipio: p.municipio || '',
-      fur: formatFecha(p.fur),
-      fpp: formatFecha(p.fpp),
-      sem: p.semanas ?? '',
-      gestas: p.gestas_previas ?? p.no_embarazos ?? '',
-      partos: p.partos ?? p.no_partos ?? '',
-      abortos: p.abortos ?? p.no_abortos ?? '',
-      riesgo: nivelRiesgo,
+      expediente: row.no_expediente || '',
+      cui: row.cui || '',
+      nombre: row.nombre_completo || '',
+      edad: row.edad ?? '',
+      etnia: row.etnia || '',
+      comunidad: row.comunidad || '',
+      fur: excelDate(row.fur),
+      fpp: excelDate(row.fpp),
+      primer_control: incluirPrimerControl ? excelDate(row.fecha_primer_control) : undefined,
+      semanas: row.semanas_gestacion ?? '',
+      gestas: row.gestas ?? '',
+      partos: row.partos ?? '',
+      abortos: row.abortos ?? '',
+      riesgo: row.nivel_riesgo,
+      estado: row.estado_embarazo || '',
     });
-
-    row.eachCell((cell) => {
+    added.height = 18;
+    added.eachCell((cell) => {
       cell.border = thinBorder;
       cell.alignment = { vertical: 'middle', wrapText: true };
-      cell.font = { color: { argb: colors.text }, size: 10 };
+      cell.font = { color: { argb: 'FF172033' }, size: 8 };
+      if (index % 2 === 1) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FBFD' } };
+      }
     });
-
-    if (index % 2 === 1) {
-      row.eachCell((cell) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.surface } };
-      });
-    }
-
-    const riesgoCell = row.getCell('riesgo');
-    const riesgoStyle = {
-      ALTO: { fill: colors.dangerBg, font: colors.dangerText },
-      MEDIO: { fill: colors.warnBg, font: colors.warnText },
-      BAJO: { fill: colors.okBg, font: colors.okText },
-    }[nivelRiesgo];
-
-    riesgoCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: riesgoStyle.fill } };
-    riesgoCell.font = { bold: true, color: { argb: riesgoStyle.font }, size: 10 };
-    riesgoCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    const riskCell = added.getCell('riesgo');
+    const style = {
+      ALTO: ['FFF8D7DA', 'FFB4232F'],
+      MEDIO: ['FFFFF1D6', 'FF995000'],
+      BAJO: ['FFDFF3EA', 'FF087A5B'],
+    }[row.nivel_riesgo];
+    riskCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: style[0] } };
+    riskCell.font = { bold: true, size: 8, color: { argb: style[1] } };
+    riskCell.alignment = { horizontal: 'center', vertical: 'middle' };
   });
 
-  const lastRow = Math.max(sheet.rowCount, 9);
-  sheet.autoFilter = `A8:N${lastRow}`;
-  sheet.getColumn('fur').numFmt = 'dd/mm/yyyy';
-  sheet.getColumn('fpp').numFmt = 'dd/mm/yyyy';
-
-  ['A', 'E', 'H', 'I', 'J', 'K', 'L', 'M', 'N'].forEach((col) => {
-    sheet.getColumn(col).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-  });
+  const lastDataRow = Math.max(sheet.rowCount, 9);
+  sheet.autoFilter = `A8:${lastColumn}${lastDataRow}`;
+  for (const key of ['fur', 'fpp', ...(incluirPrimerControl ? ['primer_control'] : [])]) {
+    sheet.getColumn(key).numFmt = 'dd/mm/yyyy';
+    sheet.getColumn(key).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  }
+  for (const key of ['no', 'edad', 'semanas', 'gestas', 'partos', 'abortos', 'riesgo', 'estado']) {
+    sheet.getColumn(key).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  }
 
   sheet.addRow([]);
-  const footerRow = sheet.addRow([
-    '', '', '', '', '', '', '', '', '', '', '', '', 'Generado por:',
-    'CAP El Chal - ' + new Date().toLocaleDateString('es-GT'),
-  ]);
-  footerRow.eachCell((cell) => {
-    cell.font = { italic: true, color: { argb: colors.muted }, size: 9 };
-  });
-
+  const note = sheet.addRow(['Documento confidencial para uso institucional. Proteja los datos nominales de las pacientes.']);
+  sheet.mergeCells(`A${note.number}:${lastColumn}${note.number}`);
+  note.getCell(1).font = { italic: true, color: { argb: 'FF5F7185' }, size: 8 };
+  note.getCell(1).alignment = { horizontal: 'center' };
   return workbook;
 }
 
-async function workbookCensoGeneral({ desde, hasta }) {
-  const rows = await reportesRepository.obtenerRowsCensoGeneral(desde, hasta);
-  return crearWorkbookCenso(rows, {
-    desde,
-    hasta,
-    titulo: 'CENSO NOMINAL DE MUJERES EMBARAZADAS',
-  });
-}
+function createReportesService({
+  repository = reportesRepository,
+  pdfService = reportesPdfService,
+  now = () => new Date(),
+} = {}) {
+  async function censoMensual({ desde, hasta }) {
+    const rows = prepararFilasConRiesgo(await repository.obtenerRowsCensoGeneral());
+    return {
+      desde: null,
+      hasta: null,
+      fecha_corte: getGuatemalaDateInputValue(),
+      historico_disponible: false,
+      total: rows.length,
+      indicadores: indicadoresRiesgo(rows),
+      pacientes: rows,
+    };
+  }
 
-async function workbookCensoPrimerControl({ desde, hasta }) {
-  const rows = await reportesRepository.obtenerRowsCensoPrimerControl(desde, hasta);
-  return crearWorkbookCenso(rows, {
-    desde,
-    hasta,
-    titulo: 'CENSO NOMINAL DE EMBARAZADAS - PRIMER CONTROL',
-  });
+  async function censoMensualPrimerControl({ desde, hasta }) {
+    const rows = prepararFilasConRiesgo(
+      await repository.obtenerRowsCensoPrimerControl(desde, hasta)
+    );
+    return {
+      desde,
+      hasta,
+      total: rows.length,
+      modo: 'primer_control',
+      indicadores: indicadoresRiesgo(rows),
+      pacientes: rows,
+    };
+  }
+
+  async function estadisticas() {
+    const data = await repository.obtenerEstadisticasBase();
+    return {
+      embarazos_activos: Number.parseInt(data.embarazosActivos.count, 10),
+      total_pacientes_historico: Number.parseInt(data.totalPacientes.count, 10),
+      total_pacientes: Number.parseInt(data.totalPacientes.count, 10),
+      pacientes_con_riesgo: Number.parseInt(data.pacientesConRiesgo.count, 10),
+      controles_este_mes: Number.parseInt(data.controlesEsteMes.count, 10),
+      proximas_citas: data.proximasCitas,
+    };
+  }
+
+  const pacientesConRiesgo = () => repository.obtenerPacientesConRiesgo();
+  const proximasAParir = () => repository.obtenerProximasAParir();
+  const sinControlReciente = () => repository.obtenerSinControlReciente();
+
+  async function resumenPorComunidad() {
+    const comunidades = await repository.obtenerResumenPorComunidad();
+    const totales = comunidades.reduce((acc, row) => ({
+      embarazos_activos: acc.embarazos_activos + Number(row.embarazos_activos || 0),
+      con_riesgo: acc.con_riesgo + Number(row.con_riesgo || 0),
+      proximas_a_parir: acc.proximas_a_parir + Number(row.proximas_a_parir || 0),
+      sin_control_reciente: acc.sin_control_reciente + Number(row.sin_control_reciente || 0),
+    }), { embarazos_activos: 0, con_riesgo: 0, proximas_a_parir: 0, sin_control_reciente: 0 });
+    return { fecha_corte: getGuatemalaDateInputValue(), totales, comunidades };
+  }
+
+  async function proximasCitasAutomatizacion({ dias = 1 } = {}) {
+    const citas = await repository.obtenerProximasCitasPorDias(dias);
+    const fechaObjetivo = citas[0]?.cita_siguiente
+      ? formatDateOnly(citas[0].cita_siguiente)
+      : formatDateOnly(new Date(now().getTime() + dias * 24 * 60 * 60 * 1000));
+    const tablaMarkdown = buildCitasMarkdownTable(citas);
+    const tablaHtml = buildCitasHtmlTable(citas);
+    const encabezado = citas.length > 0
+      ? `CAP El Chal - Recordatorio de citas prenatales\n\nSe informa que las siguientes pacientes tienen cita prenatal programada para el dia de manana, ${fechaObjetivo}:`
+      : `CAP El Chal - Recordatorio de citas prenatales\n\nNo hay pacientes con cita prenatal programada para el dia de manana, ${fechaObjetivo}.`;
+    return {
+      dias,
+      total: citas.length,
+      debe_enviar: citas.length > 0,
+      fecha_objetivo: fechaObjetivo,
+      generated_at: now().toISOString(),
+      mensaje_resumen: citas.length > 0
+        ? `${encabezado}\n\n${tablaMarkdown}\n\nSe recomienda verificar asistencia y actualizar el expediente correspondiente.`
+        : encabezado,
+      tabla_markdown: tablaMarkdown,
+      tabla_html: tablaHtml,
+      citas: citas.map((cita) => ({
+        ...cita,
+        mensaje_sugerido: `Recordatorio: ${cita.nombre} tiene cita prenatal programada para ${formatDateOnly(cita.cita_siguiente)}. Expediente ${cita.no_expediente || 'sin numero'}.`,
+      })),
+    };
+  }
+
+  async function workbookCensoGeneral() {
+    const rows = prepararFilasConRiesgo(await repository.obtenerRowsCensoGeneral());
+    const fechaCorte = getGuatemalaDateInputValue();
+    return {
+      workbook: crearWorkbookCenso(rows, {
+        desde: fechaCorte,
+        hasta: fechaCorte,
+        titulo: 'CENSO ACTUAL DE EMBARAZOS ACTIVOS',
+        generadoEn: formatGuatemalaDateTime(now()),
+      }),
+      total: rows.length,
+      fechaCorte,
+    };
+  }
+
+  async function workbookCensoPrimerControl({ desde, hasta }) {
+    const rows = prepararFilasConRiesgo(
+      await repository.obtenerRowsCensoPrimerControl(desde, hasta)
+    );
+    return {
+      workbook: crearWorkbookCenso(rows, {
+        desde,
+        hasta,
+        titulo: 'CENSO MENSUAL DE CAPTADAS EN PRIMER CONTROL',
+        incluirPrimerControl: true,
+        generadoEn: formatGuatemalaDateTime(now()),
+      }),
+      total: rows.length,
+    };
+  }
+
+  async function pdfCensoPrimerControl({ desde, hasta }) {
+    const rows = prepararFilasConRiesgo(
+      await repository.obtenerRowsCensoPrimerControl(desde, hasta)
+    );
+    const pdf = await pdfService.renderCensoPrimerControlPdf({
+      rows,
+      desde,
+      hasta,
+      generadoEn: formatGuatemalaDateTime(now()),
+    });
+    return { pdf, total: rows.length };
+  }
+
+  return {
+    censoMensual,
+    censoMensualPrimerControl,
+    estadisticas,
+    pacientesConRiesgo,
+    proximasAParir,
+    sinControlReciente,
+    resumenPorComunidad,
+    proximasCitasAutomatizacion,
+    workbookCensoGeneral,
+    workbookCensoPrimerControl,
+    pdfCensoPrimerControl,
+  };
 }
 
 module.exports = {
-  censoMensual,
-  censoMensualPrimerControl,
-  estadisticas,
-  pacientesConRiesgo,
-  proximasAParir,
-  sinControlReciente,
-  proximasCitasAutomatizacion,
-  workbookCensoGeneral,
-  workbookCensoPrimerControl,
+  ...createReportesService(),
+  clasificarRiesgo,
+  crearWorkbookCenso,
+  createReportesService,
+  indicadoresRiesgo,
+  prepararFilasConRiesgo,
 };

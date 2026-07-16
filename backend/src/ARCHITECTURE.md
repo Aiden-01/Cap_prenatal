@@ -75,6 +75,26 @@ Los siguientes modulos ya tienen separacion en controller/service/repository/val
 
 Los resultados de laboratorio no constituyen un modulo HTTP independiente. Forman parte del modelo y flujo de controles prenatales: se capturan con cada control y se consultan desde los controles y el expediente. Los datos sensibles de VIH mantienen su filtrado por permisos.
 
+## Reporteria
+
+`reportes` sigue la separacion por capas y agrega `validations/reportes.schemas.js`
+para periodos y `services/reportesPdfService.js` para el PDF nominal. El reporte
+principal es el censo de captadas por primer control: el repositorio selecciona
+deterministicamente una fila por `embarazo_id`, el servicio aplica el semaforo e
+indicadores sobre la misma coleccion y el controlador responde JSON, Excel o
+PDF.
+
+`GET /api/reportes/censo` representa exclusivamente embarazos activos al momento
+de consultar. No acepta una fecha historica porque `embarazos` no conserva una
+bitacora completa de cada transicion de estado. Los reportes de FPP, falta de
+control, riesgo y comunidad comparten la fecha operativa de
+`America/Guatemala`; no usan `p.created_at` para definir captacion o actividad.
+
+Las descargas nominales requieren `reportes.exportar`, usan oficio horizontal y
+registran metadata minima. Puppeteer genera el PDF directamente en memoria; no
+se escriben censos dentro del repositorio ni se necesitan migraciones para este
+modulo.
+
 ## Modulo de referencia
 
 Usar `pacientes` como referencia para nuevos modulos:

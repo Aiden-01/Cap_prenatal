@@ -4484,6 +4484,71 @@ h1, h2, h3, h4 {
   text-transform: uppercase;
 }
 
+.reportes-option-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.reportes-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 0.8rem;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.reportes-option:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.reportes-option.is-active {
+  border-color: var(--primary);
+  background: var(--primary-lt);
+  color: var(--primary-dk);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.reportes-option span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.reportes-option strong {
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
+.reportes-option small {
+  margin-top: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.reportes-option em {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.4rem;
+  border-radius: 999px;
+  padding: 0.15rem 0.4rem;
+  background: var(--accent-lt);
+  color: var(--accent);
+  font-size: 0.58rem;
+  font-style: normal;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .reportes-filter-card {
   margin-bottom: 0.15rem;
   border-top: 1px solid var(--border);
@@ -4505,6 +4570,13 @@ h1, h2, h3, h4 {
   margin-top: 0.25rem;
   color: var(--text);
   font-size: 1rem;
+}
+
+.reportes-section-heading p {
+  max-width: 680px;
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
 }
 
 .reportes-periodo {
@@ -4540,6 +4612,20 @@ h1, h2, h3, h4 {
   color: var(--danger);
   font-size: 0.86rem;
   font-weight: 600;
+}
+
+.reportes-permission-note,
+.reportes-context-note {
+  margin-top: 0.8rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.reportes-context-note {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
 }
 
 .empty {
@@ -4583,6 +4669,38 @@ h1, h2, h3, h4 {
   color: var(--text-muted);
   font-size: 0.85rem;
 }
+
+.reportes-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.reportes-summary-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.reportes-summary-item strong {
+  color: var(--text);
+  font-size: 1.1rem;
+}
+
+.reportes-summary-item.is-red { border-left: 3px solid var(--danger); }
+.reportes-summary-item.is-yellow { border-left: 3px solid var(--warn); }
+.reportes-summary-item.is-green { border-left: 3px solid var(--accent); }
+.reportes-summary-item.is-blue { border-left: 3px solid var(--primary); }
 
 .reportes-header-actions {
   display: flex;
@@ -4644,9 +4762,32 @@ h1, h2, h3, h4 {
   font-weight: 700;
 }
 
-.reportes-tabla td:nth-child(3) {
+.reportes-tabla td:nth-child(4) {
   min-width: 220px;
   font-weight: 700;
+}
+
+.reportes-subsection + .reportes-subsection {
+  border-top: 1px solid var(--border);
+}
+
+.reportes-subsection-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--surface2);
+}
+
+.reportes-subsection-title h4 {
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.reportes-total-row td {
+  background: var(--primary-lt) !important;
+  color: var(--primary-dk);
+  font-weight: 800;
 }
 
 .reportes-tabla tr:nth-child(even) td {
@@ -4714,6 +4855,17 @@ html.dark .badge-yellow { background: var(--warn-lt); color: var(--warn); }
   .reportes-filtros .form-group,
   .reportes-filtros button {
     width: 100%;
+  }
+
+  .reportes-option-grid,
+  .reportes-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1100px) {
+  .reportes-option-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

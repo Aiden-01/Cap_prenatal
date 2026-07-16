@@ -740,6 +740,35 @@ Reglas:
 
 ## PDF y reportes
 
+El modulo `/reportes` distingue dos conceptos que no deben intercambiarse:
+
+- **Captadas en primer control:** reporte historico principal. Incluye un
+  embarazo cuando su control numero 1 esta dentro del periodo inclusivo. Puede
+  incluir embarazos activos, en puerperio o cerrados. La edad y las semanas
+  corresponden a la fecha del primer control.
+- **Embarazos activos:** fotografia al momento de la consulta. El modelo no
+  conserva una bitacora completa de transiciones para reconstruir con certeza
+  el estado activo en una fecha historica, por lo que este reporte no acepta
+  fecha de corte.
+
+Los reportes operativos adicionales son proximas a dar a luz (FPP en 30 dias),
+sin control reciente (ninguno o mas de 28 dias), ficha de riesgo positiva y
+resumen por comunidad. Todos los calculos actuales usan `America/Guatemala`.
+La clasificacion nominal conserva el semaforo vigente: ficha positiva = alto,
+sin ficha positiva y edad menor de 20 o mayor de 35 = medio, resto = bajo. El
+listado especifico de riesgo solo incluye ficha positiva.
+
+La consulta requiere `reportes.ver`. Excel y PDF requieren
+`reportes.exportar`; el frontend no ofrece descargas sin ese permiso. Ambos
+formatos del censo principal usan oficio/folio 8.5 x 13, horizontal, una pagina
+de ancho y crecimiento vertical ilimitado. El Excel configura `paperSize: 14`,
+`fitToWidth: 1` y `fitToHeight: 0`; el PDF usa `@page { size: 13in 8.5in; }`,
+cabecera de tabla repetible, pagina numerada y respuesta privada `no-store`.
+
+El periodo mensual se valida con Zod: fechas reales `YYYY-MM-DD`, orden
+correcto, maximo inclusivo de 366 dias y rechazo de arrays o parametros
+repetidos.
+
 PDF institucionales:
 
 - Ficha MSPAS prenatal.

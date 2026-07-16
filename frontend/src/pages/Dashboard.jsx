@@ -237,11 +237,11 @@ export default function Dashboard() {
         <>
           <div className="stat-grid">
             <StatCard
-              label="Total de pacientes"
-              value={stats?.total_pacientes}
+              label="Embarazos activos"
+              value={stats?.embarazos_activos}
               variant="primary"
               Icon={Users}
-              sublabel="embarazos activos registrados"
+              sublabel="seguimientos prenatales vigentes"
               onClick={() => navigate("/pacientes")}
             />
             <StatCard

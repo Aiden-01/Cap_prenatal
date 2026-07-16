@@ -294,14 +294,32 @@ Base: `/reportes`
 
 | Metodo | Ruta | Permiso | Descripcion |
 | --- | --- | --- | --- |
-| `GET` | `/censo` | `reportes.ver` | Censo mensual. |
-| `GET` | `/censo/primer-control` | `reportes.ver` | Censo basado en primer control. |
-| `GET` | `/estadisticas` | `reportes.ver` | Indicadores generales. |
-| `GET` | `/pacientes-riesgo` | `reportes.ver` | Pacientes con riesgo. |
-| `GET` | `/censo/excel` | `reportes.exportar` | Exportacion Excel. |
-| `GET` | `/censo/primer-control/excel` | `reportes.exportar` | Exportacion Excel de primer control. |
-| `GET` | `/proximas-a-parir` | `reportes.ver` | Pacientes proximas a FPP. |
-| `GET` | `/sin-control-reciente` | `reportes.ver` | Pacientes sin control reciente. |
+| `GET` | `/censo/primer-control?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` | `reportes.ver` | Censo mensual principal: un registro por embarazo cuyo primer control cae en el periodo inclusivo. |
+| `GET` | `/censo/primer-control/excel?desde=...&hasta=...` | `reportes.exportar` | Excel oficio horizontal del censo principal. |
+| `GET` | `/censo/primer-control/pdf?desde=...&hasta=...` | `reportes.exportar` | PDF oficio horizontal del censo principal. |
+| `GET` | `/censo` | `reportes.ver` | Fotografia actual de embarazos con `estado = activo`; no reconstruye cortes historicos. |
+| `GET` | `/censo/excel` | `reportes.exportar` | Excel del censo actual de embarazos activos. |
+| `GET` | `/proximas-a-parir` | `reportes.ver` | Embarazos activos con FPP en los proximos 30 dias. |
+| `GET` | `/sin-control-reciente` | `reportes.ver` | Embarazos activos sin controles o con mas de 28 dias desde el ultimo. |
+| `GET` | `/pacientes-riesgo` | `reportes.ver` | Embarazos activos cuya ficha obstetrica tiene `tiene_riesgo = true`. |
+| `GET` | `/resumen-comunidades` | `reportes.ver` | Totales de embarazos activos, riesgo, FPP proxima y falta de control por comunidad. |
+| `GET` | `/estadisticas` | `reportes.ver` | Dashboard: embarazos activos, pacientes historicas, riesgo, controles del mes y citas. |
+
+`desde` y `hasta` son obligatorios solo en el censo por primer control y sus
+exportaciones. Deben ser fechas reales con formato estricto `YYYY-MM-DD`, no se
+aceptan valores repetidos, `desde` no puede superar `hasta` y el periodo
+inclusivo maximo es de 366 dias. La zona horaria operativa es
+`America/Guatemala`.
+
+La captacion se determina exclusivamente con la fecha del control numero 1. Si
+existieran duplicados historicos se elige primero por fecha y luego por ID, sin
+fusionar embarazos diferentes de una misma paciente. Edad y semanas se calculan
+en la fecha del primer control. El censo activo, los plazos de 30/28 dias y el
+dashboard usan la fecha actual de Guatemala.
+
+Excel y PDF usan papel oficio/folio de 8.5 x 13 pulgadas, orientacion horizontal,
+una pagina de ancho y tantas paginas verticales como sean necesarias. El PDF
+responde con `private, no-store`, `nosniff` y nombre de descarga sanitizado.
 
 ## Mapa de riesgo
 
