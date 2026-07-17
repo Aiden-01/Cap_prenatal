@@ -74,8 +74,8 @@ function publicSessionMetadata(record, config = getSessionConfig()) {
   };
 }
 
-function auditRequest(usuarioId) {
-  return { usuario: usuarioId ? { id: usuarioId } : undefined };
+function resolvePrivateRegistrar(dependencies = {}) {
+  return dependencies.registrarEventoPrivado || auditService.registrarEventoPrivado;
 }
 
 async function auditSessionEvent({
@@ -86,22 +86,28 @@ async function auditSessionEvent({
   reason = null,
   count = null,
   db,
-  registrarEvento = auditService.registrarEvento,
+  obligatorio = true,
+  registrarEventoPrivado = auditService.registrarEventoPrivado,
 }) {
-  await registrarEvento(auditRequest(usuarioId), {
-    usuarioId,
-    accion: 'estado',
-    modulo: 'autenticacion',
-    entidadAfectada: 'auth_sessions',
-    tabla: 'auth_sessions',
-    registroId: sessionId,
-    datosNuevos: {
-      tipo_evento: action,
-      motivo: reason,
-      cantidad: count,
+  const metadata = { resultado: action };
+  if (reason) metadata.motivo_codigo = String(reason).replace(/\+/g, '.');
+  if (count !== null) metadata.cantidad_sesiones_revocadas = count;
+  if (action === 'sesion_creada') metadata.sesion_creada = true;
+  if (action === 'sesion_revocada') metadata.sesion_revocada = true;
+  if (action === 'sesion_expirada') metadata.sesion_expirada = true;
+  if (action === 'reutilizacion_refresh_detectada') metadata.reutilizacion_detectada = true;
+
+  await registrarEventoPrivado(req, {
+    contexto: {
+      categoria: 'sesiones',
+      entidad: sessionId ? 'sesion' : 'usuario',
+      evento: action,
     },
-    descripcion: action,
-  }, { db, obligatorio: true });
+    accion: 'estado',
+    entidadId: sessionId || usuarioId,
+    usuarioId: req?.usuario?.id || usuarioId,
+    metadata,
+  }, { db, obligatorio });
 }
 
 function sessionError(code = 'AUTHENTICATION_REQUIRED') {
@@ -112,7 +118,7 @@ async function createSession({ usuarioId, req, dependencies = {} }) {
   const repository = dependencies.repository || authSessionsRepository;
   const config = dependencies.config || getSessionConfig();
   const clock = dependencies.clock || Date;
-  const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
+  const registrarEventoPrivado = resolvePrivateRegistrar(dependencies);
   const id = crypto.randomUUID();
   const refreshToken = generateRefreshToken(id);
   const createdAt = nowDate(clock);
@@ -132,7 +138,7 @@ async function createSession({ usuarioId, req, dependencies = {} }) {
       sessionId: id,
       action: 'sesion_creada',
       db,
-      registrarEvento,
+      registrarEventoPrivado,
     });
     return created;
   });
@@ -151,7 +157,7 @@ async function revokeInvalidSession({
   req,
   db,
   repository,
-  registrarEvento,
+  registrarEventoPrivado,
 }) {
   const changed = await repository.revocar({
     id: record.id,
@@ -173,7 +179,8 @@ async function revokeInvalidSession({
     action,
     reason: state.reason,
     db,
-    registrarEvento,
+    obligatorio: !['SESSION_INACTIVE', 'SESSION_EXPIRED'].includes(state.code),
+    registrarEventoPrivado,
   });
 }
 
@@ -181,7 +188,7 @@ async function refreshSession({ refreshToken, req, dependencies = {} }) {
   const repository = dependencies.repository || authSessionsRepository;
   const config = dependencies.config || getSessionConfig();
   const clock = dependencies.clock || Date;
-  const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
+  const registrarEventoPrivado = resolvePrivateRegistrar(dependencies);
   const sessionId = sessionIdFromRefreshToken(refreshToken);
   if (!sessionId) throw sessionError();
 
@@ -191,7 +198,15 @@ async function refreshSession({ refreshToken, req, dependencies = {} }) {
     const state = stateOfSession(record, config, now);
     if (state) {
       if (record && !record.revoked_at) {
-        await revokeInvalidSession({ record, state, now, req, db, repository, registrarEvento });
+        await revokeInvalidSession({
+          record,
+          state,
+          now,
+          req,
+          db,
+          repository,
+          registrarEventoPrivado,
+        });
       }
       return { errorCode: 'AUTHENTICATION_REQUIRED' };
     }
@@ -213,7 +228,7 @@ async function refreshSession({ refreshToken, req, dependencies = {} }) {
           ? 'previous_refresh_reused'
           : 'refresh_mismatch',
         db,
-        registrarEvento,
+        registrarEventoPrivado,
       });
       return { errorCode: 'AUTHENTICATION_REQUIRED' };
     }
@@ -246,13 +261,21 @@ async function invalidateSessionState({ sessionId, req, dependencies = {} }) {
   const repository = dependencies.repository || authSessionsRepository;
   const config = dependencies.config || getSessionConfig();
   const clock = dependencies.clock || Date;
-  const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
+  const registrarEventoPrivado = resolvePrivateRegistrar(dependencies);
   return repository.enTransaccion(async (db) => {
     const now = nowDate(clock);
     const record = await repository.obtenerConUsuarioPorId(sessionId, db, { bloquear: true });
     const state = stateOfSession(record, config, now);
     if (!record || !state || record.revoked_at) return 0;
-    await revokeInvalidSession({ record, state, now, req, db, repository, registrarEvento });
+    await revokeInvalidSession({
+      record,
+      state,
+      now,
+      req,
+      db,
+      repository,
+      registrarEventoPrivado,
+    });
     return 1;
   });
 }
@@ -261,7 +284,7 @@ async function revokeCurrent({ sessionId, usuarioId, reason = 'logout', req, dep
   if (!sessionId || !usuarioId) return 0;
   const repository = dependencies.repository || authSessionsRepository;
   const clock = dependencies.clock || Date;
-  const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
+  const registrarEventoPrivado = resolvePrivateRegistrar(dependencies);
   return repository.enTransaccion(async (db) => {
     const now = nowDate(clock);
     const count = await repository.revocar({
@@ -278,7 +301,7 @@ async function revokeCurrent({ sessionId, usuarioId, reason = 'logout', req, dep
         action: 'sesion_revocada',
         reason,
         db,
-        registrarEvento,
+        registrarEventoPrivado,
       });
     }
     return count;
@@ -290,7 +313,7 @@ async function revokeWithRefresh({ refreshToken, reason = 'logout', req, depende
   if (!sessionId) return 0;
   const repository = dependencies.repository || authSessionsRepository;
   const clock = dependencies.clock || Date;
-  const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
+  const registrarEventoPrivado = resolvePrivateRegistrar(dependencies);
   return repository.enTransaccion(async (db) => {
     const record = await repository.obtenerConUsuarioPorId(sessionId, db, { bloquear: true });
     if (!record || record.revoked_at) return 0;
@@ -313,7 +336,7 @@ async function revokeWithRefresh({ refreshToken, reason = 'logout', req, depende
         action: 'sesion_revocada',
         reason,
         db,
-        registrarEvento,
+        registrarEventoPrivado,
       });
     }
     return count;
@@ -328,7 +351,7 @@ async function revokeAllInTransaction({
   dependencies = {},
 }) {
   const repository = dependencies.repository || authSessionsRepository;
-  const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
+  const registrarEventoPrivado = resolvePrivateRegistrar(dependencies);
   const clock = dependencies.clock || Date;
   const count = await repository.revocarTodasPorUsuario({
     usuarioId,
@@ -342,7 +365,7 @@ async function revokeAllInTransaction({
     reason,
     count,
     db,
-    registrarEvento,
+    registrarEventoPrivado,
   });
   return count;
 }

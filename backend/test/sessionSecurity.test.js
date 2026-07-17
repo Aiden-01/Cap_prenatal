@@ -147,7 +147,7 @@ test('crear sesion almacena solo hash del refresh y no deja login parcial', asyn
       config: SESSION_CONFIG,
       jwtConfig: JWT_CONFIG,
       clock: { now: () => NOW.getTime() },
-      registrarEvento: async () => { audited = true; },
+      registrarEventoPrivado: async () => { audited = true; },
     },
   });
   assert.equal(audited, true);
@@ -183,7 +183,7 @@ test('login crea sesion y un usuario inactivo no inicia', async () => {
       },
       publicSessionMetadata: sessionService.publicSessionMetadata,
     },
-    registrarAuditoria: async () => {},
+    registrarEventoPrivado: async () => {},
   };
   const result = await authService.login({ username: 'actual', password: 'correcta', req: {}, dependencies });
   assert.equal(created, 1);
@@ -238,11 +238,12 @@ test('inactividad detectada se persiste como revocacion y se audita', async () =
       },
       config: SESSION_CONFIG,
       clock: { now: () => NOW.getTime() },
-      registrarEvento: async (_req, event) => events.push(event),
+      registrarEventoPrivado: async (_req, event) => events.push(event),
     },
   });
   assert.equal(record.revoked_at.toISOString(), NOW.toISOString());
-  assert.equal(events[0].datosNuevos.tipo_evento, 'sesion_inactiva');
+  assert.equal(events[0].contexto.evento, 'sesion_inactiva');
+  assert.equal(events[0].metadata.resultado, 'sesion_inactiva');
 });
 
 test('token antiguo sin sid y fallo de base de datos fallan de forma cerrada', async () => {
@@ -301,7 +302,7 @@ test('refresh rota atomicamente sin actualizar actividad ni ampliar limite absol
       config: SESSION_CONFIG,
       jwtConfig: JWT_CONFIG,
       clock: { now: () => NOW.getTime() },
-      registrarEvento: async (_req, event) => memory.events.push(event),
+      registrarEventoPrivado: async (_req, event) => memory.events.push(event),
     },
   });
   assert.notEqual(result.refreshToken, memory.original);
@@ -347,7 +348,7 @@ test('dos refresh simultaneos con el mismo valor producen una sola rotacion y re
     config: SESSION_CONFIG,
     jwtConfig: JWT_CONFIG,
     clock: { now: () => NOW.getTime() },
-    registrarEvento: async () => {},
+    registrarEventoPrivado: async () => {},
   };
 
   const results = await Promise.allSettled([
@@ -369,7 +370,7 @@ test('reutilizar refresh anterior revoca la sesion y registra evento minimo', as
     req: {},
     dependencies: {
       repository: memory.repository, config: SESSION_CONFIG, jwtConfig: JWT_CONFIG,
-      clock: { now: () => NOW.getTime() }, registrarEvento: async (_req, event) => memory.events.push(event),
+      clock: { now: () => NOW.getTime() }, registrarEventoPrivado: async (_req, event) => memory.events.push(event),
     },
   });
   await assert.rejects(
@@ -378,13 +379,14 @@ test('reutilizar refresh anterior revoca la sesion y registra evento minimo', as
       req: {},
       dependencies: {
         repository: memory.repository, config: SESSION_CONFIG, jwtConfig: JWT_CONFIG,
-        clock: { now: () => NOW.getTime() }, registrarEvento: async (_req, event) => memory.events.push(event),
+        clock: { now: () => NOW.getTime() }, registrarEventoPrivado: async (_req, event) => memory.events.push(event),
       },
     }),
     (error) => error.statusCode === 401
   );
   assert.equal(memory.record.revoked_reason, 'refresh_reuse_or_mismatch');
-  assert.equal(memory.events.at(-1).datosNuevos.tipo_evento, 'reutilizacion_refresh_detectada');
+  assert.equal(memory.events.at(-1).contexto.evento, 'reutilizacion_refresh_detectada');
+  assert.equal(memory.events.at(-1).metadata.reutilizacion_detectada, true);
   assert.doesNotMatch(JSON.stringify(memory.events), /refresh_token_hash|[A-Za-z0-9_-]{64,}/);
 });
 
@@ -556,8 +558,15 @@ test('logout revoca la sesion actual y logout-all solo usa el usuario autenticad
     async revokeCurrent(args) { calls.push(['current', args.sessionId, args.usuarioId]); },
     async revokeAll(args) { calls.push(['all', args.usuarioId]); },
   };
-  await authService.logout({ logoutClaims: { sessionId: SESSION_ID, usuarioId: '9' } }, { sessionService: fake });
-  await authService.logoutAll({ req: { usuario: { id: 9 } }, dependencies: { sessionService: fake } });
+  const registrarEventoPrivado = async () => {};
+  await authService.logout(
+    { logoutClaims: { sessionId: SESSION_ID, usuarioId: '9' } },
+    { sessionService: fake, registrarEventoPrivado }
+  );
+  await authService.logoutAll({
+    req: { usuario: { id: 9 } },
+    dependencies: { sessionService: fake, registrarEventoPrivado },
+  });
   assert.deepEqual(calls, [['current', SESSION_ID, '9'], ['all', 9]]);
 });
 
@@ -570,7 +579,7 @@ test('logout con refresh sigue revocando cuando el access cookie ya expiro', asy
     dependencies: {
       repository: memory.repository,
       clock: { now: () => NOW.getTime() },
-      registrarEvento: async () => {},
+      registrarEventoPrivado: async () => {},
     },
   });
   assert.equal(memory.record.revoked_reason, 'logout');
@@ -583,7 +592,7 @@ test('logout con refresh sigue revocando cuando el access cookie ya expiro', asy
         config: SESSION_CONFIG,
         jwtConfig: JWT_CONFIG,
         clock: { now: () => NOW.getTime() },
-        registrarEvento: async () => {},
+        registrarEventoPrivado: async () => {},
       },
     }),
     (error) => error.code === 'AUTHENTICATION_REQUIRED'
@@ -608,7 +617,7 @@ test('cambio propio de contrasena actualiza y revoca todo en la misma transaccio
       sessionService: {
         async revokeAllInTransaction(args) { assert.equal(args.db, db); calls.push('revoke'); },
       },
-      registrarEvento: async (_req, _event, options) => { assert.equal(options.db, db); calls.push('audit'); },
+      registrarEventoPrivado: async (_req, _event, options) => { assert.equal(options.db, db); calls.push('audit'); },
     },
   });
   assert.deepEqual(calls, ['password', 'revoke', 'audit']);
@@ -637,8 +646,7 @@ test('eliminacion permitida revoca sesiones antes de eliminar al usuario', async
           calls.push('revoke');
         },
       },
-      registrarEvento: async () => {},
-      registrarAuditoria: async () => { calls.push('audit'); },
+      registrarEventoPrivado: async () => { calls.push('audit'); },
     },
   });
   assert.deepEqual(calls, ['revoke', 'delete:12', 'audit']);

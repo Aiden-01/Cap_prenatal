@@ -371,9 +371,10 @@ test('exportaciones responden con nombre seguro, no-store y auditoria minima sin
 
   assert.equal(audits.length, 2);
   for (const audit of audits) {
-    assert.equal(audit.datosNuevos.cantidad_filas, 7);
-    assert.deepEqual(audit.datosNuevos.filtros, PERIODO);
-    assert.ok(audit.datosNuevos.fecha_generacion);
+    assert.equal(audit.metadata.cantidad_filas, 7);
+    assert.equal(audit.metadata.desde, PERIODO.desde);
+    assert.equal(audit.metadata.hasta, PERIODO.hasta);
+    assert.equal(audit.metadata.resultado, 'generado');
     const serialized = JSON.stringify(audit);
     assert.doesNotMatch(serialized, /Paciente Sintetica|1234567890101|pdf-sintetico/);
   }

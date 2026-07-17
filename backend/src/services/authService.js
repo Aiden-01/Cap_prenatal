@@ -5,19 +5,27 @@ const authSessionsRepository = require('../repositories/authSessionsRepository')
 const permisosRepository = require('../repositories/permisosRepository');
 const auditService = require('./auditService');
 const sessionService = require('./sessionService');
-const { registrarAuditoria } = require('../utils/auditoria');
 const { HttpError } = require('../utils/httpError');
 
-async function auditarLoginFallido(req, { username, usuario = null, accion = 'login_fallido', motivo }, audit = registrarAuditoria) {
+async function auditarLoginFallido(
+  req,
+  { usuario = null, accion = 'login_fallido', motivo },
+  audit = auditService.registrarEventoPrivado
+) {
   await audit(req, {
+    contexto: {
+      categoria: 'autenticacion',
+      entidad: 'usuario',
+      evento: accion,
+    },
     accion,
-    tabla: 'usuarios',
-    registroId: usuario?.id || null,
+    entidadId: usuario?.id || null,
     usuarioId: usuario?.id || null,
-    datosNuevos: { username_intentado: username, motivo },
-    descripcion: accion === 'login_usuario_inactivo'
-      ? 'Intento de inicio de sesion con usuario inactivo'
-      : 'Intento de inicio de sesion fallido',
+    metadata: {
+      resultado: 'fallido',
+      motivo_codigo: motivo,
+      metodo: 'password',
+    },
   });
 }
 
@@ -25,16 +33,15 @@ async function login({ username, password, req, dependencies = {} }) {
   const authRepo = dependencies.authRepository || authRepository;
   const permisosRepo = dependencies.permisosRepository || permisosRepository;
   const sessions = dependencies.sessionService || sessionService;
-  const audit = dependencies.registrarAuditoria || registrarAuditoria;
+  const audit = dependencies.registrarEventoPrivado || auditService.registrarEventoPrivado;
   const usuario = await authRepo.obtenerUsuarioPorUsername(username);
 
   if (!usuario) {
-    await auditarLoginFallido(req, { username, motivo: 'credenciales_incorrectas' }, audit);
+    await auditarLoginFallido(req, { motivo: 'credenciales_incorrectas' }, audit);
     throw new HttpError(401, 'Credenciales incorrectas');
   }
   if (!usuario.activo) {
     await auditarLoginFallido(req, {
-      username,
       usuario,
       accion: 'login_usuario_inactivo',
       motivo: 'usuario_inactivo',
@@ -42,7 +49,7 @@ async function login({ username, password, req, dependencies = {} }) {
     throw new HttpError(401, 'Credenciales incorrectas');
   }
   if (!await bcrypt.compare(password, usuario.password_hash)) {
-    await auditarLoginFallido(req, { username, usuario, motivo: 'credenciales_incorrectas' }, audit);
+    await auditarLoginFallido(req, { usuario, motivo: 'credenciales_incorrectas' }, audit);
     throw new HttpError(401, 'Credenciales incorrectas');
   }
 
@@ -55,12 +62,18 @@ async function login({ username, password, req, dependencies = {} }) {
   const csrfToken = crypto.randomBytes(32).toString('hex');
 
   await audit(req, {
+    contexto: {
+      categoria: 'autenticacion',
+      entidad: 'usuario',
+      evento: 'login_exitoso',
+    },
     accion: 'login',
-    tabla: 'usuarios',
-    registroId: usuario.id,
+    entidadId: usuario.id,
     usuarioId: usuario.id,
-    datosNuevos: { id: usuario.id, username: usuario.username, rol: usuario.rol },
-    descripcion: 'Inicio de sesion exitoso',
+    metadata: {
+      resultado: 'exitoso',
+      metodo: 'password',
+    },
   });
 
   return {
@@ -93,8 +106,10 @@ async function logout(req, dependencies = {}) {
     usuarioId: req.usuario?.id,
   };
   const sessions = dependencies.sessionService || sessionService;
+  const audit = dependencies.registrarEventoPrivado || auditService.registrarEventoPrivado;
+  let revoked = 0;
   if (claims.sessionId && claims.usuarioId) {
-    await sessions.revokeCurrent({
+    revoked = await sessions.revokeCurrent({
       sessionId: claims.sessionId,
       usuarioId: claims.usuarioId,
       reason: 'logout',
@@ -102,22 +117,42 @@ async function logout(req, dependencies = {}) {
       dependencies: dependencies.sessionDependencies,
     });
   } else if (req.logoutRefreshToken) {
-    await sessions.revokeWithRefresh({
+    revoked = await sessions.revokeWithRefresh({
       refreshToken: req.logoutRefreshToken,
       reason: 'logout',
       req,
       dependencies: dependencies.sessionDependencies,
     });
   }
+  await audit(req, {
+    contexto: { categoria: 'autenticacion', entidad: 'usuario', evento: 'logout' },
+    accion: 'logout',
+    entidadId: claims.usuarioId || null,
+    usuarioId: claims.usuarioId || null,
+    metadata: {
+      resultado: revoked ? 'exitoso' : 'sin_cambio',
+      motivo_codigo: revoked ? 'logout' : 'sesion_ya_revocada',
+    },
+  });
   return { ok: true };
 }
 
 async function logoutAll({ req, dependencies = {} }) {
-  await (dependencies.sessionService || sessionService).revokeAll({
+  const revoked = await (dependencies.sessionService || sessionService).revokeAll({
     usuarioId: req.usuario.id,
     reason: 'logout_all',
     req,
     dependencies: dependencies.sessionDependencies,
+  });
+  await (dependencies.registrarEventoPrivado || auditService.registrarEventoPrivado)(req, {
+    contexto: { categoria: 'autenticacion', entidad: 'usuario', evento: 'logout_all' },
+    accion: 'logout',
+    entidadId: req.usuario.id,
+    usuarioId: req.usuario.id,
+    metadata: {
+      resultado: revoked ? 'exitoso' : 'sin_cambio',
+      motivo_codigo: revoked ? 'logout_all' : 'sesiones_ya_revocadas',
+    },
   });
   return { ok: true };
 }
@@ -147,7 +182,8 @@ async function changePassword({ usuarioId, currentPassword, newPassword, req, de
   const authRepo = dependencies.authRepository || authRepository;
   const sessionsRepo = dependencies.authSessionsRepository || authSessionsRepository;
   const sessions = dependencies.sessionService || sessionService;
-  const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
+  const registrarEventoPrivado = dependencies.registrarEventoPrivado
+    || auditService.registrarEventoPrivado;
   const usuario = await authRepo.obtenerCredencialesPorId(usuarioId);
   if (!usuario) throw new HttpError(404, 'Usuario no encontrado');
   if (!usuario.activo) throw new HttpError(403, 'Usuario inactivo. Contacte al administrador.');
@@ -168,17 +204,20 @@ async function changePassword({ usuarioId, currentPassword, newPassword, req, de
       db,
       dependencies: {
         repository: sessionsRepo,
-        registrarEvento,
+        registrarEventoPrivado,
         ...(dependencies.sessionDependencies || {}),
       },
     });
-    await registrarEvento(req, {
+    await registrarEventoPrivado(req, {
+      contexto: {
+        categoria: 'usuarios',
+        entidad: 'usuario',
+        evento: 'password_cambiado',
+      },
       accion: 'actualizar',
-      tabla: 'usuarios',
-      registroId: usuarioId,
+      entidadId: usuarioId,
       usuarioId,
-      datosNuevos: { id: usuario.id, username: usuario.username, password_cambiado: true },
-      descripcion: 'Cambio de contrasena del usuario autenticado',
+      metadata: { password_cambiado: true },
     }, { db, obligatorio: true });
   });
 

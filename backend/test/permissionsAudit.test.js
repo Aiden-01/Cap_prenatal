@@ -2,7 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const permisosService = require('../src/services/permisosService');
-const { registrarEvento } = require('../src/services/auditService');
+const {
+  registrarEvento,
+  registrarEventoPrivado,
+} = require('../src/services/auditService');
 
 function crearEscenario({
   permisosIniciales = [],
@@ -79,11 +82,18 @@ function crearEscenario({
   };
 
   async function registrarAuditoria(req, evento, opciones) {
-    llamadas.push('AUDIT');
-    assert.equal(opciones.db, db);
-    assert.equal(opciones.obligatorio, true);
-    if (fallaAuditoria) throw new Error('fallo de auditoria');
-    auditorias.push({ req, evento, opciones });
+    return registrarEventoPrivado(req, evento, {
+      ...opciones,
+      repository: {
+        async insertarEvento(eventoSeguro, conexion) {
+          llamadas.push('AUDIT');
+          assert.equal(conexion, db);
+          assert.equal(opciones.obligatorio, true);
+          if (fallaAuditoria) throw new Error('fallo de auditoria');
+          auditorias.push({ req, evento: eventoSeguro, opciones });
+        },
+      },
+    });
   }
 
   const req = {
@@ -100,7 +110,7 @@ function crearEscenario({
       dependencies: {
         permisosRepository,
         usuariosRepository,
-        registrarEvento: registrarAuditoria,
+        registrarEventoPrivado: registrarAuditoria,
         sessionService,
         authSessionsRepository: {},
       },
@@ -117,20 +127,20 @@ function crearEscenario({
   };
 }
 
-test('agregar permisos registra estado anterior, nuevo y agregados', async () => {
+test('agregar permisos registra solo el delta agregado', async () => {
   const escenario = crearEscenario({ permisosIniciales: ['pacientes.ver'] });
   await escenario.ejecutar(['pacientes.ver', 'controles.crear']);
 
   assert.deepEqual(escenario.estado(), ['controles.crear', 'pacientes.ver']);
   assert.equal(escenario.auditorias.length, 1);
   const evento = escenario.auditorias[0].evento;
-  assert.equal(evento.descripcion, 'usuario_permisos_actualizados');
+  assert.equal(evento.descripcion, 'permisos_reemplazados');
   assert.equal(evento.usuarioId, escenario.actorId);
   assert.equal(evento.idEntidad, escenario.usuarioId);
-  assert.deepEqual(evento.datosAnteriores.permisos, ['pacientes.ver']);
-  assert.deepEqual(evento.datosNuevos.permisos, ['controles.crear', 'pacientes.ver']);
-  assert.deepEqual(evento.datosNuevos.permisos_agregados, ['controles.crear']);
-  assert.deepEqual(evento.datosNuevos.permisos_retirados, []);
+  assert.deepEqual(evento.datosNuevos.cambios.permisos_agregados, ['controles.crear']);
+  assert.equal(evento.datosNuevos.cambios.permisos_retirados, undefined);
+  assert.equal(evento.datosNuevos.permisos, undefined);
+  assert.equal(evento.datosNuevos.politica_version, 1);
   assert.equal(escenario.llamadas.includes('REVOKE_SESSIONS'), true);
 });
 
@@ -161,7 +171,7 @@ test('retirar permisos registra solamente los codigos retirados', async () => {
   await escenario.ejecutar(['pacientes.ver']);
 
   assert.deepEqual(
-    escenario.auditorias[0].evento.datosNuevos.permisos_retirados,
+    escenario.auditorias[0].evento.datosNuevos.cambios.permisos_retirados,
     ['controles.crear']
   );
 });
@@ -170,7 +180,7 @@ test('agregar y retirar simultaneamente calcula ambos deltas', async () => {
   const escenario = crearEscenario({ permisosIniciales: ['pacientes.ver'] });
   await escenario.ejecutar(['controles.editar']);
 
-  const nuevos = escenario.auditorias[0].evento.datosNuevos;
+  const nuevos = escenario.auditorias[0].evento.datosNuevos.cambios;
   assert.deepEqual(nuevos.permisos_agregados, ['controles.editar']);
   assert.deepEqual(nuevos.permisos_retirados, ['pacientes.ver']);
 });
@@ -192,7 +202,7 @@ test('normaliza duplicados y orden antes de reemplazar y auditar', async () => {
 
   assert.deepEqual(escenario.estado(), ['controles.crear', 'pacientes.ver']);
   assert.deepEqual(
-    escenario.auditorias[0].evento.datosNuevos.permisos,
+    escenario.auditorias[0].evento.datosNuevos.cambios.permisos_agregados,
     ['controles.crear', 'pacientes.ver']
   );
 });
@@ -226,7 +236,7 @@ test('soporta que actor y usuario afectado sean el mismo', async () => {
 
   const evento = escenario.auditorias[0].evento;
   assert.equal(evento.usuarioId, 7);
-  assert.equal(evento.datosNuevos.usuario_afectado_id, 7);
+  assert.equal(evento.idEntidad, 7);
 });
 
 test('usuario inexistente conserva el error previo y no inicia transaccion', async () => {

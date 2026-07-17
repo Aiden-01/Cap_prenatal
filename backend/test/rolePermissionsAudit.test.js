@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const usuariosService = require('../src/services/usuariosService');
 const permisosService = require('../src/services/permisosService');
+const { registrarEventoPrivado } = require('../src/services/auditService');
 
 const ADMIN = [
   'controles.crear',
@@ -17,6 +18,7 @@ const CATALOGO = [...new Set([...PERSONAL, 'reportes.exportar'])].sort();
 
 function crearEscenario({
   rolInicial = 'admin',
+  activoInicial = true,
   permisosIniciales = ADMIN,
   usuarioExiste = true,
   fallaAuditoriaEn = null,
@@ -29,7 +31,7 @@ function crearEscenario({
     id: usuarioId,
     nombre_completo: 'Usuario objetivo',
     username: 'objetivo',
-    activo: true,
+    activo: activoInicial,
     rol: rolInicial,
   } : null;
   let permisos = [...permisosIniciales].sort();
@@ -130,18 +132,19 @@ function crearEscenario({
   };
 
   async function registrarEvento(req, evento, opciones) {
-    assert.equal(opciones.db, db);
-    assert.equal(opciones.obligatorio, true);
-    llamadas.push(`AUDIT_${evento.tabla}`);
-    if (fallaAuditoriaEn === evento.tabla) {
-      throw new Error('auditoria obligatoria fallida');
-    }
-    auditorias.push({ req, evento, opciones });
-  }
-
-  async function registrarAuditoria(req, evento) {
-    llamadas.push(`AUDIT_${evento.tabla}`);
-    auditorias.push({ req, evento, opciones: null });
+    return registrarEventoPrivado(req, evento, {
+      ...opciones,
+      repository: {
+        async insertarEvento(eventoSeguro, conexion) {
+          if (opciones.obligatorio) assert.equal(conexion, db);
+          llamadas.push(`AUDIT_${eventoSeguro.tabla}`);
+          if (fallaAuditoriaEn === eventoSeguro.tabla) {
+            throw new Error('auditoria obligatoria fallida');
+          }
+          auditorias.push({ req, evento: eventoSeguro, opciones });
+        },
+      },
+    });
   }
 
   const req = {
@@ -166,8 +169,7 @@ function crearEscenario({
         usuariosRepository,
         permisosRepository,
         permisosService,
-        registrarAuditoria,
-        registrarEvento,
+        registrarEventoPrivado: registrarEvento,
         sessionService,
         authSessionsRepository: {},
       },
@@ -195,11 +197,16 @@ test('cambio de rol agrega los permisos predeterminados faltantes', async () => 
 
   assert.deepEqual(escenario.permisos(), PERSONAL);
   const evento = eventoPermisos(escenario);
-  assert.deepEqual(evento.datosNuevos.permisos_agregados, ['mapa_riesgo.ver']);
-  assert.deepEqual(evento.datosNuevos.permisos_retirados, []);
-  assert.equal(evento.datosNuevos.origen, 'cambio_rol');
-  assert.equal(evento.datosNuevos.rol_anterior, 'admin');
-  assert.equal(evento.datosNuevos.rol_nuevo, 'personal_salud');
+  assert.deepEqual(evento.datosNuevos.cambios.permisos_agregados, ['mapa_riesgo.ver']);
+  assert.equal(evento.datosNuevos.cambios.permisos_retirados, undefined);
+  assert.equal(evento.datosNuevos.permisos, undefined);
+  const cambioRol = escenario.auditorias.find(
+    ({ evento: auditEvent }) => auditEvent.descripcion === 'cambio_rol'
+  ).evento;
+  assert.deepEqual(cambioRol.datosNuevos.cambios.rol, {
+    anterior: 'admin',
+    nuevo: 'personal_salud',
+  });
   assert.equal(escenario.llamadas.includes('REVOKE_SESSIONS'), true);
 });
 
@@ -212,6 +219,13 @@ test('reinicio administrativo de password revoca sesiones', async () => {
     password: 'NuevaClaveSegura123!',
   });
   assert.equal(escenario.llamadas.includes('REVOKE_SESSIONS'), true);
+  const event = escenario.auditorias.find(
+    ({ evento }) => evento.descripcion === 'password_reiniciado'
+  ).evento;
+  assert.deepEqual(event.datosNuevos, {
+    password_cambiado: true,
+    politica_version: 1,
+  });
 });
 
 test('desactivar usuario revoca sesiones', async () => {
@@ -219,6 +233,23 @@ test('desactivar usuario revoca sesiones', async () => {
   await escenario.ejecutar({ nombre_completo: 'Usuario objetivo', activo: false, rol: 'admin' });
   assert.equal(escenario.llamadas.includes('REVOKE_SESSIONS'), true);
   assert.equal(escenario.usuario().activo, false);
+  const event = escenario.auditorias.find(
+    ({ evento }) => evento.descripcion === 'usuario_desactivado'
+  ).evento;
+  assert.deepEqual(event.datosNuevos.cambios.activo, { anterior: true, nuevo: false });
+});
+
+test('activar usuario comparte transaccion y conserva la transicion booleana', async () => {
+  const escenario = crearEscenario({ activoInicial: false });
+  await escenario.ejecutar({ nombre_completo: 'Usuario objetivo', activo: true, rol: 'admin' });
+
+  assert.equal(escenario.usuario().activo, true);
+  assert.equal(escenario.llamadas[0], 'BEGIN');
+  assert.equal(escenario.llamadas.at(-1), 'COMMIT');
+  const event = escenario.auditorias.find(
+    ({ evento }) => evento.descripcion === 'usuario_activado'
+  ).evento;
+  assert.deepEqual(event.datosNuevos.cambios.activo, { anterior: false, nuevo: true });
 });
 
 test('fallo de revocacion revierte cambio critico de rol', async () => {
@@ -238,7 +269,7 @@ test('cambio de rol retira permisos que no pertenecen al nuevo rol', async () =>
 
   assert.deepEqual(escenario.permisos(), ADMIN);
   assert.deepEqual(
-    eventoPermisos(escenario).datosNuevos.permisos_retirados,
+    eventoPermisos(escenario).datosNuevos.cambios.permisos_retirados,
     ['mapa_riesgo.ver']
   );
 });
@@ -248,8 +279,8 @@ test('cambio de rol sin diferencia efectiva no genera evento de permisos', async
   await escenario.ejecutar('personal_salud');
 
   assert.equal(eventoPermisos(escenario), undefined);
-  assert.equal(escenario.auditorias.length, 1);
-  assert.equal(escenario.auditorias[0].evento.tabla, 'usuarios');
+  assert.equal(escenario.auditorias.length, 2);
+  assert.ok(escenario.auditorias.every(({ evento }) => evento.tabla === 'usuarios'));
   assert.equal(escenario.llamadas.includes('REPLACE_PERMISSIONS'), false);
 });
 
@@ -261,7 +292,7 @@ test('mantiene la politica actual y elimina permisos personalizados al cambiar r
 
   assert.deepEqual(escenario.permisos(), PERSONAL);
   assert.deepEqual(
-    eventoPermisos(escenario).datosNuevos.permisos_retirados,
+    eventoPermisos(escenario).datosNuevos.cambios.permisos_retirados,
     ['reportes.exportar']
   );
 });
@@ -296,7 +327,7 @@ test('actor y usuario afectado pueden ser el mismo', async () => {
 
   const evento = eventoPermisos(escenario);
   assert.equal(evento.usuarioId, 12);
-  assert.equal(evento.datosNuevos.usuario_afectado_id, 12);
+  assert.equal(evento.idEntidad, 12);
   assert.equal(escenario.llamadas.includes('REVOKE_SESSIONS'), true);
 });
 
@@ -336,7 +367,7 @@ test('enviar el mismo rol conserva permisos personalizados', async () => {
   assert.equal(escenario.auditorias.length, 1);
 });
 
-test('mismo rol sin otros cambios mantiene el comportamiento actual', async () => {
+test('mismo rol sin otros cambios no genera evento falso', async () => {
   const escenario = crearEscenario();
 
   await escenario.ejecutar({
@@ -350,7 +381,7 @@ test('mismo rol sin otros cambios mantiene el comportamiento actual', async () =
   assert.equal(eventoPermisos(escenario), undefined);
   assert.deepEqual(
     escenario.llamadas,
-    ['UPDATE_USER', 'AUDIT_usuarios']
+    ['UPDATE_USER']
   );
 });
 
@@ -366,9 +397,13 @@ test('cambio real de rol junto con otro campo comparte transaccion y auditorias'
   assert.equal(escenario.usuario().nombre_completo, 'Nombre y rol actualizados');
   assert.equal(escenario.usuario().rol, 'personal_salud');
   assert.deepEqual(escenario.permisos(), PERSONAL);
-  assert.equal(escenario.auditorias.length, 2);
-  assert.equal(escenario.auditorias[0].opciones.db, escenario.auditorias[1].opciones.db);
-  assert.equal(escenario.auditorias[0].opciones.obligatorio, true);
-  assert.equal(escenario.auditorias[1].opciones.obligatorio, true);
-  assert.deepEqual(escenario.llamadas.slice(-2), ['AUDIT_usuarios', 'COMMIT']);
+  assert.equal(escenario.auditorias.length, 3);
+  assert.ok(escenario.auditorias.every(
+    ({ opciones }) => opciones.db === escenario.auditorias[0].opciones.db
+  ));
+  assert.ok(escenario.auditorias.every(({ opciones }) => opciones.obligatorio === true));
+  assert.deepEqual(
+    escenario.llamadas.slice(-3),
+    ['AUDIT_usuarios', 'AUDIT_usuarios', 'COMMIT']
+  );
 });

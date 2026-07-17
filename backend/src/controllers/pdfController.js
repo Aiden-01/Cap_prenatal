@@ -7,7 +7,7 @@ const { promisify } = require('util');
 const pdfService = require('../services/pdfService');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { AppError } = require('../utils/appError');
-const { registrarAuditoria } = require('../utils/auditoria');
+const { registrarEventoPrivado } = require('../services/auditService');
 const { consumePdfQuota } = require('../middleware/pdfRateLimit');
 const { generarFichaClinicaPrenatalPdf } = require('../services/fichaClinicaPrenatalPdf');
 const { sendPdfResponse } = require('../utils/pdfResponse');
@@ -88,17 +88,21 @@ async function pdfControlHandler(req, res, dependencies) {
     dependencies.consumePdfQuota(req);
     const pdf = await renderControlPdf(html, dependencies.puppeteerClient);
 
-    await dependencies.registrarAuditoria(req, {
+    await dependencies.registrarEventoPrivado(req, {
+      contexto: {
+        categoria: 'documentos',
+        entidad: 'documento',
+        evento: 'pdf_clinico_generado',
+      },
       accion: 'generar_pdf',
-      tabla: 'documentos',
-      registroId: id,
+      entidadId: id,
       pacienteId: c.paciente_id || pacienteId,
       embarazoId: c.embarazo_id || null,
-      datosNuevos: {
+      metadata: {
         tipo_documento: 'control_prenatal',
-        control_id: id,
+        formato: 'pdf',
+        resultado: 'generado',
       },
-      descripcion: 'PDF de control prenatal generado',
     });
 
     return dependencies.sendPdfResponse(res, pdf, `control-${id}.pdf`);
@@ -1172,16 +1176,21 @@ async function pdfMspasHandler(req, res, dependencies) {
     dependencies.consumePdfQuota(req);
     const pdf = await dependencies.generarFichaClinicaPrenatalPdf(data);
 
-    await dependencies.registrarAuditoria(req, {
+    await dependencies.registrarEventoPrivado(req, {
+      contexto: {
+        categoria: 'documentos',
+        entidad: 'documento',
+        evento: 'pdf_clinico_generado',
+      },
       accion: 'generar_pdf',
-      tabla: 'documentos',
-      registroId: pacienteId,
+      entidadId: pacienteId,
       pacienteId,
       embarazoId: data.embarazo?.id || null,
-      datosNuevos: {
+      metadata: {
         tipo_documento: 'ficha_mspas_prenatal',
+        formato: 'pdf',
+        resultado: 'generado',
       },
-      descripcion: 'PDF MSPAS prenatal generado',
     });
 
     return dependencies.sendPdfResponse(res, pdf, 'ficha-prenatal.pdf');
@@ -1217,17 +1226,21 @@ async function pdfRiesgoObstetricoHandler(req, res, dependencies) {
     dependencies.consumePdfQuota(req);
     const pdf = await dependencies.exportExcelTemplateToPdf(templatePath, cellMap);
 
-    await dependencies.registrarAuditoria(req, {
+    await dependencies.registrarEventoPrivado(req, {
+      contexto: {
+        categoria: 'documentos',
+        entidad: 'documento',
+        evento: 'pdf_clinico_generado',
+      },
       accion: 'generar_pdf',
-      tabla: 'documentos',
-      registroId: riesgo.id,
+      entidadId: riesgo.id,
       pacienteId,
       embarazoId: embarazo?.id || riesgo.embarazo_id || null,
-      datosNuevos: {
+      metadata: {
         tipo_documento: 'riesgo_obstetrico',
-        ficha_riesgo_id: riesgo.id,
+        formato: 'pdf',
+        resultado: 'generado',
       },
-      descripcion: 'PDF de ficha de riesgo obstetrico generado',
     });
 
     return dependencies.sendPdfResponse(res, pdf, `ficha-riesgo-${pacienteId}.pdf`);
@@ -1259,17 +1272,21 @@ async function pdfPlanPartoHandler(req, res, dependencies) {
     dependencies.consumePdfQuota(req);
     const pdf = await dependencies.exportExcelTemplateToPdf(templatePath, cellMap);
 
-    await dependencies.registrarAuditoria(req, {
+    await dependencies.registrarEventoPrivado(req, {
+      contexto: {
+        categoria: 'documentos',
+        entidad: 'documento',
+        evento: 'pdf_clinico_generado',
+      },
       accion: 'generar_pdf',
-      tabla: 'documentos',
-      registroId: plan.id,
+      entidadId: plan.id,
       pacienteId,
       embarazoId: embarazo?.id || plan.embarazo_id || null,
-      datosNuevos: {
+      metadata: {
         tipo_documento: 'plan_parto',
-        plan_parto_id: plan.id,
+        formato: 'pdf',
+        resultado: 'generado',
       },
-      descripcion: 'PDF de plan de parto generado',
     });
 
     return dependencies.sendPdfResponse(res, pdf, `plan-parto-${pacienteId}.pdf`);
@@ -1287,7 +1304,7 @@ function createPdfController(overrides = {}) {
     generarFichaClinicaPrenatalPdf,
     pdfService,
     puppeteerClient: puppeteer,
-    registrarAuditoria,
+    registrarEventoPrivado,
     sendPdfResponse,
     ...overrides,
   };

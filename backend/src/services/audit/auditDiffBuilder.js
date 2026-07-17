@@ -245,6 +245,39 @@ function sortObject(value) {
   return Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]]));
 }
 
+function buildAuditMetadata(value, {
+  context = {},
+  policy = defaultAuditFieldPolicy,
+} = {}) {
+  const result = { politica_version: AUDIT_POLICY_VERSION };
+  if (!isPlainObject(value)) return result;
+
+  const sanitized = sanitizeAuditValue(value, { policy });
+  for (const [rawField, rawValue] of Object.entries(sanitized)) {
+    const field = normalizeFieldName(rawField);
+    const rule = resolveFieldRule(field, context, policy);
+    if (rule.category !== AUDIT_FIELD_CATEGORIES.FULL) continue;
+
+    const normalized = normalizeAllowedAuditValue(rule, rawValue);
+    if (normalized.valid) result[field] = normalized.value;
+  }
+
+  return sanitizeAuditValue(sortObject(result), { policy });
+}
+
+function buildAuditPayload({ previous, next, metadata } = {}, options = {}) {
+  const diff = previous !== undefined || next !== undefined
+    ? buildAuditDiff(previous, next, options)
+    : { politica_version: AUDIT_POLICY_VERSION };
+  const safeMetadata = buildAuditMetadata(metadata, options);
+  return sanitizeAuditValue({ ...diff, ...safeMetadata }, { policy: options.policy });
+}
+
+function hasAuditPayload(payload) {
+  return isPlainObject(payload)
+    && Object.keys(payload).some((key) => key !== 'politica_version');
+}
+
 function buildAuditDiff(previous, next, {
   context = {},
   policy = defaultAuditFieldPolicy,
@@ -284,6 +317,9 @@ function buildAuditDiff(previous, next, {
 module.exports = {
   AUDIT_POLICY_VERSION,
   buildAuditDiff,
+  buildAuditMetadata,
+  buildAuditPayload,
+  hasAuditPayload,
   normalizedDateTimestamp,
   structurallyEqual,
 };

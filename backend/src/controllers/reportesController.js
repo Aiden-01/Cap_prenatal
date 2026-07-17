@@ -1,6 +1,6 @@
 const reportesService = require('../services/reportesService');
 const { asyncHandler } = require('../middleware/asyncHandler');
-const { registrarAuditoria } = require('../utils/auditoria');
+const { registrarEventoPrivado } = require('../services/auditService');
 const { PDF_RESPONSE_HEADERS, sanitizePdfFilename } = require('../utils/pdfResponse');
 
 function setPrivateDownloadHeaders(res) {
@@ -37,15 +37,16 @@ function exportAuditData({ tipoReporte, formato, periodo, total }) {
   return {
     tipo_reporte: tipoReporte,
     formato,
-    filtros: periodo,
+    desde: periodo?.desde,
+    hasta: periodo?.hasta,
     cantidad_filas: total,
-    fecha_generacion: new Date().toISOString(),
+    resultado: 'generado',
   };
 }
 
 function createReportesController({
   service = reportesService,
-  audit = registrarAuditoria,
+  audit = registrarEventoPrivado,
 } = {}) {
   const censoMensual = asyncHandler(async (_req, res) => {
     const result = await service.censoMensual({});
@@ -60,15 +61,18 @@ function createReportesController({
   const exportarCensoExcel = asyncHandler(async (req, res) => {
     const result = await service.workbookCensoGeneral();
     await audit(req, {
+      contexto: {
+        categoria: 'reportes',
+        entidad: 'exportacion',
+        evento: 'exportacion_censo',
+      },
       accion: 'exportar',
-      tabla: 'reportes',
-      datosNuevos: exportAuditData({
+      metadata: exportAuditData({
         tipoReporte: 'censo_embarazos_activos',
         formato: 'xlsx',
-        periodo: { fecha_corte: result.fechaCorte },
+        periodo: { desde: result.fechaCorte, hasta: result.fechaCorte },
         total: result.total,
       }),
-      descripcion: 'Exportacion de censo actual de embarazos activos en Excel',
     });
     return writeWorkbook(
       res,
@@ -80,15 +84,18 @@ function createReportesController({
   const exportarCensoPrimerControlExcel = asyncHandler(async (req, res) => {
     const result = await service.workbookCensoPrimerControl(req.query);
     await audit(req, {
+      contexto: {
+        categoria: 'reportes',
+        entidad: 'exportacion',
+        evento: 'exportacion_censo',
+      },
       accion: 'exportar',
-      tabla: 'reportes',
-      datosNuevos: exportAuditData({
+      metadata: exportAuditData({
         tipoReporte: 'censo_primer_control',
         formato: 'xlsx',
         periodo: req.query,
         total: result.total,
       }),
-      descripcion: 'Exportacion de censo de captadas en primer control en Excel',
     });
     return writeWorkbook(
       res,
@@ -100,15 +107,18 @@ function createReportesController({
   const exportarCensoPrimerControlPdf = asyncHandler(async (req, res) => {
     const result = await service.pdfCensoPrimerControl(req.query);
     await audit(req, {
+      contexto: {
+        categoria: 'reportes',
+        entidad: 'exportacion',
+        evento: 'exportacion_censo',
+      },
       accion: 'exportar',
-      tabla: 'reportes',
-      datosNuevos: exportAuditData({
+      metadata: exportAuditData({
         tipoReporte: 'censo_primer_control',
         formato: 'pdf',
         periodo: req.query,
         total: result.total,
       }),
-      descripcion: 'Exportacion de censo de captadas en primer control en PDF',
     });
     return sendReportPdf(
       res,

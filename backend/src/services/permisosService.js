@@ -54,7 +54,8 @@ async function reemplazarPermisosEnTransaccion({
   dependencies = {},
 }) {
   const permisosRepo = dependencies.permisosRepository || permisosRepository;
-  const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
+  const registrarEventoPrivado = dependencies.registrarEventoPrivado
+    || auditService.registrarEventoPrivado;
   const sessions = dependencies.sessionService || sessionService;
   const nuevos = normalizarCodigos(codigos);
   const existentes = await permisosRepo.existenCodigos(nuevos, db, true);
@@ -94,34 +95,24 @@ async function reemplazarPermisosEnTransaccion({
       db,
       dependencies: {
         repository: dependencies.authSessionsRepository,
-        registrarEvento,
+        registrarEventoPrivado,
       },
     });
   }
 
-  await registrarEvento(req, {
-    usuarioId: req.usuario.id,
+  await registrarEventoPrivado(req, {
+    contexto: {
+      categoria: 'permisos',
+      entidad: 'usuario_permisos',
+      evento: 'permisos_reemplazados',
+    },
     accion: 'actualizar',
-    modulo: 'permisos',
-    entidadAfectada: 'usuario_permisos',
-    tabla: 'usuario_permisos',
-    idEntidad: usuarioId,
-    registroId: usuarioId,
-    datosAnteriores: {
-      tipo_evento: 'usuario_permisos_actualizados',
-      usuario_afectado_id: usuarioId,
-      permisos: anteriores,
-      ...contexto,
+    entidadId: usuarioId,
+    usuarioId: req.usuario.id,
+    cambios: {
+      anteriores: { permisos: anteriores },
+      nuevos: { permisos: nuevos },
     },
-    datosNuevos: {
-      tipo_evento: 'usuario_permisos_actualizados',
-      usuario_afectado_id: usuarioId,
-      permisos: nuevos,
-      permisos_agregados: agregados,
-      permisos_retirados: retirados,
-      ...contexto,
-    },
-    descripcion: 'usuario_permisos_actualizados',
   }, { db, obligatorio: true });
 
   return { cambio: true, permisos, anteriores, nuevos, agregados, retirados };

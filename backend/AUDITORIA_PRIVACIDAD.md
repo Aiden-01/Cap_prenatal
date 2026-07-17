@@ -1,10 +1,17 @@
 # Politica contextual de privacidad para auditoria
 
-## Estado del Sprint 4B.1
+## Estado del Sprint 4B.2
 
-Este sub-sprint crea y endurece un nucleo aislado para construir payloads de
-auditoria minimos. El nucleo esta exportado y probado, pero todavia no se
-conecta a `registrarEvento` ni a ningun productor.
+El nucleo contextual ya esta conectado mediante `registrarEventoPrivado` a
+los productores no clinicos de autenticacion, usuarios, passwords, roles,
+permisos, sesiones, PDF y exportaciones de reportes. El camino privado exige
+`categoria`, `entidad` y `evento`, construye el payload con
+`buildAuditPayload`, ejecuta `auditSanitizer` inmediatamente antes de
+`auditRepository` y conserva `politica_version: 1`.
+
+`registrarEvento` permanece temporalmente como camino legado solo para los
+productores clinicos pendientes del Sprint 4B.3. Por ello no debe afirmarse
+todavia que toda la auditoria del sistema aplica la nueva politica.
 
 No se modifican:
 
@@ -13,6 +20,9 @@ No se modifican:
 - eventos historicos;
 - archivos `.env` o `.env.example`;
 - API, frontend o comportamiento clinico.
+
+Tampoco se modificaron contratos HTTP, permisos, tiempos de sesion, PDFs
+oficiales ni reglas clinicas.
 
 ## Problema y objetivo
 
@@ -48,17 +58,49 @@ Para autorizar un valor deben coincidir de forma exacta y normalizada:
 Si falta cualquier elemento del contexto, el campo se trata como `SENSITIVE`.
 Una regla de otra entidad o categoria nunca se reutiliza implicitamente.
 
+## Contrato integrado
+
+Los productores migrados llaman exclusivamente:
+
+```js
+registrarEventoPrivado(req, {
+  contexto: { categoria, entidad, evento },
+  accion,
+  entidadId,
+  usuarioId,
+  pacienteId,
+  embarazoId,
+  cambios: { anteriores, nuevos },
+  metadata,
+}, { db, obligatorio });
+```
+
+`cambios` y `metadata` son entradas para el constructor, no payloads que se
+envian directamente al repositorio. El servicio:
+
+1. valida el contexto y la accion contra listas cerradas;
+2. construye diff, campos registrados/eliminados o metadata tipada;
+3. descarta eventos sin cambio ni metadata efectiva;
+4. sanea recursivamente el resultado;
+5. deriva modulo, tabla y descripcion desde el contexto;
+6. fuerza `ip` y `user_agent` a `null`;
+7. entrega al repositorio solo el evento final saneado.
+
+No acepta `req.body`, headers, descripciones libres ni snapshots como payload
+final. Los productores migrados no importan `registrarEvento` ni
+`utils/auditoria.js`.
+
 ## Matriz contextual
 
 | Categoria | Entidad | Eventos permitidos | Campos con valor | Validacion |
 | --- | --- | --- | --- | --- |
-| `usuarios` | `usuario` | `actualizar`, `cambiar_rol` | `rol` | codigo controlado |
-| `usuarios` | `usuario` | `actualizar`, `cambiar_estado` | `activo`, `estado` | booleano o `activo`/`inactivo` |
+| `usuarios` | `usuario` | actualizacion y `cambio_rol` | `rol` | codigo controlado |
+| `usuarios` | `usuario` | actualizacion, activacion o desactivacion | `activo`, `estado` | booleano o `activo`/`inactivo` |
 | `usuarios` | `usuario` | cambios o reinicios de password | `password_cambiado` | solo booleano |
-| `usuarios` | `usuario` | asignacion o retiro de permisos | `permisos` | codigos `modulo.accion` |
+| `permisos` | `usuario_permisos` | reemplazo, asignacion o retiro | `permisos` | deltas de codigos `modulo.accion` |
 | `usuarios` | `usuario` | eventos administrativos definidos | `motivo_codigo` | codigo controlado |
 | `clinica` | `embarazo` | cambio de estado, cierre o puerperio | `estado_embarazo` | `activo`, `puerperio`, `cerrado` |
-| `seguridad`, `sesiones` | `sesion`, `usuario` | autenticacion, revocacion o expiracion | `resultado`, `motivo_codigo`, banderas de sesion | codigos o booleanos |
+| `autenticacion`, `sesiones` | `sesion`, `usuario` | login, logout, creacion, revocacion o expiracion | resultado, motivo, banderas y cantidad revocada | codigos, booleanos o entero |
 | `documentos` | `documento`, `exportacion` | crear, generar, exportar o descargar | tipo, formato, cantidad y fechas | codigos, entero o fecha ISO |
 | `reportes` | `reporte`, `exportacion` | generar, exportar, descargar o consultar | tipo, formato, cantidad y fechas | codigos, entero o fecha ISO |
 
@@ -142,9 +184,60 @@ La politica sigue siendo conservadora:
 - valores nulos no se listan;
 - campos `FORBIDDEN` desaparecen tambien de las listas.
 
-Los identificadores internos `entidad_id`, `paciente_id` y `embarazo_id`
-podran agregarse como metadata cuando se conecten los productores. Este nucleo
-todavia no los incorpora ni cambia el contrato existente.
+Los identificadores internos `id_entidad`, `paciente_id` y `embarazo_id` se
+guardan en sus columnas existentes, no dentro del JSON. El camino privado
+valida su forma antes de entregarlos al repositorio.
+
+## Productores migrados
+
+- Autenticacion: `login_exitoso`, `login_fallido`,
+  `login_usuario_inactivo`, `logout` y `logout_all`.
+- Usuarios: creacion, actualizacion nominal por nombre de campo, activacion,
+  desactivacion, cambio de rol, cambio/reinicio de password y eliminacion.
+- Permisos: reemplazo efectivo con codigos agregados y retirados; una entrada
+  sin diferencia no genera evento.
+- Sesiones: creacion, revocacion individual o masiva, inactividad, expiracion y
+  deteccion de reutilizacion de refresh.
+- Documentos: los cuatro PDF clinicos existentes, auditados solo como emision
+  documental con tipo e identificadores internos.
+- Reportes: Excel y PDF de censos con tipo, formato, periodo validado y cantidad.
+
+## Criticos y best effort
+
+Comparten la transaccion y usan `obligatorio: true`:
+
+- cambio o reinicio de password;
+- cambio de rol;
+- activacion o desactivacion;
+- reemplazo efectivo de permisos;
+- eliminacion de usuario;
+- las auditorias de sesion que ya eran parte de una operacion atomica, excepto
+  expiracion o inactividad automatica.
+
+Permanecen informativos o best effort:
+
+- login y sus fallos;
+- logout sin cambio porque la sesion ya estaba revocada;
+- inactividad y expiracion automatica;
+- generacion de PDF;
+- generacion de Excel/PDF de reporte y exportacion de censo.
+
+Una falla best effort se advierte sin romper una descarga ya generada. Una
+falla obligatoria se relanza para que el coordinador transaccional haga
+rollback.
+
+## Payload permitido por categoria
+
+- Autenticacion: `resultado`, `motivo_codigo`, `metodo`; `usuario_id` solo en
+  columna y solo si se conoce.
+- Usuarios: `campos_registrados`, `campos_eliminados`, nombres de campos
+  sensibles modificados, transiciones de `rol`/`activo` y
+  `password_cambiado: true`.
+- Permisos: `permisos_agregados` y `permisos_retirados` dentro de `cambios`.
+- Sesiones: resultado, motivo controlado, banderas booleanas y
+  `cantidad_sesiones_revocadas`; nunca listas de IDs.
+- Documentos/reportes: tipo, formato, `desde`, `hasta`, `cantidad_filas`,
+  resultado e identificadores internos en columnas.
 
 ## Ejemplos permitidos
 
@@ -201,22 +294,28 @@ negativas que demuestren que la regla no se aplica fuera de su contexto.
 
 ## Limitaciones actuales
 
-- El nucleo no se utiliza en `auditService.js`.
-- Los productores actuales conservan su comportamiento previo.
-- No existe API ni interfaz de consulta para esta politica.
+- Los productores clinicos de pacientes, embarazos, controles prenatales,
+  laboratorios, riesgo, vacunas, morbilidad, plan de parto, puerperio y
+  referencias todavia usan el camino legado y quedan para Sprint 4B.3.
+- No existe una API nueva ni cambio en la interfaz de consulta de auditoria.
 - No se han transformado eventos historicos.
 - El esquema conserva `datos_anteriores` y `datos_nuevos` sin cambios.
 - Las mascaras son una utilidad sin reglas activas para pacientes.
+- Automatizaciones y otros productores no enumerados no fueron migrados en
+  esta fase.
 
-## Migracion gradual siguiente
+## Migracion siguiente
 
-1. Incorporar contexto e identificadores internos en autenticacion y usuarios.
-2. Migrar roles y permisos usando deltas de codigos.
-3. Migrar pacientes sin valores nominales o de ubicacion.
-4. Migrar embarazo conservando solo estados operativos permitidos.
-5. Migrar modulos clinicos registrando exclusivamente nombres de campos.
-6. Migrar documentos, reportes, sesiones y automatizaciones con sus allowlists.
-7. Disenar por separado el saneamiento de historicos, con respaldo y dry-run.
+1. Migrar pacientes sin valores nominales o de ubicacion.
+2. Migrar embarazo conservando solo estados operativos permitidos.
+3. Migrar controles, laboratorios y demas modulos clinicos registrando
+   exclusivamente nombres de campos y transiciones justificadas.
+4. Revisar automatizaciones y productores restantes por separado.
+5. Disenar el saneamiento de historicos como tarea independiente, con respaldo
+   y dry-run.
 
 Cada fase debe mantener el contrato publico de `registrarEvento` hasta que sus
 consumidores sean migrados y probados explicitamente.
+
+Sprint 4B.2 no cambio base de datos, `schema.sql`, migraciones, registros
+historicos, `.env` ni `.env.example`.

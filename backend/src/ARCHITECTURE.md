@@ -136,7 +136,28 @@ Las reglas de embarazo viven en services y utils, no en controllers:
 
 ## Auditoria
 
-Las escrituras clinicas deben registrar auditoria mediante `services/auditService.js` o utilidades existentes.
+Los productores no clinicos migrados usan esta unica secuencia:
+
+```text
+producer -> registrarEventoPrivado -> auditDiffBuilder/auditFieldPolicy
+         -> auditSanitizer -> auditRepository -> auditoria_eventos
+```
+
+`registrarEventoPrivado` exige `contexto.categoria`, `contexto.entidad` y
+`contexto.evento`. El productor entrega `cambios` o `metadata`; nunca arma el
+JSON persistido ni pasa `req.body`. El servicio deriva modulo, tabla y
+descripcion, fuerza IP/user-agent a `null`, descarta eventos vacios y sanea de
+nuevo justo antes del repositorio.
+
+Productores en este camino: autenticacion, usuarios, passwords, roles,
+permisos, sesiones, PDF y exportaciones/reportes. Password, rol, estado,
+permisos y eliminacion escriben auditoria obligatoria en la misma transaccion.
+Login, expiracion automatica y documentos/reportes son best effort.
+
+Pacientes, embarazos, controles, laboratorios, riesgo, vacunas, morbilidad,
+plan de parto, puerperio, referencias y otros productores clinicos conservan
+temporalmente `registrarEvento` o `utils/auditoria.js` hasta Sprint 4B.3. Ese
+camino no debe reutilizarse en codigo no clinico nuevo.
 
 No auditar:
 
@@ -145,6 +166,10 @@ No auditar:
 - JWT,
 - secretos,
 - datos clinicos completos si basta metadata.
+
+Tampoco auditar IP, user-agent, headers, cookies, request completo, buffers,
+HTML, temporales, query completa ni filas nominales en el camino privado. Todo
+payload migrado incluye `politica_version: 1`.
 
 Ver `AUDITORIA.md`.
 

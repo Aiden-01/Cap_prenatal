@@ -1,12 +1,22 @@
 # Auditoria de eventos
 
-La auditoria actual es hibrida: algunos modulos registran eventos mediante `services/auditService.js` y otros mediante utilidades compatibles en `utils/auditoria.js`. Ambos caminos escriben en `auditoria_eventos`.
+Desde Sprint 4B.2 la auditoria tiene dos caminos delimitados:
 
-La politica general es no bloquear la operacion clinica si falla la escritura de auditoria. El servicio registra un warning/error en consola y permite que la operacion principal continue.
+- `registrarEventoPrivado`: obligatorio para autenticacion, usuarios,
+  passwords, roles, permisos, sesiones, PDF y exportaciones/reportes. Requiere
+  contexto explicito, construye payload por allowlist, sanea antes del
+  repositorio y nunca captura IP, user-agent, headers ni body.
+- `registrarEvento`/`utils/auditoria.js`: camino legado temporal para pacientes,
+  embarazos y productores clinicos pendientes de Sprint 4B.3.
 
-La actualizacion directa de permisos de un usuario (`PUT /api/usuarios/:id/permisos`) es una excepcion deliberada: el reemplazo y el evento `usuario_permisos_actualizados` se escriben con la misma conexion y transaccion. Si falla la auditoria obligatoria, tambien se revierten los permisos. El evento conserva el actor, el usuario afectado, los conjuntos anterior y nuevo ordenados, y los permisos agregados y retirados. Una solicitud cuyo conjunto normalizado no cambia no escribe un evento, porque no hubo cambio efectivo de privilegios.
+No se debe usar el camino legado en un productor no clinico migrado. Tampoco se
+debe afirmar que toda la auditoria clinica esta protegida hasta completar
+4B.3.
 
-El cambio de rol mediante `PUT /api/usuarios/:id` conserva la politica de reemplazar todos los permisos por los predeterminados del nuevo rol. La actualizacion del usuario, el reemplazo y las auditorias obligatorias se ejecutan en una sola transaccion. El evento de permisos usa el mismo tipo e incluye `origen: cambio_rol`, `rol_anterior` y `rol_nuevo`. Si el cambio de rol no altera efectivamente el conjunto, se registra la actualizacion del usuario pero no un evento de permisos sin diferencias.
+Los eventos informativos siguen siendo best effort. Los cambios de password,
+rol, estado del usuario, permisos y eliminacion usan la misma conexion que la
+operacion principal y `obligatorio: true`; una falla de auditoria provoca
+rollback. Una solicitud de permisos sin delta no escribe un evento.
 
 ## Objetivo
 
@@ -17,7 +27,8 @@ La auditoria debe responder:
 - Sobre que modulo o entidad.
 - Sobre que paciente y embarazo, si aplica.
 - Cuando ocurrio.
-- Desde que IP y cliente.
+- En eventos legados, desde que IP y cliente; el camino privado omite ambos
+  deliberadamente por politica.
 - Que cambio, sin guardar informacion innecesaria o peligrosa.
 
 ## Campos principales
@@ -30,11 +41,11 @@ La auditoria debe responder:
 - `paciente_id`: paciente relacionada, cuando aplica.
 - `embarazo_id`: embarazo relacionado, cuando aplica.
 - `fecha_hora`: momento del evento.
-- `ip`: direccion IP detectada desde la solicitud.
-- `user_agent`: cliente usado para la solicitud.
-- `datos_anteriores`: snapshot previo cuando aplica.
-- `datos_nuevos`: snapshot resultante cuando aplica.
-- `descripcion`: texto breve del evento.
+- `ip` y `user_agent`: siempre `null` en productores migrados; el legado aun
+  conserva el comportamiento anterior.
+- `datos_anteriores`: siempre `null` en el camino privado.
+- `datos_nuevos`: diff o metadata minima con `politica_version: 1`.
+- `descripcion`: codigo controlado de `contexto.evento` en el camino privado.
 
 ## Acciones permitidas
 
@@ -89,15 +100,36 @@ Para documentos y reportes guardar metadata minima:
 - tipo de documento,
 - tipo de reporte,
 - formato,
-- filtros,
+- `desde` y `hasta` ya validados cuando aplican,
 - cantidad de filas exportadas,
-- fecha de generacion,
+- resultado controlado,
 - paciente/embarazo si aplica.
 
 No copiar snapshots clinicos completos si no son necesarios para trazabilidad.
 Las exportaciones del censo de primer control registran `censo_primer_control`,
-formato `xlsx` o `pdf`, `desde`, `hasta`, cantidad de filas y fecha de
-generacion. No registran nombres, CUI, el archivo, binarios ni la tabla nominal.
+formato `xlsx` o `pdf`, `desde`, `hasta` y cantidad de filas. No registran
+nombres, CUI, query completa, filtros libres, el archivo, binarios ni la tabla
+nominal.
+
+## Eventos privados y payload
+
+- Login/logout: resultado, motivo y metodo controlados; el usuario escrito en
+  un fallo no se conserva.
+- Usuario creado/eliminado: solo `campos_registrados` o
+  `campos_eliminados`.
+- Usuario actualizado: nombres de campos personales; solo `rol` y `activo`
+  conservan transiciones.
+- Password: solo `password_cambiado: true`.
+- Permisos: solo codigos agregados y retirados, nunca la lista total.
+- Sesiones: resultado, motivo, banderas y cantidad revocada; nunca tokens,
+  hashes, cookies, IP ni lista completa de IDs.
+- Documentos/reportes: tipo, formato, periodo, cantidad e IDs internos en las
+  columnas existentes; nunca contenido, HTML, buffer, temporal o fila nominal.
+
+Los productores clinicos pendientes son pacientes, embarazos, controles,
+laboratorios, riesgo obstetrico, vacunas, morbilidad, plan de parto,
+puerperio, referencias y otros productores clinicos. Los historicos no fueron
+saneados. No hubo cambios de base de datos, migraciones ni ENV en Sprint 4B.2.
 
 ## Criterio funcional para PDF institucional
 
@@ -140,7 +172,7 @@ El esquema actual no tiene un campo para exigir cambio de contrasena en el prime
 acceso. Esa capacidad queda pendiente para el sprint de sesiones y politica de
 contrasenas; no se agrega una migracion exclusivamente para ello en este sprint.
 
-## Ejemplo: crear paciente
+## Ejemplo legado pendiente: crear paciente
 
 ```json
 {
@@ -160,7 +192,7 @@ contrasenas; no se agrega una migracion exclusivamente para ello en este sprint.
 }
 ```
 
-## Ejemplo: crear control prenatal
+## Ejemplo legado pendiente: crear control prenatal
 
 ```json
 {

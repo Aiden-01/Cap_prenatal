@@ -98,6 +98,38 @@ Respuesta de error esperada:
 }
 ```
 
+### Auditoria privada Sprint 4B.2
+
+Autenticacion, usuarios, passwords, roles, permisos, sesiones, PDF y
+exportaciones/reportes usan `registrarEventoPrivado`. El contrato exige
+`categoria`, `entidad` y `evento`, construye el diff o metadata con la politica
+contextual, elimina campos prohibidos de forma recursiva y ejecuta el
+saneamiento inmediatamente antes de `auditRepository`.
+
+El payload privado conserva `politica_version: 1` y metadata minima:
+
+- autenticacion: resultado, motivo y metodo controlados;
+- usuarios: nombres de campos, transiciones de rol/activo y booleano de
+  password cambiado;
+- permisos: codigos agregados y retirados;
+- sesiones: resultado, motivo, banderas y cantidad revocada;
+- documentos/reportes: tipo, formato, fechas validadas, cantidad e IDs
+  internos.
+
+No guarda password, hash, token, JWT, cookie, CSRF, Authorization, IP,
+user-agent, request/body completo, nombres, CUI, contenido clinico, buffer,
+HTML, temporal, query libre ni filas nominales.
+
+Password, rol, estado, permisos y eliminacion son eventos obligatorios dentro
+de la transaccion. Login, expiraciones automaticas y documentos/reportes son
+best effort. Una falla informativa no invalida una descarga ya generada.
+
+Los productores clinicos (pacientes, embarazos, controles, laboratorios,
+riesgo, vacunas, morbilidad, plan de parto, puerperio y referencias) siguen en
+el camino legado hasta Sprint 4B.3. Los historicos no fueron saneados. Esta
+fase no cambio esquema, migraciones, ENV, frontend, contratos HTTP, permisos,
+sesiones funcionales ni PDFs oficiales.
+
 ### Chatbot Lia: privacidad y validacion
 
 Los endpoints autenticados son `POST /api/chatbot/mensaje` y
@@ -785,7 +817,8 @@ La autorizacion, la existencia de la paciente y la pertenencia de
 `embarazo_id`/`control_id` se resuelven antes de iniciar cualquier generador.
 Una respuesta valida aplica cabeceras privadas `no-store`, nombre de archivo
 sanitizado y auditoria minima del tipo de documento, usuario, paciente y
-embarazo, sin guardar el binario ni el contenido clinico.
+embarazo, con `politica_version: 1` y sin guardar el binario ni el contenido
+clinico.
 
 El limite permite 20 inicios de generacion por usuario autenticado cada 5
 minutos. Solo se incrementa despues de autenticacion, autorizacion, validacion
@@ -874,7 +907,9 @@ Fuera de alcance actual:
 - En frontend, preservar `embarazo_id` al navegar hacia formularios clinicos.
 - Comparar IDs de URL como string.
 - Para escrituras clinicas, registrar auditoria.
-- La auditoria es hibrida: algunos modulos usan `services/auditService.js` y otros utilidades compatibles en `utils/auditoria.js`; ambos caminos escriben en `auditoria_eventos`.
+- Los productores no clinicos migrados deben usar `registrarEventoPrivado`;
+  `registrarEvento` y `utils/auditoria.js` quedan solo para productores
+  clinicos pendientes de Sprint 4B.3.
 - No guardar tokens, contrasenas ni secretos en logs o auditoria.
 - Usar Zod para nuevos endpoints.
 - Preferir mensajes de error claros para el personal de salud.

@@ -5,7 +5,6 @@ const permisosService = require('./permisosService');
 const auditService = require('./auditService');
 const sessionService = require('./sessionService');
 const authSessionsRepository = require('../repositories/authSessionsRepository');
-const { registrarAuditoria } = require('../utils/auditoria');
 const { HttpError } = require('../utils/httpError');
 
 async function listarUsuarios(req) {
@@ -29,32 +28,111 @@ async function obtenerTargetVisible({ id, req, repository = usuariosRepository }
   return target;
 }
 
-async function crearUsuario({ body, req }) {
+async function crearUsuario({ body, req, dependencies = {} }) {
+  const usuariosRepo = dependencies.usuariosRepository || usuariosRepository;
+  const permisosRepo = dependencies.permisosRepository || permisosRepository;
+  const registrarEventoPrivado = dependencies.registrarEventoPrivado
+    || auditService.registrarEventoPrivado;
   assertPuedeAsignarRol({ rol: body.rol, actorRol: req.usuario.rol });
 
   const hash = await bcrypt.hash(body.password, 12);
-  const usuario = await usuariosRepository.crear({
+  const usuario = await usuariosRepo.crear({
     nombreCompleto: body.nombre_completo,
     username: body.username,
     passwordHash: hash,
     rol: body.rol,
     createdBy: req.usuario?.id || null,
   });
-  await permisosRepository.asignarPermisosIniciales({
+  await permisosRepo.asignarPermisosIniciales({
     usuarioId: usuario.id,
     rol: body.rol,
     otorgadoPor: req.usuario?.id || null,
   });
 
-  await registrarAuditoria(req, {
+  await registrarEventoPrivado(req, {
+    contexto: { categoria: 'usuarios', entidad: 'usuario', evento: 'usuario_creado' },
     accion: 'crear',
-    tabla: 'usuarios',
-    registroId: usuario.id,
-    datosNuevos: { ...usuario, rol: body.rol },
-    descripcion: 'Usuario creado',
+    entidadId: usuario.id,
+    cambios: {
+      anteriores: null,
+      nuevos: {
+        nombre_completo: body.nombre_completo,
+        username: body.username,
+        rol: body.rol,
+      },
+    },
   });
 
   return usuario;
+}
+
+async function auditarCambiosUsuario({
+  before,
+  after,
+  passwordReset,
+  req,
+  db,
+  obligatorio,
+  registrarEventoPrivado,
+}) {
+  const options = { db, obligatorio };
+  const common = {
+    accion: 'actualizar',
+    entidadId: after.id,
+  };
+
+  if (before.nombre_completo !== after.nombre_completo) {
+    await registrarEventoPrivado(req, {
+      ...common,
+      contexto: {
+        categoria: 'usuarios',
+        entidad: 'usuario',
+        evento: 'usuario_actualizado',
+      },
+      cambios: {
+        anteriores: { nombre_completo: before.nombre_completo },
+        nuevos: { nombre_completo: after.nombre_completo },
+      },
+    }, options);
+  }
+
+  if (before.rol !== after.rol) {
+    await registrarEventoPrivado(req, {
+      ...common,
+      contexto: { categoria: 'usuarios', entidad: 'usuario', evento: 'cambio_rol' },
+      cambios: {
+        anteriores: { rol: before.rol },
+        nuevos: { rol: after.rol },
+      },
+    }, options);
+  }
+
+  if (before.activo !== after.activo) {
+    await registrarEventoPrivado(req, {
+      ...common,
+      contexto: {
+        categoria: 'usuarios',
+        entidad: 'usuario',
+        evento: after.activo ? 'usuario_activado' : 'usuario_desactivado',
+      },
+      cambios: {
+        anteriores: { activo: before.activo },
+        nuevos: { activo: after.activo },
+      },
+    }, options);
+  }
+
+  if (passwordReset) {
+    await registrarEventoPrivado(req, {
+      ...common,
+      contexto: {
+        categoria: 'usuarios',
+        entidad: 'usuario',
+        evento: 'password_reiniciado',
+      },
+      metadata: { password_cambiado: true },
+    }, options);
+  }
 }
 
 async function assertPuedeCambiarSelf({
@@ -99,8 +177,8 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
   const usuariosRepo = dependencies.usuariosRepository || usuariosRepository;
   const permisosRepo = dependencies.permisosRepository || permisosRepository;
   const permisosLogic = dependencies.permisosService || permisosService;
-  const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
-  const registrarAuditoriaNormal = dependencies.registrarAuditoria || registrarAuditoria;
+  const registrarEventoPrivado = dependencies.registrarEventoPrivado
+    || auditService.registrarEventoPrivado;
   const sessions = dependencies.sessionService || sessionService;
   const sessionsRepo = dependencies.authSessionsRepository || authSessionsRepository;
   const before = await obtenerTargetVisible({ id, req, repository: usuariosRepo });
@@ -132,9 +210,11 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
   }, db || undefined);
 
   const roleChanged = before.rol !== nextRol;
-  const deactivated = before.activo === true && body.activo === false;
+  const nextActivo = body.activo ?? before.activo;
+  const stateChanged = before.activo !== nextActivo;
+  const deactivated = before.activo === true && nextActivo === false;
   const passwordReset = Boolean(body.password);
-  const criticalChange = roleChanged || deactivated || passwordReset;
+  const criticalChange = roleChanged || stateChanged || passwordReset;
 
   if (criticalChange) {
     await permisosRepo.enTransaccion(async (db) => {
@@ -167,7 +247,7 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
           revocarSesiones: false,
           dependencies: {
             permisosRepository: permisosRepo,
-            registrarEvento,
+            registrarEventoPrivado,
             sessionService: sessions,
             authSessionsRepository: sessionsRepo,
           },
@@ -185,18 +265,19 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
         db,
         dependencies: {
           repository: sessionsRepo,
-          registrarEvento,
+          registrarEventoPrivado,
         },
       });
 
-      await registrarEvento(req, {
-        accion: 'actualizar',
-        tabla: 'usuarios',
-        registroId: id,
-        datosAnteriores: estadoAnterior,
-        datosNuevos: { ...usuario, rol: nextRol, password_cambiado: Boolean(body.password) },
-        descripcion: 'Usuario actualizado',
-      }, { db, obligatorio: true });
+      await auditarCambiosUsuario({
+        before: estadoAnterior,
+        after: usuario,
+        passwordReset,
+        req,
+        db,
+        obligatorio: true,
+        registrarEventoPrivado,
+      });
     });
 
     return { message: 'Usuario actualizado' };
@@ -204,13 +285,13 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
 
   const usuario = await actualizar();
 
-  await registrarAuditoriaNormal(req, {
-    accion: 'actualizar',
-    tabla: 'usuarios',
-    registroId: id,
-    datosAnteriores: before,
-    datosNuevos: { ...usuario, rol: nextRol, password_cambiado: Boolean(body.password) },
-    descripcion: 'Usuario actualizado',
+  await auditarCambiosUsuario({
+    before,
+    after: usuario,
+    passwordReset: false,
+    req,
+    obligatorio: false,
+    registrarEventoPrivado,
   });
 
   return { message: 'Usuario actualizado' };
@@ -221,8 +302,8 @@ async function eliminarUsuario({ id, req, dependencies = {} }) {
   const permisosRepo = dependencies.permisosRepository || permisosRepository;
   const sessions = dependencies.sessionService || sessionService;
   const sessionsRepo = dependencies.authSessionsRepository || authSessionsRepository;
-  const registrarEvento = dependencies.registrarEvento || auditService.registrarEvento;
-  const registrarAuditoriaNormal = dependencies.registrarAuditoria || registrarAuditoria;
+  const registrarEventoPrivado = dependencies.registrarEventoPrivado
+    || auditService.registrarEventoPrivado;
   const esSelf = String(id) === String(req.usuario.id);
   if (esSelf) throw new HttpError(403, 'No puedes eliminar tu propia cuenta');
 
@@ -254,16 +335,18 @@ async function eliminarUsuario({ id, req, dependencies = {} }) {
       reason: 'user_deleted',
       req,
       db,
-      dependencies: { repository: sessionsRepo, registrarEvento },
+      dependencies: { repository: sessionsRepo, registrarEventoPrivado },
     });
     await usuariosRepo.eliminar(id, db);
-  });
-  await registrarAuditoriaNormal(req, {
-    accion: 'eliminar',
-    tabla: 'usuarios',
-    registroId: id,
-    datosAnteriores: target,
-    descripcion: 'Usuario eliminado',
+    await registrarEventoPrivado(req, {
+      contexto: { categoria: 'usuarios', entidad: 'usuario', evento: 'usuario_eliminado' },
+      accion: 'eliminar',
+      entidadId: id,
+      cambios: {
+        anteriores: target,
+        nuevos: null,
+      },
+    }, { db, obligatorio: true });
   });
 
   return { message: 'Usuario eliminado' };

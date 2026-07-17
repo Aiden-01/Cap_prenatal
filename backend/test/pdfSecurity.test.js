@@ -489,7 +489,7 @@ test('IDs incompatibles no consumen cupo ni invocan el generador MSPAS', async (
         return { paciente: { id: 41 }, embarazo: { id: 91 } };
       },
     },
-    registrarAuditoria: async () => { auditCalls += 1; },
+    registrarEventoPrivado: async () => { auditCalls += 1; },
   });
 
   await assert.rejects(
@@ -536,7 +536,7 @@ test('error interno previo a invocar el generador no consume cupo', async () => 
         };
       },
     },
-    registrarAuditoria: async () => {},
+    registrarEventoPrivado: async () => {},
   });
 
   await assert.rejects(
@@ -606,7 +606,7 @@ test('20 intentos validos se permiten y el intento 21 no ejecuta el generador', 
         embarazo: { id: 91 },
       }),
     },
-    registrarAuditoria: async () => { auditCalls += 1; },
+    registrarEventoPrivado: async () => { auditCalls += 1; },
   });
 
   for (let attempt = 1; attempt <= 20; attempt += 1) {
@@ -648,7 +648,7 @@ test('Chromium se cierra despues de generar control y antes de responder', async
     fsApi: { readFileSync: () => '<p>{{nombre}}</p>' },
     pdfService: { obtenerControlConPaciente: async () => controlFixture() },
     puppeteerClient: { launch: async () => browser },
-    registrarAuditoria: async () => events.push('audit'),
+    registrarEventoPrivado: async () => events.push('audit'),
     sendPdfResponse: (_res, _pdf, filename) => events.push(`send:${filename}`),
   });
 
@@ -671,7 +671,7 @@ test('Chromium se cierra si falla la generacion de control', async () => {
         }),
       }),
     },
-    registrarAuditoria: async () => { audits += 1; },
+    registrarEventoPrivado: async () => { audits += 1; },
   });
 
   await assert.rejects(
@@ -702,14 +702,16 @@ test('PDF exitoso audita solo metadata minima y aplica cabeceras seguras', async
         secreto_clinico: 'NO_AUDITAR',
       }),
     },
-    registrarAuditoria: async (auditReq, event) => auditEvents.push({ auditReq, event }),
+    registrarEventoPrivado: async (auditReq, event) => auditEvents.push({ auditReq, event }),
   });
 
   await controller.pdfMspas(req, res);
   assert.equal(auditEvents.length, 1);
   assert.equal(auditEvents[0].auditReq.usuario.id, 7);
-  assert.deepEqual(auditEvents[0].event.datosNuevos, {
+  assert.deepEqual(auditEvents[0].event.metadata, {
     tipo_documento: 'ficha_mspas_prenatal',
+    formato: 'pdf',
+    resultado: 'generado',
   });
   assert.equal(auditEvents[0].event.pacienteId, 41);
   assert.equal(auditEvents[0].event.embarazoId, 91);

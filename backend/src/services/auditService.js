@@ -1,4 +1,14 @@
 const pool = require('../db/pool');
+const auditRepository = require('../repositories/auditRepository');
+const {
+  buildAuditPayload,
+  hasAuditPayload,
+} = require('./audit/auditDiffBuilder');
+const {
+  normalizeAuditContext,
+  normalizeFieldName,
+} = require('./audit/auditFieldPolicy');
+const { sanitizeAuditValue } = require('./audit/auditSanitizer');
 
 const SENSITIVE_KEYS = new Set([
   'password',
@@ -24,6 +34,39 @@ const MODULO_POR_ENTIDAD = {
   usuarios: 'usuarios',
   comunidades: 'comunidades',
 };
+
+const PRIVATE_ACTIONS = new Set([
+  'login',
+  'logout',
+  'login_fallido',
+  'login_usuario_inactivo',
+  'crear',
+  'actualizar',
+  'eliminar',
+  'estado',
+  'consultar',
+  'generar_pdf',
+  'exportar',
+]);
+
+const PRIVATE_MODULES = Object.freeze({
+  autenticacion: 'autenticacion',
+  seguridad: 'autenticacion',
+  usuarios: 'usuarios',
+  permisos: 'permisos',
+  sesiones: 'autenticacion',
+  documentos: 'documentos',
+  reportes: 'reportes',
+});
+
+const PRIVATE_TABLES = Object.freeze({
+  usuario: 'usuarios',
+  usuario_permisos: 'usuario_permisos',
+  sesion: 'auth_sessions',
+  documento: 'documentos',
+  reporte: 'reportes',
+  exportacion: 'reportes',
+});
 
 function sanitize(value) {
   if (Array.isArray(value)) return value.map(sanitize);
@@ -101,7 +144,77 @@ async function registrarEvento(req, event, { db = pool, obligatorio = false } = 
   }
 }
 
+function assertPrivateContext(rawContext) {
+  const context = normalizeAuditContext(rawContext);
+  if (!context.completo) {
+    throw new TypeError('La auditoria privada requiere categoria, entidad y evento');
+  }
+  if (!PRIVATE_MODULES[context.categoria] || !PRIVATE_TABLES[context.entidad]) {
+    throw new TypeError('Contexto de auditoria privada no soportado');
+  }
+  return context;
+}
+
+function normalizePrivateId(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return Number.isSafeInteger(value) && value >= 0 ? value : null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return /^[a-zA-Z0-9-]{1,100}$/.test(trimmed) ? trimmed : null;
+  }
+  return null;
+}
+
+function normalizePrivateEvent(req, event, context, payload) {
+  const accion = normalizeFieldName(event.accion);
+  if (!PRIVATE_ACTIONS.has(accion)) throw new TypeError('Accion de auditoria privada no soportada');
+
+  const idEntidad = normalizePrivateId(event.entidadId ?? event.idEntidad ?? event.registroId);
+  return {
+    usuarioId: normalizePrivateId(event.usuarioId ?? req?.usuario?.id),
+    accion,
+    modulo: PRIVATE_MODULES[context.categoria],
+    entidadAfectada: context.entidad,
+    idEntidad,
+    tabla: PRIVATE_TABLES[context.entidad],
+    registroId: idEntidad,
+    pacienteId: normalizePrivateId(event.pacienteId),
+    embarazoId: normalizePrivateId(event.embarazoId),
+    datosAnteriores: null,
+    datosNuevos: sanitizeAuditValue(payload),
+    ip: null,
+    userAgent: null,
+    descripcion: context.evento,
+  };
+}
+
+async function registrarEventoPrivado(req, event, {
+  db = pool,
+  obligatorio = false,
+  repository = auditRepository,
+} = {}) {
+  const context = assertPrivateContext(event?.contexto);
+  const payload = buildAuditPayload({
+    previous: event?.cambios?.anteriores,
+    next: event?.cambios?.nuevos,
+    metadata: event?.metadata,
+  }, { context });
+
+  if (!hasAuditPayload(payload)) return false;
+  const auditEvent = normalizePrivateEvent(req, event, context, payload);
+
+  try {
+    await repository.insertarEvento(auditEvent, db);
+    return true;
+  } catch (err) {
+    console.warn('[audit] No se pudo registrar auditoria privada:', err.message);
+    if (obligatorio) throw err;
+    return false;
+  }
+}
+
 module.exports = {
   registrarEvento,
+  registrarEventoPrivado,
   sanitize,
 };
