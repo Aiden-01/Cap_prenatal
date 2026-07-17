@@ -161,7 +161,15 @@ const DEFAULT_FREE_TEXT_PATTERNS = Object.freeze([
 const BASE_CONTEXTUAL_RULES = Object.freeze([
   Object.freeze({
     categories: ['clinica'],
-    entities: ['paciente', 'embarazo', 'control_prenatal', 'riesgo_obstetrico', 'vacuna'],
+    entities: [
+      'paciente',
+      'embarazo',
+      'control_prenatal',
+      'riesgo_obstetrico',
+      'vacuna',
+      'morbilidad',
+      'plan_parto',
+    ],
     events: ['crear', 'actualizar', 'eliminar', 'cambiar_estado'],
     fields: ['resultado', 'motivo_codigo'],
     valueType: AUDIT_VALUE_TYPES.CONTROLLED_CODE,

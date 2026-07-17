@@ -1,16 +1,15 @@
 # Auditoria de eventos
 
-Desde Sprint 4B.3C la auditoria tiene dos caminos delimitados:
+Desde Sprint 4B.3D la auditoria tiene dos caminos delimitados:
 
 - `registrarEventoPrivado`: obligatorio para autenticacion, usuarios,
   passwords, roles, permisos, sesiones, PDF, exportaciones/reportes, pacientes,
-  embarazos, controles prenatales/laboratorios embebidos, riesgo obstetrico y
-  vacunas. Requiere
+  embarazos, controles prenatales/laboratorios embebidos, riesgo obstetrico,
+  vacunas, morbilidad y plan de parto. Requiere
   contexto explicito, construye payload por allowlist, sanea antes del
   repositorio y nunca captura IP, user-agent, headers ni body.
-- `registrarEvento`/`utils/auditoria.js`: camino legado temporal para
-  morbilidad, plan de parto, puerperio clinico, referencias y otros productores
-  clinicos pendientes.
+- `registrarEvento`/`utils/auditoria.js`: camino legado temporal para puerperio
+  clinico, referencias y otros productores clinicos pendientes.
 
 No se debe usar el camino legado en un productor no clinico migrado. Tampoco se
 debe afirmar que toda la auditoria clinica esta protegida hasta completar
@@ -18,7 +17,7 @@ debe afirmar que toda la auditoria clinica esta protegida hasta completar
 
 Los eventos informativos siguen siendo best effort. Los cambios de password,
 rol, estado del usuario, permisos, eliminacion de usuario y todas las escrituras
-de paciente, embarazo, control prenatal, riesgo o vacuna migradas usan la misma conexion que la operacion principal
+de paciente, embarazo, control prenatal, riesgo, vacuna, morbilidad o plan de parto migradas usan la misma conexion que la operacion principal
 y `obligatorio: true`; una falla de auditoria provoca rollback. Una solicitud de
 permisos o actualizacion de paciente sin delta no escribe un evento.
 
@@ -73,8 +72,10 @@ La auditoria debe responder:
 - Cerrar embarazo o pasarlo a puerperio.
 - Crear, actualizar o eliminar controles prenatales.
 - Crear, actualizar o eliminar ficha de riesgo.
-- Crear, actualizar o eliminar plan de parto.
-- Crear, actualizar o eliminar vacunas, puerperio, morbilidad y referencias.
+- Crear o actualizar plan de parto mediante su upsert existente. No existe
+  eliminacion HTTP para esta entidad.
+- Crear, actualizar o eliminar vacunas y morbilidad.
+- Crear, actualizar o eliminar puerperio y referencias cuando sean migrados.
 - Login exitoso.
 - Login fallido.
 - Intento de login con usuario inactivo.
@@ -145,12 +146,19 @@ nominal.
   efectivo. Tipo, momento, dosis y fecha nunca conservan valor. Antecedentes de
   otros embarazos y filas legacy son de solo lectura y no generan auditoria de
   modificacion.
+- Morbilidad: creacion/eliminacion conserva nombres y actualizacion solo el
+  delta real. Motivo, historia, diagnostico/impresion, tratamiento, referencia,
+  medicamentos, dosis, observaciones, fechas y texto libre nunca conservan valor.
+- Plan de parto: el upsert conserva nombres de campos persistidos y un unico
+  evento por operacion. Datos prellenados, lugares, transporte, nombres,
+  telefonos, direcciones, FUR, FPP y riesgo nunca conservan valor. Las consultas
+  y la apertura del formulario no generan eventos.
 
-Los productores clinicos pendientes son morbilidad, plan de parto, puerperio
-clinico, referencias y
+Los productores clinicos pendientes son puerperio clinico, referencias y
 otros productores clinicos. Los historicos no fueron saneados. No existen rutas
-HTTP actuales para eliminar pacientes o embarazos y no se agregaron en este
-sprint. No hubo cambios de base de datos, migraciones ni ENV en Sprint 4B.3C.
+HTTP actuales para eliminar pacientes, embarazos o planes de parto y no se
+agregaron en este sprint. No hubo cambios de base de datos, migraciones ni ENV
+en Sprint 4B.3D.
 
 ## Criterio funcional para PDF institucional
 

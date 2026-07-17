@@ -151,16 +151,18 @@ nuevo justo antes del repositorio.
 
 Productores en este camino: autenticacion, usuarios, passwords, roles,
 permisos, sesiones, PDF, exportaciones/reportes, pacientes, embarazos y
-controles prenatales con laboratorios embebidos, riesgo obstetrico y vacunas.
+controles prenatales con laboratorios embebidos, riesgo obstetrico, vacunas,
+morbilidad y plan de parto.
 Password, rol, estado, permisos, eliminacion de usuario y escrituras de paciente
-o embarazo, y creacion/actualizacion/eliminacion de control prenatal, riesgo o vacuna escriben
+o embarazo, y las escrituras existentes de control prenatal, riesgo, vacuna,
+morbilidad o plan de parto escriben
 auditoria obligatoria en la misma transaccion. Login,
 expiracion automatica y documentos/reportes son best effort.
 
-Morbilidad, plan de parto, puerperio clinico, referencias y otros productores
-clinicos conservan temporalmente
+Puerperio clinico, referencias y otros productores clinicos conservan temporalmente
 `registrarEvento` o `utils/auditoria.js`. Ese camino no debe reutilizarse en
-pacientes, embarazos, controles prenatales, riesgo, vacunas ni codigo nuevo.
+pacientes, embarazos, controles prenatales, riesgo, vacunas, morbilidad, plan de
+parto ni codigo nuevo.
 
 Paciente y embarazo comparten el cliente transaccional con cada evento privado.
 Creaciones/eliminaciones solo listan campos; actualizaciones solo listan campos
@@ -189,6 +191,20 @@ por nombre de campo al constructor privado; tipo, momento, dosis y fecha nunca
 llegan al repositorio de auditoria. `GET /vacunas/antecedentes` conserva la
 separacion historica existente y es solo lectura, por lo que no tiene productor
 de auditoria ni entidad privada adicional.
+
+Morbilidad mantiene sus rutas reales de lista, detalle, creacion, actualizacion
+y eliminacion. Las tres escrituras bloquean el embarazo y comparten cliente con
+el evento privado obligatorio. La actualizacion compara solamente los campos
+enviados; no inyecta una hora cuando `hora` no forma parte del body y omite DML
+si fechas, horas o vacios son equivalentes. El productor entrega marcadores por
+nombre, nunca la fila o el texto clinico.
+
+Plan de parto expone lectura y un unico `POST` de upsert. El prellenado se forma
+en la interfaz a partir de lecturas del expediente y no escribe ni audita. Al
+guardar, el servicio compara solo los campos permitidos enviados, ejecuta un
+INSERT o UPDATE con delta efectivo y registra un solo evento privado dentro de
+la misma transaccion. No existe eliminacion de plan en ruta, controlador,
+servicio ni repositorio, y este sprint no la agrega.
 
 No auditar:
 

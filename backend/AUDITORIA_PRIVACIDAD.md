@@ -1,19 +1,18 @@
 # Politica contextual de privacidad para auditoria
 
-## Estado del Sprint 4B.3C
+## Estado del Sprint 4B.3D
 
 El nucleo contextual ya esta conectado mediante `registrarEventoPrivado` a
 los productores no clinicos de autenticacion, usuarios, passwords, roles,
 permisos, sesiones, PDF y exportaciones de reportes, ademas de pacientes,
 embarazos, controles prenatales con sus laboratorios embebidos, riesgo
-obstetrico y vacunas. El camino privado exige
+obstetrico, vacunas, morbilidad y plan de parto. El camino privado exige
 `categoria`, `entidad` y `evento`, construye el payload con
 `buildAuditPayload`, ejecuta `auditSanitizer` inmediatamente antes de
 `auditRepository` y conserva `politica_version: 1`.
 
 `registrarEvento` permanece temporalmente como camino legado solo para
-morbilidad, plan de parto, puerperio clinico, referencias y otros productores
-clinicos pendientes. Por
+puerperio clinico, referencias y otros productores clinicos pendientes. Por
 ello no debe afirmarse
 todavia que toda la auditoria del sistema aplica la nueva politica.
 
@@ -211,6 +210,11 @@ valida su forma antes de entregarlos al repositorio.
   `activo`, `puerperio` y `cerrado` pueden conservarse como valores.
 - Controles prenatales: creacion/upsert, actualizacion y eliminacion existentes.
   Los laboratorios son columnas del mismo control, no una entidad ni evento separado.
+- Riesgo obstetrico y vacunas: todas sus escrituras existentes; antecedentes
+  vacunales y calculos de mapa permanecen como lecturas sin eventos derivados.
+- Morbilidad: creacion, actualizacion y eliminacion existentes.
+- Plan de parto: creacion o actualizacion mediante el unico upsert existente.
+  No hay endpoint, controlador ni metodo de repositorio para eliminarlo.
 
 ## Criticos y best effort
 
@@ -227,6 +231,8 @@ Comparten la transaccion y usan `obligatorio: true`:
 - creacion, actualizacion y eliminacion de controles prenatales;
 - creacion, actualizacion y eliminacion de ficha de riesgo obstetrico;
 - creacion, actualizacion y eliminacion de vacunas del embarazo seleccionado;
+- creacion, actualizacion y eliminacion de morbilidad;
+- creacion o actualizacion del plan de parto existente;
 - las auditorias de sesion que ya eran parte de una operacion atomica, excepto
   expiracion o inactividad automatica.
 
@@ -271,6 +277,14 @@ rollback.
   `fecha_dosis`, nunca sus valores. Los antecedentes de otros embarazos y los
   registros legacy son lecturas; no existe productor independiente de escritura
   para `antecedente_vacunacion` ni se inventa un evento.
+- Morbilidad: IDs internos y nombres de campos creados, modificados o
+  eliminados. Diagnostico/impresion, motivo, historia, examen, tratamiento,
+  referencia, medicamentos, dosis, fecha, hora, persona que atiende y cualquier
+  codigo o texto libre nunca conservan valor.
+- Plan de parto: IDs internos y nombres de los campos persistidos por el upsert.
+  Lugar, transporte, nombres, telefonos, direcciones, comunidad, FUR, FPP,
+  riesgo y otros datos prellenados nunca conservan valor. Consultar el
+  expediente o abrir el formulario no genera auditoria.
 
 ## Ejemplos permitidos
 
@@ -327,9 +341,10 @@ negativas que demuestren que la regla no se aplica fuera de su contexto.
 
 ## Limitaciones actuales
 
-- Los productores clinicos de morbilidad, plan de parto, puerperio clinico y
-  referencias todavia usan el camino legado.
-- No existen actualmente rutas HTTP de eliminacion de paciente o embarazo. El
+- Los productores clinicos de puerperio clinico y referencias todavia usan el
+  camino legado.
+- No existen actualmente rutas HTTP de eliminacion de paciente, embarazo o plan
+  de parto. El
   contrato privado de eliminacion esta validado, pero este sprint no crea endpoints.
 - No existe una API nueva ni cambio en la interfaz de consulta de auditoria.
 - No se han transformado eventos historicos.
@@ -349,5 +364,5 @@ negativas que demuestren que la regla no se aplica fuera de su contexto.
 Cada fase debe mantener el contrato publico de `registrarEvento` hasta que sus
 consumidores sean migrados y probados explicitamente.
 
-Sprint 4B.3C no cambio base de datos, `schema.sql`, migraciones, registros
+Sprint 4B.3D no cambio base de datos, `schema.sql`, migraciones, registros
 historicos, `.env` ni `.env.example`.
