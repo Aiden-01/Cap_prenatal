@@ -152,17 +152,17 @@ nuevo justo antes del repositorio.
 Productores en este camino: autenticacion, usuarios, passwords, roles,
 permisos, sesiones, PDF, exportaciones/reportes, pacientes, embarazos y
 controles prenatales con laboratorios embebidos, riesgo obstetrico, vacunas,
-morbilidad y plan de parto.
+morbilidad, plan de parto, puerperio, referencias y comunidades.
 Password, rol, estado, permisos, eliminacion de usuario y escrituras de paciente
 o embarazo, y las escrituras existentes de control prenatal, riesgo, vacuna,
-morbilidad o plan de parto escriben
+morbilidad, plan de parto, puerperio, referencia o comunidad escriben
 auditoria obligatoria en la misma transaccion. Login,
 expiracion automatica y documentos/reportes son best effort.
 
-Puerperio clinico, referencias y otros productores clinicos conservan temporalmente
-`registrarEvento` o `utils/auditoria.js`. Ese camino no debe reutilizarse en
-pacientes, embarazos, controles prenatales, riesgo, vacunas, morbilidad, plan de
-parto ni codigo nuevo.
+`registrarEvento` y `utils/auditoria.js` se conservan como compatibilidad central
+obsoleta, sin consumidores productivos. `auditLegacySweep.test.js` recorre
+`backend/src`, prohibe importaciones o llamadas nuevas, impide `INSERT` fuera de
+`auditRepository` y evita que productores accedan directamente al repositorio.
 
 Paciente y embarazo comparten el cliente transaccional con cada evento privado.
 Creaciones/eliminaciones solo listan campos; actualizaciones solo listan campos
@@ -205,6 +205,23 @@ guardar, el servicio compara solo los campos permitidos enviados, ejecuta un
 INSERT o UPDATE con delta efectivo y registra un solo evento privado dentro de
 la misma transaccion. No existe eliminacion de plan en ruta, controlador,
 servicio ni repositorio, y este sprint no la agrega.
+
+Puerperio conserva sus rutas de lista, detalle, upsert, actualizacion y
+eliminacion. Cada escritura y su evento privado obligatorio usan el mismo
+cliente. El upsert bloquea el embarazo; si este sigue activo, cambia solo a
+`puerperio` y registra un evento separado con el enum permitido. El control y
+la transicion se confirman o revierten juntos. Un control equivalente omite DML
+y evento, y nunca duplica la transicion dentro del payload puerperal.
+
+Referencias conserva el CRUD paciente-only existente. Creacion, actualizacion y
+eliminacion son atomicas con auditoria y solo entregan nombres de campos. La
+tabla `referencias_efectuadas` no tiene `embarazo_id`; crear esa asociacion
+requiere una migracion separada y no se infiere desde el embarazo visible.
+
+Comunidades era el ultimo consumidor productivo del adaptador legacy detectado
+por el barrido. Sus escrituras usan ahora contexto administrativo privado,
+transaccion obligatoria y no-ops efectivos; nombres y coordenadas quedan como
+nombres de campos y solo `activo` conserva una transicion booleana.
 
 No auditar:
 

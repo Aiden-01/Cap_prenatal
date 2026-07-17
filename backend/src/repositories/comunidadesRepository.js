@@ -135,16 +135,16 @@ async function listarActivas() {
   return rows;
 }
 
-async function obtenerPorId(id) {
-  const { rows } = await pool.query(
+async function obtenerPorId(id, db = pool) {
+  const { rows } = await db.query(
     'SELECT * FROM comunidades WHERE id = $1',
     [id]
   );
   return rows[0] || null;
 }
 
-async function existeNombre({ nombre, excluirId = null }) {
-  const { rowCount } = await pool.query(
+async function existeNombre({ nombre, excluirId = null }, db = pool) {
+  const { rowCount } = await db.query(
     `SELECT 1
      FROM comunidades
      WHERE LOWER(regexp_replace(BTRIM(nombre), '[[:space:]]+', ' ', 'g')) = LOWER($1)
@@ -155,8 +155,8 @@ async function existeNombre({ nombre, excluirId = null }) {
   return rowCount > 0;
 }
 
-async function crear(data) {
-  const { rows } = await pool.query(
+async function crear(data, db = pool) {
+  const { rows } = await db.query(
     `INSERT INTO comunidades (
        nombre, territorio, sector, lat, lng, activo, created_by, updated_by
      ) VALUES ($1, $2, $3, $4, $5, TRUE, $6, $6)
@@ -173,8 +173,8 @@ async function crear(data) {
   return rows[0] || null;
 }
 
-async function actualizar({ id, data }) {
-  const { rows } = await pool.query(
+async function actualizar({ id, data }, db = pool) {
+  const { rows } = await db.query(
     `UPDATE comunidades SET
        nombre = $1,
        territorio = $2,
@@ -198,8 +198,8 @@ async function actualizar({ id, data }) {
   return rows[0] || null;
 }
 
-async function totalRiesgoActivo(id) {
-  const { rows } = await pool.query(`
+async function totalRiesgoActivo(id, db = pool) {
+  const { rows } = await db.query(`
     SELECT COALESCE(riesgo_activo.total_riesgo_activo, 0)::INTEGER AS total
     FROM comunidades c
     ${riesgoActivoAgregadoLateral()}
@@ -208,8 +208,8 @@ async function totalRiesgoActivo(id) {
   return Number(rows[0]?.total || 0);
 }
 
-async function actualizarActivo({ id, activo, usuarioId }) {
-  const { rows } = await pool.query(
+async function actualizarActivo({ id, activo, usuarioId }, db = pool) {
+  const { rows } = await db.query(
     `UPDATE comunidades SET
        activo = $1,
        updated_at = NOW(),
@@ -221,11 +221,27 @@ async function actualizarActivo({ id, activo, usuarioId }) {
   return rows[0] || null;
 }
 
+async function enTransaccion(callback) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   actualizar,
   actualizarActivo,
   contarAdmin,
   crear,
+  enTransaccion,
   existeNombre,
   listarActivas,
   listarAdmin,

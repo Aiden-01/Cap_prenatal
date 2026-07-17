@@ -58,6 +58,7 @@ const PRIVATE_MODULES = Object.freeze({
   documentos: 'documentos',
   reportes: 'reportes',
   clinica: 'pacientes',
+  administracion: 'comunidades',
 });
 
 const PRIVATE_TABLES = Object.freeze({
@@ -74,6 +75,9 @@ const PRIVATE_TABLES = Object.freeze({
   vacuna: 'vacunas_paciente',
   morbilidad: 'morbilidad_embarazo',
   plan_parto: 'planes_parto',
+  puerperio: 'controles_puerperio',
+  referencia: 'referencias_efectuadas',
+  comunidad: 'comunidades',
 });
 
 function sanitize(value) {
@@ -123,29 +127,13 @@ async function registrarEvento(req, event, { db = pool, obligatorio = false } = 
   const auditEvent = normalizeEvent(req, event);
 
   try {
-    await db.query(
-      `INSERT INTO auditoria_eventos (
-        usuario_id, accion, modulo, entidad_afectada, id_entidad,
-        tabla, registro_id, paciente_id, embarazo_id,
-        datos_anteriores, datos_nuevos, ip, user_agent, descripcion
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-      [
-        auditEvent.usuarioId,
-        auditEvent.accion,
-        auditEvent.modulo,
-        auditEvent.entidadAfectada,
-        auditEvent.idEntidad ? String(auditEvent.idEntidad) : null,
-        auditEvent.tabla,
-        auditEvent.registroId ? String(auditEvent.registroId) : null,
-        auditEvent.pacienteId,
-        auditEvent.embarazoId,
-        auditEvent.datosAnteriores ? sanitize(auditEvent.datosAnteriores) : null,
-        auditEvent.datosNuevos ? sanitize(auditEvent.datosNuevos) : null,
-        auditEvent.ip,
-        auditEvent.userAgent,
-        auditEvent.descripcion,
-      ]
-    );
+    await auditRepository.insertarEvento({
+      ...auditEvent,
+      datosAnteriores: auditEvent.datosAnteriores
+        ? sanitize(auditEvent.datosAnteriores)
+        : null,
+      datosNuevos: auditEvent.datosNuevos ? sanitize(auditEvent.datosNuevos) : null,
+    }, db);
   } catch (err) {
     console.warn('[audit] No se pudo registrar auditoria:', err.message);
     if (obligatorio) throw err;

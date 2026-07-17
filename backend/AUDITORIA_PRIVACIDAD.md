@@ -1,20 +1,21 @@
 # Politica contextual de privacidad para auditoria
 
-## Estado del Sprint 4B.3D
+## Estado del Sprint 4B.3E
 
 El nucleo contextual ya esta conectado mediante `registrarEventoPrivado` a
 los productores no clinicos de autenticacion, usuarios, passwords, roles,
 permisos, sesiones, PDF y exportaciones de reportes, ademas de pacientes,
 embarazos, controles prenatales con sus laboratorios embebidos, riesgo
-obstetrico, vacunas, morbilidad y plan de parto. El camino privado exige
+obstetrico, vacunas, morbilidad, plan de parto, puerperio, referencias y
+comunidades. El camino privado exige
 `categoria`, `entidad` y `evento`, construye el payload con
 `buildAuditPayload`, ejecuta `auditSanitizer` inmediatamente antes de
 `auditRepository` y conserva `politica_version: 1`.
 
-`registrarEvento` permanece temporalmente como camino legado solo para
-puerperio clinico, referencias y otros productores clinicos pendientes. Por
-ello no debe afirmarse
-todavia que toda la auditoria del sistema aplica la nueva politica.
+`registrarEvento` y `utils/auditoria.js` permanecen unicamente como API central
+obsoleta de compatibilidad. El barrido automatico de `backend/src` confirma que
+ningun servicio, controlador o repositorio productivo los importa o llama. El
+unico `INSERT INTO auditoria_eventos` vive en `auditRepository`.
 
 No se modifican:
 
@@ -103,6 +104,7 @@ final. Los productores migrados no importan `registrarEvento` ni
 | `permisos` | `usuario_permisos` | reemplazo, asignacion o retiro | `permisos` | deltas de codigos `modulo.accion` |
 | `usuarios` | `usuario` | eventos administrativos definidos | `motivo_codigo` | codigo controlado |
 | `clinica` | `embarazo` | cambio de estado, cierre o puerperio | `estado_embarazo` | `activo`, `puerperio`, `cerrado` |
+| `administracion` | `comunidad` | cambio de estado | `activo` | booleano |
 | `autenticacion`, `sesiones` | `sesion`, `usuario` | login, logout, creacion, revocacion o expiracion | resultado, motivo, banderas y cantidad revocada | codigos, booleanos o entero |
 | `documentos` | `documento`, `exportacion` | crear, generar, exportar o descargar | tipo, formato, cantidad y fechas | codigos, entero o fecha ISO |
 | `reportes` | `reporte`, `exportacion` | generar, exportar, descargar o consultar | tipo, formato, cantidad y fechas | codigos, entero o fecha ISO |
@@ -215,6 +217,13 @@ valida su forma antes de entregarlos al repositorio.
 - Morbilidad: creacion, actualizacion y eliminacion existentes.
 - Plan de parto: creacion o actualizacion mediante el unico upsert existente.
   No hay endpoint, controlador ni metodo de repositorio para eliminarlo.
+- Puerperio: upsert, actualizacion y eliminacion. Cuando el upsert cambia el
+  embarazo de `activo` a `puerperio`, ambos DML y ambos eventos comparten el
+  mismo cliente y se revierten juntos.
+- Referencias: creacion, actualizacion y eliminacion existentes. El modelo
+  actual pertenece a la paciente y no contiene `embarazo_id`.
+- Comunidades: creacion, actualizacion y transiciones de estado; fue el ultimo
+  productor productivo adicional localizado por el barrido legacy.
 
 ## Criticos y best effort
 
@@ -233,6 +242,10 @@ Comparten la transaccion y usan `obligatorio: true`:
 - creacion, actualizacion y eliminacion de vacunas del embarazo seleccionado;
 - creacion, actualizacion y eliminacion de morbilidad;
 - creacion o actualizacion del plan de parto existente;
+- creacion, actualizacion y eliminacion de puerperio, incluida su transicion de
+  embarazo cuando ocurre;
+- creacion, actualizacion y eliminacion de referencias;
+- creacion, actualizacion y cambio de estado de comunidades;
 - las auditorias de sesion que ya eran parte de una operacion atomica, excepto
   expiracion o inactividad automatica.
 
@@ -285,6 +298,16 @@ rollback.
   Lugar, transporte, nombres, telefonos, direcciones, comunidad, FUR, FPP,
   riesgo y otros datos prellenados nunca conservan valor. Consultar el
   expediente o abrir el formulario no genera auditoria.
+- Puerperio: IDs internos y nombres de campos registrados, realmente
+  modificados o eliminados. Signos vitales, sangrado, dolor, lactancia,
+  diagnostico, tratamiento, observaciones e informacion de madre o recien
+  nacido nunca conservan valor. La transicion de embarazo queda en un evento
+  separado que solo conserva `estado_embarazo` dentro de la lista cerrada.
+- Referencias: `referencia_id` y `paciente_id` internos y nombres de campos.
+  Motivo, diagnostico, destino, estado, traslado, observaciones, identidad y
+  texto libre nunca conservan valor. No se inventa `embarazo_id`.
+- Comunidades: ID interno y nombres de campos; solo `activo` conserva una
+  transicion booleana en el contexto administrativo exacto.
 
 ## Ejemplos permitidos
 
@@ -341,8 +364,10 @@ negativas que demuestren que la regla no se aplica fuera de su contexto.
 
 ## Limitaciones actuales
 
-- Los productores clinicos de puerperio clinico y referencias todavia usan el
-  camino legado.
+- No quedan productores productivos usando el camino legado. La definicion
+  central se conserva por compatibilidad y una prueba impide reintroducirla.
+- Las referencias pertenecen estructuralmente a la paciente. Asociarlas a un
+  embarazo requiere una migracion de BD y queda para un sprint separado.
 - No existen actualmente rutas HTTP de eliminacion de paciente, embarazo o plan
   de parto. El
   contrato privado de eliminacion esta validado, pero este sprint no crea endpoints.
@@ -350,19 +375,15 @@ negativas que demuestren que la regla no se aplica fuera de su contexto.
 - No se han transformado eventos historicos.
 - El esquema conserva `datos_anteriores` y `datos_nuevos` sin cambios.
 - Las mascaras son una utilidad sin reglas activas para pacientes.
-- Automatizaciones y otros productores no enumerados no fueron migrados en
-  esta fase.
 
-## Migracion siguiente
+## Trabajo posterior
 
-1. Migrar los demas modulos clinicos registrando
-   exclusivamente nombres de campos y transiciones justificadas.
-2. Revisar automatizaciones y productores restantes por separado.
-3. Disenar el saneamiento de historicos como tarea independiente, con respaldo
+1. Disenar la asociacion referencia-embarazo con migracion y auditoria de datos.
+2. Disenar el saneamiento de historicos como tarea independiente, con respaldo
    y dry-run.
 
 Cada fase debe mantener el contrato publico de `registrarEvento` hasta que sus
 consumidores sean migrados y probados explicitamente.
 
-Sprint 4B.3D no cambio base de datos, `schema.sql`, migraciones, registros
+Sprint 4B.3E no cambio base de datos, `schema.sql`, migraciones, registros
 historicos, `.env` ni `.env.example`.

@@ -465,11 +465,11 @@ test('reportes aceptan solo tipo, formato, fechas ISO y cantidad', async () => {
   assertNoSensitiveAuditData(recorder.events[0]);
 });
 
-test('el camino legado sigue disponible para puerperio clinico pendiente de 4B.3D', async () => {
+test('el camino legado central sigue disponible solo para compatibilidad', async () => {
   let query;
   await auditService.registrarEvento({ usuario: { id: 7 } }, {
     accion: 'actualizar',
-    tabla: 'controles_puerperio',
+    tabla: 'compatibilidad_legacy',
     registroId: 31,
     datosNuevos: { diagnostico: 'dato clinico legado' },
   }, {

@@ -18,6 +18,7 @@ const CONTEXT = Object.freeze({
   patient: Object.freeze({ categoria: 'clinica', entidad: 'paciente', evento: 'actualizar' }),
   condition: Object.freeze({ categoria: 'clinica', entidad: 'condicion_clinica', evento: 'actualizar' }),
   pregnancy: Object.freeze({ categoria: 'clinica', entidad: 'embarazo', evento: 'cambiar_estado' }),
+  reference: Object.freeze({ categoria: 'clinica', entidad: 'referencia', evento: 'actualizar' }),
   userUpdate: Object.freeze({ categoria: 'usuarios', entidad: 'usuario', evento: 'actualizar' }),
   userRole: Object.freeze({ categoria: 'usuarios', entidad: 'usuario', evento: 'cambiar_rol' }),
   userState: Object.freeze({ categoria: 'usuarios', entidad: 'usuario', evento: 'cambiar_estado' }),
@@ -177,6 +178,20 @@ test('estado del embarazo conserva solo una transicion permitida', () => {
       },
     }
   );
+});
+
+test('estado de referencia permanece clinico y no conserva sus valores', () => {
+  const result = buildAuditDiff(
+    { estado: 'pendiente', prioridad: 'urgente' },
+    { estado: 'trasladada', prioridad: 'inmediata' },
+    { context: CONTEXT.reference }
+  );
+
+  assert.deepEqual(result, {
+    politica_version: 1,
+    campos_sensibles_modificados: ['estado', 'prioridad'],
+  });
+  assertOmits(result, 'pendiente', 'trasladada', 'urgente', 'inmediata');
 });
 
 test('rol de usuario conserva una transicion de codigos controlados', () => {

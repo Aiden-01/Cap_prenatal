@@ -1,23 +1,25 @@
 # Auditoria de eventos
 
-Desde Sprint 4B.3D la auditoria tiene dos caminos delimitados:
+Desde Sprint 4B.3E todos los productores productivos usan el camino privado:
 
 - `registrarEventoPrivado`: obligatorio para autenticacion, usuarios,
   passwords, roles, permisos, sesiones, PDF, exportaciones/reportes, pacientes,
   embarazos, controles prenatales/laboratorios embebidos, riesgo obstetrico,
-  vacunas, morbilidad y plan de parto. Requiere
+  vacunas, morbilidad, plan de parto, puerperio, referencias y comunidades.
+  Requiere
   contexto explicito, construye payload por allowlist, sanea antes del
   repositorio y nunca captura IP, user-agent, headers ni body.
-- `registrarEvento`/`utils/auditoria.js`: camino legado temporal para puerperio
-  clinico, referencias y otros productores clinicos pendientes.
+- `registrarEvento`/`utils/auditoria.js`: API central obsoleta conservada solo
+  por compatibilidad; no tiene consumidores productivos activos.
 
-No se debe usar el camino legado en un productor no clinico migrado. Tampoco se
-debe afirmar que toda la auditoria clinica esta protegida hasta completar
-4B.3.
+Una prueba recorre `backend/src` y falla si un productor reintroduce el camino
+legacy, llama `auditRepository` o agrega un `INSERT` fuera del repositorio.
 
 Los eventos informativos siguen siendo best effort. Los cambios de password,
 rol, estado del usuario, permisos, eliminacion de usuario y todas las escrituras
-de paciente, embarazo, control prenatal, riesgo, vacuna, morbilidad o plan de parto migradas usan la misma conexion que la operacion principal
+de paciente, embarazo, control prenatal, riesgo, vacuna, morbilidad, plan de
+parto, puerperio, referencia o comunidad migradas usan la misma conexion que
+la operacion principal
 y `obligatorio: true`; una falla de auditoria provoca rollback. Una solicitud de
 permisos o actualizacion de paciente sin delta no escribe un evento.
 
@@ -75,7 +77,7 @@ La auditoria debe responder:
 - Crear o actualizar plan de parto mediante su upsert existente. No existe
   eliminacion HTTP para esta entidad.
 - Crear, actualizar o eliminar vacunas y morbilidad.
-- Crear, actualizar o eliminar puerperio y referencias cuando sean migrados.
+- Crear, actualizar o eliminar puerperio y referencias.
 - Login exitoso.
 - Login fallido.
 - Intento de login con usuario inactivo.
@@ -153,12 +155,25 @@ nominal.
   evento por operacion. Datos prellenados, lugares, transporte, nombres,
   telefonos, direcciones, FUR, FPP y riesgo nunca conservan valor. Las consultas
   y la apertura del formulario no generan eventos.
+- Puerperio: creacion/eliminacion conserva nombres y actualizacion solo el
+  delta real. Signos vitales, sangrado, dolor, lactancia, diagnostico,
+  tratamiento, observaciones y datos del recien nacido nunca conservan valor.
+  Si el upsert cambia el embarazo, un evento separado conserva exclusivamente
+  `estado_embarazo: activo -> puerperio`; ambos eventos comparten transaccion.
+- Referencias: conserva `referencia_id`, `paciente_id` y nombres de campos.
+  Destino, diagnostico, motivo, estado, traslado y texto libre no conservan
+  valor. El esquema actual no posee `embarazo_id` y este sprint no lo inventa.
+- Comunidades: conserva ID y nombres de campos; solo la transicion booleana de
+  `activo` puede guardar valores bajo el contexto administrativo exacto.
 
-Los productores clinicos pendientes son puerperio clinico, referencias y
-otros productores clinicos. Los historicos no fueron saneados. No existen rutas
+No quedan productores productivos usando el camino legacy. La API central se
+conserva por compatibilidad y `auditLegacySweep.test.js` impide nuevos usos,
+`INSERT` directos o accesos de productores al repositorio. Los historicos no
+fueron saneados. No existen rutas
 HTTP actuales para eliminar pacientes, embarazos o planes de parto y no se
 agregaron en este sprint. No hubo cambios de base de datos, migraciones ni ENV
-en Sprint 4B.3D.
+en Sprint 4B.3E. Asociar referencias a un embarazo queda para una migracion de
+BD separada.
 
 ## Criterio funcional para PDF institucional
 

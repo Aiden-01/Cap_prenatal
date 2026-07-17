@@ -98,11 +98,12 @@ Respuesta de error esperada:
 }
 ```
 
-### Auditoria privada Sprint 4B.3D
+### Auditoria privada Sprint 4B.3E
 
 Autenticacion, usuarios, passwords, roles, permisos, sesiones, PDF,
 exportaciones/reportes, pacientes, embarazos, controles prenatales con sus
-laboratorios embebidos, riesgo obstetrico, vacunas, morbilidad y plan de parto usan
+laboratorios embebidos, riesgo obstetrico, vacunas, morbilidad, plan de parto,
+puerperio, referencias y comunidades usan
 `registrarEventoPrivado`.
 El contrato exige
 `categoria`, `entidad` y `evento`, construye el diff o metadata con la politica
@@ -133,6 +134,14 @@ El payload privado conserva `politica_version: 1` y metadata minima:
   conservan valores;
 - plan de parto: IDs y nombres de campos persistidos por el upsert; ningun dato
   prellenado, personal, logistico, clinico o de riesgo conserva valor.
+- puerperio: IDs y nombres de campos; signos vitales, sangrado, dolor,
+  lactancia, diagnostico, tratamiento, observaciones y datos del recien nacido
+  no conservan valor. La transicion de embarazo es un evento separado;
+- referencias: ID y paciente internos y nombres de campos. El esquema no posee
+  `embarazo_id`; destino, diagnostico, estado, traslado y texto no conservan
+  valor;
+- comunidades: ID y nombres de campos; solo `activo` conserva una transicion
+  booleana bajo el contexto administrativo exacto.
 
 No guarda password, hash, token, JWT, cookie, CSRF, Authorization, IP,
 user-agent, request/body completo, nombres, CUI, contenido clinico, buffer,
@@ -140,14 +149,16 @@ HTML, temporal, query libre ni filas nominales.
 
 Password, rol, estado, permisos, eliminacion de usuario y escrituras de paciente
 o embarazo, y las escrituras existentes de controles, riesgo, vacunas,
-morbilidad o plan de parto son eventos obligatorios
-dentro de la transaccion. Una falla revierte
-la escritura clinica completa. Login, expiraciones automaticas y
+morbilidad o plan de parto son eventos obligatorios dentro de la transaccion.
+Puerperio, referencias y comunidades tambien son obligatorios. Una falla
+revierte la escritura clinica completa. Login, expiraciones automaticas y
 documentos/reportes son best effort. Una falla informativa no invalida una
 descarga ya generada.
 
-Los productores de puerperio clinico y referencias siguen en el camino legado. Los
-historicos no fueron saneados. No existen endpoints actuales de eliminacion de
+No quedan productores productivos usando el camino legado. La API central se
+conserva solo por compatibilidad y una prueba recorre `backend/src` para impedir
+regresiones, `INSERT` directos o accesos directos al repositorio. Los historicos
+no fueron saneados. No existen endpoints actuales de eliminacion de
 paciente o embarazo y no se agregaron. Esta fase no cambio esquema, migraciones,
 ENV, frontend, contratos HTTP, permisos, sesiones funcionales ni PDFs oficiales.
 
@@ -832,6 +843,33 @@ transporte, acompañantes, responsables, donantes, nombres, teléfonos,
 direcciones, FUR, FPP y datos de riesgo nunca llegan como valores. Actualmente
 no existe endpoint de eliminación del plan de parto y este sprint no lo agrega.
 
+### Controles de puerperio
+
+El `POST` de puerperio conserva el upsert por `embarazo_id` y
+`numero_atencion`. Bloquea el embarazo y, solo si sigue `activo`, lo pasa a
+`puerperio`. El control, la transicion y sus eventos privados comparten cliente
+y transaccion; una falla de auditoria revierte todo. La transicion se audita por
+separado con el unico valor permitido `estado_embarazo`, sin duplicarlo en el
+payload del control.
+
+Crear, actualizar o eliminar un control guarda solamente nombres de campos.
+Fechas, horas, signos vitales, sangrado, heridas, dolor, lactancia,
+diagnostico, tratamiento, observaciones y datos del recien nacido nunca llegan
+como valores. Cambios equivalentes en vacios, numeros, fechas, horas, booleanos
+o espacios no generan DML ni evento.
+
+### Referencias
+
+Referencias conserva el CRUD existente bajo la paciente. Cada escritura y su
+auditoria privada obligatoria son atomicas; los eventos guardan el ID interno,
+`paciente_id` y nombres de campos, nunca destino, motivo, diagnostico, estado,
+traslado, identidad ni texto libre.
+
+`referencias_efectuadas` no contiene `embarazo_id`. Este sprint no agrega la
+columna ni infiere un embarazo desde la interfaz. La asociacion definitiva
+requiere un sprint separado con migracion de BD y tratamiento de datos
+existentes.
+
 ## PDF y reportes
 
 El modulo `/reportes` distingue dos conceptos que no deben intercambiarse:
@@ -977,9 +1015,9 @@ Fuera de alcance actual:
 - Para escrituras clinicas, registrar auditoria.
 - Los productores migrados, incluidos pacientes y embarazos, deben usar
   `registrarEventoPrivado`; esto incluye controles y laboratorios embebidos,
-  riesgo obstetrico, vacunas, morbilidad y plan de parto. `registrarEvento` y
-  `utils/auditoria.js` quedan solo para puerperio clinico, referencias y
-  pendientes equivalentes.
+  riesgo obstetrico, vacunas, morbilidad, plan de parto, puerperio, referencias
+  y comunidades. `registrarEvento` y `utils/auditoria.js` son compatibilidad
+  central obsoleta y no deben tener consumidores productivos.
 - No guardar tokens, contrasenas ni secretos en logs o auditoria.
 - Usar Zod para nuevos endpoints.
 - Preferir mensajes de error claros para el personal de salud.
