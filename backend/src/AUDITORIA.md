@@ -1,15 +1,16 @@
 # Auditoria de eventos
 
-Desde Sprint 4B.3B la auditoria tiene dos caminos delimitados:
+Desde Sprint 4B.3C la auditoria tiene dos caminos delimitados:
 
 - `registrarEventoPrivado`: obligatorio para autenticacion, usuarios,
   passwords, roles, permisos, sesiones, PDF, exportaciones/reportes, pacientes,
-  embarazos y controles prenatales/laboratorios embebidos. Requiere
+  embarazos, controles prenatales/laboratorios embebidos, riesgo obstetrico y
+  vacunas. Requiere
   contexto explicito, construye payload por allowlist, sanea antes del
   repositorio y nunca captura IP, user-agent, headers ni body.
-- `registrarEvento`/`utils/auditoria.js`: camino legado temporal para riesgo,
-  vacunas, morbilidad, plan de parto, puerperio clinico, referencias y otros
-  productores clinicos pendientes.
+- `registrarEvento`/`utils/auditoria.js`: camino legado temporal para
+  morbilidad, plan de parto, puerperio clinico, referencias y otros productores
+  clinicos pendientes.
 
 No se debe usar el camino legado en un productor no clinico migrado. Tampoco se
 debe afirmar que toda la auditoria clinica esta protegida hasta completar
@@ -17,7 +18,7 @@ debe afirmar que toda la auditoria clinica esta protegida hasta completar
 
 Los eventos informativos siguen siendo best effort. Los cambios de password,
 rol, estado del usuario, permisos, eliminacion de usuario y todas las escrituras
-de paciente, embarazo o control prenatal migradas usan la misma conexion que la operacion principal
+de paciente, embarazo, control prenatal, riesgo o vacuna migradas usan la misma conexion que la operacion principal
 y `obligatorio: true`; una falla de auditoria provoca rollback. Una solicitud de
 permisos o actualizacion de paciente sin delta no escribe un evento.
 
@@ -137,12 +138,19 @@ nominal.
   actualizacion solo nombres con delta real. Laboratorios, incluido VIH, nunca
   conservan resultados, numeros, fechas ni valores positivo/negativo. El permiso
   `controles.ver_vih` no altera esta politica de auditoria.
+- Riesgo obstetrico: los criterios persistidos se reducen al nombre
+  `factores_riesgo`; el resultado generado se reduce a `tiene_riesgo`. No se
+  conservan criterios concretos, booleanos, observaciones, antecedentes ni texto.
+- Vacunas: creacion/eliminacion conserva nombres y actualizacion solo el delta
+  efectivo. Tipo, momento, dosis y fecha nunca conservan valor. Antecedentes de
+  otros embarazos y filas legacy son de solo lectura y no generan auditoria de
+  modificacion.
 
-Los productores clinicos pendientes son riesgo obstetrico, vacunas, morbilidad,
-plan de parto, puerperio clinico, referencias y
+Los productores clinicos pendientes son morbilidad, plan de parto, puerperio
+clinico, referencias y
 otros productores clinicos. Los historicos no fueron saneados. No existen rutas
 HTTP actuales para eliminar pacientes o embarazos y no se agregaron en este
-sprint. No hubo cambios de base de datos, migraciones ni ENV en Sprint 4B.3B.
+sprint. No hubo cambios de base de datos, migraciones ni ENV en Sprint 4B.3C.
 
 ## Criterio funcional para PDF institucional
 

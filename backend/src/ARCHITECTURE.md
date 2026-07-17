@@ -151,16 +151,16 @@ nuevo justo antes del repositorio.
 
 Productores en este camino: autenticacion, usuarios, passwords, roles,
 permisos, sesiones, PDF, exportaciones/reportes, pacientes, embarazos y
-controles prenatales con laboratorios embebidos.
+controles prenatales con laboratorios embebidos, riesgo obstetrico y vacunas.
 Password, rol, estado, permisos, eliminacion de usuario y escrituras de paciente
-o embarazo, y creacion/actualizacion/eliminacion de control prenatal escriben
+o embarazo, y creacion/actualizacion/eliminacion de control prenatal, riesgo o vacuna escriben
 auditoria obligatoria en la misma transaccion. Login,
 expiracion automatica y documentos/reportes son best effort.
 
-Riesgo, vacunas, morbilidad, plan de parto, puerperio clinico, referencias y
-otros productores clinicos conservan temporalmente
+Morbilidad, plan de parto, puerperio clinico, referencias y otros productores
+clinicos conservan temporalmente
 `registrarEvento` o `utils/auditoria.js`. Ese camino no debe reutilizarse en
-pacientes, embarazos, controles prenatales ni codigo nuevo.
+pacientes, embarazos, controles prenatales, riesgo, vacunas ni codigo nuevo.
 
 Paciente y embarazo comparten el cliente transaccional con cada evento privado.
 Creaciones/eliminaciones solo listan campos; actualizaciones solo listan campos
@@ -175,6 +175,20 @@ incluido VIH, se reducen a nombres. El servicio elimina no-ops por equivalencia
 de numeros PostgreSQL, fechas y vacios normalizados; timestamps y actor no
 entran al payload. La escritura, el bloqueo del embarazo y el evento privado
 usan un unico cliente y se confirman o revierten juntos.
+
+La ficha de riesgo tampoco tiene una tabla separada de factores: el modelo usa
+columnas booleanas y calcula `tiene_riesgo` como columna generada. El servicio
+compara cada columna para evitar DML falso, pero el evento privado agrupa todos
+los criterios bajo `factores_riesgo` y solo agrega el nombre `tiene_riesgo` si
+cambia el resultado. El mapa, contadores y dashboard consultan ese resultado;
+no ejecutan DML derivado ni generan eventos duplicados.
+
+Las vacunas del embarazo seleccionado usan la misma transaccion para bloqueo,
+upsert/actualizacion/eliminacion y auditoria. Solo se envian marcadores internos
+por nombre de campo al constructor privado; tipo, momento, dosis y fecha nunca
+llegan al repositorio de auditoria. `GET /vacunas/antecedentes` conserva la
+separacion historica existente y es solo lectura, por lo que no tiene productor
+de auditoria ni entidad privada adicional.
 
 No auditar:
 

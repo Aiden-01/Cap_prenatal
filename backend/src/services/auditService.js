@@ -70,6 +70,8 @@ const PRIVATE_TABLES = Object.freeze({
   paciente: 'pacientes',
   embarazo: 'embarazos',
   control_prenatal: 'controles_prenatales',
+  riesgo_obstetrico: 'fichas_riesgo_obstetrico',
+  vacuna: 'vacunas_paciente',
 });
 
 function sanitize(value) {

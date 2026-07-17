@@ -98,11 +98,12 @@ Respuesta de error esperada:
 }
 ```
 
-### Auditoria privada Sprint 4B.3B
+### Auditoria privada Sprint 4B.3C
 
 Autenticacion, usuarios, passwords, roles, permisos, sesiones, PDF,
-exportaciones/reportes, pacientes, embarazos y controles prenatales con sus
-laboratorios embebidos usan `registrarEventoPrivado`.
+exportaciones/reportes, pacientes, embarazos, controles prenatales con sus
+laboratorios embebidos, riesgo obstetrico y vacunas usan
+`registrarEventoPrivado`.
 El contrato exige
 `categoria`, `entidad` y `evento`, construye el diff o metadata con la politica
 contextual, elimina campos prohibidos de forma recursiva y ejecuta el
@@ -123,20 +124,24 @@ El payload privado conserva `politica_version: 1` y metadata minima:
   transiciones entre `activo`, `puerperio` y `cerrado`.
 - controles prenatales: IDs internos y nombres de campos creados, eliminados o
   realmente modificados. Signos vitales, citas y laboratorios nunca conservan valores.
+- riesgo obstetrico: IDs y nombres de campos; los criterios se agrupan como
+  `factores_riesgo` y el resultado como `tiene_riesgo`, nunca con valores;
+- vacunas: IDs y nombres de campos; tipo, momento, dosis y fecha no conservan
+  valor. Los antecedentes historicos son lecturas y no crean eventos.
 
 No guarda password, hash, token, JWT, cookie, CSRF, Authorization, IP,
 user-agent, request/body completo, nombres, CUI, contenido clinico, buffer,
 HTML, temporal, query libre ni filas nominales.
 
 Password, rol, estado, permisos, eliminacion de usuario y escrituras de paciente
-o embarazo, y crear/actualizar/eliminar controles son eventos obligatorios
+o embarazo, y crear/actualizar/eliminar controles, riesgo o vacunas son eventos obligatorios
 dentro de la transaccion. Una falla revierte
 la escritura clinica completa. Login, expiraciones automaticas y
 documentos/reportes son best effort. Una falla informativa no invalida una
 descarga ya generada.
 
-Los productores de riesgo, vacunas, morbilidad, plan de parto, puerperio
-clinico y referencias siguen en el camino legado. Los
+Los productores de morbilidad, plan de parto, puerperio clinico y referencias
+siguen en el camino legado. Los
 historicos no fueron saneados. No existen endpoints actuales de eliminacion de
 paciente o embarazo y no se agregaron. Esta fase no cambio esquema, migraciones,
 ENV, frontend, contratos HTTP, permisos, sesiones funcionales ni PDFs oficiales.
@@ -763,6 +768,19 @@ en este cierre.
 5. Audita la transicion a `cerrado` dentro de la misma transaccion, sin datos
    de parto, puerperio u observaciones.
 
+### Riesgo obstetrico
+
+La ficha pertenece al `embarazo_id` seleccionado y solo puede crearse,
+actualizarse o eliminarse mientras ese embarazo sea editable. Sus criterios son
+columnas booleanas de la misma ficha; no existe una tabla separada de factores.
+PostgreSQL calcula `tiene_riesgo` y las consultas de mapa/dashboard leen ese
+resultado sin ejecutar una sincronizacion adicional.
+
+La escritura y el evento privado comparten cliente y transaccion. En auditoria,
+los criterios se reducen a `factores_riesgo` y el resultado generado a
+`tiene_riesgo`; no se conservan factores concretos, booleanos, ubicacion,
+observaciones ni texto. Un recalculo de solo lectura no crea eventos.
+
 ### Vacunas y antecedentes
 
 Las vacunas propias del embarazo seleccionado se leen desde:
@@ -783,6 +801,10 @@ Reglas:
 - Las vacunas de otros embarazos se muestran como antecedentes.
 - Una vacuna sin `embarazo_id` se considera antecedente de solo lectura.
 - Para crear, actualizar o eliminar vacunas, `embarazo_id` es obligatorio.
+- Crear, actualizar o eliminar comparte transaccion con la auditoria privada; un
+  fallo de auditoria revierte la vacuna.
+- El evento conserva solo nombres de campos. Una advertencia de vacuna similar
+  o la lectura de antecedentes no genera una modificacion auditada.
 
 ## PDF y reportes
 
@@ -928,9 +950,10 @@ Fuera de alcance actual:
 - Comparar IDs de URL como string.
 - Para escrituras clinicas, registrar auditoria.
 - Los productores migrados, incluidos pacientes y embarazos, deben usar
-  `registrarEventoPrivado`; esto incluye controles y laboratorios embebidos.
-  `registrarEvento` y `utils/auditoria.js` quedan solo para riesgo, vacunas,
-  morbilidad, plan de parto, puerperio clinico, referencias y pendientes equivalentes.
+  `registrarEventoPrivado`; esto incluye controles y laboratorios embebidos,
+  riesgo obstetrico y vacunas. `registrarEvento` y `utils/auditoria.js` quedan
+  solo para morbilidad, plan de parto, puerperio clinico, referencias y
+  pendientes equivalentes.
 - No guardar tokens, contrasenas ni secretos en logs o auditoria.
 - Usar Zod para nuevos endpoints.
 - Preferir mensajes de error claros para el personal de salud.

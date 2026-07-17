@@ -1,18 +1,19 @@
 # Politica contextual de privacidad para auditoria
 
-## Estado del Sprint 4B.3B
+## Estado del Sprint 4B.3C
 
 El nucleo contextual ya esta conectado mediante `registrarEventoPrivado` a
 los productores no clinicos de autenticacion, usuarios, passwords, roles,
 permisos, sesiones, PDF y exportaciones de reportes, ademas de pacientes,
-embarazos y controles prenatales con sus laboratorios embebidos. El camino privado exige
+embarazos, controles prenatales con sus laboratorios embebidos, riesgo
+obstetrico y vacunas. El camino privado exige
 `categoria`, `entidad` y `evento`, construye el payload con
 `buildAuditPayload`, ejecuta `auditSanitizer` inmediatamente antes de
 `auditRepository` y conserva `politica_version: 1`.
 
 `registrarEvento` permanece temporalmente como camino legado solo para
-riesgo, vacunas, morbilidad, plan de parto, puerperio clinico, referencias y
-otros productores clinicos pendientes. Por
+morbilidad, plan de parto, puerperio clinico, referencias y otros productores
+clinicos pendientes. Por
 ello no debe afirmarse
 todavia que toda la auditoria del sistema aplica la nueva politica.
 
@@ -224,6 +225,8 @@ Comparten la transaccion y usan `obligatorio: true`:
 - creacion y actualizacion de embarazo;
 - transiciones de estado de embarazo;
 - creacion, actualizacion y eliminacion de controles prenatales;
+- creacion, actualizacion y eliminacion de ficha de riesgo obstetrico;
+- creacion, actualizacion y eliminacion de vacunas del embarazo seleccionado;
 - las auditorias de sesion que ya eran parte de una operacion atomica, excepto
   expiracion o inactividad automatica.
 
@@ -260,6 +263,14 @@ rollback.
   `campos_eliminados` o `campos_sensibles_modificados`. Signos vitales, fechas,
   numero de control, observaciones y laboratorios aparecen solo por nombre.
   Ningun resultado VIH, positivo/negativo o valor numerico se conserva.
+- Riesgo obstetrico: IDs internos y los mismos listados de nombres. Los criterios
+  booleanos se agrupan como `factores_riesgo`; nunca se enumeran factores
+  agregados o retirados. `tiene_riesgo` solo aparece como nombre cuando cambia
+  el resultado generado, sin conservar `true`, `false`, observaciones ni texto.
+- Vacunas: IDs internos y nombres de `tipo_vacuna`, `momento`, `numero_dosis` y
+  `fecha_dosis`, nunca sus valores. Los antecedentes de otros embarazos y los
+  registros legacy son lecturas; no existe productor independiente de escritura
+  para `antecedente_vacunacion` ni se inventa un evento.
 
 ## Ejemplos permitidos
 
@@ -316,8 +327,8 @@ negativas que demuestren que la regla no se aplica fuera de su contexto.
 
 ## Limitaciones actuales
 
-- Los productores clinicos de riesgo, vacunas, morbilidad, plan de parto,
-  puerperio clinico y referencias todavia usan el camino legado.
+- Los productores clinicos de morbilidad, plan de parto, puerperio clinico y
+  referencias todavia usan el camino legado.
 - No existen actualmente rutas HTTP de eliminacion de paciente o embarazo. El
   contrato privado de eliminacion esta validado, pero este sprint no crea endpoints.
 - No existe una API nueva ni cambio en la interfaz de consulta de auditoria.
@@ -338,5 +349,5 @@ negativas que demuestren que la regla no se aplica fuera de su contexto.
 Cada fase debe mantener el contrato publico de `registrarEvento` hasta que sus
 consumidores sean migrados y probados explicitamente.
 
-Sprint 4B.3B no cambio base de datos, `schema.sql`, migraciones, registros
+Sprint 4B.3C no cambio base de datos, `schema.sql`, migraciones, registros
 historicos, `.env` ni `.env.example`.

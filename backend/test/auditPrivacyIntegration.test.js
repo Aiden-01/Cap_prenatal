@@ -465,11 +465,11 @@ test('reportes aceptan solo tipo, formato, fechas ISO y cantidad', async () => {
   assertNoSensitiveAuditData(recorder.events[0]);
 });
 
-test('el camino legado sigue disponible para riesgo clinico pendiente de 4B.3B', async () => {
+test('el camino legado sigue disponible para morbilidad clinica pendiente de 4B.3C', async () => {
   let query;
   await auditService.registrarEvento({ usuario: { id: 7 } }, {
     accion: 'actualizar',
-    tabla: 'fichas_riesgo_obstetrico',
+    tabla: 'morbilidad_embarazo',
     registroId: 31,
     datosNuevos: { diagnostico: 'dato clinico legado' },
   }, {
