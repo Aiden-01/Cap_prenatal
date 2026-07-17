@@ -1,15 +1,15 @@
 # Auditoria de eventos
 
-Desde Sprint 4B.3A la auditoria tiene dos caminos delimitados:
+Desde Sprint 4B.3B la auditoria tiene dos caminos delimitados:
 
 - `registrarEventoPrivado`: obligatorio para autenticacion, usuarios,
-  passwords, roles, permisos, sesiones, PDF, exportaciones/reportes, pacientes
-  y embarazos. Requiere
+  passwords, roles, permisos, sesiones, PDF, exportaciones/reportes, pacientes,
+  embarazos y controles prenatales/laboratorios embebidos. Requiere
   contexto explicito, construye payload por allowlist, sanea antes del
   repositorio y nunca captura IP, user-agent, headers ni body.
-- `registrarEvento`/`utils/auditoria.js`: camino legado temporal para controles,
-  laboratorios, riesgo, vacunas, morbilidad, plan de parto, puerperio clinico,
-  referencias y otros productores clinicos pendientes.
+- `registrarEvento`/`utils/auditoria.js`: camino legado temporal para riesgo,
+  vacunas, morbilidad, plan de parto, puerperio clinico, referencias y otros
+  productores clinicos pendientes.
 
 No se debe usar el camino legado en un productor no clinico migrado. Tampoco se
 debe afirmar que toda la auditoria clinica esta protegida hasta completar
@@ -17,7 +17,7 @@ debe afirmar que toda la auditoria clinica esta protegida hasta completar
 
 Los eventos informativos siguen siendo best effort. Los cambios de password,
 rol, estado del usuario, permisos, eliminacion de usuario y todas las escrituras
-de paciente o embarazo migradas usan la misma conexion que la operacion principal
+de paciente, embarazo o control prenatal migradas usan la misma conexion que la operacion principal
 y `obligatorio: true`; una falla de auditoria provoca rollback. Una solicitud de
 permisos o actualizacion de paciente sin delta no escribe un evento.
 
@@ -133,12 +133,16 @@ nominal.
 - Embarazo: creacion/actualizacion conserva nombres de campos; solo
   `estado_embarazo` puede guardar los valores `activo`, `puerperio` o `cerrado`.
   `numero_embarazo`, FUR, FPP, observaciones y datos obstetricos no guardan valor.
+- Control prenatal: creacion/eliminacion solo conserva nombres de campos y la
+  actualizacion solo nombres con delta real. Laboratorios, incluido VIH, nunca
+  conservan resultados, numeros, fechas ni valores positivo/negativo. El permiso
+  `controles.ver_vih` no altera esta politica de auditoria.
 
-Los productores clinicos pendientes son controles, laboratorios, riesgo
-obstetrico, vacunas, morbilidad, plan de parto, puerperio clinico, referencias y
+Los productores clinicos pendientes son riesgo obstetrico, vacunas, morbilidad,
+plan de parto, puerperio clinico, referencias y
 otros productores clinicos. Los historicos no fueron saneados. No existen rutas
 HTTP actuales para eliminar pacientes o embarazos y no se agregaron en este
-sprint. No hubo cambios de base de datos, migraciones ni ENV en Sprint 4B.3A.
+sprint. No hubo cambios de base de datos, migraciones ni ENV en Sprint 4B.3B.
 
 ## Criterio funcional para PDF institucional
 
@@ -201,20 +205,21 @@ contrasenas; no se agrega una migracion exclusivamente para ello en este sprint.
 }
 ```
 
-## Ejemplo legado pendiente: crear control prenatal
+## Ejemplo privado: crear control prenatal
 
 ```json
 {
   "usuario_id": 5,
   "accion": "crear",
   "modulo": "controles_prenatales",
-  "entidad_afectada": "controles_prenatales",
+  "entidad_afectada": "control_prenatal",
   "id_entidad": "88",
   "paciente_id": 42,
   "embarazo_id": 12,
   "datos_nuevos": {
-    "numero_control": 1,
-    "fecha": "2026-06-04"
+    "politica_version": 1,
+    "campos_registrados": ["fecha", "numero_control", "vih_resultado"],
+    "resultado": "exitoso"
   }
 }
 ```

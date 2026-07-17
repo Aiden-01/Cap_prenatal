@@ -5,11 +5,18 @@ const {
   validarEmbarazoEditable,
 } = require('../utils/embarazos');
 const { withGuatemalaTimeFallback } = require('../utils/guatemalaTime');
-const { registrarEvento: registrarAuditoria } = require('./auditService');
+const { registrarEventoPrivado: registrarAuditoria } = require('./auditService');
+const { structurallyEqual } = require('./audit/auditDiffBuilder');
 const { HttpError } = require('../utils/httpError');
 const { filtrarCamposVih, VIH_FIELDS, puedeVerVih } = require('../utils/datosSensibles');
 
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
+const AUDIT_CONTEXT = Object.freeze({
+  crear: Object.freeze({ categoria: 'clinica', entidad: 'control_prenatal', evento: 'crear' }),
+  actualizar: Object.freeze({ categoria: 'clinica', entidad: 'control_prenatal', evento: 'actualizar' }),
+  eliminar: Object.freeze({ categoria: 'clinica', entidad: 'control_prenatal', evento: 'eliminar' }),
+});
+const RESULTADO_EXITOSO = 'exitoso';
 
 const CONTROL_FIELDS = [
   'numero_control', 'fecha', 'hora', 'motivo_consulta',
@@ -91,6 +98,42 @@ const CONTROL_NULLABLE_BOOLEAN = [
   'torch_resultado_positivo',
 ];
 
+function seleccionarCamposAuditoria(registro, campos) {
+  if (!registro || typeof registro !== 'object') return {};
+  return Object.fromEntries(
+    campos
+      .filter((campo) => Object.prototype.hasOwnProperty.call(registro, campo))
+      .map((campo) => [campo, registro[campo]])
+  );
+}
+
+function numericValue(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  if (!/^-?(?:\d+\.?\d*|\d*\.\d+)$/.test(value.trim())) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function valoresControlEquivalentes(anterior, nuevo) {
+  const anteriorVacio = anterior === null || anterior === undefined || anterior === '';
+  const nuevoVacio = nuevo === null || nuevo === undefined || nuevo === '';
+  if (anteriorVacio || nuevoVacio) return anteriorVacio && nuevoVacio;
+
+  const numeroAnterior = numericValue(anterior);
+  const numeroNuevo = numericValue(nuevo);
+  if (numeroAnterior !== null && numeroNuevo !== null) {
+    return numeroAnterior === numeroNuevo;
+  }
+  return structurallyEqual(anterior, nuevo);
+}
+
+function camposRealmenteModificados(anterior, nuevo, campos) {
+  return campos.filter(
+    (campo) => !valoresControlEquivalentes(anterior?.[campo], nuevo?.[campo])
+  );
+}
+
 function buildUpdateData(body) {
   const data = withGuatemalaTimeFallback(body, { onlyWhenHoraIsPresent: true });
   const campos = CONTROL_FIELDS.filter((field) => Object.prototype.hasOwnProperty.call(data, field));
@@ -145,39 +188,54 @@ async function obtenerControl({ pacienteId, embarazoId = null, id }) {
 async function crearControl({ pacienteId, embarazoId, body, req }) {
   const dataWithTime = withGuatemalaTimeFallback(body);
   requerirEmbarazoId(embarazoId);
-  await validarEmbarazoEditable({ pacienteId, embarazoId });
-  const before = await controlesRepository.obtenerPorNumeroYEmbarazo(
-    embarazoId,
-    dataWithTime.numero_control
-  );
-  const data = buildCreateData({
-    pacienteId,
-    embarazoId,
-    body: dataWithTime,
-    usuarioId: req.usuario.id,
-  });
-  const updateFields = CONTROL_FIELDS.filter((field) =>
-    field !== 'numero_control' &&
-    (puedeVerVih(req.usuario.permisos) || !VIH_FIELDS.has(field))
-  );
-  const control = await controlesRepository.upsert({ data, updateFields });
-  if (!control) {
-    await validarEmbarazoEditable({ pacienteId, embarazoId });
-    throw new HttpError(409, 'No fue posible guardar el control');
-  }
+  return controlesRepository.enTransaccion(async (client) => {
+    await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
+    const before = await controlesRepository.obtenerPorNumeroYEmbarazo(
+      embarazoId,
+      dataWithTime.numero_control,
+      client
+    );
+    const data = buildCreateData({
+      pacienteId,
+      embarazoId,
+      body: dataWithTime,
+      usuarioId: req.usuario.id,
+    });
+    const updateFields = CONTROL_FIELDS.filter((field) =>
+      field !== 'numero_control' &&
+      (puedeVerVih(req.usuario.permisos) || !VIH_FIELDS.has(field))
+    );
+    const modifiedFields = before
+      ? camposRealmenteModificados(before, data, updateFields)
+      : updateFields;
+    if (before && modifiedFields.length === 0) return before;
 
-  await registrarAuditoria(req, {
-    accion: before ? 'actualizar' : 'crear',
-    tabla: 'controles_prenatales',
-    registroId: control.id,
-    pacienteId,
-    embarazoId,
-    datosAnteriores: before || null,
-    datosNuevos: control,
-    descripcion: before ? 'Control prenatal actualizado por upsert' : 'Control prenatal registrado',
-  });
+    const control = await controlesRepository.upsert({
+      data,
+      updateFields: before ? modifiedFields : updateFields,
+    }, client);
+    if (!control) {
+      await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
+      throw new HttpError(409, 'No fue posible guardar el control');
+    }
 
-  return control;
+    await registrarAuditoria(req, {
+      contexto: before ? AUDIT_CONTEXT.actualizar : AUDIT_CONTEXT.crear,
+      accion: before ? 'actualizar' : 'crear',
+      entidadId: control.id,
+      pacienteId,
+      embarazoId,
+      cambios: before
+        ? {
+          anteriores: seleccionarCamposAuditoria(before, modifiedFields),
+          nuevos: seleccionarCamposAuditoria(control, modifiedFields),
+        }
+        : { nuevos: seleccionarCamposAuditoria(data, CONTROL_FIELDS) },
+      metadata: { resultado: RESULTADO_EXITOSO },
+    }, { db: client, obligatorio: true });
+
+    return control;
+  });
 }
 
 async function actualizarControl({ pacienteId, embarazoId, id, body, req }) {
@@ -185,71 +243,86 @@ async function actualizarControl({ pacienteId, embarazoId, id, body, req }) {
   const bodyPermitido = filtrarCamposVih(body, req.usuario.permisos);
   const { data, campos } = buildUpdateData(bodyPermitido);
   if (campos.length === 0) throw new HttpError(400, 'Sin campos para actualizar');
+  return controlesRepository.enTransaccion(async (client) => {
+    const before = await controlesRepository.obtenerPorId(id, client);
+    if (!before) throw new HttpError(404, 'Control no encontrado');
+    if (String(before.embarazo_id) !== String(embarazoId)) {
+      throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
+    }
+    await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
 
-  const before = await controlesRepository.obtenerPorId(id);
-  if (!before) throw new HttpError(404, 'Control no encontrado');
-  if (String(before.embarazo_id) !== String(embarazoId)) {
-    throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
-  }
-  await validarEmbarazoEditable({ pacienteId, embarazoId });
-  const control = await controlesRepository.actualizar({
-    id,
-    embarazoId,
-    data,
-    campos,
-    updatedBy: req.usuario.id,
-    pacienteId,
+    const modifiedFields = camposRealmenteModificados(before, data, campos);
+    if (modifiedFields.length === 0) return before;
+    const modifiedData = seleccionarCamposAuditoria(data, modifiedFields);
+    const control = await controlesRepository.actualizar({
+      id,
+      embarazoId,
+      data: modifiedData,
+      campos: modifiedFields,
+      updatedBy: req.usuario.id,
+      pacienteId,
+    }, client);
+
+    if (!control) {
+      await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
+      throw new HttpError(404, 'Control no encontrado');
+    }
+
+    await registrarAuditoria(req, {
+      contexto: AUDIT_CONTEXT.actualizar,
+      accion: 'actualizar',
+      entidadId: control.id,
+      pacienteId,
+      embarazoId,
+      cambios: {
+        anteriores: seleccionarCamposAuditoria(before, modifiedFields),
+        nuevos: seleccionarCamposAuditoria(control, modifiedFields),
+      },
+      metadata: { resultado: RESULTADO_EXITOSO },
+    }, { db: client, obligatorio: true });
+
+    return control;
   });
-
-  if (!control) {
-    await validarEmbarazoEditable({ pacienteId, embarazoId });
-    throw new HttpError(404, 'Control no encontrado');
-  }
-
-  await registrarAuditoria(req, {
-    accion: 'actualizar',
-    tabla: 'controles_prenatales',
-    registroId: control.id,
-    pacienteId,
-    embarazoId,
-    datosAnteriores: before,
-    datosNuevos: control,
-    descripcion: 'Control prenatal actualizado',
-  });
-
-  return control;
 }
 
 async function eliminarControl({ pacienteId, embarazoId, id, req }) {
   requerirEmbarazoId(embarazoId);
-  const before = await controlesRepository.obtenerPorId(id);
-  if (!before) throw new HttpError(404, 'Control no encontrado');
-  if (String(before.embarazo_id) !== String(embarazoId)) {
-    throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
-  }
-  await validarEmbarazoEditable({ pacienteId, embarazoId });
-  const { control, rowCount } = await controlesRepository.eliminar({ id, embarazoId, pacienteId });
+  return controlesRepository.enTransaccion(async (client) => {
+    const before = await controlesRepository.obtenerPorId(id, client);
+    if (!before) throw new HttpError(404, 'Control no encontrado');
+    if (String(before.embarazo_id) !== String(embarazoId)) {
+      throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
+    }
+    await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
+    const { control, rowCount } = await controlesRepository.eliminar(
+      { id, embarazoId, pacienteId },
+      client
+    );
 
-  if (rowCount === 0) {
-    await validarEmbarazoEditable({ pacienteId, embarazoId });
-    throw new HttpError(404, 'Control no encontrado');
-  }
+    if (rowCount === 0) {
+      await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
+      throw new HttpError(404, 'Control no encontrado');
+    }
 
-  await registrarAuditoria(req, {
-    accion: 'eliminar',
-    tabla: 'controles_prenatales',
-    registroId: id,
-    pacienteId,
-    embarazoId,
-    datosAnteriores: control,
-    descripcion: 'Control prenatal eliminado',
+    await registrarAuditoria(req, {
+      contexto: AUDIT_CONTEXT.eliminar,
+      accion: 'eliminar',
+      entidadId: id,
+      pacienteId,
+      embarazoId,
+      cambios: {
+        anteriores: seleccionarCamposAuditoria(control || before, CONTROL_FIELDS),
+      },
+      metadata: { resultado: RESULTADO_EXITOSO },
+    }, { db: client, obligatorio: true });
+
+    return { message: 'Control eliminado' };
   });
-
-  return { message: 'Control eliminado' };
 }
 
 module.exports = {
   CONTROL_FIELDS,
+  valoresControlEquivalentes,
   listarControles,
   obtenerControl,
   crearControl,

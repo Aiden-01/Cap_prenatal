@@ -1,18 +1,18 @@
 # Politica contextual de privacidad para auditoria
 
-## Estado del Sprint 4B.3A
+## Estado del Sprint 4B.3B
 
 El nucleo contextual ya esta conectado mediante `registrarEventoPrivado` a
 los productores no clinicos de autenticacion, usuarios, passwords, roles,
-permisos, sesiones, PDF y exportaciones de reportes, ademas de pacientes y
-embarazos. El camino privado exige
+permisos, sesiones, PDF y exportaciones de reportes, ademas de pacientes,
+embarazos y controles prenatales con sus laboratorios embebidos. El camino privado exige
 `categoria`, `entidad` y `evento`, construye el payload con
 `buildAuditPayload`, ejecuta `auditSanitizer` inmediatamente antes de
 `auditRepository` y conserva `politica_version: 1`.
 
 `registrarEvento` permanece temporalmente como camino legado solo para
-controles prenatales, laboratorios, riesgo, vacunas, morbilidad, plan de parto,
-puerperio clinico, referencias y otros productores clinicos pendientes. Por
+riesgo, vacunas, morbilidad, plan de parto, puerperio clinico, referencias y
+otros productores clinicos pendientes. Por
 ello no debe afirmarse
 todavia que toda la auditoria del sistema aplica la nueva politica.
 
@@ -208,6 +208,8 @@ valida su forma antes de entregarlos al repositorio.
   solo IDs internos y nombres de campos, nunca valores nominales o clinicos.
 - Embarazos: creacion, actualizacion de fechas y cambios de estado; solo
   `activo`, `puerperio` y `cerrado` pueden conservarse como valores.
+- Controles prenatales: creacion/upsert, actualizacion y eliminacion existentes.
+  Los laboratorios son columnas del mismo control, no una entidad ni evento separado.
 
 ## Criticos y best effort
 
@@ -221,6 +223,7 @@ Comparten la transaccion y usan `obligatorio: true`:
 - creacion y actualizacion de paciente;
 - creacion y actualizacion de embarazo;
 - transiciones de estado de embarazo;
+- creacion, actualizacion y eliminacion de controles prenatales;
 - las auditorias de sesion que ya eran parte de una operacion atomica, excepto
   expiracion o inactividad automatica.
 
@@ -253,6 +256,10 @@ rollback.
   nombre, telefono, direccion y comunidad aparecen como maximo por nombre de campo.
 - Embarazos: los mismos listados de campos, IDs internos y transiciones cerradas
   de `estado_embarazo`. `numero_embarazo`, FUR, FPP y observaciones nunca conservan valor.
+- Controles prenatales: IDs internos y `campos_registrados`,
+  `campos_eliminados` o `campos_sensibles_modificados`. Signos vitales, fechas,
+  numero de control, observaciones y laboratorios aparecen solo por nombre.
+  Ningun resultado VIH, positivo/negativo o valor numerico se conserva.
 
 ## Ejemplos permitidos
 
@@ -309,9 +316,8 @@ negativas que demuestren que la regla no se aplica fuera de su contexto.
 
 ## Limitaciones actuales
 
-- Los productores clinicos de controles prenatales, laboratorios, riesgo,
-  vacunas, morbilidad, plan de parto, puerperio clinico y referencias todavia
-  usan el camino legado.
+- Los productores clinicos de riesgo, vacunas, morbilidad, plan de parto,
+  puerperio clinico y referencias todavia usan el camino legado.
 - No existen actualmente rutas HTTP de eliminacion de paciente o embarazo. El
   contrato privado de eliminacion esta validado, pero este sprint no crea endpoints.
 - No existe una API nueva ni cambio en la interfaz de consulta de auditoria.
@@ -323,7 +329,7 @@ negativas que demuestren que la regla no se aplica fuera de su contexto.
 
 ## Migracion siguiente
 
-1. Migrar controles, laboratorios y demas modulos clinicos registrando
+1. Migrar los demas modulos clinicos registrando
    exclusivamente nombres de campos y transiciones justificadas.
 2. Revisar automatizaciones y productores restantes por separado.
 3. Disenar el saneamiento de historicos como tarea independiente, con respaldo
@@ -332,5 +338,5 @@ negativas que demuestren que la regla no se aplica fuera de su contexto.
 Cada fase debe mantener el contrato publico de `registrarEvento` hasta que sus
 consumidores sean migrados y probados explicitamente.
 
-Sprint 4B.3A no cambio base de datos, `schema.sql`, migraciones, registros
+Sprint 4B.3B no cambio base de datos, `schema.sql`, migraciones, registros
 historicos, `.env` ni `.env.example`.

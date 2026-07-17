@@ -98,10 +98,11 @@ Respuesta de error esperada:
 }
 ```
 
-### Auditoria privada Sprint 4B.3A
+### Auditoria privada Sprint 4B.3B
 
 Autenticacion, usuarios, passwords, roles, permisos, sesiones, PDF,
-exportaciones/reportes, pacientes y embarazos usan `registrarEventoPrivado`.
+exportaciones/reportes, pacientes, embarazos y controles prenatales con sus
+laboratorios embebidos usan `registrarEventoPrivado`.
 El contrato exige
 `categoria`, `entidad` y `evento`, construye el diff o metadata con la politica
 contextual, elimina campos prohibidos de forma recursiva y ejecuta el
@@ -120,19 +121,22 @@ El payload privado conserva `politica_version: 1` y metadata minima:
   modificados; nunca valores nominales, de ubicacion o clinicos;
 - embarazos: IDs internos y nombres de campos; solo `estado_embarazo` conserva
   transiciones entre `activo`, `puerperio` y `cerrado`.
+- controles prenatales: IDs internos y nombres de campos creados, eliminados o
+  realmente modificados. Signos vitales, citas y laboratorios nunca conservan valores.
 
 No guarda password, hash, token, JWT, cookie, CSRF, Authorization, IP,
 user-agent, request/body completo, nombres, CUI, contenido clinico, buffer,
 HTML, temporal, query libre ni filas nominales.
 
 Password, rol, estado, permisos, eliminacion de usuario y escrituras de paciente
-o embarazo son eventos obligatorios dentro de la transaccion. Una falla revierte
+o embarazo, y crear/actualizar/eliminar controles son eventos obligatorios
+dentro de la transaccion. Una falla revierte
 la escritura clinica completa. Login, expiraciones automaticas y
 documentos/reportes son best effort. Una falla informativa no invalida una
 descarga ya generada.
 
-Los productores de controles, laboratorios, riesgo, vacunas, morbilidad, plan
-de parto, puerperio clinico y referencias siguen en el camino legado. Los
+Los productores de riesgo, vacunas, morbilidad, plan de parto, puerperio
+clinico y referencias siguen en el camino legado. Los
 historicos no fueron saneados. No existen endpoints actuales de eliminacion de
 paciente o embarazo y no se agregaron. Esta fase no cambio esquema, migraciones,
 ENV, frontend, contratos HTTP, permisos, sesiones funcionales ni PDFs oficiales.
@@ -900,6 +904,12 @@ Los resultados de laboratorio pertenecen a cada control prenatal y `controles_pr
 
 Los resultados sensibles de VIH conservan el filtrado y los permisos vigentes, incluido `controles.ver_vih` para su visualizacion.
 
+Crear, actualizar o eliminar un control y registrar su auditoria privada ocurre
+en una sola transaccion. El evento solo conserva IDs internos y nombres de
+campos. Ningun resultado de laboratorio, incluido VIH, hemoglobina, glicemia,
+orina, sifilis, hepatitis o grupo/Rh, conserva valores. `controles.ver_vih`
+solo regula lectura/escritura funcional y no amplia el payload de auditoria.
+
 ## Pendientes y fuera de alcance
 
 Fuera de alcance actual:
@@ -918,8 +928,9 @@ Fuera de alcance actual:
 - Comparar IDs de URL como string.
 - Para escrituras clinicas, registrar auditoria.
 - Los productores migrados, incluidos pacientes y embarazos, deben usar
-  `registrarEventoPrivado`; `registrarEvento` y `utils/auditoria.js` quedan solo
-  para controles, laboratorios y demas productores clinicos pendientes.
+  `registrarEventoPrivado`; esto incluye controles y laboratorios embebidos.
+  `registrarEvento` y `utils/auditoria.js` quedan solo para riesgo, vacunas,
+  morbilidad, plan de parto, puerperio clinico, referencias y pendientes equivalentes.
 - No guardar tokens, contrasenas ni secretos en logs o auditoria.
 - Usar Zod para nuevos endpoints.
 - Preferir mensajes de error claros para el personal de salud.

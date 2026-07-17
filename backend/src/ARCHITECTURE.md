@@ -150,15 +150,17 @@ descripcion, fuerza IP/user-agent a `null`, descarta eventos vacios y sanea de
 nuevo justo antes del repositorio.
 
 Productores en este camino: autenticacion, usuarios, passwords, roles,
-permisos, sesiones, PDF, exportaciones/reportes, pacientes y embarazos.
+permisos, sesiones, PDF, exportaciones/reportes, pacientes, embarazos y
+controles prenatales con laboratorios embebidos.
 Password, rol, estado, permisos, eliminacion de usuario y escrituras de paciente
-o embarazo escriben auditoria obligatoria en la misma transaccion. Login,
+o embarazo, y creacion/actualizacion/eliminacion de control prenatal escriben
+auditoria obligatoria en la misma transaccion. Login,
 expiracion automatica y documentos/reportes son best effort.
 
-Controles, laboratorios, riesgo, vacunas, morbilidad, plan de parto, puerperio
-clinico, referencias y otros productores clinicos conservan temporalmente
+Riesgo, vacunas, morbilidad, plan de parto, puerperio clinico, referencias y
+otros productores clinicos conservan temporalmente
 `registrarEvento` o `utils/auditoria.js`. Ese camino no debe reutilizarse en
-pacientes, embarazos ni codigo nuevo.
+pacientes, embarazos, controles prenatales ni codigo nuevo.
 
 Paciente y embarazo comparten el cliente transaccional con cada evento privado.
 Creaciones/eliminaciones solo listan campos; actualizaciones solo listan campos
@@ -166,6 +168,13 @@ con delta persistido; la unica transicion clinica con valores es
 `estado_embarazo` dentro de `activo`, `puerperio` y `cerrado`. Un fallo de
 auditoria obligatoria revierte toda la operacion. No se agregaron rutas de
 eliminacion que no existieran previamente.
+
+Los laboratorios no tienen repositorio ni evento independiente: se persisten en
+`controles_prenatales` y participan en el mismo diff. Todos sus campos,
+incluido VIH, se reducen a nombres. El servicio elimina no-ops por equivalencia
+de numeros PostgreSQL, fechas y vacios normalizados; timestamps y actor no
+entran al payload. La escritura, el bloqueo del embarazo y el evento privado
+usan un unico cliente y se confirman o revierten juntos.
 
 No auditar:
 

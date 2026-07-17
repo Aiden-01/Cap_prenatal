@@ -69,6 +69,7 @@ const PRIVATE_TABLES = Object.freeze({
   exportacion: 'reportes',
   paciente: 'pacientes',
   embarazo: 'embarazos',
+  control_prenatal: 'controles_prenatales',
 });
 
 function sanitize(value) {
