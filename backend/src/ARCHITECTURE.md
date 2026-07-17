@@ -136,7 +136,7 @@ Las reglas de embarazo viven en services y utils, no en controllers:
 
 ## Auditoria
 
-Los productores no clinicos migrados usan esta unica secuencia:
+Los productores migrados usan esta unica secuencia:
 
 ```text
 producer -> registrarEventoPrivado -> auditDiffBuilder/auditFieldPolicy
@@ -150,14 +150,22 @@ descripcion, fuerza IP/user-agent a `null`, descarta eventos vacios y sanea de
 nuevo justo antes del repositorio.
 
 Productores en este camino: autenticacion, usuarios, passwords, roles,
-permisos, sesiones, PDF y exportaciones/reportes. Password, rol, estado,
-permisos y eliminacion escriben auditoria obligatoria en la misma transaccion.
-Login, expiracion automatica y documentos/reportes son best effort.
+permisos, sesiones, PDF, exportaciones/reportes, pacientes y embarazos.
+Password, rol, estado, permisos, eliminacion de usuario y escrituras de paciente
+o embarazo escriben auditoria obligatoria en la misma transaccion. Login,
+expiracion automatica y documentos/reportes son best effort.
 
-Pacientes, embarazos, controles, laboratorios, riesgo, vacunas, morbilidad,
-plan de parto, puerperio, referencias y otros productores clinicos conservan
-temporalmente `registrarEvento` o `utils/auditoria.js` hasta Sprint 4B.3. Ese
-camino no debe reutilizarse en codigo no clinico nuevo.
+Controles, laboratorios, riesgo, vacunas, morbilidad, plan de parto, puerperio
+clinico, referencias y otros productores clinicos conservan temporalmente
+`registrarEvento` o `utils/auditoria.js`. Ese camino no debe reutilizarse en
+pacientes, embarazos ni codigo nuevo.
+
+Paciente y embarazo comparten el cliente transaccional con cada evento privado.
+Creaciones/eliminaciones solo listan campos; actualizaciones solo listan campos
+con delta persistido; la unica transicion clinica con valores es
+`estado_embarazo` dentro de `activo`, `puerperio` y `cerrado`. Un fallo de
+auditoria obligatoria revierte toda la operacion. No se agregaron rutas de
+eliminacion que no existieran previamente.
 
 No auditar:
 

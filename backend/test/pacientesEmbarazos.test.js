@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const test = require('node:test');
 
 const { verificarPermiso } = require('../src/middleware/permisos');
@@ -7,6 +8,7 @@ const {
   pacienteCreateSchema,
 } = require('../src/validations/pacientes.schemas');
 const { HttpError } = require('../src/utils/httpError');
+const privateAuditService = require('../src/services/auditService');
 
 const SERVICE_PATH = require.resolve('../src/services/pacientesService');
 const REPOSITORY_PATH = require.resolve('../src/repositories/pacientesRepository');
@@ -62,11 +64,15 @@ function strictMock(overrides, label) {
 }
 
 async function withPacientesService({ repository = {}, communities = {}, audit, pregnancies = {} }, callback) {
+  const repositoryWithTransaction = {
+    enTransaccion: async (operation) => operation({ transaction: true }),
+    ...repository,
+  };
   const restore = [
-    cacheModule(REPOSITORY_PATH, strictMock(repository, 'pacientesRepository')),
+    cacheModule(REPOSITORY_PATH, strictMock(repositoryWithTransaction, 'pacientesRepository')),
     cacheModule(COMMUNITIES_PATH, strictMock(communities, 'comunidadesRepository')),
     cacheModule(AUDIT_PATH, {
-      registrarEvento: audit || (async () => {}),
+      registrarEventoPrivado: audit || (async () => {}),
     }),
     cacheModule(PREGNANCIES_PATH, {
       resolverEmbarazoParaLectura: pregnancies.resolverEmbarazoParaLectura || (async () => {
@@ -117,6 +123,30 @@ function invokeMiddleware(middleware, req) {
   });
 }
 
+function privateAuditRecorder({ fail = false, failAt = null } = {}) {
+  const events = [];
+  const databases = [];
+  let attempts = 0;
+  const repository = {
+    async insertarEvento(event, db) {
+      attempts += 1;
+      databases.push(db);
+      if (fail || attempts === failAt) throw new Error('audit insert failed');
+      events.push(event);
+    },
+  };
+  return {
+    events,
+    databases,
+    audit(req, event, options = {}) {
+      return privateAuditService.registrarEventoPrivado(req, event, {
+        ...options,
+        repository,
+      });
+    },
+  };
+}
+
 test('acepta los datos obligatorios de una paciente valida', () => {
   const result = pacienteCreateSchema.safeParse(VALID_PATIENT);
   assert.equal(result.success, true);
@@ -165,7 +195,7 @@ test('crea una paciente valida y su embarazo inicial con el actor autenticado', 
         return pregnancy;
       },
     },
-    audit: async (req, event) => calls.push(['auditoria', req, event]),
+    audit: async (req, event, options) => calls.push(['auditoria', req, event, options]),
   }, async (service) => {
     const result = await service.crearPaciente({ body: VALID_PATIENT, req: ACTOR });
 
@@ -186,7 +216,12 @@ test('crea una paciente valida y su embarazo inicial con el actor autenticado', 
     const audits = calls.filter(([name]) => name === 'auditoria');
     assert.equal(audits.length, 2);
     assert.ok(audits.every(([, req]) => req === ACTOR));
-    assert.deepEqual(audits.map(([, , event]) => event.tabla), ['pacientes', 'embarazos']);
+    assert.deepEqual(
+      audits.map(([, , event]) => event.contexto.entidad),
+      ['paciente', 'embarazo']
+    );
+    assert.ok(audits.every(([, , , options]) => options.obligatorio === true));
+    assert.ok(audits.every(([, , event]) => !('datosNuevos' in event)));
   });
 });
 
@@ -206,7 +241,7 @@ test('actualiza una paciente y atribuye el cambio al actor autenticado', async (
 
   await withPacientesService({
     repository: {
-      obtenerPorId: async () => before,
+      obtenerPacienteParaActualizar: async () => before,
       actualizarPaciente: async (...args) => {
         updateArgs = args;
         return {
@@ -229,8 +264,18 @@ test('actualiza una paciente y atribuye el cambio al actor autenticado', async (
     assert.deepEqual(updateArgs[1], { telefono: '55550000' });
     assert.deepEqual(updateArgs[2], ['telefono']);
     assert.equal(updateArgs[3], ACTOR.usuario.id);
+    assert.equal(updateArgs[4].transaction, true);
     assert.equal(auditArgs[0], ACTOR);
-    assert.equal(auditArgs[1].tabla, 'pacientes');
+    assert.deepEqual(auditArgs[1].contexto, {
+      categoria: 'clinica',
+      entidad: 'paciente',
+      evento: 'actualizar',
+    });
+    assert.deepEqual(auditArgs[1].cambios, {
+      anteriores: {},
+      nuevos: { telefono: '55550000' },
+    });
+    assert.equal(auditArgs[2].obligatorio, true);
   });
 });
 
@@ -511,7 +556,7 @@ test('POST crea, sincroniza y audita obligatoriamente usando la misma transaccio
       },
     },
     audit: async (req, event, options) => {
-      order.push(`auditar-${event.tabla}`);
+      order.push(`auditar-${event.contexto.entidad}`);
       audits.push({ req, event, options });
     },
   }, async (service) => {
@@ -526,16 +571,23 @@ test('POST crea, sincroniza y audita obligatoriamente usando la misma transaccio
       'siguiente-numero',
       'insertar',
       'sincronizar',
-      'auditar-embarazos',
-      'auditar-pacientes',
+      'auditar-embarazo',
+      'auditar-paciente',
       'commit',
     ]);
     assert.equal(audits.length, 2);
     assert.ok(audits.every(({ req }) => req === ACTOR));
     assert.ok(audits.every(({ options }) => options.db === client && options.obligatorio === true));
     assert.equal(audits[0].event.embarazoId, created.id);
-    assert.equal(audits[1].event.datosAnteriores, patient);
-    assert.equal(audits[1].event.datosNuevos, updatedPatient);
+    assert.deepEqual(audits[0].event.contexto, {
+      categoria: 'clinica',
+      entidad: 'embarazo',
+      evento: 'crear',
+    });
+    assert.deepEqual(audits[1].event.cambios, {
+      anteriores: { fur: null, fpp: null },
+      nuevos: { fur: '2026-03-01', fpp: '2026-12-06' },
+    });
   });
 });
 
@@ -905,4 +957,522 @@ test('valida que embarazo_id pertenezca a la paciente indicada', async () => {
     if (previousPool) require.cache[POOL_PATH] = previousPool;
     else delete require.cache[POOL_PATH];
   }
+});
+
+test('auditoria privada de creacion registra solo campos e IDs internos', async () => {
+  const recorder = privateAuditRecorder();
+  const patient = { id: 41, ...VALID_PATIENT };
+  const pregnancy = {
+    id: 91,
+    paciente_id: 41,
+    numero_embarazo: 1,
+    estado: 'activo',
+    fur: VALID_PATIENT.fur,
+    fpp: '2026-10-17',
+    fecha_inicio: VALID_PATIENT.fur,
+  };
+  let client;
+
+  await withPacientesService({
+    repository: {
+      enTransaccion: async (operation) => {
+        client = { transaction: 'patient-create' };
+        return operation(client);
+      },
+      existeCui: async (_cui, _exclude, db) => {
+        assert.equal(db, client);
+        return false;
+      },
+      insertarPaciente: async (_data, db) => {
+        assert.equal(db, client);
+        return patient;
+      },
+      obtenerEmbarazoEnSeguimiento: async (_id, _exclude, db) => {
+        assert.equal(db, client);
+        return null;
+      },
+      crearEmbarazoInicial: async (_args, db) => {
+        assert.equal(db, client);
+        return pregnancy;
+      },
+    },
+    audit: recorder.audit,
+  }, async (service) => {
+    await service.crearPaciente({
+      body: {
+        ...VALID_PATIENT,
+        telefono: '55550000',
+        domicilio: 'Direccion de prueba',
+        datos_extra: { cookie: 'cookie-anidada' },
+      },
+      req: { ...ACTOR, body: { cui: VALID_PATIENT.cui, token: 'token-request' } },
+    });
+  });
+
+  assert.equal(recorder.events.length, 2);
+  assert.ok(recorder.databases.every((db) => db === client));
+  const [patientEvent, pregnancyEvent] = recorder.events;
+  assert.equal(patientEvent.entidadAfectada, 'paciente');
+  assert.equal(patientEvent.pacienteId, 41);
+  assert.equal(patientEvent.idEntidad, 41);
+  assert.ok(patientEvent.datosNuevos.campos_registrados.includes('nombres'));
+  assert.ok(patientEvent.datosNuevos.campos_registrados.includes('cui'));
+  assert.equal(patientEvent.datosNuevos.resultado, 'exitoso');
+  assert.equal(patientEvent.datosNuevos.politica_version, 1);
+  assert.equal(pregnancyEvent.entidadAfectada, 'embarazo');
+  assert.equal(pregnancyEvent.pacienteId, 41);
+  assert.equal(pregnancyEvent.embarazoId, 91);
+  assert.equal(pregnancyEvent.idEntidad, 91);
+  assert.ok(pregnancyEvent.datosNuevos.campos_registrados.includes('numero_embarazo'));
+  const serialized = JSON.stringify(recorder.events);
+  assert.doesNotMatch(serialized, /Ana Prueba|Control Mock|1234567890101|55550000|Direccion de prueba|2026-01-10|2026-10-17|cookie-anidada|token-request/);
+});
+
+test('auditoria privada de actualizacion conserva solo nombres realmente modificados', async () => {
+  const recorder = privateAuditRecorder();
+  const before = {
+    id: 41,
+    nombres: 'Nombre anterior',
+    cui: '1111111111111',
+    telefono: '40000000',
+    comunidad: 'Comunidad anterior',
+    comunidad_id: null,
+    municipio: 'Otro municipio',
+  };
+
+  await withPacientesService({
+    repository: {
+      obtenerPacienteParaActualizar: async () => before,
+      existeCui: async () => false,
+      actualizarPaciente: async (_id, data) => ({
+        paciente: { ...before, ...data },
+        rowCount: 1,
+      }),
+    },
+    audit: recorder.audit,
+  }, async (service) => {
+    await service.actualizarPaciente({
+      id: 41,
+      body: {
+        nombres: 'Nombre nuevo',
+        cui: '2222222222222',
+        telefono: '49999999',
+        comunidad: 'Comunidad nueva',
+      },
+      req: { ...ACTOR, body: { nombres: 'Nombre nuevo', cui: '2222222222222' } },
+    });
+  });
+
+  assert.equal(recorder.events.length, 1);
+  assert.deepEqual(recorder.events[0].datosNuevos, {
+    campos_sensibles_modificados: ['comunidad', 'cui', 'nombres', 'telefono'],
+    politica_version: 1,
+    resultado: 'exitoso',
+  });
+  assert.doesNotMatch(
+    JSON.stringify(recorder.events[0]),
+    /Nombre anterior|Nombre nuevo|1111111111111|2222222222222|40000000|49999999|Comunidad anterior|Comunidad nueva/
+  );
+});
+
+test('actualizacion sin diferencia real no escribe ni genera auditoria', async () => {
+  let updates = 0;
+  let audits = 0;
+  await withPacientesService({
+    repository: {
+      obtenerPacienteParaActualizar: async () => ({ id: 41, telefono: '55550000' }),
+      actualizarPaciente: async () => {
+        updates += 1;
+        return { paciente: null, rowCount: 0 };
+      },
+    },
+    audit: async () => { audits += 1; },
+  }, async (service) => {
+    assert.deepEqual(
+      await service.actualizarPaciente({ id: 41, body: { telefono: '55550000' }, req: ACTOR }),
+      { message: 'Paciente actualizado' }
+    );
+  });
+  assert.equal(updates, 0);
+  assert.equal(audits, 0);
+});
+
+test('sincronizacion de fechas audita el embarazo solo por nombres de campos clinicos', async () => {
+  const recorder = privateAuditRecorder();
+  const client = { transaction: 'patient-pregnancy-update' };
+  const beforePatient = { id: 41, fur: '2026-01-01', fpp: '2026-10-08' };
+  const beforePregnancy = { id: 91, paciente_id: 41, fur: '2026-01-01', fpp: '2026-10-08' };
+
+  await withPacientesService({
+    repository: {
+      enTransaccion: async (operation) => operation(client),
+      obtenerPacienteParaActualizar: async () => beforePatient,
+      actualizarPaciente: async (_id, data) => ({
+        paciente: { ...beforePatient, ...data },
+        rowCount: 1,
+      }),
+      obtenerEmbarazoActivoId: async (_id, db) => {
+        assert.equal(db, client);
+        return 91;
+      },
+      obtenerEmbarazoPorId: async (_id, db) => {
+        assert.equal(db, client);
+        return beforePregnancy;
+      },
+      actualizarEmbarazoFechas: async (_args, db) => {
+        assert.equal(db, client);
+        return { ...beforePregnancy, fur: '2026-02-01', fpp: '2026-11-08' };
+      },
+    },
+    audit: recorder.audit,
+  }, async (service) => {
+    await service.actualizarPaciente({
+      id: 41,
+      body: { fur: '2026-02-01', fpp: '2026-11-08' },
+      req: ACTOR,
+    });
+  });
+
+  assert.equal(recorder.events.length, 2);
+  assert.ok(recorder.databases.every((db) => db === client));
+  assert.deepEqual(recorder.events[1].datosNuevos, {
+    campos_sensibles_modificados: ['fpp', 'fur'],
+    politica_version: 1,
+    resultado: 'exitoso',
+  });
+  assert.equal(recorder.events[1].entidadAfectada, 'embarazo');
+  assert.doesNotMatch(JSON.stringify(recorder.events), /2026-01-01|2026-10-08|2026-02-01|2026-11-08/);
+});
+
+test('fallo de la segunda auditoria revierte actualizaciones de paciente y embarazo', async () => {
+  const recorder = privateAuditRecorder({ failAt: 2 });
+  const originalPatient = { id: 41, fur: '2026-01-01', fpp: '2026-10-08' };
+  const originalPregnancy = { id: 91, paciente_id: 41, fur: '2026-01-01', fpp: '2026-10-08' };
+  let patientState = { ...originalPatient };
+  let pregnancyState = { ...originalPregnancy };
+  let rolledBack = false;
+
+  await withPacientesService({
+    repository: {
+      enTransaccion: async (operation) => {
+        try {
+          return await operation({ transaction: 'update-rollback' });
+        } catch (error) {
+          patientState = { ...originalPatient };
+          pregnancyState = { ...originalPregnancy };
+          recorder.events.length = 0;
+          rolledBack = true;
+          throw error;
+        }
+      },
+      obtenerPacienteParaActualizar: async () => patientState,
+      actualizarPaciente: async (_id, data) => {
+        patientState = { ...patientState, ...data };
+        return { paciente: patientState, rowCount: 1 };
+      },
+      obtenerEmbarazoActivoId: async () => 91,
+      obtenerEmbarazoPorId: async () => pregnancyState,
+      actualizarEmbarazoFechas: async () => {
+        pregnancyState = { ...pregnancyState, fur: '2026-02-01', fpp: '2026-11-08' };
+        return pregnancyState;
+      },
+    },
+    audit: recorder.audit,
+  }, async (service) => {
+    await assert.rejects(
+      service.actualizarPaciente({
+        id: 41,
+        body: { fur: '2026-02-01', fpp: '2026-11-08' },
+        req: ACTOR,
+      }),
+      /audit insert failed/
+    );
+  });
+
+  assert.equal(rolledBack, true);
+  assert.deepEqual(patientState, originalPatient);
+  assert.deepEqual(pregnancyState, originalPregnancy);
+  assert.equal(recorder.events.length, 0);
+});
+
+test('fallo de auditoria revierte la creacion conjunta de paciente y embarazo', async () => {
+  const recorder = privateAuditRecorder({ fail: true });
+  let persisted = false;
+  let rolledBack = false;
+  const client = { transaction: 'patient-create-rollback' };
+
+  await withPacientesService({
+    repository: {
+      enTransaccion: async (operation) => {
+        try {
+          return await operation(client);
+        } catch (error) {
+          persisted = false;
+          rolledBack = true;
+          throw error;
+        }
+      },
+      existeCui: async () => false,
+      insertarPaciente: async () => {
+        persisted = true;
+        return { id: 41, ...VALID_PATIENT };
+      },
+      obtenerEmbarazoEnSeguimiento: async () => null,
+      crearEmbarazoInicial: async () => ({ id: 91, paciente_id: 41, estado: 'activo' }),
+    },
+    audit: recorder.audit,
+  }, async (service) => {
+    await assert.rejects(
+      service.crearPaciente({ body: VALID_PATIENT, req: ACTOR }),
+      /audit insert failed/
+    );
+  });
+
+  assert.equal(rolledBack, true);
+  assert.equal(persisted, false);
+  assert.equal(recorder.events.length, 0);
+  assert.deepEqual(recorder.databases, [client]);
+});
+
+test('nuevo embarazo audita campos sin valores obstetricos y sincroniza en la misma transaccion', async () => {
+  const recorder = privateAuditRecorder();
+  const client = { transaction: 'pregnancy-create' };
+  const previousPatient = { id: 41, fur: null, fpp: null, tiene_ficha_riesgo: true };
+  const pregnancy = {
+    id: 92,
+    paciente_id: 41,
+    numero_embarazo: 2,
+    estado: 'activo',
+    fur: '2026-03-01',
+    fpp: '2026-12-06',
+    observaciones: 'Observacion de prueba',
+  };
+
+  await withPacientesService({
+    repository: {
+      enTransaccion: async (operation) => operation(client),
+      obtenerPacienteParaActualizar: async () => previousPatient,
+      obtenerEmbarazoEnSeguimiento: async () => null,
+      obtenerSiguienteNumeroEmbarazo: async () => 2,
+      insertarNuevoEmbarazo: async () => pregnancy,
+      sincronizarPacienteConEmbarazo: async () => ({
+        ...previousPatient,
+        fur: pregnancy.fur,
+        fpp: pregnancy.fpp,
+        tiene_ficha_riesgo: false,
+      }),
+    },
+    audit: recorder.audit,
+  }, async (service) => {
+    await service.nuevoEmbarazo({
+      id: 41,
+      body: { fur: pregnancy.fur, observaciones: pregnancy.observaciones },
+      req: ACTOR,
+    });
+  });
+
+  assert.equal(recorder.events.length, 2);
+  assert.ok(recorder.databases.every((db) => db === client));
+  const pregnancyEvent = recorder.events[0];
+  assert.deepEqual(pregnancyEvent.datosNuevos, {
+    campos_registrados: [
+      'estado_embarazo',
+      'fpp',
+      'fur',
+      'numero_embarazo',
+      'observaciones',
+    ],
+    politica_version: 1,
+    resultado: 'exitoso',
+  });
+  assert.equal(pregnancyEvent.pacienteId, 41);
+  assert.equal(pregnancyEvent.embarazoId, 92);
+  assert.doesNotMatch(
+    JSON.stringify(recorder.events),
+    /2026-03-01|2026-12-06|Observacion de prueba|"numero_embarazo":2/
+  );
+});
+
+test('fallo de auditoria revierte la creacion de embarazo y no deja eventos', async () => {
+  const recorder = privateAuditRecorder({ fail: true });
+  let pregnancyPersisted = false;
+  let rolledBack = false;
+  const client = { transaction: 'pregnancy-create-rollback' };
+
+  await withPacientesService({
+    repository: {
+      enTransaccion: async (operation) => {
+        try {
+          return await operation(client);
+        } catch (error) {
+          pregnancyPersisted = false;
+          rolledBack = true;
+          throw error;
+        }
+      },
+      obtenerPacienteParaActualizar: async () => ({ id: 41, fur: null, fpp: null }),
+      obtenerEmbarazoEnSeguimiento: async () => null,
+      obtenerSiguienteNumeroEmbarazo: async () => 2,
+      insertarNuevoEmbarazo: async () => {
+        pregnancyPersisted = true;
+        return { id: 92, paciente_id: 41, numero_embarazo: 2, estado: 'activo' };
+      },
+      sincronizarPacienteConEmbarazo: async () => ({ id: 41 }),
+    },
+    audit: recorder.audit,
+  }, async (service) => {
+    await assert.rejects(
+      service.nuevoEmbarazo({ id: 41, body: {}, req: ACTOR }),
+      /audit insert failed/
+    );
+  });
+
+  assert.equal(rolledBack, true);
+  assert.equal(pregnancyPersisted, false);
+  assert.equal(recorder.events.length, 0);
+});
+
+test('transiciones a puerperio y cerrado conservan exclusivamente el enum controlado', async () => {
+  const recorder = privateAuditRecorder();
+  let state = 'activo';
+  await withPacientesService({
+    repository: {
+      pasarEmbarazoAPuerperio: async () => {
+        state = 'puerperio';
+        return { id: 91, paciente_id: 41, estado: state, observaciones: 'No auditar' };
+      },
+      cerrarEmbarazoEnSeguimiento: async () => {
+        state = 'cerrado';
+        return { id: 91, paciente_id: 41, estado: state, observaciones: 'No auditar' };
+      },
+    },
+    audit: recorder.audit,
+    pregnancies: {
+      validarEmbarazoEditable: async () => ({ id: 91, paciente_id: 41, estado: state }),
+    },
+  }, async (service) => {
+    await service.pasarAPuerperio({
+      id: 41,
+      embarazoId: 91,
+      body: { observaciones: 'Dato de parto no auditable' },
+      req: ACTOR,
+    });
+    await service.cerrarEmbarazo({
+      id: 41,
+      embarazoId: 91,
+      body: { observaciones: 'Dato puerperal no auditable' },
+      req: ACTOR,
+    });
+  });
+
+  assert.deepEqual(recorder.events.map((event) => event.datosNuevos), [
+    {
+      cambios: { estado_embarazo: { anterior: 'activo', nuevo: 'puerperio' } },
+      politica_version: 1,
+      resultado: 'exitoso',
+    },
+    {
+      cambios: { estado_embarazo: { anterior: 'puerperio', nuevo: 'cerrado' } },
+      politica_version: 1,
+      resultado: 'exitoso',
+    },
+  ]);
+  assert.doesNotMatch(JSON.stringify(recorder.events), /No auditar|Dato de parto|Dato puerperal/);
+});
+
+test('fallo de auditoria revierte el cambio de estado del embarazo', async () => {
+  const recorder = privateAuditRecorder({ fail: true });
+  let state = 'activo';
+  let rolledBack = false;
+  await withPacientesService({
+    repository: {
+      enTransaccion: async (operation) => {
+        try {
+          return await operation({ transaction: 'state-rollback' });
+        } catch (error) {
+          state = 'activo';
+          rolledBack = true;
+          throw error;
+        }
+      },
+      pasarEmbarazoAPuerperio: async () => {
+        state = 'puerperio';
+        return { id: 91, paciente_id: 41, estado: state };
+      },
+    },
+    audit: recorder.audit,
+    pregnancies: {
+      validarEmbarazoEditable: async () => ({ id: 91, paciente_id: 41, estado: 'activo' }),
+    },
+  }, async (service) => {
+    await assert.rejects(
+      service.pasarAPuerperio({ id: 41, embarazoId: 91, body: {}, req: ACTOR }),
+      /audit insert failed/
+    );
+  });
+  assert.equal(rolledBack, true);
+  assert.equal(state, 'activo');
+  assert.equal(recorder.events.length, 0);
+});
+
+test('contrato privado de eliminacion omite snapshots y valores identificables', async () => {
+  const recorder = privateAuditRecorder();
+  await recorder.audit(ACTOR, {
+    contexto: { categoria: 'clinica', entidad: 'paciente', evento: 'eliminar' },
+    accion: 'eliminar',
+    entidadId: 41,
+    pacienteId: 41,
+    cambios: {
+      anteriores: {
+        nombres: 'Nombre eliminado',
+        cui: '3333333333333',
+        telefono: '45555555',
+        domicilio: 'Direccion eliminada',
+        token: 'token-eliminado',
+      },
+    },
+    metadata: { resultado: 'exitoso', motivo_codigo: 'sin_historial_protegido' },
+  });
+
+  assert.deepEqual(recorder.events[0].datosNuevos, {
+    campos_eliminados: ['cui', 'domicilio', 'nombres', 'telefono'],
+    motivo_codigo: 'sin_historial_protegido',
+    politica_version: 1,
+    resultado: 'exitoso',
+  });
+  assert.doesNotMatch(
+    JSON.stringify(recorder.events[0]),
+    /Nombre eliminado|3333333333333|45555555|Direccion eliminada|token-eliminado/
+  );
+});
+
+test('estado de embarazo desconocido se degrada a nombre sensible sin conservar valor', async () => {
+  const recorder = privateAuditRecorder();
+  await recorder.audit(ACTOR, {
+    contexto: { categoria: 'clinica', entidad: 'embarazo', evento: 'cambiar_estado' },
+    accion: 'estado',
+    entidadId: 91,
+    pacienteId: 41,
+    embarazoId: 91,
+    cambios: {
+      anteriores: { estado_embarazo: 'activo' },
+      nuevos: { estado_embarazo: 'estado_desconocido' },
+    },
+    metadata: { resultado: 'rechazado' },
+  });
+
+  assert.deepEqual(recorder.events[0].datosNuevos, {
+    campos_sensibles_modificados: ['estado_embarazo'],
+    politica_version: 1,
+    resultado: 'rechazado',
+  });
+  assert.doesNotMatch(JSON.stringify(recorder.events[0]), /estado_desconocido/);
+});
+
+test('productores de pacientes y embarazos no conservan llamadas al escritor legado', () => {
+  const source = fs.readFileSync(SERVICE_PATH, 'utf8');
+  assert.match(source, /registrarEventoPrivado/);
+  assert.doesNotMatch(source, /registrarEvento\s*:/);
+  assert.doesNotMatch(source, /datosAnteriores|datosNuevos/);
+  assert.doesNotMatch(source, /cambios:\s*\{\s*anteriores:\s*before,\s*nuevos:\s*paciente/s);
 });

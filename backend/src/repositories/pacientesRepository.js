@@ -85,7 +85,7 @@ async function obtenerPacienteParaActualizar(id, db = pool) {
   return rows[0] || null;
 }
 
-async function existeCui(cui, pacienteId = null) {
+async function existeCui(cui, pacienteId = null, db = pool) {
   if (!cui) return false;
 
   const params = [cui];
@@ -95,18 +95,18 @@ async function existeCui(cui, pacienteId = null) {
     where += ` AND id <> $${params.length}`;
   }
 
-  const { rowCount } = await pool.query(
+  const { rowCount } = await db.query(
     `SELECT 1 FROM pacientes WHERE ${where} LIMIT 1`,
     params
   );
   return rowCount > 0;
 }
 
-async function insertarPaciente(data) {
+async function insertarPaciente(data, db = pool) {
   const campos = Object.keys(data);
   const placeholders = campos.map((_, i) => `$${i + 1}`).join(', ');
   const valores = campos.map((campo) => data[campo]);
-  const { rows } = await pool.query(
+  const { rows } = await db.query(
     `INSERT INTO pacientes (${campos.join(', ')})
      VALUES (${placeholders})
      RETURNING *`,
@@ -115,12 +115,12 @@ async function insertarPaciente(data) {
   return rows[0];
 }
 
-async function actualizarPaciente(id, data, campos, updatedBy = null) {
+async function actualizarPaciente(id, data, campos, updatedBy = null, db = pool) {
   const sets = campos.map((c, i) => `${c} = $${i + 1}`).join(', ');
   const valores = campos.map((campo) => data[campo]);
   valores.push(updatedBy, id);
 
-  const { rows, rowCount } = await pool.query(
+  const { rows, rowCount } = await db.query(
     `UPDATE pacientes SET ${sets}, updated_at = NOW(), updated_by = $${valores.length - 1}
      WHERE id = $${valores.length}
      RETURNING *`,
@@ -129,8 +129,8 @@ async function actualizarPaciente(id, data, campos, updatedBy = null) {
   return { paciente: rows[0] || null, rowCount };
 }
 
-async function crearEmbarazoInicial({ pacienteId, fur, fpp, usuarioId }) {
-  const { rows } = await pool.query(
+async function crearEmbarazoInicial({ pacienteId, fur, fpp, usuarioId }, db = pool) {
+  const { rows } = await db.query(
     `INSERT INTO embarazos (paciente_id, numero_embarazo, estado, fur, fpp, fecha_inicio, registrado_por)
      VALUES ($1, 1, 'activo', $2, $3, COALESCE($2, CURRENT_DATE), $4)
      RETURNING *`,
@@ -173,8 +173,8 @@ async function obtenerEmbarazoEnSeguimiento(pacienteId, embarazoIdExcluir = null
   return rows[0] || null;
 }
 
-async function obtenerEmbarazoActivoId(pacienteId) {
-  const { rows } = await pool.query(
+async function obtenerEmbarazoActivoId(pacienteId, db = pool) {
+  const { rows } = await db.query(
     `SELECT id
      FROM embarazos
      WHERE paciente_id = $1 AND estado = 'activo'
@@ -185,8 +185,8 @@ async function obtenerEmbarazoActivoId(pacienteId) {
   return rows[0]?.id || null;
 }
 
-async function obtenerEmbarazoPorId(id) {
-  const { rows } = await pool.query('SELECT * FROM embarazos WHERE id = $1', [id]);
+async function obtenerEmbarazoPorId(id, db = pool) {
+  const { rows } = await db.query('SELECT * FROM embarazos WHERE id = $1', [id]);
   return rows[0] || null;
 }
 
@@ -305,8 +305,8 @@ async function obtenerUltimoEmbarazoActivo(pacienteId) {
   return rows[0] || null;
 }
 
-async function pasarEmbarazoAPuerperio({ pacienteId, embarazoId, fechaCierre, observaciones, updatedBy = null }) {
-  const { rows } = await pool.query(
+async function pasarEmbarazoAPuerperio({ pacienteId, embarazoId, fechaCierre, observaciones, updatedBy = null }, db = pool) {
+  const { rows } = await db.query(
     `UPDATE embarazos
      SET estado = 'puerperio',
          fecha_cierre = COALESCE($2, fecha_cierre, CURRENT_DATE),
@@ -330,8 +330,8 @@ async function obtenerUltimoEmbarazoEnSeguimiento(pacienteId) {
   return rows[0] || null;
 }
 
-async function cerrarEmbarazoEnSeguimiento({ pacienteId, embarazoId, fechaCierre, observaciones, updatedBy = null }) {
-  const { rows } = await pool.query(
+async function cerrarEmbarazoEnSeguimiento({ pacienteId, embarazoId, fechaCierre, observaciones, updatedBy = null }, db = pool) {
+  const { rows } = await db.query(
     `UPDATE embarazos
      SET estado = 'cerrado',
          fecha_cierre = COALESCE($2, fecha_cierre, CURRENT_DATE),
@@ -345,8 +345,8 @@ async function cerrarEmbarazoEnSeguimiento({ pacienteId, embarazoId, fechaCierre
   return rows[0] || null;
 }
 
-async function actualizarEmbarazoFechas({ embarazoId, fur, fpp, updatedBy = null }) {
-  const { rows } = await pool.query(
+async function actualizarEmbarazoFechas({ embarazoId, fur, fpp, updatedBy = null }, db = pool) {
+  const { rows } = await db.query(
     `UPDATE embarazos
      SET fur = COALESCE($2, fur), fpp = COALESCE($3, fpp),
          updated_at = NOW(), updated_by = $4

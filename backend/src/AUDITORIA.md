@@ -1,22 +1,25 @@
 # Auditoria de eventos
 
-Desde Sprint 4B.2 la auditoria tiene dos caminos delimitados:
+Desde Sprint 4B.3A la auditoria tiene dos caminos delimitados:
 
 - `registrarEventoPrivado`: obligatorio para autenticacion, usuarios,
-  passwords, roles, permisos, sesiones, PDF y exportaciones/reportes. Requiere
+  passwords, roles, permisos, sesiones, PDF, exportaciones/reportes, pacientes
+  y embarazos. Requiere
   contexto explicito, construye payload por allowlist, sanea antes del
   repositorio y nunca captura IP, user-agent, headers ni body.
-- `registrarEvento`/`utils/auditoria.js`: camino legado temporal para pacientes,
-  embarazos y productores clinicos pendientes de Sprint 4B.3.
+- `registrarEvento`/`utils/auditoria.js`: camino legado temporal para controles,
+  laboratorios, riesgo, vacunas, morbilidad, plan de parto, puerperio clinico,
+  referencias y otros productores clinicos pendientes.
 
 No se debe usar el camino legado en un productor no clinico migrado. Tampoco se
 debe afirmar que toda la auditoria clinica esta protegida hasta completar
 4B.3.
 
 Los eventos informativos siguen siendo best effort. Los cambios de password,
-rol, estado del usuario, permisos y eliminacion usan la misma conexion que la
-operacion principal y `obligatorio: true`; una falla de auditoria provoca
-rollback. Una solicitud de permisos sin delta no escribe un evento.
+rol, estado del usuario, permisos, eliminacion de usuario y todas las escrituras
+de paciente o embarazo migradas usan la misma conexion que la operacion principal
+y `obligatorio: true`; una falla de auditoria provoca rollback. Una solicitud de
+permisos o actualizacion de paciente sin delta no escribe un evento.
 
 ## Objetivo
 
@@ -125,11 +128,17 @@ nominal.
   hashes, cookies, IP ni lista completa de IDs.
 - Documentos/reportes: tipo, formato, periodo, cantidad e IDs internos en las
   columnas existentes; nunca contenido, HTML, buffer, temporal o fila nominal.
+- Paciente creado/eliminado: solo nombres en `campos_registrados` o
+  `campos_eliminados`; una actualizacion conserva solo nombres de campos con delta real.
+- Embarazo: creacion/actualizacion conserva nombres de campos; solo
+  `estado_embarazo` puede guardar los valores `activo`, `puerperio` o `cerrado`.
+  `numero_embarazo`, FUR, FPP, observaciones y datos obstetricos no guardan valor.
 
-Los productores clinicos pendientes son pacientes, embarazos, controles,
-laboratorios, riesgo obstetrico, vacunas, morbilidad, plan de parto,
-puerperio, referencias y otros productores clinicos. Los historicos no fueron
-saneados. No hubo cambios de base de datos, migraciones ni ENV en Sprint 4B.2.
+Los productores clinicos pendientes son controles, laboratorios, riesgo
+obstetrico, vacunas, morbilidad, plan de parto, puerperio clinico, referencias y
+otros productores clinicos. Los historicos no fueron saneados. No existen rutas
+HTTP actuales para eliminar pacientes o embarazos y no se agregaron en este
+sprint. No hubo cambios de base de datos, migraciones ni ENV en Sprint 4B.3A.
 
 ## Criterio funcional para PDF institucional
 
@@ -172,22 +181,22 @@ El esquema actual no tiene un campo para exigir cambio de contrasena en el prime
 acceso. Esa capacidad queda pendiente para el sprint de sesiones y politica de
 contrasenas; no se agrega una migracion exclusivamente para ello en este sprint.
 
-## Ejemplo legado pendiente: crear paciente
+## Ejemplo privado: crear paciente
 
 ```json
 {
   "usuario_id": 3,
   "accion": "crear",
   "modulo": "pacientes",
-  "entidad_afectada": "pacientes",
+  "entidad_afectada": "paciente",
   "id_entidad": "42",
   "paciente_id": 42,
   "embarazo_id": null,
   "datos_anteriores": null,
   "datos_nuevos": {
-    "id": 42,
-    "no_expediente": "CAP-001",
-    "nombres": "Ana"
+    "politica_version": 1,
+    "campos_registrados": ["cui", "no_expediente", "nombres"],
+    "resultado": "exitoso"
   }
 }
 ```

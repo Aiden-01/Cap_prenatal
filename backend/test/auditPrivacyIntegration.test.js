@@ -465,7 +465,7 @@ test('reportes aceptan solo tipo, formato, fechas ISO y cantidad', async () => {
   assertNoSensitiveAuditData(recorder.events[0]);
 });
 
-test('el camino clinico legado sigue disponible hasta Sprint 4B.3', async () => {
+test('el camino legado sigue disponible para controles clinicos pendientes de 4B.3A', async () => {
   let query;
   await auditService.registrarEvento({ usuario: { id: 7 } }, {
     accion: 'actualizar',

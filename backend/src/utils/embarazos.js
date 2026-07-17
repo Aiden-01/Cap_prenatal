@@ -12,13 +12,13 @@ function requerirEmbarazoId(embarazoId) {
   return embarazoId;
 }
 
-async function obtenerEmbarazoDePaciente({ pacienteId, embarazoId }) {
+async function obtenerEmbarazoDePaciente({ pacienteId, embarazoId, db = pool, bloquear = false }) {
   if (!embarazoId) return null;
   if (!/^\d+$/.test(String(embarazoId))) {
     throw new HttpError(400, 'embarazo_id invalido', { code: 'INVALID_PREGNANCY_ID' });
   }
-  const { rows } = await pool.query(
-    'SELECT * FROM embarazos WHERE id = $1 AND paciente_id = $2',
+  const { rows } = await db.query(
+    `SELECT * FROM embarazos WHERE id = $1 AND paciente_id = $2${bloquear ? ' FOR UPDATE' : ''}`,
     [embarazoId, pacienteId]
   );
   return rows[0] || null;
@@ -51,8 +51,10 @@ async function validarEmbarazoEditable({
   pacienteId,
   embarazoId,
   estadosPermitidos = ESTADOS_EDITABLES,
+  db = pool,
+  bloquear = false,
 }) {
-  const embarazo = await obtenerEmbarazoDePaciente({ pacienteId, embarazoId });
+  const embarazo = await obtenerEmbarazoDePaciente({ pacienteId, embarazoId, db, bloquear });
   if (!embarazo) {
     throw new HttpError(404, 'Embarazo no encontrado para esta paciente', {
       code: 'PREGNANCY_NOT_FOUND',

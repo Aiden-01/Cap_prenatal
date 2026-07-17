@@ -57,6 +57,7 @@ const PRIVATE_MODULES = Object.freeze({
   sesiones: 'autenticacion',
   documentos: 'documentos',
   reportes: 'reportes',
+  clinica: 'pacientes',
 });
 
 const PRIVATE_TABLES = Object.freeze({
@@ -66,6 +67,8 @@ const PRIVATE_TABLES = Object.freeze({
   documento: 'documentos',
   reporte: 'reportes',
   exportacion: 'reportes',
+  paciente: 'pacientes',
+  embarazo: 'embarazos',
 });
 
 function sanitize(value) {

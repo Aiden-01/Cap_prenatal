@@ -1,6 +1,7 @@
 const pacientesRepository = require('../repositories/pacientesRepository');
 const comunidadesRepository = require('../repositories/comunidadesRepository');
-const { registrarEvento: registrarAuditoria } = require('./auditService');
+const { registrarEventoPrivado: registrarAuditoria } = require('./auditService');
+const { structurallyEqual } = require('./audit/auditDiffBuilder');
 const { HttpError } = require('../utils/httpError');
 const { filtrarCamposVih } = require('../utils/datosSensibles');
 const { resolverEmbarazoParaLectura, requerirEmbarazoId, validarEmbarazoEditable } = require('../utils/embarazos');
@@ -11,6 +12,15 @@ const ESTADO_EMBARAZO_CERRADO = 'cerrado';
 const MENSAJE_EMBARAZO_ACTIVO_DUPLICADO = 'La paciente ya tiene un embarazo activo. Complete el seguimiento y cierre el embarazo actual antes de registrar uno nuevo.';
 const MENSAJE_EMBARAZO_PUERPERIO_DUPLICADO = 'La paciente tiene un embarazo en puerperio. Complete y cierre el puerperio antes de registrar un embarazo nuevo.';
 const MUNICIPIO_EL_CHAL = 'el chal';
+const RESULTADO_EXITOSO = 'exitoso';
+
+const CONTEXTO_AUDITORIA = Object.freeze({
+  pacienteCrear: Object.freeze({ categoria: 'clinica', entidad: 'paciente', evento: 'crear' }),
+  pacienteActualizar: Object.freeze({ categoria: 'clinica', entidad: 'paciente', evento: 'actualizar' }),
+  embarazoCrear: Object.freeze({ categoria: 'clinica', entidad: 'embarazo', evento: 'crear' }),
+  embarazoActualizar: Object.freeze({ categoria: 'clinica', entidad: 'embarazo', evento: 'actualizar' }),
+  embarazoEstado: Object.freeze({ categoria: 'clinica', entidad: 'embarazo', evento: 'cambiar_estado' }),
+});
 
 const emptyToNull = (value) => value === '' ? null : value;
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
@@ -24,6 +34,28 @@ const numOrNull = (value) => {
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : parsed;
 };
+
+function seleccionarCamposAuditoria(registro, campos) {
+  if (!registro || typeof registro !== 'object') return {};
+  return Object.fromEntries(
+    campos
+      .filter((campo) => hasOwn(registro, campo))
+      .map((campo) => [campo, registro[campo]])
+  );
+}
+
+function estadoCreacionPaciente(data) {
+  return seleccionarCamposAuditoria(
+    data,
+    Object.keys(data).filter((campo) => campo !== 'registrado_por')
+  );
+}
+
+function estadoAuditoriaEmbarazo(registro, campos = []) {
+  const estado = seleccionarCamposAuditoria(registro, campos);
+  if (hasOwn(registro || {}, 'estado')) estado.estado_embarazo = registro.estado;
+  return estado;
+}
 
 const calcularEdadAnios = (fechaNacimiento) => {
   const value = emptyToNull(fechaNacimiento);
@@ -294,112 +326,134 @@ async function obtenerPaciente(id) {
 async function crearPaciente({ body, req }) {
   const bodyPermitido = filtrarCamposVih(body, req.usuario.permisos);
   const cui = normalizeCui(bodyPermitido.cui);
-  if (await pacientesRepository.existeCui(cui)) {
-    throw new HttpError(409, 'Ya existe una paciente registrada con ese CUI');
-  }
-
   const bodyConComunidad = await normalizarComunidadPaciente(bodyPermitido);
   const data = buildPacienteInsertData(bodyConComunidad, req.usuario.id);
-  const paciente = await pacientesRepository.insertarPaciente(data);
-  await validarPuedeActivarEmbarazo(paciente.id);
-  const embarazo = await pacientesRepository.crearEmbarazoInicial({
-    pacienteId: paciente.id,
-    fur: data.fur,
-    fpp: data.fpp,
-    usuarioId: req.usuario.id,
-  });
+  return pacientesRepository.enTransaccion(async (client) => {
+    if (await pacientesRepository.existeCui(cui, null, client)) {
+      throw new HttpError(409, 'Ya existe una paciente registrada con ese CUI');
+    }
 
-  await registrarAuditoria(req, {
-    accion: 'crear',
-    tabla: 'pacientes',
-    registroId: paciente.id,
-    pacienteId: paciente.id,
-    datosNuevos: paciente,
-    descripcion: 'Paciente creada',
-  });
-
-  if (embarazo) {
-    await registrarAuditoria(req, {
-      accion: 'crear',
-      tabla: 'embarazos',
-      registroId: embarazo.id,
+    const paciente = await pacientesRepository.insertarPaciente(data, client);
+    await validarPuedeActivarEmbarazo(paciente.id, null, client);
+    const embarazo = await pacientesRepository.crearEmbarazoInicial({
       pacienteId: paciente.id,
-      embarazoId: embarazo.id,
-      datosNuevos: embarazo,
-      descripcion: 'Embarazo inicial creado automaticamente',
-    });
-  }
+      fur: data.fur,
+      fpp: data.fpp,
+      usuarioId: req.usuario.id,
+    }, client);
 
-  return {
-    id: paciente.id,
-    no_expediente: paciente.no_expediente,
-    cui: paciente.cui,
-    nombres: paciente.nombres,
-    apellidos: paciente.apellidos,
-  };
+    await registrarAuditoria(req, {
+      contexto: CONTEXTO_AUDITORIA.pacienteCrear,
+      accion: 'crear',
+      entidadId: paciente.id,
+      pacienteId: paciente.id,
+      cambios: { nuevos: estadoCreacionPaciente(data) },
+      metadata: { resultado: RESULTADO_EXITOSO },
+    }, { db: client, obligatorio: true });
+
+    if (embarazo) {
+      await registrarAuditoria(req, {
+        contexto: CONTEXTO_AUDITORIA.embarazoCrear,
+        accion: 'crear',
+        entidadId: embarazo.id,
+        pacienteId: paciente.id,
+        embarazoId: embarazo.id,
+        cambios: {
+          nuevos: estadoAuditoriaEmbarazo(embarazo, [
+            'numero_embarazo',
+            'fur',
+            'fpp',
+            'fecha_inicio',
+          ]),
+        },
+        metadata: { resultado: RESULTADO_EXITOSO },
+      }, { db: client, obligatorio: true });
+    }
+
+    return {
+      id: paciente.id,
+      no_expediente: paciente.no_expediente,
+      cui: paciente.cui,
+      nombres: paciente.nombres,
+      apellidos: paciente.apellidos,
+    };
+  });
 }
 
 async function actualizarPaciente({ id, body, req }) {
   const bodyPermitido = filtrarCamposVih(body, req.usuario.permisos);
-  const before = await pacientesRepository.obtenerPorId(id);
-  if (!before) throw new HttpError(404, 'Paciente no encontrado');
+  return pacientesRepository.enTransaccion(async (client) => {
+    const before = await pacientesRepository.obtenerPacienteParaActualizar(id, client);
+    if (!before) throw new HttpError(404, 'Paciente no encontrado');
 
-  const bodyConComunidad = await normalizarComunidadPaciente(bodyPermitido, before);
-  const { data, campos } = buildPacienteUpdateData(bodyConComunidad);
-  if (campos.length === 0) throw new HttpError(400, 'Sin campos para actualizar');
+    const bodyConComunidad = await normalizarComunidadPaciente(bodyPermitido, before);
+    const { data, campos } = buildPacienteUpdateData(bodyConComunidad);
+    if (campos.length === 0) throw new HttpError(400, 'Sin campos para actualizar');
 
-  if (
-    Object.prototype.hasOwnProperty.call(data, 'cui') &&
-    await pacientesRepository.existeCui(data.cui, id)
-  ) {
-    throw new HttpError(409, 'Ya existe una paciente registrada con ese CUI');
-  }
+    const camposModificados = campos.filter(
+      (campo) => !structurallyEqual(before[campo], data[campo])
+    );
+    if (camposModificados.length === 0) return { message: 'Paciente actualizado' };
+    const datosModificados = seleccionarCamposAuditoria(data, camposModificados);
 
-  const { paciente, rowCount } = await pacientesRepository.actualizarPaciente(
-    id,
-    data,
-    campos,
-    req.usuario.id
-  );
-  if (rowCount === 0) throw new HttpError(404, 'Paciente no encontrado');
+    if (
+      hasOwn(datosModificados, 'cui')
+      && await pacientesRepository.existeCui(datosModificados.cui, id, client)
+    ) {
+      throw new HttpError(409, 'Ya existe una paciente registrada con ese CUI');
+    }
 
-  await registrarAuditoria(req, {
-    accion: 'actualizar',
-    tabla: 'pacientes',
-    registroId: id,
-    pacienteId: id,
-    datosAnteriores: before,
-    datosNuevos: paciente,
-    descripcion: 'Paciente actualizada',
-  });
+    const { paciente, rowCount } = await pacientesRepository.actualizarPaciente(
+      id,
+      datosModificados,
+      camposModificados,
+      req.usuario.id,
+      client
+    );
+    if (rowCount === 0) throw new HttpError(404, 'Paciente no encontrado');
 
-  if (Object.prototype.hasOwnProperty.call(data, 'fur') || Object.prototype.hasOwnProperty.call(data, 'fpp')) {
-    const embarazoId = await pacientesRepository.obtenerEmbarazoActivoId(id);
-    if (embarazoId) {
-      const embarazoBefore = await pacientesRepository.obtenerEmbarazoPorId(embarazoId);
-      const embarazo = await pacientesRepository.actualizarEmbarazoFechas({
-        embarazoId,
-        fur: emptyToNull(data.fur),
-        fpp: emptyToNull(data.fpp),
-        updatedBy: req.usuario.id,
-      });
+    await registrarAuditoria(req, {
+      contexto: CONTEXTO_AUDITORIA.pacienteActualizar,
+      accion: 'actualizar',
+      entidadId: id,
+      pacienteId: id,
+      cambios: {
+        anteriores: seleccionarCamposAuditoria(before, camposModificados),
+        nuevos: seleccionarCamposAuditoria(paciente, camposModificados),
+      },
+      metadata: { resultado: RESULTADO_EXITOSO },
+    }, { db: client, obligatorio: true });
 
-      if (embarazo) {
-        await registrarAuditoria(req, {
-          accion: 'actualizar',
-          tabla: 'embarazos',
-          registroId: embarazoId,
-          pacienteId: id,
+    if (hasOwn(datosModificados, 'fur') || hasOwn(datosModificados, 'fpp')) {
+      const embarazoId = await pacientesRepository.obtenerEmbarazoActivoId(id, client);
+      if (embarazoId) {
+        const embarazoBefore = await pacientesRepository.obtenerEmbarazoPorId(embarazoId, client);
+        const embarazo = await pacientesRepository.actualizarEmbarazoFechas({
           embarazoId,
-          datosAnteriores: embarazoBefore,
-          datosNuevos: embarazo,
-          descripcion: 'Fechas de embarazo sincronizadas desde paciente',
-        });
+          fur: emptyToNull(datosModificados.fur),
+          fpp: emptyToNull(datosModificados.fpp),
+          updatedBy: req.usuario.id,
+        }, client);
+
+        if (embarazo) {
+          await registrarAuditoria(req, {
+            contexto: CONTEXTO_AUDITORIA.embarazoActualizar,
+            accion: 'actualizar',
+            entidadId: embarazoId,
+            pacienteId: id,
+            embarazoId,
+            cambios: {
+              anteriores: seleccionarCamposAuditoria(embarazoBefore, ['fur', 'fpp']),
+              nuevos: seleccionarCamposAuditoria(embarazo, ['fur', 'fpp']),
+            },
+            metadata: { resultado: RESULTADO_EXITOSO },
+          }, { db: client, obligatorio: true });
+        }
       }
     }
-  }
 
-  return { message: 'Paciente actualizado' };
+    return { message: 'Paciente actualizado' };
+  });
 }
 
 async function expedienteCompleto(id, embarazoIdSolicitado = null) {
@@ -505,23 +559,36 @@ async function nuevoEmbarazo({ id, body, req }) {
     }, client);
 
     await registrarAuditoria(req, {
+      contexto: CONTEXTO_AUDITORIA.embarazoCrear,
       accion: 'crear',
-      tabla: 'embarazos',
-      registroId: embarazo.id,
+      entidadId: embarazo.id,
       pacienteId: id,
       embarazoId: embarazo.id,
-      datosNuevos: embarazo,
-      descripcion: 'Nuevo embarazo creado',
+      cambios: {
+        nuevos: estadoAuditoriaEmbarazo(embarazo, [
+          'numero_embarazo',
+          'fur',
+          'fpp',
+          'fecha_inicio',
+          'observaciones',
+        ]),
+      },
+      metadata: { resultado: RESULTADO_EXITOSO },
     }, { db: client, obligatorio: true });
 
     await registrarAuditoria(req, {
+      contexto: CONTEXTO_AUDITORIA.pacienteActualizar,
       accion: 'actualizar',
-      tabla: 'pacientes',
-      registroId: id,
+      entidadId: id,
       pacienteId: id,
-      datosAnteriores: paciente,
-      datosNuevos: pacienteActualizado,
-      descripcion: 'Paciente sincronizada con nuevo embarazo',
+      cambios: {
+        anteriores: seleccionarCamposAuditoria(paciente, ['fur', 'fpp', 'tiene_ficha_riesgo']),
+        nuevos: seleccionarCamposAuditoria(
+          pacienteActualizado,
+          ['fur', 'fpp', 'tiene_ficha_riesgo']
+        ),
+      },
+      metadata: { resultado: RESULTADO_EXITOSO },
     }, { db: client, obligatorio: true });
 
     return embarazo;
@@ -530,63 +597,81 @@ async function nuevoEmbarazo({ id, body, req }) {
 
 async function pasarAPuerperio({ id, embarazoId, body, req }) {
   requerirEmbarazoId(embarazoId);
-  const before = await validarEmbarazoEditable({ pacienteId: id, embarazoId });
-  if (before.estado !== ESTADO_EMBARAZO_ACTIVO) {
-    throw new HttpError(409, 'Solo un embarazo activo puede pasar a puerperio');
-  }
-  const embarazo = await pacientesRepository.pasarEmbarazoAPuerperio({
-    pacienteId: id,
-    embarazoId,
-    fechaCierre: emptyToNull(body.fecha_parto || body.fecha_cierre),
-    observaciones: emptyToNull(body.observaciones),
-    updatedBy: req.usuario.id,
+  return pacientesRepository.enTransaccion(async (client) => {
+    const before = await validarEmbarazoEditable({
+      pacienteId: id,
+      embarazoId,
+      db: client,
+      bloquear: true,
+    });
+    if (before.estado !== ESTADO_EMBARAZO_ACTIVO) {
+      throw new HttpError(409, 'Solo un embarazo activo puede pasar a puerperio');
+    }
+    const embarazo = await pacientesRepository.pasarEmbarazoAPuerperio({
+      pacienteId: id,
+      embarazoId,
+      fechaCierre: emptyToNull(body.fecha_parto || body.fecha_cierre),
+      observaciones: emptyToNull(body.observaciones),
+      updatedBy: req.usuario.id,
+    }, client);
+
+    if (!embarazo) {
+      throw new HttpError(409, 'La paciente no tiene un embarazo activo para pasar a puerperio');
+    }
+
+    await registrarAuditoria(req, {
+      contexto: CONTEXTO_AUDITORIA.embarazoEstado,
+      accion: 'estado',
+      entidadId: embarazo.id,
+      pacienteId: id,
+      embarazoId: embarazo.id,
+      cambios: {
+        anteriores: estadoAuditoriaEmbarazo(before),
+        nuevos: estadoAuditoriaEmbarazo(embarazo),
+      },
+      metadata: { resultado: RESULTADO_EXITOSO },
+    }, { db: client, obligatorio: true });
+
+    return embarazo;
   });
-
-  if (!embarazo) {
-    throw new HttpError(409, 'La paciente no tiene un embarazo activo para pasar a puerperio');
-  }
-
-  await registrarAuditoria(req, {
-    accion: 'estado',
-    tabla: 'embarazos',
-    registroId: embarazo.id,
-    pacienteId: id,
-    embarazoId: embarazo.id,
-    datosAnteriores: before,
-    datosNuevos: embarazo,
-    descripcion: 'Embarazo pasado a puerperio',
-  });
-
-  return embarazo;
 }
 
 async function cerrarEmbarazo({ id, embarazoId, body, req }) {
   requerirEmbarazoId(embarazoId);
-  const before = await validarEmbarazoEditable({ pacienteId: id, embarazoId });
-  const embarazo = await pacientesRepository.cerrarEmbarazoEnSeguimiento({
-    pacienteId: id,
-    embarazoId,
-    fechaCierre: emptyToNull(body.fecha_cierre),
-    observaciones: emptyToNull(body.observaciones),
-    updatedBy: req.usuario.id,
+  return pacientesRepository.enTransaccion(async (client) => {
+    const before = await validarEmbarazoEditable({
+      pacienteId: id,
+      embarazoId,
+      db: client,
+      bloquear: true,
+    });
+    const embarazo = await pacientesRepository.cerrarEmbarazoEnSeguimiento({
+      pacienteId: id,
+      embarazoId,
+      fechaCierre: emptyToNull(body.fecha_cierre),
+      observaciones: emptyToNull(body.observaciones),
+      updatedBy: req.usuario.id,
+    }, client);
+
+    if (!embarazo) {
+      throw new HttpError(409, 'La paciente no tiene un embarazo activo o en puerperio para cerrar');
+    }
+
+    await registrarAuditoria(req, {
+      contexto: CONTEXTO_AUDITORIA.embarazoEstado,
+      accion: 'estado',
+      entidadId: embarazo.id,
+      pacienteId: id,
+      embarazoId: embarazo.id,
+      cambios: {
+        anteriores: estadoAuditoriaEmbarazo(before),
+        nuevos: estadoAuditoriaEmbarazo(embarazo),
+      },
+      metadata: { resultado: RESULTADO_EXITOSO },
+    }, { db: client, obligatorio: true });
+
+    return embarazo;
   });
-
-  if (!embarazo) {
-    throw new HttpError(409, 'La paciente no tiene un embarazo activo o en puerperio para cerrar');
-  }
-
-  await registrarAuditoria(req, {
-    accion: 'estado',
-    tabla: 'embarazos',
-    registroId: embarazo.id,
-    pacienteId: id,
-    embarazoId: embarazo.id,
-    datosAnteriores: before,
-    datosNuevos: embarazo,
-    descripcion: 'Embarazo cerrado',
-  });
-
-  return embarazo;
 }
 
 module.exports = {

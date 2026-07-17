@@ -160,6 +160,13 @@ const DEFAULT_FREE_TEXT_PATTERNS = Object.freeze([
 
 const BASE_CONTEXTUAL_RULES = Object.freeze([
   Object.freeze({
+    categories: ['clinica'],
+    entities: ['paciente', 'embarazo'],
+    events: ['crear', 'actualizar', 'eliminar', 'cambiar_estado'],
+    fields: ['resultado', 'motivo_codigo'],
+    valueType: AUDIT_VALUE_TYPES.CONTROLLED_CODE,
+  }),
+  Object.freeze({
     categories: ['usuarios'],
     entities: ['usuario'],
     events: ['actualizar', 'usuario_actualizado', 'cambiar_rol', 'cambio_rol'],
@@ -224,7 +231,7 @@ const BASE_CONTEXTUAL_RULES = Object.freeze([
   Object.freeze({
     categories: ['clinica'],
     entities: ['embarazo'],
-    events: ['actualizar', 'cambiar_estado', 'cerrar', 'iniciar_puerperio'],
+    events: ['actualizar', 'cambiar_estado'],
     fields: ['estado_embarazo'],
     valueType: AUDIT_VALUE_TYPES.ENUM,
     allowedValues: ['activo', 'puerperio', 'cerrado'],

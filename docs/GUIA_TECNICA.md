@@ -98,10 +98,11 @@ Respuesta de error esperada:
 }
 ```
 
-### Auditoria privada Sprint 4B.2
+### Auditoria privada Sprint 4B.3A
 
-Autenticacion, usuarios, passwords, roles, permisos, sesiones, PDF y
-exportaciones/reportes usan `registrarEventoPrivado`. El contrato exige
+Autenticacion, usuarios, passwords, roles, permisos, sesiones, PDF,
+exportaciones/reportes, pacientes y embarazos usan `registrarEventoPrivado`.
+El contrato exige
 `categoria`, `entidad` y `evento`, construye el diff o metadata con la politica
 contextual, elimina campos prohibidos de forma recursiva y ejecuta el
 saneamiento inmediatamente antes de `auditRepository`.
@@ -115,20 +116,26 @@ El payload privado conserva `politica_version: 1` y metadata minima:
 - sesiones: resultado, motivo, banderas y cantidad revocada;
 - documentos/reportes: tipo, formato, fechas validadas, cantidad e IDs
   internos.
+- pacientes: IDs internos y nombres de campos creados, eliminados o realmente
+  modificados; nunca valores nominales, de ubicacion o clinicos;
+- embarazos: IDs internos y nombres de campos; solo `estado_embarazo` conserva
+  transiciones entre `activo`, `puerperio` y `cerrado`.
 
 No guarda password, hash, token, JWT, cookie, CSRF, Authorization, IP,
 user-agent, request/body completo, nombres, CUI, contenido clinico, buffer,
 HTML, temporal, query libre ni filas nominales.
 
-Password, rol, estado, permisos y eliminacion son eventos obligatorios dentro
-de la transaccion. Login, expiraciones automaticas y documentos/reportes son
-best effort. Una falla informativa no invalida una descarga ya generada.
+Password, rol, estado, permisos, eliminacion de usuario y escrituras de paciente
+o embarazo son eventos obligatorios dentro de la transaccion. Una falla revierte
+la escritura clinica completa. Login, expiraciones automaticas y
+documentos/reportes son best effort. Una falla informativa no invalida una
+descarga ya generada.
 
-Los productores clinicos (pacientes, embarazos, controles, laboratorios,
-riesgo, vacunas, morbilidad, plan de parto, puerperio y referencias) siguen en
-el camino legado hasta Sprint 4B.3. Los historicos no fueron saneados. Esta
-fase no cambio esquema, migraciones, ENV, frontend, contratos HTTP, permisos,
-sesiones funcionales ni PDFs oficiales.
+Los productores de controles, laboratorios, riesgo, vacunas, morbilidad, plan
+de parto, puerperio clinico y referencias siguen en el camino legado. Los
+historicos no fueron saneados. No existen endpoints actuales de eliminacion de
+paciente o embarazo y no se agregaron. Esta fase no cambio esquema, migraciones,
+ENV, frontend, contratos HTTP, permisos, sesiones funcionales ni PDFs oficiales.
 
 ### Chatbot Lia: privacidad y validacion
 
@@ -697,17 +704,19 @@ Estados de embarazo:
 
 1. Frontend envia datos generales a `POST /api/pacientes`.
 2. Backend normaliza fechas, edad, FUR/FPP y campos booleanos.
-3. Se crea paciente.
-4. Se crea embarazo inicial activo con FUR/FPP.
-5. Se auditan paciente y embarazo.
+3. Dentro de una transaccion se crea la paciente.
+4. En la misma transaccion se crea el embarazo inicial activo con FUR/FPP.
+5. Se auditan ambas entidades con payload minimo y auditoria obligatoria; un
+   fallo revierte las dos inserciones.
 
 ### Actualizar paciente
 
 1. Frontend envia `PUT /api/pacientes/:id`.
 2. Backend filtra campos sensibles segun permisos.
-3. Se actualizan campos permitidos.
+3. Se actualizan solo campos con diferencia persistida; sin delta no hay DML ni evento.
 4. Si cambia FUR/FPP, se sincronizan fechas del embarazo activo.
-5. Se audita el cambio.
+5. Paciente, sincronizacion de embarazo y auditorias comparten transaccion; los
+   valores personales/obstetricos nunca llegan al repositorio de auditoria.
 
 ### Nuevo embarazo
 
@@ -739,7 +748,7 @@ en este cierre.
 2. Requiere embarazo activo.
 3. Cambia estado a `puerperio`.
 4. Registra fecha de parto/cierre si aplica.
-5. Audita cambio de estado.
+5. Audita exclusivamente `activo` a `puerperio` dentro de la misma transaccion.
 
 ### Cerrar embarazo
 
@@ -747,7 +756,8 @@ en este cierre.
 2. Requiere embarazo activo o puerperio.
 3. Cambia estado a `cerrado`.
 4. El expediente queda historico/solo lectura.
-5. Audita cambio de estado.
+5. Audita la transicion a `cerrado` dentro de la misma transaccion, sin datos
+   de parto, puerperio u observaciones.
 
 ### Vacunas y antecedentes
 
@@ -907,9 +917,9 @@ Fuera de alcance actual:
 - En frontend, preservar `embarazo_id` al navegar hacia formularios clinicos.
 - Comparar IDs de URL como string.
 - Para escrituras clinicas, registrar auditoria.
-- Los productores no clinicos migrados deben usar `registrarEventoPrivado`;
-  `registrarEvento` y `utils/auditoria.js` quedan solo para productores
-  clinicos pendientes de Sprint 4B.3.
+- Los productores migrados, incluidos pacientes y embarazos, deben usar
+  `registrarEventoPrivado`; `registrarEvento` y `utils/auditoria.js` quedan solo
+  para controles, laboratorios y demas productores clinicos pendientes.
 - No guardar tokens, contrasenas ni secretos en logs o auditoria.
 - Usar Zod para nuevos endpoints.
 - Preferir mensajes de error claros para el personal de salud.
