@@ -162,6 +162,26 @@ no fueron saneados. No existen endpoints actuales de eliminacion de
 paciente o embarazo y no se agregaron. Esta fase no cambio esquema, migraciones,
 ENV, frontend, contratos HTTP, permisos, sesiones funcionales ni PDFs oficiales.
 
+### Artefacto de saneamiento historico Sprint 4C.2A
+
+El backend incluye un programa offline con nucleo puro, orquestador
+transaccional y CLI. Clasifica eventos A/B/C sin eliminar filas; D es solo una
+estadistica y debe ser cero. Los B reconstruyen el JSON por allowlist y los C
+reciben un marcador minimo. Ambos limpian snapshot anterior, IP, user-agent y
+los identificadores TEXT que no sean internos verificables.
+
+El modo predeterminado `--dry-run` consulta en una transaccion read-only,
+valida y hace rollback. El modo `--apply` queda reservado para Sprint 4C.2B y
+requiere backup verificado, `--backup-confirmed` y la confirmacion exacta
+`SANITIZE_AUDIT_HISTORY_V1`; ademas usa advisory lock y valida antes del commit.
+
+Sprint 4C.2A creo y probo el artefacto solo con datos sinteticos. No se ejecuto
+sobre bases reales; los historicos permanecen intactos. Los productores activos
+ya son privados. No se modificaron esquema, `schema.sql`, migraciones, ENV,
+frontend o contratos HTTP. El saneamiento futuro es destructivo y depende del
+backup para revertirse. El runbook completo esta en
+`AUDITORIA_SANEAMIENTO_HISTORICO.md`.
+
 ### Chatbot Lia: privacidad y validacion
 
 Los endpoints autenticados son `POST /api/chatbot/mensaje` y

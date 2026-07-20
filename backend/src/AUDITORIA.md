@@ -15,6 +15,28 @@ Desde Sprint 4B.3E todos los productores productivos usan el camino privado:
 Una prueba recorre `backend/src` y falla si un productor reintroduce el camino
 legacy, llama `auditRepository` o agrega un `INSERT` fuera del repositorio.
 
+## Saneamiento historico Sprint 4C.2A
+
+El artefacto controlado vive en `scripts/sanitizeAuditHistory.js`, con la
+orquestacion transaccional en `services/audit/auditHistoryMigration.js` y la
+clasificacion pura en `services/audit/auditHistorySanitizer.js`. No es una
+migracion de esquema. A conserva la fila sin `UPDATE`; B reconstruye metadata,
+nombres de campos y transiciones permitidas; C usa un marcador minimo; D no
+elimina y su conteo debe ser cero.
+
+El dry-run predeterminado abre `REPEATABLE READ READ ONLY`, valida en memoria,
+solo expone estadisticas agregadas y hace `ROLLBACK`. El apply requiere
+`--backup-confirmed --confirmation SANITIZE_AUDIT_HISTORY_V1`, usa una unica
+transaccion `SERIALIZABLE` y advisory lock, y valida de nuevo antes del commit.
+Una segunda ejecucion debe producir cero `UPDATE`.
+
+Sprint 4C.2A no ejecuto apply contra bases reales. Los productores activos ya
+son privados; los historicos permanecen intactos hasta 4C.2B. No cambiaron
+esquema, `schema.sql`, migraciones, ENV, frontend ni contratos HTTP. La futura
+transformacion es destructiva y depende de backups verificados para revertirse.
+El procedimiento operativo esta en
+`../../docs/AUDITORIA_SANEAMIENTO_HISTORICO.md`.
+
 Los eventos informativos siguen siendo best effort. Los cambios de password,
 rol, estado del usuario, permisos, eliminacion de usuario y todas las escrituras
 de paciente, embarazo, control prenatal, riesgo, vacuna, morbilidad, plan de

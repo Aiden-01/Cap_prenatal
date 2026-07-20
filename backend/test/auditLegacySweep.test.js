@@ -12,6 +12,10 @@ const AUDIT_REPOSITORY_FILES = new Set([
   'repositories/auditRepository.js',
   'services/auditService.js',
 ]);
+const HISTORICAL_SANITIZER_FILES = new Set([
+  'services/audit/auditHistoryMigration.js',
+  'services/audit/auditHistorySanitizer.js',
+]);
 
 function javascriptFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -70,6 +74,7 @@ test('productores no llaman auditRepository ni construyen payloads legacy', () =
     pattern: /\b(datosAnteriores|datosNuevos|datos_anteriores|datos_nuevos)\b/,
     allowed: new Set([
       ...LEGACY_CENTRAL_FILES,
+      ...HISTORICAL_SANITIZER_FILES,
       'repositories/auditRepository.js',
     ]),
   }), 'Payload legacy encontrado');

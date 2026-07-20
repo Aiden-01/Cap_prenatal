@@ -379,11 +379,32 @@ negativas que demuestren que la regla no se aplica fuera de su contexto.
 ## Trabajo posterior
 
 1. Disenar la asociacion referencia-embarazo con migracion y auditoria de datos.
-2. Disenar el saneamiento de historicos como tarea independiente, con respaldo
-   y dry-run.
+2. Aplicar el artefacto de saneamiento historico unicamente en Sprint 4C.2B,
+   despues de backup verificado, restauracion aislada y dry-run aprobado.
 
 Cada fase debe mantener el contrato publico de `registrarEvento` hasta que sus
 consumidores sean migrados y probados explicitamente.
 
 Sprint 4B.3E no cambio base de datos, `schema.sql`, migraciones, registros
 historicos, `.env` ni `.env.example`.
+
+## Artefacto historico Sprint 4C.2A
+
+`scripts/sanitizeAuditHistory.js`, `auditHistoryMigration.js` y
+`auditHistorySanitizer.js` implementan el saneamiento de datos historicos sin
+cambios estructurales. El nucleo clasifica A (seguro e intacto), B (derivable)
+y C (marcador conservador); D existe solo como estadistica con conteo esperado
+cero. Reconstruye los payloads desde cero, ejecuta `auditSanitizer`, valida la
+forma final por allowlist y limpia snapshots, IP, user-agent e identificadores
+TEXT no verificables solo para B/C.
+
+El modo predeterminado es `--dry-run`: usa una transaccion de solo lectura y
+termina con `ROLLBACK`. `--apply` requiere backup confirmado, la frase exacta
+`SANITIZE_AUDIT_HISTORY_V1`, una unica transaccion y advisory lock. El
+artefacto existe y esta probado con datos sinteticos, pero no se aplico a las
+bases reales durante 4C.2A. Los productores activos ya son privados y los
+historicos siguen intactos hasta 4C.2B.
+
+No hubo cambios de esquema, `schema.sql`, migraciones, ENV, frontend o
+contratos HTTP. El saneamiento futuro es destructivo y solo puede revertirse
+desde backups verificados. Ver `../docs/AUDITORIA_SANEAMIENTO_HISTORICO.md`.

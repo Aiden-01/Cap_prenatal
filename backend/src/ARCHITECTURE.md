@@ -237,6 +237,25 @@ payload migrado incluye `politica_version: 1`.
 
 Ver `AUDITORIA.md`.
 
+### Saneamiento historico controlado
+
+Sprint 4C.2A agrega un camino offline, separado de los productores activos:
+
+```text
+CLI -> auditHistoryMigration -> auditHistorySanitizer
+    -> auditSanitizer -> validacion allowlist -> ROLLBACK/COMMIT
+```
+
+El CLI usa dry-run de solo lectura por defecto. El apply protegido requiere
+dos confirmaciones, una unica transaccion y advisory lock, y solo actualiza
+eventos legacy B/C. Los A no reciben `UPDATE`; D nunca elimina. La segunda
+ejecucion clasifica los eventos saneados como A y produce cero cambios.
+
+Este artefacto no participa en solicitudes HTTP ni modifica productores. En
+4C.2A no se aplico a bases reales: los historicos siguen intactos hasta 4C.2B.
+No hubo cambio de esquema o ENV. La perdida de contenido legacy es deliberada
+y solo puede revertirse restaurando un backup verificado.
+
 ## Checklist para crear endpoint nuevo
 
 1. Definir ruta en `routes`.
