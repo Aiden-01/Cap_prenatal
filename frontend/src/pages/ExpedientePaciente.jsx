@@ -708,6 +708,8 @@ export default function ExpedientePaciente() {
   const tieneEmbarazoQueBloqueaCreacion = hasPregnancyBlockingCreation(exp);
   const tieneEmbarazoEnPuerperio = hasPuerperiumPregnancy(exp);
   const puedeEditarPacientes = Boolean(usuario?.permisos?.includes("pacientes.editar"));
+  const puedeConsultarControles = Boolean(usuario?.permisos?.includes("pacientes.ver"));
+  const puedeCrearControles = Boolean(usuario?.permisos?.includes("controles.crear"));
   const puedeCrearEmbarazo = canCreatePregnancy(exp, puedeEditarPacientes);
   const etiquetaCrearEmbarazo = pregnancyActionLabel(exp);
   const embarazoSeleccionadoId = embarazoSeleccionado?.id ? String(embarazoSeleccionado.id) : "";
@@ -762,7 +764,7 @@ export default function ExpedientePaciente() {
       : nombreCompleto.length > 24
         ? "is-medium"
       : "";
-  const puedeRegistrarPrenatal = estadoEmbarazo === "activo";
+  const puedeRegistrarPrenatal = estadoEmbarazo === "activo" && puedeCrearControles;
   const puedeRegistrarPuerperio = estadoEmbarazo === "activo" || estadoEmbarazo === "puerperio";
   const riskTotalCriteria = riskTotalCount();
   const riskPositiveCriteria = exp.ficha_riesgo
@@ -1352,7 +1354,14 @@ export default function ExpedientePaciente() {
               </button>
             </div>
           )}
-          <TimelineControles pacienteId={id} embarazoId={embarazoSeleccionado?.id} controles={exp.controles_prenatales} isReadOnly={isReadOnly} />
+          <TimelineControles
+            pacienteId={id}
+            embarazoId={embarazoSeleccionado?.id}
+            controles={exp.controles_prenatales}
+            isReadOnly={isReadOnly}
+            puedeConsultar={puedeConsultarControles}
+            puedeCrear={puedeCrearControles}
+          />
         </div>
       )}
 

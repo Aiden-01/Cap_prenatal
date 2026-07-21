@@ -244,21 +244,51 @@ test('lista controles del embarazo seleccionado, incluido uno historico', async 
   });
 });
 
-test('consulta un control existente y valida su embarazo para lectura', async () => {
+for (const estado of ['activo', 'puerperio', 'cerrado']) {
+  test(`consulta un control de embarazo ${estado} sin generar auditoria`, async () => {
+    const control = { id: 201, paciente_id: 41, embarazo_id: 88, numero_control: 1 };
+    let selection;
+    let audits = 0;
+
+    await withService({
+      repository: { obtenerPorId: async (id) => id === 201 ? control : null },
+      pregnancies: {
+        resolverEmbarazoParaLectura: async (args) => {
+          selection = args;
+          return { id: 88, paciente_id: 41, estado };
+        },
+      },
+      audit: async () => { audits += 1; },
+    }, async (service) => {
+      assert.equal(await service.obtenerControl({ pacienteId: 41, embarazoId: 88, id: 201 }), control);
+      assert.deepEqual(selection, { pacienteId: 41, embarazoId: 88 });
+      assert.equal(audits, 0);
+    });
+  });
+}
+
+test('rechaza consultar un control desde un embarazo seleccionado distinto', async () => {
   const control = { id: 201, paciente_id: 41, embarazo_id: 88, numero_control: 1 };
   let selection;
+  let audits = 0;
 
   await withService({
-    repository: { obtenerPorId: async (id) => id === 201 ? control : null },
+    repository: { obtenerPorId: async () => control },
     pregnancies: {
       resolverEmbarazoParaLectura: async (args) => {
         selection = args;
         return { id: 88, paciente_id: 41, estado: 'cerrado' };
       },
     },
+    audit: async () => { audits += 1; },
   }, async (service) => {
-    assert.equal(await service.obtenerControl({ pacienteId: 41, embarazoId: 88, id: 201 }), control);
+    await assert.rejects(
+      service.obtenerControl({ pacienteId: 41, embarazoId: 91, id: 201 }),
+      (error) => error.statusCode === 404
+        && error.message === 'Control no encontrado en el embarazo seleccionado'
+    );
     assert.deepEqual(selection, { pacienteId: 41, embarazoId: 88 });
+    assert.equal(audits, 0);
   });
 });
 

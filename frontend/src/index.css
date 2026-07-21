@@ -650,6 +650,26 @@ h1, h2, h3, h4 {
   font-weight: 650;
 }
 
+.toggle-control.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+  pointer-events: none;
+}
+
+.control-form-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.control-read-only-badge {
+  gap: 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--border));
+  background: color-mix(in srgb, var(--warn) 12%, var(--surface));
+  color: var(--text);
+}
+
 .toggle-mark {
   width: 16px;
   height: 16px;

@@ -15,6 +15,10 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { isValidPregnancyId } from "../utils/pregnancyState";
+import {
+  canConsultPrenatalControl,
+  prenatalControlDetailPath,
+} from "../utils/prenatalControlAccess";
 
 function fecha(value) {
   if (!value) return "-";
@@ -65,7 +69,7 @@ function DetailItem({ label, value }) {
   );
 }
 
-function ControlRow({ control, index, pacienteId, embarazoId, isReadOnly, isOpen, onToggle }) {
+function ControlRow({ control, index, pacienteId, embarazoId, puedeConsultarControles, isOpen, onToggle }) {
   const navigate = useNavigate();
   const observaciones = control.observaciones || control.impresion_clinica;
   const numeroControl = control.numero_control ?? index + 1;
@@ -73,14 +77,16 @@ function ControlRow({ control, index, pacienteId, embarazoId, isReadOnly, isOpen
   const estadoClass = control.tiene_hallazgo ? "badge-red" : complete ? "badge-green" : "badge-orange";
   const estadoLabel = control.tiene_hallazgo ? "Hallazgo" : complete ? "Completo" : "Incompleto";
   const EstadoIcon = control.tiene_hallazgo ? AlertTriangle : complete ? CheckCircle2 : AlertTriangle;
-  const canEdit = !isReadOnly && isValidPregnancyId(embarazoId);
+  const puedeConsultar = canConsultPrenatalControl({
+    canRead: puedeConsultarControles,
+    pacienteId,
+    embarazoId,
+    controlId: control.id,
+  });
 
   const openControl = () => {
-    if (canEdit) {
-      navigate(`/pacientes/${pacienteId}/controles/${control.id}/editar?embarazo_id=${encodeURIComponent(embarazoId)}`);
-      return;
-    }
-    onToggle();
+    if (!puedeConsultar) return;
+    navigate(prenatalControlDetailPath({ pacienteId, embarazoId, controlId: control.id }));
   };
 
   return (
@@ -105,7 +111,12 @@ function ControlRow({ control, index, pacienteId, embarazoId, isReadOnly, isOpen
           <EstadoIcon size={13} /> {estadoLabel}
         </span>
         <div className="prenatal-actions">
-          <button type="button" className="btn-secondary prenatal-open-button" onClick={openControl}>
+          <button
+            type="button"
+            className="btn-secondary prenatal-open-button"
+            onClick={openControl}
+            disabled={!puedeConsultar}
+          >
             <ExternalLink size={14} /> Abrir
           </button>
         </div>
@@ -134,7 +145,14 @@ function ControlRow({ control, index, pacienteId, embarazoId, isReadOnly, isOpen
   );
 }
 
-export default function TimelineControles({ pacienteId, embarazoId, controles = [], isReadOnly = false }) {
+export default function TimelineControles({
+  pacienteId,
+  embarazoId,
+  controles = [],
+  isReadOnly = false,
+  puedeConsultar = false,
+  puedeCrear = false,
+}) {
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState(null);
   const hasEmbarazoId = isValidPregnancyId(embarazoId);
@@ -148,7 +166,7 @@ export default function TimelineControles({ pacienteId, embarazoId, controles = 
       <div className="card empty-state" style={{ display: "grid", justifyItems: "center", gap: "0.85rem" }}>
         <ClipboardList size={28} style={{ color: "var(--primary)" }} />
         <span>Sin controles registrados aun</span>
-        {!isReadOnly && hasEmbarazoId && (
+        {!isReadOnly && puedeCrear && hasEmbarazoId && (
           <button className="btn-primary" onClick={() => navigate(`/pacientes/${pacienteId}/controles/nuevo?embarazo_id=${encodeURIComponent(embarazoId)}`)}>
             Registrar primer control
           </button>
@@ -188,7 +206,7 @@ export default function TimelineControles({ pacienteId, embarazoId, controles = 
             index={index}
             pacienteId={pacienteId}
             embarazoId={embarazoId}
-            isReadOnly={isReadOnly}
+            puedeConsultarControles={puedeConsultar}
             isOpen={expandedId === control.id}
             onToggle={() => setExpandedId((value) => (value === control.id ? null : control.id))}
           />

@@ -28,7 +28,7 @@ test("las defensas frontend no navegan ni escriben con embarazo_id ausente", asy
     source("src/pages/Pacientes.jsx"),
   ]);
 
-  assert.match(timeline, /!isReadOnly && hasEmbarazoId/);
+  assert.match(timeline, /!isReadOnly && puedeCrear && hasEmbarazoId/);
   assert.match(timeline, /encodeURIComponent\(embarazoId\)/);
   assert.match(control, /if \(!hasEmbarazoId\)/);
   assert.match(control, /Selecciona un embarazo antes de guardar el control/);

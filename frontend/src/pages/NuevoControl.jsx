@@ -3,11 +3,15 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
-import { ChevronLeft, Save, Stethoscope, FlaskConical, Pill, BookOpen } from "lucide-react";
+import { ChevronLeft, Save, Stethoscope, FlaskConical, Pill, BookOpen, LockKeyhole } from "lucide-react";
 import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
 import { calculateGestationalWeeks } from "../utils/gestationalAge";
 import { getErrorMessage, getFieldErrors } from "../utils/errorMessage";
 import { isValidPregnancyId } from "../utils/pregnancyState";
+import {
+  canConsultPrenatalControl,
+  canEditPrenatalControl,
+} from "../utils/prenatalControlAccess";
 
 // ─── HELPERS ────────────────────────────────────────────────
 function Field({ label, children, col, error }) {
@@ -37,12 +41,13 @@ function Inp({ label, name, type = "text", form, set, col, errors = {}, ...rest 
   );
 }
 
-function Toggle({ label, name, form, set }) {
+function Toggle({ label, name, form, set, disabled = false }) {
   const val = form[name] ?? false;
   return (
     <div
-      onClick={() => set(name, !val)}
-      className={`toggle-control ${val ? "is-on" : ""}`}
+      onClick={() => { if (!disabled) set(name, !val); }}
+      className={`toggle-control ${val ? "is-on" : ""} ${disabled ? "is-disabled" : ""}`}
+      aria-disabled={disabled}
     >
       <div className="toggle-mark">
         {val && "✓"}
@@ -54,11 +59,11 @@ function Toggle({ label, name, form, set }) {
   );
 }
 
-function LabRow({ label, realizadoKey, resultadoKey, form, set, errors = {}, extra }) {
+function LabRow({ label, realizadoKey, resultadoKey, form, set, errors = {}, extra, disabled = false }) {
   const error = errors[resultadoKey];
   return (
     <div className="lab-row">
-      <Toggle label={label} name={realizadoKey} form={form} set={set} />
+      <Toggle label={label} name={realizadoKey} form={form} set={set} disabled={disabled} />
       {form[realizadoKey] && (
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
           <input
@@ -67,6 +72,7 @@ function LabRow({ label, realizadoKey, resultadoKey, form, set, errors = {}, ext
             placeholder="Resultado"
             value={form[resultadoKey] ?? ""}
             onChange={(e) => set(resultadoKey, e.target.value)}
+            disabled={disabled}
           />
           {extra}
           {error && <div className="field-error-text" style={{ flexBasis: "100%" }}>{error}</div>}
@@ -295,11 +301,14 @@ export default function NuevoControl() {
   const [searchParams] = useSearchParams();
   const embarazoId = searchParams.get("embarazo_id") || "";
   const hasEmbarazoId = isValidPregnancyId(embarazoId);
+  const editando = Boolean(controlId);
   const expedientePath = hasEmbarazoId
     ? `/pacientes/${id}?embarazo_id=${encodeURIComponent(embarazoId)}&tab=controles`
     : `/pacientes/${id}?tab=controles`;
   const toast    = useGlobalToast();
   const { usuario } = useAuth();
+  const tienePermisoLectura = Boolean(usuario?.permisos?.includes("pacientes.ver"));
+  const tienePermisoEscritura = Boolean(usuario?.permisos?.includes(editando ? "controles.editar" : "controles.crear"));
   const puedeVerVih = usuario?.permisos?.includes("controles.ver_vih");
   const puedeCapturarVih = !controlId || puedeVerVih;
   const [loading, setLoading] = useState(false);
@@ -307,11 +316,26 @@ export default function NuevoControl() {
   const [tab, setTab]         = useState("general");
   const [form, setForm]       = useState(initialControlForm);
   const [fur, setFur]         = useState("");
+  const [isReadOnly, setIsReadOnly] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
-  const editando = Boolean(controlId);
   const todayInputValue = getGuatemalaDateInputValue();
+  const puedeConsultar = editando && canConsultPrenatalControl({
+    canRead: tienePermisoLectura,
+    pacienteId: id,
+    embarazoId,
+    controlId,
+  });
+  const puedeEditar = editando
+    ? canEditPrenatalControl({
+      canConsult: puedeConsultar,
+      canWrite: tienePermisoEscritura,
+      isReadOnly,
+    })
+    : Boolean(hasEmbarazoId && tienePermisoEscritura && !isReadOnly);
+  const soloLectura = editando && puedeConsultar && !puedeEditar;
 
   const set = (k, v) => {
+    if (soloLectura) return;
     setForm((f) => ({ ...f, [k]: v }));
     setFieldErrors((errors) => {
       if (!errors[k]) return errors;
@@ -322,7 +346,7 @@ export default function NuevoControl() {
   };
   const inputClass = (name) => `input-field ${fieldErrors[name] ? "input-error" : ""}`;
   const fieldError = (name) => fieldErrors[name];
-  const p = { form, set, errors: fieldErrors };
+  const p = { form, set, errors: fieldErrors, disabled: soloLectura };
   const visibleFieldErrors = Object.entries(fieldErrors).map(([field, message]) => ({
     field,
     label: CONTROL_FIELD_LABELS[field] || field,
@@ -355,7 +379,9 @@ export default function NuevoControl() {
 
     Promise.all([controlesRequest, api.get(`/pacientes/${id}/expediente`, { params: { embarazo_id: embarazoId } })])
       .then(([{ data }, { data: expediente }]) => {
-        if (expediente?.is_read_only) {
+        const readOnly = Boolean(expediente?.is_read_only);
+        setIsReadOnly(readOnly);
+        if (readOnly && !editando) {
           toast("El embarazo esta cerrado y es de solo lectura", "error");
           navigate(expedientePath, { replace: true });
           return;
@@ -396,6 +422,10 @@ export default function NuevoControl() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!puedeEditar) {
+      toast("Este control es de solo lectura", "error");
+      return;
+    }
     if (!hasEmbarazoId) {
       toast("Selecciona un embarazo antes de guardar el control", "error");
       return;
@@ -449,9 +479,22 @@ export default function NuevoControl() {
           <ChevronLeft size={15} /> Volver
         </button>
         <div>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>{editando ? "Editar Control Prenatal" : "Registrar Control Prenatal"}</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", flexWrap: "wrap" }}>
+            <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>
+              {soloLectura ? "Detalle del Control Prenatal" : editando ? "Editar Control Prenatal" : "Registrar Control Prenatal"}
+            </h1>
+            {soloLectura && (
+              <span className="badge control-read-only-badge">
+                <LockKeyhole size={13} /> Solo lectura
+              </span>
+            )}
+          </div>
           <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 2 }}>
-            {editando ? `Control ${form.numero_control}` : `Se registrara como control ${form.numero_control}`}
+            {soloLectura
+              ? `Control ${form.numero_control} · Consulta histórica`
+              : editando
+                ? `Control ${form.numero_control}`
+                : `Se registrara como control ${form.numero_control}`}
           </p>
         </div>
       </div>
@@ -469,6 +512,7 @@ export default function NuevoControl() {
           </div>
         )}
 
+        <fieldset disabled={soloLectura} className="control-form-fieldset">
         {/* DATOS BÁSICOS DEL CONTROL — siempre visibles */}
         <div className="card" style={{ marginBottom: "1.25rem" }}>
           <div className="form-section-body col-4">
@@ -508,6 +552,7 @@ export default function NuevoControl() {
             <Inp label="Otro signo de peligro" name="peligro_otro" {...p} placeholder="Especifique..." />
           </div>
         </div>
+        </fieldset>
 
         {/* TABS */}
         <div className="content-tabs">
@@ -521,6 +566,7 @@ export default function NuevoControl() {
           })}
         </div>
 
+        <fieldset disabled={soloLectura} className="control-form-fieldset">
         {/* ── TAB: GENERAL ── */}
         {tab === "general" && (
           <div className="card">
@@ -801,17 +847,20 @@ export default function NuevoControl() {
             </div>
           </div>
         )}
+        </fieldset>
 
         {/* BOTONES */}
         <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end", marginTop: "1.5rem" }}>
           <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>
-            Cancelar
+            {soloLectura ? "Volver" : "Cancelar"}
           </button>
-          <button type="submit" className="btn-primary" disabled={loading}
-            style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            <Save size={15} />
-            {loading ? "Guardando..." : editando ? "Guardar cambios" : "Guardar control"}
-          </button>
+          {puedeEditar && (
+            <button type="submit" className="btn-primary" disabled={loading}
+              style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <Save size={15} />
+              {loading ? "Guardando..." : editando ? "Guardar cambios" : "Guardar control"}
+            </button>
+          )}
         </div>
 
       </form>
