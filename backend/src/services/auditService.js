@@ -57,6 +57,7 @@ const PRIVATE_MODULES = Object.freeze({
   sesiones: 'autenticacion',
   documentos: 'documentos',
   reportes: 'reportes',
+  automatizaciones: 'automatizaciones',
   clinica: 'pacientes',
   administracion: 'comunidades',
 });
@@ -68,6 +69,7 @@ const PRIVATE_TABLES = Object.freeze({
   documento: 'documentos',
   reporte: 'reportes',
   exportacion: 'reportes',
+  proximas_citas: 'automatizaciones',
   paciente: 'pacientes',
   embarazo: 'embarazos',
   control_prenatal: 'controles_prenatales',
@@ -203,7 +205,10 @@ async function registrarEventoPrivado(req, event, {
     await repository.insertarEvento(auditEvent, db);
     return true;
   } catch (err) {
-    console.warn('[audit] No se pudo registrar auditoria privada:', err.message);
+    const detail = context.categoria === 'automatizaciones'
+      ? 'evento informativo no registrado'
+      : err.message;
+    console.warn('[audit] No se pudo registrar auditoria privada:', detail);
     if (obligatorio) throw err;
     return false;
   }

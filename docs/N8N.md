@@ -1,164 +1,177 @@
-# Integracion n8n
+# Integracion segura con n8n
 
-El proyecto puede usar n8n como motor de automatizaciones externas. La prioridad recomendada es enviar recordatorios operativos, por ejemplo citas prenatales programadas para manana.
+## Estado
 
-## Opcion local sin Docker
+Sprint 5B.1 implementa solamente el endpoint interno del backend. Todavia no
+existe un workflow n8n productivo, no se envian correos y no se habilita la
+integracion en desarrollo.
 
-Para pruebas locales puedes correr n8n con Node.js, sin levantar Docker.
+El endpoint anterior:
 
-Requisitos:
-
-- Node.js 20 o superior recomendado.
-- Backend corriendo en `http://localhost:3001`.
-- n8n corriendo en `http://localhost:5678`.
-
-Desde la raiz del proyecto:
-
-```bash
-npm run n8n:local
+```text
+GET /api/automatizaciones/proximas-citas
 ```
 
-Ese comando carga variables desde `backend/.env` y luego inicia n8n. Tambien puedes ejecutarlo directo, pero en ese caso n8n no cargara automaticamente las variables SMTP del proyecto:
+esta retirado y responde `404`. `AUTOMATION_SECRET` es obsoleto y el backend no
+lo usa. No debe restaurarse ni redirigirse al contrato nuevo.
 
-```bash
-npx n8n
+## Endpoint v1
+
+```text
+GET /api/automatizaciones/v1/proximas-citas
+X-CAP-Automation-Key: <API_KEY_ALEATORIA>
 ```
 
-La primera vez puede tardar porque descarga n8n. Despues abre:
+Parametros opcionales:
 
-```txt
-http://localhost:5678
-```
+- `offset_days`: entero de 0 a 30; default `1`.
+- `window_days`: entero de 1 a 7; default `1`.
 
-### Variables para backend local
+No se permiten parametros repetidos, desconocidos, negativos o decimales. La
+zona horaria unica de esta version es `America/Guatemala`.
 
-Si backend corre fuera de Docker, configura estas variables en `backend/.env` o en tu terminal antes de iniciar el backend:
+El endpoint existe funcionalmente solo cuando:
 
-```env
-AUTOMATION_SECRET=
-GENERIC_TIMEZONE=America/Guatemala
-TZ=America/Guatemala
-```
+- `NODE_ENV=production`;
+- `N8N_INTEGRATION_ENABLED=true`;
+- el hash CURRENT esta configurado;
+- el origen pertenece a `N8N_ALLOWED_CIDRS`;
+- la API key es valida;
+- el rate limit permite la solicitud.
 
-El campo vacio debe completarse localmente con un valor aleatorio generado fuera
-del repositorio. No reutilice `JWT_SECRET` ni la contrasena de PostgreSQL.
+En desarrollo, test o con la integracion deshabilitada responde `404`. JWT,
+cookies, CSRF, `Authorization` y credenciales en query string no autentican esta
+ruta. Las solicitudes de navegador con header `Origin` se rechazan.
 
-Para el flujo de citas de manana, la variable indispensable es `AUTOMATION_SECRET`.
-Para que el horario sea Guatemala, n8n debe iniciar con `GENERIC_TIMEZONE=America/Guatemala` y `TZ=America/Guatemala`. Si ya estaba abierto, cierralo y vuelve a iniciar con `npm run n8n:local`.
-
-### Credenciales SMTP locales
-
-Crear las credenciales SMTP directamente en n8n. Para Gmail se usa el servidor
-SMTP de Gmail, puerto seguro 465, SSL/TLS activo, el correo emisor y una
-contrasena de aplicacion generada en Google.
-
-No escribir contrasenas SMTP en archivos versionados ni en documentacion.
-
-### URL del HTTP Request en n8n local
-
-Cuando n8n corre sin Docker, el nodo `HTTP Request` debe usar:
-
-```txt
-http://localhost:3001/api/automatizaciones/proximas-citas?dias=1
-```
-
-Header:
-
-```txt
-x-cap-prenatal-secret: {{$env.AUTOMATION_SECRET}}
-```
-
-## Servicios Docker
-
-`docker-compose.yml` incluye el servicio `n8n` en el puerto `5678` con volumen persistente `n8n_data`.
-
-```bash
-docker compose up -d n8n
-```
-
-Interfaz local:
-
-```txt
-http://localhost:5678
-```
-
-## Variables del backend
-
-El endpoint de automatizaciones usa un secreto compartido entre backend y n8n.
-
-La variable `AUTOMATION_SECRET` debe inyectarse desde el entorno o un gestor de
-secretos. Los archivos de ejemplo la dejan vacia deliberadamente.
-
-## Workflow recomendado: citas de manana
-
-1. Crear un workflow en n8n.
-2. Agregar nodo `Schedule Trigger`.
-3. Programarlo diariamente, por ejemplo 6:00 a. m.
-   Verificar que el timezone del trigger/workflow sea `America/Guatemala`.
-4. Agregar nodo `HTTP Request`.
-5. Metodo: `GET`.
-6. URL segun entorno:
-
-Local sin Docker:
-
-```txt
-http://localhost:3001/api/automatizaciones/proximas-citas?dias=1
-```
-
-Dentro de Docker:
-
-```txt
-http://backend:3001/api/automatizaciones/proximas-citas?dias=1
-```
-
-7. Header:
-
-```txt
-x-cap-prenatal-secret: {{$env.AUTOMATION_SECRET}}
-```
-
-8. Agregar un nodo `IF` antes de enviar el mensaje.
-9. Condicion:
-
-```txt
-debe_enviar = true
-```
-
-10. Si `debe_enviar` es `true`, enviar un solo mensaje diario usando `mensaje_resumen` o `tabla_html`.
-11. Si `debe_enviar` es `false`, finalizar el workflow sin enviar nada.
-12. Conectar el canal configurado:
-   - `Send Email`
-   - `Telegram`
-   - `Google Sheets`
-   - `HTTP Request`
-
-Respuesta del endpoint:
+## Respuesta
 
 ```json
 {
-  "dias": 1,
-  "total": 2,
-  "debe_enviar": true,
-  "fecha_objetivo": "16/6/2026",
-  "generated_at": "2026-06-15T00:00:00.000Z",
-  "mensaje_resumen": "CAP El Chal - Recordatorio de citas prenatales\n\nSe informa que las siguientes pacientes tienen cita prenatal programada para el dia de manana, 16/6/2026:\n\n| No. | Paciente | Expediente | Comunidad | Control | Riesgo |\n| --- | --- | --- | --- | --- | --- |\n| 1 | Paciente Demo | EXP-001 | El Chal | 2 | Con riesgo |\n\nSe recomienda verificar asistencia y actualizar el expediente correspondiente.",
-  "tabla_markdown": "| No. | Paciente | Expediente | Comunidad | Control | Riesgo |\n| --- | --- | --- | --- | --- | --- |\n| 1 | Paciente Demo | EXP-001 | El Chal | 2 | Con riesgo |",
-  "tabla_html": "<table>...</table>",
-  "citas": [
+  "schema_version": 1,
+  "generated_at": "2026-01-01T12:00:00.000Z",
+  "timezone": "America/Guatemala",
+  "range": {
+    "from": "2026-01-02",
+    "to": "2026-01-02"
+  },
+  "total": 3,
+  "summary_by_date": [
     {
-      "paciente_id": 1,
-      "embarazo_id": 1,
-      "nombre": "Paciente Demo",
-      "no_expediente": "EXP-001",
-      "telefono": "55555555",
-      "comunidad": "El Chal",
-      "control_id": 10,
-      "numero_control": 2,
-      "cita_siguiente": "2026-06-16",
-      "tiene_riesgo": true,
-      "mensaje_sugerido": "Recordatorio: Paciente Demo tiene cita prenatal programada para 16/6/2026. Expediente EXP-001."
+      "date": "2026-01-02",
+      "total": 3
     }
-  ]
+  ],
+  "secure_path": "/dashboard"
 }
 ```
 
+`range.to` es la ultima fecha incluida. Una consulta sin citas responde
+`total: 0` y `summary_by_date: []`.
+
+La respuesta nunca contiene paciente, embarazo, nombre, CUI, telefono,
+expediente, direccion, comunidad, territorio, riesgo, diagnostico, controles,
+observaciones, HTML, Markdown ni SQL.
+
+## Seleccion de citas
+
+La consulta:
+
+- usa la fecha de PostgreSQL en `America/Guatemala`;
+- incluye solo embarazos `activo`;
+- exige que control y embarazo pertenezcan a la misma paciente;
+- particiona por `embarazo_id`;
+- elige `fecha DESC, numero_control DESC, id DESC`;
+- considera solo `cita_siguiente` del control mas reciente;
+- no revive una cita de un control anterior si el ultimo no tiene fecha;
+- excluye fechas fuera del rango;
+- agrega el resultado por fecha.
+
+No realiza escrituras ni requiere cambios de base de datos.
+
+## Configuracion del backend
+
+```env
+N8N_INTEGRATION_ENABLED=false
+N8N_API_KEY_HASH_CURRENT=
+N8N_API_KEY_HASH_NEXT=
+N8N_ALLOWED_CIDRS=
+APPOINTMENT_NOTIFICATION_START_OFFSET_DAYS=1
+APPOINTMENT_NOTIFICATION_WINDOW_DAYS=1
+APPOINTMENT_NOTIFICATION_TIMEZONE=America/Guatemala
+AUTOMATION_RATE_LIMIT_WINDOW_MS=900000
+AUTOMATION_RATE_LIMIT_MAX=6
+```
+
+CURRENT y NEXT son hashes SHA-256 hexadecimales de 64 caracteres. La API key
+original existe unicamente en la credencial Header Auth de n8n. Los hashes se
+tratan como configuracion sensible y no se escriben en Git, tickets o logs.
+
+En produccion habilitada la allowlist no puede estar vacia. Soporta IPv4, IPv6
+y direcciones IPv4 mapeadas como IPv6. El backend usa la direccion del socket;
+no confia en `X-Forwarded-For`. La configuracion exacta de `trust proxy`, proxy
+reverso y red Docker queda para Sprint 5B.2.
+
+La validacion CIDR usa la dependencia explicita `ipaddr.js` porque implementa
+parseo y comparacion mantenidos para IPv4, IPv6 e IPv4 mapeada; evita un parser
+manual incompleto en un control de acceso de red.
+
+## Generacion y rotacion
+
+En una terminal administrativa segura puede generarse una key base64url y su
+hash:
+
+```text
+node -e "const c=require('crypto');const k=c.randomBytes(32).toString('base64url');console.log('KEY='+k);console.log('SHA256='+c.createHash('sha256').update(k).digest('hex'))"
+```
+
+Procedimiento:
+
+1. Guardar `KEY` solamente como credencial `X-CAP-Automation-Key` en n8n.
+2. Guardar `SHA256` como `N8N_API_KEY_HASH_CURRENT` en el gestor de secretos del backend.
+3. Para rotar, colocar el hash nuevo en `N8N_API_KEY_HASH_NEXT`.
+4. Cambiar la credencial de n8n a la key nueva.
+5. Promover NEXT a CURRENT y vaciar NEXT al terminar la ventana.
+
+Nunca copiar la key original al entorno del backend.
+
+## Rate limit y errores
+
+El limite predeterminado es 6 solicitudes por 15 minutos y tiene un contador
+independiente por origen validado. No comparte estado con login, reportes ni
+rutas clinicas.
+
+Codigos controlados:
+
+- `400 AUTOMATION_INVALID_RANGE`;
+- `401 AUTOMATION_UNAUTHORIZED`;
+- `404 ROUTE_NOT_FOUND`;
+- `429 AUTOMATION_RATE_LIMITED`;
+- `500 AUTOMATION_INTERNAL_ERROR`.
+
+Las respuestas y logs no incluyen key, hash, IP permitida, headers, query
+completa, SQL o stack de automatizacion.
+
+## Auditoria
+
+Una consulta autorizada registra best effort:
+
+```text
+categoria: automatizaciones
+entidad: proximas_citas
+evento: consultar
+accion: consultar
+```
+
+Solo conserva tipo, resultado, motivo controlado, cantidad, rango y
+`politica_version: 1`. IP y user-agent quedan `null`. Un fallo de esta auditoria
+informativa no convierte una consulta valida en error. Los intentos con key
+incorrecta no crean filas de auditoria.
+
+## Pendiente para Sprint 5B.2
+
+- crear y versionar el workflow;
+- configurar credenciales y destinatario;
+- endurecer n8n, retencion y cifrado;
+- terminar red Docker, firewall, HTTPS, proxy y `trust proxy`;
+- impedir la exposicion publica del prefijo de automatizaciones;
+- retirar la referencia obsoleta a `AUTOMATION_SECRET` del Compose local.

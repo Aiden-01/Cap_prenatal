@@ -28,13 +28,18 @@ const permisosRoutes = require('./routes/permisos');
 const mapaRoutes = require('./routes/mapa');
 const comunidadesRoutes = require('./routes/comunidades');
 const chatbotRoutes = require('./routes/chatbot');
-const automatizacionesRoutes = require('./routes/automatizaciones');
+const {
+  createAutomatizacionesRouter,
+} = require('./routes/automatizaciones');
 const { csrfMiddleware } = require('./middleware/auth');
 const { errorHandler } = require('./middleware/errorHandler');
 const { AppError } = require('./utils/appError');
 
 const app = express();
 const allowedOrigins = config.frontendOrigins;
+const automatizacionesRoutes = createAutomatizacionesRouter({
+  config: config.automation,
+});
 
 function isAllowedDevOrigin(origin) {
   if (config.nodeEnv === 'production') return false;
@@ -63,6 +68,7 @@ function isAllowedOrigin(origin) {
 app.use(helmet({
   crossOriginResourcePolicy: false,
 }));
+app.use('/api/automatizaciones', automatizacionesRoutes);
 app.use(cors({
   origin(origin, callback) {
     if (isAllowedOrigin(origin)) return callback(null, true);
@@ -81,7 +87,6 @@ app.use('/api/reportes', reportesRoutes);
 app.use('/api/mapa', mapaRoutes);
 app.use('/api/comunidades', comunidadesRoutes);
 app.use('/api/chatbot', chatbotRoutes);
-app.use('/api/automatizaciones', automatizacionesRoutes);
 
 app.get('/api/health', (_, res) => res.json({
   status: 'ok',

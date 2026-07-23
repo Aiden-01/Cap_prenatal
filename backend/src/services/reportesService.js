@@ -26,56 +26,6 @@ function indicadoresRiesgo(rows) {
   }, { total: 0, riesgo_alto: 0, riesgo_medio: 0, riesgo_bajo: 0 });
 }
 
-function formatDateOnly(value) {
-  if (!value) return 'fecha pendiente';
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleDateString('es-GT', { timeZone: 'America/Guatemala' });
-}
-
-function getRiskLabel(value) {
-  return value ? 'Con riesgo' : 'Sin riesgo';
-}
-
-function buildCitasMarkdownTable(citas) {
-  if (citas.length === 0) return 'No hay pacientes con cita prenatal programada para manana.';
-  const rows = citas.map((cita, index) => [
-    index + 1,
-    cita.nombre || 'Paciente sin nombre',
-    cita.no_expediente || 'Sin expediente',
-    cita.comunidad || 'No registrada',
-    cita.numero_control || 'N/A',
-    getRiskLabel(cita.tiene_riesgo),
-  ]);
-  return [
-    '| No. | Paciente | Expediente | Comunidad | Control | Riesgo |',
-    '| --- | --- | --- | --- | --- | --- |',
-    ...rows.map((row) => `| ${row.join(' | ')} |`),
-  ].join('\n');
-}
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-function buildCitasHtmlTable(citas) {
-  if (citas.length === 0) return '<p>No hay pacientes con cita prenatal programada para manana.</p>';
-  const cells = citas.map((cita, index) => `
-    <tr><td>${index + 1}</td><td>${escapeHtml(cita.nombre || 'Paciente sin nombre')}</td>
-      <td>${escapeHtml(cita.no_expediente || 'Sin expediente')}</td>
-      <td>${escapeHtml(cita.comunidad || 'No registrada')}</td>
-      <td>${escapeHtml(cita.numero_control || 'N/A')}</td>
-      <td>${getRiskLabel(cita.tiene_riesgo)}</td></tr>`).join('');
-  return `<table border="1" cellpadding="6" cellspacing="0"><thead><tr>
-    <th>No.</th><th>Paciente</th><th>Expediente</th><th>Comunidad</th><th>Control</th><th>Riesgo</th>
-    </tr></thead><tbody>${cells}</tbody></table>`;
-}
-
 function excelDate(value) {
   if (!value) return '';
   if (value instanceof Date) return value;
@@ -311,34 +261,6 @@ function createReportesService({
     return { fecha_corte: getGuatemalaDateInputValue(), totales, comunidades };
   }
 
-  async function proximasCitasAutomatizacion({ dias = 1 } = {}) {
-    const citas = await repository.obtenerProximasCitasPorDias(dias);
-    const fechaObjetivo = citas[0]?.cita_siguiente
-      ? formatDateOnly(citas[0].cita_siguiente)
-      : formatDateOnly(new Date(now().getTime() + dias * 24 * 60 * 60 * 1000));
-    const tablaMarkdown = buildCitasMarkdownTable(citas);
-    const tablaHtml = buildCitasHtmlTable(citas);
-    const encabezado = citas.length > 0
-      ? `CAP El Chal - Recordatorio de citas prenatales\n\nSe informa que las siguientes pacientes tienen cita prenatal programada para el dia de manana, ${fechaObjetivo}:`
-      : `CAP El Chal - Recordatorio de citas prenatales\n\nNo hay pacientes con cita prenatal programada para el dia de manana, ${fechaObjetivo}.`;
-    return {
-      dias,
-      total: citas.length,
-      debe_enviar: citas.length > 0,
-      fecha_objetivo: fechaObjetivo,
-      generated_at: now().toISOString(),
-      mensaje_resumen: citas.length > 0
-        ? `${encabezado}\n\n${tablaMarkdown}\n\nSe recomienda verificar asistencia y actualizar el expediente correspondiente.`
-        : encabezado,
-      tabla_markdown: tablaMarkdown,
-      tabla_html: tablaHtml,
-      citas: citas.map((cita) => ({
-        ...cita,
-        mensaje_sugerido: `Recordatorio: ${cita.nombre} tiene cita prenatal programada para ${formatDateOnly(cita.cita_siguiente)}. Expediente ${cita.no_expediente || 'sin numero'}.`,
-      })),
-    };
-  }
-
   async function workbookCensoGeneral() {
     const rows = prepararFilasConRiesgo(await repository.obtenerRowsCensoGeneral());
     const fechaCorte = getGuatemalaDateInputValue();
@@ -391,7 +313,6 @@ function createReportesService({
     proximasAParir,
     sinControlReciente,
     resumenPorComunidad,
-    proximasCitasAutomatizacion,
     workbookCensoGeneral,
     workbookCensoPrimerControl,
     pdfCensoPrimerControl,

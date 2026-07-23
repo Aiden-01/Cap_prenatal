@@ -234,15 +234,6 @@ test('COOKIE_SAMESITE solo acepta valores conocidos', () => {
   );
 });
 
-test('produccion rechaza AUTOMATION_SECRET de ejemplo cuando se habilita', () => {
-  assert.throws(
-    () => validateAppConfig(productionEnv({
-      AUTOMATION_SECRET: `example-${'a'.repeat(40)}`,
-    })),
-    (error) => error instanceof ConfigError && error.variable === 'AUTOMATION_SECRET'
-  );
-});
-
 test('Docker Compose exige secretos externos y no contiene defaults utilizables', () => {
   const source = fs.readFileSync(path.join(ROOT, 'docker-compose.yml'), 'utf8');
   const jwtLines = source.split(/\r?\n/).filter((line) => /^\s*JWT_SECRET:/.test(line));
@@ -269,6 +260,8 @@ test('archivos env de ejemplo dejan vacios todos los secretos', () => {
     'DB_PASSWORD',
     'JWT_SECRET',
     'AUTOMATION_SECRET',
+    'N8N_API_KEY_HASH_CURRENT',
+    'N8N_API_KEY_HASH_NEXT',
     'SEED_DIRECTOR_PASSWORD',
   ]);
 

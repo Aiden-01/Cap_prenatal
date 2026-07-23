@@ -982,27 +982,28 @@ PDF_EXCEL_ENGINE=excel
 
 ## Automatizaciones y n8n
 
-El backend expone endpoints de automatizacion bajo:
+Sprint 5B.1 incorpora un endpoint interno versionado bajo:
 
 ```text
-/api/automatizaciones
+GET /api/automatizaciones/v1/proximas-citas?offset_days=1&window_days=1
 ```
 
-El endpoint actual relevante:
+Requiere `NODE_ENV=production`, `N8N_INTEGRATION_ENABLED=true`, origen en la
+allowlist, rate limit disponible y el header:
 
 ```text
-GET /api/automatizaciones/proximas-citas?dias=1
+X-CAP-Automation-Key: <API_KEY_ALEATORIA>
 ```
 
-Requiere header:
+El backend conserva solamente hashes SHA-256 CURRENT/NEXT. JWT, cookies, CSRF,
+`Authorization`, parametros desconocidos y credenciales en query string no
+autentican la ruta. En desarrollo o deshabilitada responde `404`.
 
-```text
-X-CAP-Prenatal-Secret: <AUTOMATION_SECRET>
-```
-
-En codigo el header se lee como `x-cap-prenatal-secret`.
-
-Mas detalle operativo en `docs/N8N.md`.
+La consulta usa el ultimo control determinista por embarazo activo y responde
+solo conteos por fecha, sin IDs, datos personales, clinicos, HTML o Markdown.
+El endpoint legacy `/api/automatizaciones/proximas-citas` responde `404`.
+Todavia no existe workflow productivo; red, proxy y n8n se endureceran en
+Sprint 5B.2. Contrato completo en `docs/N8N.md`.
 
 ## Laboratorios
 
@@ -1068,7 +1069,16 @@ Fuera de alcance actual:
 | `CHATBOT_RATE_LIMIT_WINDOW_MS` | Ventana de rate limit de Lia en ms. Default `60000`. |
 | `CHATBOT_MESSAGE_RATE_LIMIT` | Solicitudes de `/mensaje` por ventana y usuario/IP. Default `30`. |
 | `CHATBOT_FEEDBACK_RATE_LIMIT` | Solicitudes de `/feedback` por ventana y usuario/IP. Default `20`. |
-| `AUTOMATION_SECRET` | Secreto para endpoints n8n. |
+| `N8N_INTEGRATION_ENABLED` | Activa el endpoint v1 solo en produccion. Default `false`. |
+| `N8N_API_KEY_HASH_CURRENT` | SHA-256 de la API key vigente; sensible. |
+| `N8N_API_KEY_HASH_NEXT` | SHA-256 opcional durante rotacion; sensible. |
+| `N8N_ALLOWED_CIDRS` | Origenes IPv4/IPv6 permitidos, separados por coma. |
+| `APPOINTMENT_NOTIFICATION_START_OFFSET_DAYS` | Offset default de citas. Rango `0-30`; default `1`. |
+| `APPOINTMENT_NOTIFICATION_WINDOW_DAYS` | Ventana default. Rango `1-7`; default `1`. |
+| `APPOINTMENT_NOTIFICATION_TIMEZONE` | Solo `America/Guatemala` en v1. |
+| `AUTOMATION_RATE_LIMIT_WINDOW_MS` | Ventana del limite M2M. Default `900000`. |
+| `AUTOMATION_RATE_LIMIT_MAX` | Solicitudes M2M por ventana. Default `6`. |
+| `AUTOMATION_SECRET` | Obsoleto; el backend no lo usa. |
 | `PDF_RATE_LIMIT_WINDOW_MS` | Ventana por usuario para PDF clinico. Default `300000`. |
 | `PDF_RATE_LIMIT` | Generaciones PDF permitidas por ventana. Default `20`. |
 | `PDF_EXCEL_ENGINE` | `auto`, `excel` o `libreoffice`. |

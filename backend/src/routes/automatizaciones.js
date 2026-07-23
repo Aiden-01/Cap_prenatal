@@ -1,47 +1,63 @@
-const crypto = require('crypto');
 const express = require('express');
-const reportesService = require('../services/reportesService');
-const { asyncHandler } = require('../middleware/asyncHandler');
-const { AppError } = require('../utils/appError');
-const { getAutomationSecret } = require('../config/env');
+const defaultControllers = require('../controllers/automatizacionesController');
+const { createAutomationRateLimiter } = require('../middleware/automationRateLimit');
+const {
+  createAutomationAuthentication,
+  createAutomationOriginMiddleware,
+  createAutomationRangeMiddleware,
+} = require('../middleware/automationSecurity');
 
-const router = express.Router();
-
-function safeEqual(a, b) {
-  const left = Buffer.from(String(a || ''));
-  const right = Buffer.from(String(b || ''));
-
-  if (left.length !== right.length) return false;
-  return crypto.timingSafeEqual(left, right);
+function automationNotFound(_req, res) {
+  return res.status(404).json({
+    ok: false,
+    message: 'Ruta no encontrada',
+    code: 'ROUTE_NOT_FOUND',
+  });
 }
 
-function automationSecretMiddleware(req, _res, next) {
-  const expected = getAutomationSecret();
-  const received = req.headers['x-cap-prenatal-secret'];
+function createAutomatizacionesRouter({
+  config,
+  controllers = defaultControllers,
+  resolveOrigin,
+  rateLimiter,
+} = {}) {
+  if (!config) throw new TypeError('La configuracion de automatizaciones es obligatoria');
+  const router = express.Router();
 
-  if (!expected) {
-    return next(new AppError(503, 'Automatizaciones no configuradas', {
-      code: 'AUTOMATION_SECRET_MISSING',
-    }));
+  router.get('/proximas-citas', automationNotFound);
+
+  if (!config.active) {
+    router.get('/v1/proximas-citas', automationNotFound);
+    return router;
   }
 
-  if (!safeEqual(received, expected)) {
-    return next(new AppError(401, 'Secreto de automatizacion invalido', {
-      code: 'AUTOMATION_SECRET_INVALID',
-    }));
-  }
+  const originMiddleware = createAutomationOriginMiddleware({
+    allowedCidrs: config.allowedCidrs,
+    resolveOrigin,
+  });
+  const limiter = rateLimiter || createAutomationRateLimiter({
+    windowMs: config.rateLimitWindowMs,
+    limit: config.rateLimitMax,
+  });
+  const authenticate = createAutomationAuthentication({
+    currentHash: config.currentHash,
+    nextHash: config.nextHash,
+  });
+  const validateRange = createAutomationRangeMiddleware(config);
 
-  return next();
+  router.get(
+    '/v1/proximas-citas',
+    originMiddleware,
+    limiter,
+    authenticate,
+    validateRange,
+    controllers.proximasCitas
+  );
+
+  return router;
 }
 
-router.use(automationSecretMiddleware);
-
-router.get('/proximas-citas', asyncHandler(async (req, res) => {
-  const dias = Number.parseInt(req.query.dias || '1', 10);
-  const safeDias = Number.isInteger(dias) && dias >= 0 && dias <= 30 ? dias : 1;
-  const result = await reportesService.proximasCitasAutomatizacion({ dias: safeDias });
-
-  return res.json(result);
-}));
-
-module.exports = router;
+module.exports = {
+  automationNotFound,
+  createAutomatizacionesRouter,
+};

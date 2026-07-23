@@ -279,30 +279,6 @@ function createReportesRepository(db = pool) {
     return rows;
   }
 
-  async function obtenerProximasCitasPorDias(dias = 1) {
-    const { rows } = await db.query(`
-      SELECT
-        p.id AS paciente_id,
-        e.id AS embarazo_id,
-        p.nombres || ' ' || p.apellidos AS nombre,
-        p.no_expediente,
-        p.telefono,
-        COALESCE(com.nombre, p.comunidad) AS comunidad,
-        c.id AS control_id,
-        c.numero_control,
-        c.cita_siguiente,
-        COALESCE(r.tiene_riesgo, FALSE) AS tiene_riesgo
-      FROM controles_prenatales c
-      JOIN embarazos e ON e.id = c.embarazo_id AND e.estado = 'activo'
-      JOIN pacientes p ON p.id = c.paciente_id
-      LEFT JOIN comunidades com ON com.id = p.comunidad_id
-      LEFT JOIN fichas_riesgo_obstetrico r ON r.embarazo_id = e.id
-      WHERE c.cita_siguiente = ${GT_TODAY_SQL} + $1::INTEGER
-      ORDER BY c.cita_siguiente ASC, p.apellidos ASC, p.nombres ASC
-    `, [dias]);
-    return rows;
-  }
-
   return {
     obtenerRowsCensoGeneral,
     obtenerRowsCensoPrimerControl,
@@ -311,7 +287,6 @@ function createReportesRepository(db = pool) {
     obtenerProximasAParir,
     obtenerSinControlReciente,
     obtenerResumenPorComunidad,
-    obtenerProximasCitasPorDias,
   };
 }
 

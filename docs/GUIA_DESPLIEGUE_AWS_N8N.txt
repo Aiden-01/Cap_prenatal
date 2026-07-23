@@ -58,12 +58,21 @@ o todas las siguientes:
   DB_USER
   DB_PASSWORD
 
-Integraciones opcionales:
+Integracion n8n v1:
 
-  AUTOMATION_SECRET
+  N8N_INTEGRATION_ENABLED
+  N8N_API_KEY_HASH_CURRENT
+  N8N_API_KEY_HASH_NEXT
+  N8N_ALLOWED_CIDRS
+  APPOINTMENT_NOTIFICATION_START_OFFSET_DAYS
+  APPOINTMENT_NOTIFICATION_WINDOW_DAYS
+  APPOINTMENT_NOTIFICATION_TIMEZONE
+  AUTOMATION_RATE_LIMIT_WINDOW_MS
+  AUTOMATION_RATE_LIMIT_MAX
 
 No escribir valores en esta guia, Compose, Dockerfile, comandos de shell, tickets
-o logs. JWT, PostgreSQL y automatizacion deben usar valores aleatorios distintos.
+o logs. La API key original existe solo en la credencial de n8n; el backend
+recibe exclusivamente su hash SHA-256. AUTOMATION_SECRET es obsoleto.
 
 
 3. Validacion del backend
@@ -78,7 +87,9 @@ El backend valida la configuracion antes de cargar rutas. En produccion rechaza:
   - FRONTEND_URL con HTTP, loopback, comodines, credenciales, rutas, query o
     fragmentos.
   - COOKIE_SAMESITE fuera de los valores admitidos.
-  - AUTOMATION_SECRET inseguro cuando se configura.
+  - Hash CURRENT ausente o invalido cuando n8n esta habilitado.
+  - Allowlist CIDR vacia o invalida cuando n8n esta habilitado.
+  - Offset, ventana, timezone o rate limit fuera de sus limites.
 
 Los errores identifican la variable invalida sin imprimir su valor.
 
@@ -132,9 +143,10 @@ Eliminar el archivo del ultimo commit no elimina sus versiones historicas.
 6. n8n
 ------
 
-Este sprint no cambia n8n. La configuracion funcional local sigue documentada en
-docs/N8N.md. Antes de produccion se deberan definir por separado cifrado, retencion,
-autenticacion, red y rotacion de AUTOMATION_SECRET.
+Sprint 5B.1 implementa solamente el endpoint interno agregado y retira el
+endpoint nominal anterior. Todavia no existe workflow productivo. Antes de
+produccion, Sprint 5B.2 debera definir cifrado, retencion, credenciales, red,
+proxy, HTTPS, trust proxy y rotacion operativa CURRENT/NEXT.
 
 
 7. Criterio de habilitacion futuro

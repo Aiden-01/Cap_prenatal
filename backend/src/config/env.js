@@ -1,5 +1,6 @@
 const path = require('path');
 const dotenv = require('dotenv');
+const { parseAllowedCidrs } = require('../utils/ipAllowlist');
 
 const BACKEND_ENV_PATH = path.resolve(__dirname, '../../.env');
 const NODE_ENV_VALUES = new Set(['development', 'test', 'production']);
@@ -10,6 +11,8 @@ const PRODUCTION_SEED_CONFIRMATION = 'CREATE_INITIAL_PRIVILEGED_ACCOUNT';
 const JWT_ALGORITHM = 'HS256';
 const JWT_ISSUER = 'cap-prenatal-api';
 const JWT_AUDIENCE = 'cap-prenatal-web';
+const AUTOMATION_TIMEZONE = 'America/Guatemala';
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
 let environmentFileLoaded = false;
 const UNSAFE_SECRET_MARKERS = [
   /change[\s_-]*me/i,
@@ -282,12 +285,72 @@ function validateCookieSameSite(env) {
   return value;
 }
 
-function validateOptionalAutomationSecret(env, { nodeEnv }) {
-  const value = readOptional(env, 'AUTOMATION_SECRET');
+function validateAutomationHash(env, variable) {
+  const value = readOptional(env, variable);
   if (!value) return null;
-  return validateSecret('AUTOMATION_SECRET', value, {
-    nodeEnv,
-    minBytes: MIN_JWT_SECRET_BYTES,
+  if (!SHA256_HEX_PATTERN.test(value)) invalid(variable);
+  return value.toLowerCase();
+}
+
+function validateAutomationCidrs(env) {
+  const raw = readOptional(env, 'N8N_ALLOWED_CIDRS');
+  if (!raw) return Object.freeze([]);
+
+  try {
+    return Object.freeze(parseAllowedCidrs(raw).map(({ source }) => source));
+  } catch {
+    invalid('N8N_ALLOWED_CIDRS');
+  }
+}
+
+function validateAutomationConfig(env = process.env, options = {}) {
+  const nodeEnv = options.nodeEnv || nodeEnvForValidation(env);
+  const enabled = parseBoolean(env, 'N8N_INTEGRATION_ENABLED', { fallback: false });
+  const currentHash = validateAutomationHash(env, 'N8N_API_KEY_HASH_CURRENT');
+  const nextHash = validateAutomationHash(env, 'N8N_API_KEY_HASH_NEXT');
+  const allowedCidrs = validateAutomationCidrs(env);
+  const startOffsetDays = parseInteger(env, 'APPOINTMENT_NOTIFICATION_START_OFFSET_DAYS', {
+    fallback: 1,
+    min: 0,
+    max: 30,
+  });
+  const windowDays = parseInteger(env, 'APPOINTMENT_NOTIFICATION_WINDOW_DAYS', {
+    fallback: 1,
+    min: 1,
+    max: 7,
+  });
+  const timezone = readOptional(
+    env,
+    'APPOINTMENT_NOTIFICATION_TIMEZONE',
+    AUTOMATION_TIMEZONE
+  );
+  if (timezone !== AUTOMATION_TIMEZONE) invalid('APPOINTMENT_NOTIFICATION_TIMEZONE');
+  const rateLimitWindowMs = parseInteger(env, 'AUTOMATION_RATE_LIMIT_WINDOW_MS', {
+    fallback: 15 * 60 * 1000,
+    min: 1000,
+    max: 24 * 60 * 60 * 1000,
+  });
+  const rateLimitMax = parseInteger(env, 'AUTOMATION_RATE_LIMIT_MAX', {
+    fallback: 6,
+    min: 1,
+    max: 100,
+  });
+  const active = nodeEnv === 'production' && enabled;
+
+  if (active && !currentHash) invalid('N8N_API_KEY_HASH_CURRENT');
+  if (active && allowedCidrs.length === 0) invalid('N8N_ALLOWED_CIDRS');
+
+  return Object.freeze({
+    active,
+    allowedCidrs,
+    currentHash,
+    enabled,
+    nextHash,
+    rateLimitMax,
+    rateLimitWindowMs,
+    startOffsetDays,
+    timezone,
+    windowDays,
   });
 }
 
@@ -298,7 +361,7 @@ function validateAppConfig(env = process.env) {
   const database = validateDatabaseConfig(env, { nodeEnv });
   const frontendOrigins = validateFrontendOrigins(env, { nodeEnv });
   const cookieSameSite = validateCookieSameSite(env);
-  const automationSecret = validateOptionalAutomationSecret(env, { nodeEnv });
+  const automation = validateAutomationConfig(env, { nodeEnv });
   const port = parseInteger(env, 'PORT', { fallback: 3001, min: 1, max: 65535 });
   const jsonBodyLimit = readOptional(env, 'JSON_BODY_LIMIT', '1mb');
   if (!/^\d+(?:b|kb|mb)$/i.test(jsonBodyLimit)) invalid('JSON_BODY_LIMIT');
@@ -310,7 +373,7 @@ function validateAppConfig(env = process.env) {
     database,
     frontendOrigins,
     cookieSameSite,
-    automationSecret,
+    automation,
     port,
     jsonBodyLimit,
   });
@@ -368,10 +431,10 @@ function getSessionConfig() {
   return validateSessionConfig(process.env);
 }
 
-function getAutomationSecret() {
+function getAutomationConfig() {
   loadEnvironmentFile();
   const nodeEnv = nodeEnvForValidation(process.env);
-  return validateOptionalAutomationSecret(process.env, { nodeEnv });
+  return validateAutomationConfig(process.env, { nodeEnv });
 }
 
 module.exports = {
@@ -379,12 +442,13 @@ module.exports = {
   ConfigError,
   MIN_JWT_SECRET_BYTES,
   PRODUCTION_SEED_CONFIRMATION,
-  getAutomationSecret,
+  getAutomationConfig,
   getCookieConfig,
   getJwtConfig,
   getSessionConfig,
   loadEnvironmentFile,
   nodeEnvForValidation,
+  validateAutomationConfig,
   validateAppConfig,
   validateDatabaseConfig,
   validateJwtConfig,

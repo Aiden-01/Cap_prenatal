@@ -70,6 +70,7 @@ Los siguientes modulos ya tienen separacion en controller/service/repository/val
 - usuarios
 - permisos
 - reportes
+- automatizaciones
 - PDF
 - chatbot
 
@@ -94,6 +95,29 @@ Las descargas nominales requieren `reportes.exportar`, usan oficio horizontal y
 registran metadata minima. Puppeteer genera el PDF directamente en memoria; no
 se escriben censos dentro del repositorio ni se necesitan migraciones para este
 modulo.
+
+## Automatizaciones
+
+`automatizaciones` usa las mismas capas, pero no comparte autenticacion humana:
+
+```text
+routes/automatizaciones
+  -> controllers/automatizacionesController
+  -> services/automatizacionesService
+  -> repositories/automatizacionesRepository
+```
+
+`GET /api/automatizaciones/v1/proximas-citas` solo esta activo en produccion
+habilitada. La ruta valida direccion de socket contra CIDR, aplica un rate limit
+independiente, compara SHA-256 de `X-CAP-Automation-Key`, valida el rango y
+responde conteos por fecha. No usa JWT, cookies, CSRF, `Authorization`,
+`X-Forwarded-For` ni CORS de navegador.
+
+El repositorio selecciona el ultimo control por `embarazo_id` mediante
+`fecha DESC, numero_control DESC, id DESC`, filtra exclusivamente embarazos
+activos y nunca selecciona datos nominales. El endpoint legacy responde `404`.
+La auditoria de consulta es informativa y best effort. No se modifico la base de
+datos; workflow, red productiva, proxy y n8n quedan para Sprint 5B.2.
 
 ## Modulo de referencia
 
@@ -150,14 +174,15 @@ descripcion, fuerza IP/user-agent a `null`, descarta eventos vacios y sanea de
 nuevo justo antes del repositorio.
 
 Productores en este camino: autenticacion, usuarios, passwords, roles,
-permisos, sesiones, PDF, exportaciones/reportes, pacientes, embarazos y
+permisos, sesiones, PDF, exportaciones/reportes, automatizaciones, pacientes, embarazos y
 controles prenatales con laboratorios embebidos, riesgo obstetrico, vacunas,
 morbilidad, plan de parto, puerperio, referencias y comunidades.
 Password, rol, estado, permisos, eliminacion de usuario y escrituras de paciente
 o embarazo, y las escrituras existentes de control prenatal, riesgo, vacuna,
 morbilidad, plan de parto, puerperio, referencia o comunidad escriben
 auditoria obligatoria en la misma transaccion. Login,
-expiracion automatica y documentos/reportes son best effort.
+expiracion automatica, documentos/reportes y consultas de automatizacion son
+best effort.
 
 `registrarEvento` y `utils/auditoria.js` se conservan como compatibilidad central
 obsoleta, sin consumidores productivos. `auditLegacySweep.test.js` recorre

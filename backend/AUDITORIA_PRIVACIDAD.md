@@ -1,5 +1,19 @@
 # Politica contextual de privacidad para auditoria
 
+## Extension Sprint 5B.1
+
+La consulta M2M de proximas citas usa el contexto
+`automatizaciones/proximas_citas/consultar`. La allowlist permite solamente
+`tipo_automatizacion`, `resultado`, `motivo_codigo`, `cantidad_citas`,
+`fecha_desde` y `fecha_hasta`, ademas de `politica_version: 1` generada por el
+constructor. No conserva pacientes, embarazos, IP, user-agent, API key, hash,
+headers, query, SQL ni payload HTTP.
+
+El evento es informativo y best effort. El controlador entrega un objeto de
+solicitud vacio a `registrarEventoPrivado`; una falla de auditoria no cambia una
+respuesta valida. Los intentos con autenticacion u origen invalidos no producen
+filas. No fue necesaria una migracion ni cambio de `schema.sql`.
+
 ## Estado del Sprint 4B.3E
 
 El nucleo contextual ya esta conectado mediante `registrarEventoPrivado` a
@@ -108,6 +122,7 @@ final. Los productores migrados no importan `registrarEvento` ni
 | `autenticacion`, `sesiones` | `sesion`, `usuario` | login, logout, creacion, revocacion o expiracion | resultado, motivo, banderas y cantidad revocada | codigos, booleanos o entero |
 | `documentos` | `documento`, `exportacion` | crear, generar, exportar o descargar | tipo, formato, cantidad y fechas | codigos, entero o fecha ISO |
 | `reportes` | `reporte`, `exportacion` | generar, exportar, descargar o consultar | tipo, formato, cantidad y fechas | codigos, entero o fecha ISO |
+| `automatizaciones` | `proximas_citas` | consultar | tipo, resultado, motivo, cantidad y rango | codigos, entero o fecha ISO |
 
 `unidad_operativa` no conserva valores en esta version porque aun no existe una
 justificacion documentada. El numero de embarazo tampoco se incluye hasta
@@ -206,6 +221,8 @@ valida su forma antes de entregarlos al repositorio.
 - Documentos: los cuatro PDF clinicos existentes, auditados solo como emision
   documental con tipo e identificadores internos.
 - Reportes: Excel y PDF de censos con tipo, formato, periodo validado y cantidad.
+- Automatizaciones: consulta agregada de proximas citas; solo resultado,
+  cantidad y rango, sin filas nominales.
 - Pacientes: creacion, actualizacion efectiva y sincronizaciones con embarazo;
   solo IDs internos y nombres de campos, nunca valores nominales o clinicos.
 - Embarazos: creacion, actualizacion de fechas y cambios de estado; solo
@@ -256,6 +273,7 @@ Permanecen informativos o best effort:
 - inactividad y expiracion automatica;
 - generacion de PDF;
 - generacion de Excel/PDF de reporte y exportacion de censo.
+- consulta agregada de proximas citas.
 
 Una falla best effort se advierte sin romper una descarga ya generada. Una
 falla obligatoria se relanza para que el coordinador transaccional haga
@@ -273,6 +291,9 @@ rollback.
   `cantidad_sesiones_revocadas`; nunca listas de IDs.
 - Documentos/reportes: tipo, formato, `desde`, `hasta`, `cantidad_filas`,
   resultado e identificadores internos en columnas.
+- Automatizaciones: `tipo_automatizacion`, resultado, motivo controlado,
+  `cantidad_citas`, `fecha_desde` y `fecha_hasta`; sin identificadores internos
+  ni contenido de pacientes.
 - Pacientes: `campos_registrados`, `campos_eliminados` o
   `campos_sensibles_modificados`, resultado y motivo controlado. CUI, expediente,
   nombre, telefono, direccion y comunidad aparecen como maximo por nombre de campo.

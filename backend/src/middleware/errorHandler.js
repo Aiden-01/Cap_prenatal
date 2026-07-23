@@ -99,15 +99,16 @@ function normalizeError(err) {
 }
 
 function logError(err, req, normalized) {
+  const isAutomationError = String(normalized.code || '').startsWith('AUTOMATION_');
   const payload = {
     method: req.method,
-    path: req.originalUrl,
+    path: req.path,
     status: normalized.statusCode,
     code: normalized.code,
     message: err.message,
   };
 
-  if (!isProduction()) {
+  if (!isProduction() && !isAutomationError) {
     payload.name = err.name;
     payload.dbCode = err.code;
     payload.constraint = err.constraint;
@@ -119,6 +120,7 @@ function logError(err, req, normalized) {
 
 function errorHandler(err, req, res, _next) {
   const normalized = normalizeError(err);
+  const isAutomationError = String(normalized.code || '').startsWith('AUTOMATION_');
   logError(err, req, normalized);
 
   const response = {
@@ -132,7 +134,7 @@ function errorHandler(err, req, res, _next) {
     response.detalles = normalized.details;
   }
 
-  if (!isProduction() && normalized.statusCode >= 500) {
+  if (!isProduction() && normalized.statusCode >= 500 && !isAutomationError) {
     response.debug = {
       name: err.name,
       stack: err.stack,

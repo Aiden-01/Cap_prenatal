@@ -3,7 +3,8 @@
 Desde Sprint 4B.3E todos los productores productivos usan el camino privado:
 
 - `registrarEventoPrivado`: obligatorio para autenticacion, usuarios,
-  passwords, roles, permisos, sesiones, PDF, exportaciones/reportes, pacientes,
+  passwords, roles, permisos, sesiones, PDF, exportaciones/reportes,
+  automatizaciones, pacientes,
   embarazos, controles prenatales/laboratorios embebidos, riesgo obstetrico,
   vacunas, morbilidad, plan de parto, puerperio, referencias y comunidades.
   Requiere
@@ -106,6 +107,7 @@ La auditoria debe responder:
 - Logout.
 - Generacion exitosa de PDF.
 - Exportacion de reportes.
+- Consulta autorizada del resumen agregado de proximas citas.
 
 La creacion explicita de un embarazo registra sus eventos con la misma
 conexion y transaccion que la insercion. Si esa auditoria obligatoria falla,
@@ -120,7 +122,7 @@ Nunca guardar:
 - Hashes de contrasena.
 - JWT.
 - Tokens CSRF.
-- `AUTOMATION_SECRET`.
+- `AUTOMATION_SECRET`, API keys o sus hashes.
 - Variables de entorno.
 - Credenciales SMTP.
 
@@ -133,6 +135,19 @@ Para documentos y reportes guardar metadata minima:
 - cantidad de filas exportadas,
 - resultado controlado,
 - paciente/embarazo si aplica.
+
+Para `automatizaciones/proximas_citas/consultar` guardar unicamente:
+
+- `tipo_automatizacion: proximas_citas`;
+- resultado y motivo controlados;
+- cantidad agregada;
+- `fecha_desde` y `fecha_hasta`;
+- `politica_version: 1`.
+
+No guardar lista de pacientes, IDs, IP, user-agent, headers, query completa,
+API key, hash, SQL ni respuesta nominal. Este evento es best effort: su fallo
+no convierte una consulta valida en error. Los intentos no autenticados no
+crean una fila de auditoria.
 
 No copiar snapshots clinicos completos si no son necesarios para trazabilidad.
 Las exportaciones del censo de primer control registran `censo_primer_control`,
@@ -154,6 +169,8 @@ nominal.
   hashes, cookies, IP ni lista completa de IDs.
 - Documentos/reportes: tipo, formato, periodo, cantidad e IDs internos en las
   columnas existentes; nunca contenido, HTML, buffer, temporal o fila nominal.
+- Automatizaciones: tipo, resultado, motivo, cantidad y rango. IP y user-agent
+  permanecen `null`; nunca se conserva la respuesta HTTP ni entrada M2M.
 - Paciente creado/eliminado: solo nombres en `campos_registrados` o
   `campos_eliminados`; una actualizacion conserva solo nombres de campos con delta real.
 - Embarazo: creacion/actualizacion conserva nombres de campos; solo

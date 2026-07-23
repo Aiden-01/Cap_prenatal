@@ -344,12 +344,20 @@ Requiere sesion JWT/cookie valida. No usa permisos por codigo en la ruta actual.
 
 Base: `/automatizaciones`
 
-Estas rutas no usan JWT. Usan header:
+La integracion esta deshabilitada por defecto y el endpoint v1 solo se monta
+funcionalmente en produccion habilitada. No usa JWT, cookies ni sesiones
+humanas. Usa:
 
 ```text
-X-CAP-Prenatal-Secret: <AUTOMATION_SECRET>
+X-CAP-Automation-Key: <API_KEY_ALEATORIA>
 ```
 
 | Metodo | Ruta | Descripcion |
 | --- | --- | --- |
-| `GET` | `/proximas-citas?dias=1` | Datos para recordatorios externos. |
+| `GET` | `/v1/proximas-citas?offset_days=1&window_days=1` | Conteo agregado de citas por fecha. |
+| `GET` | `/proximas-citas` | Endpoint legacy retirado; siempre `404`. |
+
+La key original vive solo en n8n. El backend compara su SHA-256 contra
+`N8N_API_KEY_HASH_CURRENT` o el hash NEXT de rotacion. La ruta exige allowlist
+CIDR y tiene rate limit propio. La respuesta solo contiene version, fecha de
+generacion, zona horaria, rango, total, resumen por fecha y `/dashboard`.

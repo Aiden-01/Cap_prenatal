@@ -337,6 +337,27 @@ const BASE_CONTEXTUAL_RULES = Object.freeze([
     valueType: AUDIT_VALUE_TYPES.NON_NEGATIVE_INTEGER,
   }),
   Object.freeze({
+    categories: ['automatizaciones'],
+    entities: ['proximas_citas'],
+    events: ['consultar'],
+    fields: ['tipo_automatizacion', 'resultado', 'motivo_codigo'],
+    valueType: AUDIT_VALUE_TYPES.CONTROLLED_CODE,
+  }),
+  Object.freeze({
+    categories: ['automatizaciones'],
+    entities: ['proximas_citas'],
+    events: ['consultar'],
+    fields: ['cantidad_citas'],
+    valueType: AUDIT_VALUE_TYPES.NON_NEGATIVE_INTEGER,
+  }),
+  Object.freeze({
+    categories: ['automatizaciones'],
+    entities: ['proximas_citas'],
+    events: ['consultar'],
+    fields: ['fecha_desde', 'fecha_hasta'],
+    valueType: AUDIT_VALUE_TYPES.ISO_DATE,
+  }),
+  Object.freeze({
     categories: ['documentos'],
     entities: ['documento', 'exportacion'],
     events: ['crear', 'generar', 'exportar', 'descargar', 'pdf_clinico_generado'],
