@@ -361,3 +361,8 @@ La key original vive solo en n8n. El backend compara su SHA-256 contra
 `N8N_API_KEY_HASH_CURRENT` o el hash NEXT de rotacion. La ruta exige allowlist
 CIDR y tiene rate limit propio. La respuesta solo contiene version, fecha de
 generacion, zona horaria, rango, total, resumen por fecha y `/dashboard`.
+
+El proxy publico Nginx no reenvia este prefijo: responde `404` antes del bloque
+general `/api/`. Solo n8n puede usar la ruta directa
+`http://backend:3001/api/automatizaciones/v1/proximas-citas` dentro de
+`automation_internal`.

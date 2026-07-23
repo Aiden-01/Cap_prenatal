@@ -1,19 +1,14 @@
-# ENTORNO DE DESARROLLO LOCAL EXCLUSIVAMENTE.
-# Publica puertos y no incorpora controles suficientes para Internet o produccion.
-# Copie .env.example a .env, genere secretos unicos y complete los campos vacios.
-# Docker Compose detendra la carga si falta una variable secreta obligatoria.
+# EJEMPLO DE PRODUCCION. NO CONTIENE SECRETOS Y NO DEBE DESPLEGARSE SIN
+# completar TLS, firewall, backups, permisos del host y gestion de secretos.
 
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: cap-prenatal-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: "${POSTGRES_DB:-cap_prenatal}"
       POSTGRES_USER: "${POSTGRES_USER:-cap_prenatal_app}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en el archivo .env local}"
-    ports:
-      - "127.0.0.1:5432:5432"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Inyecte POSTGRES_PASSWORD desde un gestor seguro}"
     expose:
       - "5432"
     volumes:
@@ -25,47 +20,47 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
 
   backend:
     build:
       context: ./backend
-    container_name: cap-prenatal-backend
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     environment:
+      NODE_ENV: production
+      PORT: "3001"
       DB_HOST: postgres
-      DB_PORT: 5432
+      DB_PORT: "5432"
       DB_NAME: "${POSTGRES_DB:-cap_prenatal}"
       DB_USER: "${POSTGRES_USER:-cap_prenatal_app}"
-      DB_PASSWORD: "${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en el archivo .env local}"
+      DB_PASSWORD: "${POSTGRES_PASSWORD:?Inyecte POSTGRES_PASSWORD desde un gestor seguro}"
       DB_SSL: "false"
       DB_SSL_REJECT_UNAUTHORIZED: "false"
-      JWT_SECRET: "${JWT_SECRET:?Defina JWT_SECRET en el archivo .env local}"
-      JWT_EXPIRES_IN: 8h
-      PORT: 3001
-      NODE_ENV: development
-      FRONTEND_URL: "${FRONTEND_URL:-http://localhost:8080,http://localhost:5173}"
-      COOKIE_SAMESITE: "${COOKIE_SAMESITE:-lax}"
-      TRUSTED_PROXY_CIDRS: "172.31.10.0/24"
+      JWT_SECRET: "${JWT_SECRET:?Inyecte JWT_SECRET desde un gestor seguro}"
+      FRONTEND_URL: "${FRONTEND_URL:?Defina el origen HTTPS exacto del sistema}"
+      COOKIE_SAMESITE: strict
+      TRUSTED_PROXY_CIDRS: "172.30.10.0/24"
+      ACCESS_TOKEN_TTL_MINUTES: "10"
+      SESSION_IDLE_TIMEOUT_MINUTES: "15"
+      SESSION_WARNING_MINUTES: "13"
+      SESSION_ABSOLUTE_HOURS: "8"
+      SESSION_ACTIVITY_UPDATE_SECONDS: "60"
       PDF_EXCEL_ENGINE: libreoffice
       LIBREOFFICE_PATH: /usr/bin/soffice
-      N8N_INTEGRATION_ENABLED: "false"
-      N8N_API_KEY_HASH_CURRENT: ""
-      N8N_API_KEY_HASH_NEXT: ""
-      N8N_ALLOWED_CIDRS: "172.31.30.0/24"
+      N8N_INTEGRATION_ENABLED: "${N8N_INTEGRATION_ENABLED:-false}"
+      N8N_API_KEY_HASH_CURRENT: "${N8N_API_KEY_HASH_CURRENT:-}"
+      N8N_API_KEY_HASH_NEXT: "${N8N_API_KEY_HASH_NEXT:-}"
+      N8N_ALLOWED_CIDRS: "172.30.30.0/24"
       APPOINTMENT_NOTIFICATION_START_OFFSET_DAYS: "1"
       APPOINTMENT_NOTIFICATION_WINDOW_DAYS: "1"
       APPOINTMENT_NOTIFICATION_TIMEZONE: America/Guatemala
       AUTOMATION_RATE_LIMIT_WINDOW_MS: "900000"
       AUTOMATION_RATE_LIMIT_MAX: "6"
-      SEED_DIRECTOR_NAME: "${SEED_DIRECTOR_NAME:-}"
-      SEED_DIRECTOR_USERNAME: "${SEED_DIRECTOR_USERNAME:-}"
-      SEED_DIRECTOR_PASSWORD: "${SEED_DIRECTOR_PASSWORD:-}"
-      SEED_CONFIRM_PRODUCTION: "${SEED_CONFIRM_PRODUCTION:-}"
-    ports:
-      - "127.0.0.1:3001:3001"
     expose:
       - "3001"
     networks:
@@ -82,39 +77,40 @@ services:
       timeout: 5s
       retries: 6
       start_period: 20s
+    security_opt:
+      - no-new-privileges:true
 
   n8n:
     image: docker.n8n.io/n8nio/n8n:2.26.4
-    container_name: cap-prenatal-n8n
     restart: unless-stopped
+    user: "1000:1000"
     depends_on:
       backend:
         condition: service_healthy
     environment:
-      GENERIC_TIMEZONE: America/Guatemala
-      TZ: America/Guatemala
-      N8N_HOST: 127.0.0.1
+      N8N_ENCRYPTION_KEY: "${N8N_ENCRYPTION_KEY:?Inyecte una clave estable y respaldada}"
+      N8N_HOST: "${N8N_HOST:?Defina el nombre administrativo interno}"
       N8N_PORT: "5678"
       N8N_PROTOCOL: http
       N8N_LISTEN_ADDRESS: 0.0.0.0
-      N8N_EDITOR_BASE_URL: http://127.0.0.1:5678/
+      N8N_EDITOR_BASE_URL: "${N8N_EDITOR_BASE_URL:?Defina la URL HTTPS administrativa}"
+      WEBHOOK_URL: "${WEBHOOK_URL:?Defina la URL HTTPS controlada}"
+      GENERIC_TIMEZONE: America/Guatemala
+      TZ: America/Guatemala
       N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
-      N8N_ENCRYPTION_KEY: "${N8N_ENCRYPTION_KEY:?Defina N8N_ENCRYPTION_KEY en el archivo .env local}"
       N8N_RUNNERS_ENABLED: "true"
       N8N_DIAGNOSTICS_ENABLED: "false"
       N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+      N8N_TEMPLATES_ENABLED: "false"
       EXECUTIONS_DATA_PRUNE: "true"
-      EXECUTIONS_DATA_MAX_AGE: "24"
-      EXECUTIONS_DATA_PRUNE_MAX_COUNT: "100"
+      EXECUTIONS_DATA_MAX_AGE: "168"
+      EXECUTIONS_DATA_PRUNE_MAX_COUNT: "1000"
       EXECUTIONS_DATA_SAVE_ON_SUCCESS: none
-      EXECUTIONS_DATA_SAVE_ON_ERROR: all
-      EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS: "true"
+      EXECUTIONS_DATA_SAVE_ON_ERROR: none
+      EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS: "false"
       EXECUTIONS_DATA_SAVE_ON_PROGRESS: "false"
-      WEBHOOK_URL: http://127.0.0.1:5678/
       CAP_BACKEND_AUTOMATION_URL: http://backend:3001/api/automatizaciones/v1/proximas-citas
-      CAP_SYSTEM_BASE_URL: http://127.0.0.1:8080
-    ports:
-      - "127.0.0.1:5678:5678"
+      CAP_SYSTEM_BASE_URL: "${CAP_SYSTEM_BASE_URL:?Defina la URL HTTPS del sistema}"
     expose:
       - "5678"
     volumes:
@@ -131,46 +127,57 @@ services:
       timeout: 5s
       retries: 6
       start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
 
-  frontend:
+  proxy:
     build:
       context: ./frontend
       args:
         VITE_API_URL: /api
-    container_name: cap-prenatal-frontend
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
     ports:
-      - "127.0.0.1:8080:80"
+      - "80:80"
     networks:
+      - proxy_public
       - app_internal
     healthcheck:
       test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1/healthz || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   postgres_data:
-    name: cap_prenatal_local_postgres_data
+    name: cap_prenatal_production_postgres_data
   n8n_data:
-    name: cap_prenatal_local_n8n_data
+    name: cap_prenatal_production_n8n_data
 
 networks:
+  proxy_public:
+    name: cap_prenatal_production_proxy
   app_internal:
-    name: cap_prenatal_local_app
+    name: cap_prenatal_production_app
+    internal: true
     ipam:
       config:
-        - subnet: 172.31.10.0/24
+        - subnet: 172.30.10.0/24
   data_internal:
-    name: cap_prenatal_local_data
+    name: cap_prenatal_production_data
+    internal: true
     ipam:
       config:
-        - subnet: 172.31.20.0/24
+        - subnet: 172.30.20.0/24
   automation_internal:
-    name: cap_prenatal_local_automation
+    name: cap_prenatal_production_automation
+    internal: true
     ipam:
       config:
-        - subnet: 172.31.30.0/24
+        - subnet: 172.30.30.0/24

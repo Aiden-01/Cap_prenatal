@@ -303,6 +303,17 @@ function validateAutomationCidrs(env) {
   }
 }
 
+function validateTrustedProxyCidrs(env) {
+  const raw = readOptional(env, 'TRUSTED_PROXY_CIDRS');
+  if (!raw) return Object.freeze([]);
+
+  try {
+    return Object.freeze(parseAllowedCidrs(raw).map(({ source }) => source));
+  } catch {
+    invalid('TRUSTED_PROXY_CIDRS');
+  }
+}
+
 function validateAutomationConfig(env = process.env, options = {}) {
   const nodeEnv = options.nodeEnv || nodeEnvForValidation(env);
   const enabled = parseBoolean(env, 'N8N_INTEGRATION_ENABLED', { fallback: false });
@@ -362,6 +373,7 @@ function validateAppConfig(env = process.env) {
   const frontendOrigins = validateFrontendOrigins(env, { nodeEnv });
   const cookieSameSite = validateCookieSameSite(env);
   const automation = validateAutomationConfig(env, { nodeEnv });
+  const trustedProxyCidrs = validateTrustedProxyCidrs(env);
   const port = parseInteger(env, 'PORT', { fallback: 3001, min: 1, max: 65535 });
   const jsonBodyLimit = readOptional(env, 'JSON_BODY_LIMIT', '1mb');
   if (!/^\d+(?:b|kb|mb)$/i.test(jsonBodyLimit)) invalid('JSON_BODY_LIMIT');
@@ -374,6 +386,7 @@ function validateAppConfig(env = process.env) {
     frontendOrigins,
     cookieSameSite,
     automation,
+    trustedProxyCidrs,
     port,
     jsonBodyLimit,
   });
@@ -454,4 +467,5 @@ module.exports = {
   validateJwtConfig,
   validateSessionConfig,
   validateSeedConfig,
+  validateTrustedProxyCidrs,
 };

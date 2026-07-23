@@ -13,7 +13,7 @@ El proyecto incluye:
 ## Preparacion local
 
 Copiar `.env.example` a `.env` en la raiz y completar los valores vacios.
-`POSTGRES_PASSWORD`, `JWT_SECRET` y `AUTOMATION_SECRET` no tienen fallback:
+`POSTGRES_PASSWORD`, `JWT_SECRET` y `N8N_ENCRYPTION_KEY` no tienen fallback:
 Compose falla antes de crear contenedores si falta cualquiera de ellos. Genere
 un valor aleatorio diferente para cada variable con uno de los comandos indicados
 en `.env.example`.
@@ -35,7 +35,12 @@ Servicios locales:
 Frontend: http://localhost:8080
 Backend:  http://localhost:3001/api/health
 Postgres: localhost:5432
+n8n UI:   http://127.0.0.1:5678
 ```
+
+Todos los puertos locales se ligan a `127.0.0.1`. Los servicios usan redes
+separadas: frontend/backend, backend/PostgreSQL y n8n/backend. n8n no comparte
+red con PostgreSQL y la integracion M2M del backend permanece deshabilitada.
 
 Ejecutar migracion dentro del contenedor:
 
@@ -59,10 +64,20 @@ bloqueado salvo que se proporcione tambien la confirmacion explicita descrita en
 
 ## Produccion
 
-Este sprint no incorpora `docker-compose.production.yml`. Un despliegue real debe
-inyectar secretos desde el entorno o un gestor de secretos y no debe reutilizar el
-Compose local. El backend acepta `DATABASE_URL` o todas las variables `DB_*`, pero
-valida la configuracion antes de cargar rutas.
+`docker-compose.production.example.yml` documenta la topologia endurecida, pero
+no es un despliegue listo para ejecutar. No contiene secretos, publica solo el
+proxy y separa las redes de aplicacion, datos y automatizacion. Debe revisarse
+para el host concreto, TLS, firewall, subredes, backups, permisos y gestor de
+secretos.
+
+No usar el Compose local en servidores. El archivo `deploy/.env.example` es un
+inventario; no debe convertirse en almacen de secretos productivos. El backend
+acepta `DATABASE_URL` o todas las variables `DB_*`, pero valida la configuracion
+antes de cargar rutas.
+
+La imagen n8n y la dependencia local estan fijadas en `2.26.4`. Revisar notas de
+version, respaldar el volumen y probar restauracion antes de cualquier
+actualizacion.
 
 Consulte `docs/ROTACION_SECRETOS.md` antes de preparar cualquier entorno nuevo.
 

@@ -2,9 +2,10 @@
 
 ## Estado
 
-Sprint 5B.1 implementa solamente el endpoint interno del backend. Todavia no
-existe un workflow n8n productivo, no se envian correos y no se habilita la
-integracion en desarrollo.
+Sprint 5B.2A agrega configuraciones local y productiva de ejemplo para separar
+n8n, backend, PostgreSQL y el proxy. No se desplego esta topologia, no existe un
+workflow funcional, no se configuraron credenciales reales, no se enviaron
+correos y no hubo cambios de base de datos.
 
 El endpoint anterior:
 
@@ -14,6 +15,61 @@ GET /api/automatizaciones/proximas-citas
 
 esta retirado y responde `404`. `AUTOMATION_SECRET` es obsoleto y el backend no
 lo usa. No debe restaurarse ni redirigirse al contrato nuevo.
+
+## Topologia
+
+```text
+Internet/navegador
+        |
+        v
+proxy Nginx :80/:443  -- app_internal -->  backend :3001
+                                                |
+                                                +-- data_internal --> PostgreSQL :5432
+                                                |
+n8n :5678 -- automation_internal ---------------+
+```
+
+La configuracion productiva de ejemplo define:
+
+- `proxy_public`: solo el proxy;
+- `app_internal`: proxy y backend;
+- `data_internal`: backend y PostgreSQL;
+- `automation_internal`: n8n y backend.
+
+Las tres redes internas usan `internal: true`. PostgreSQL, backend y n8n no
+publican puertos al host; solo `proxy` publica `80`. TLS debe terminar en este
+proxy o en un balanceador administrado antes de usar la configuracion.
+
+Inventario:
+
+| Servicio | Desarrollo local | Produccion de ejemplo | Redes productivas |
+| --- | --- | --- | --- |
+| Proxy/frontend | `127.0.0.1:8080` | publica `80`; `443` debe resolverse en proxy/balanceador | `proxy_public`, `app_internal` |
+| Backend | `127.0.0.1:3001` | sin `ports`, solo `expose: 3001` | `app_internal`, `data_internal`, `automation_internal` |
+| PostgreSQL | `127.0.0.1:5432` | sin `ports`, solo `expose: 5432` | `data_internal` |
+| n8n | `127.0.0.1:5678` | sin `ports`, solo `expose: 5678` | `automation_internal` |
+
+El backend recibe DB/JWT y hashes M2M; PostgreSQL recibe unicamente sus
+variables propias; n8n recibe cifrado, retencion y URLs dedicadas; el proxy no
+recibe secretos de backend o n8n.
+
+n8n consulta directamente:
+
+```text
+http://backend:3001/api/automatizaciones/v1/proximas-citas
+```
+
+No usa el proxy publico. Nginx responde un `404` JSON uniforme para el prefijo
+normalizado `/api/automatizaciones/` antes del bloque general `/api/`. La regla
+es case-insensitive y se aplica con `merge_slashes on`, por lo que variantes
+simples de mayusculas, barras duplicadas o URI normalizada tampoco se reenvian.
+Las rutas humanas restantes conservan el proxy general.
+
+En una llamada directa n8n -> backend, `req.socket.remoteAddress` es la IP del
+contenedor n8n dentro de `172.30.30.0/24`. En una llamada humana, el socket del
+backend observa al proxy dentro de `172.30.10.0/24` y Express solo acepta sus
+headers reenviados porque esa subred esta en `TRUSTED_PROXY_CIDRS`. Una llamada
+publica nunca llega al router de automatizaciones porque Nginx la corta.
 
 ## Endpoint v1
 
@@ -108,12 +164,98 @@ tratan como configuracion sensible y no se escriben en Git, tickets o logs.
 
 En produccion habilitada la allowlist no puede estar vacia. Soporta IPv4, IPv6
 y direcciones IPv4 mapeadas como IPv6. El backend usa la direccion del socket;
-no confia en `X-Forwarded-For`. La configuracion exacta de `trust proxy`, proxy
-reverso y red Docker queda para Sprint 5B.2.
+no confia en `X-Forwarded-For`.
 
 La validacion CIDR usa la dependencia explicita `ipaddr.js` porque implementa
 parseo y comparacion mantenidos para IPv4, IPv6 e IPv4 mapeada; evita un parser
 manual incompleto en un control de acceso de red.
+
+Para trafico humano, Express configura `trust proxy` con una funcion CIDR
+estricta basada en `TRUSTED_PROXY_CIDRS`. El ejemplo productivo confia solo en
+`172.30.10.0/24`, la subred de `app_internal`; nunca usa `true`. Esta
+configuracion permite interpretar los headers del proxy humano, pero no cambia
+el origen del endpoint M2M, que siempre usa `req.socket.remoteAddress`.
+
+## n8n, secretos y version
+
+La imagen y la dependencia local estan fijadas en `2.26.4`. Se eligio esta
+version porque es la que ya resuelve el lockfile del proyecto; no se afirma que
+sea la version mas reciente. No se usa `latest`, rango semver ni descarga
+implicita mediante `npx`.
+
+Para actualizar:
+
+1. revisar las notas de version y cambios incompatibles;
+2. respaldar y probar restauracion del volumen n8n;
+3. verificar compatibilidad de nodos y credenciales en un entorno aislado;
+4. actualizar a la vez Compose local, Compose productivo, `package.json` y lock;
+5. ejecutar las pruebas de infraestructura y no saltar automaticamente de major.
+
+n8n recibe solamente variables dedicadas. No recibe PostgreSQL clinico, JWT,
+sesiones, SMTP, seed ni hashes CURRENT/NEXT. La API key original debe crearse
+como credencial Header Auth dentro de n8n; el backend recibe unicamente los
+hashes SHA-256.
+
+`N8N_ENCRYPTION_KEY` es obligatoria, estable y secreta. Debe respaldarse en un
+gestor independiente del volumen. Regenerarla despues de crear credenciales
+puede impedir descifrarlas. El volumen `n8n_data` es persistente, se ejecuta con
+UID/GID `1000:1000` y `N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true`. El backup
+debe cifrarse, tener acceso restringido e incluir una prueba periodica de
+restauracion; la clave no debe guardarse dentro del mismo backup sin una
+proteccion separada.
+
+## Retencion
+
+Produccion parte de una politica conservadora:
+
+```env
+EXECUTIONS_DATA_PRUNE=true
+EXECUTIONS_DATA_MAX_AGE=168
+EXECUTIONS_DATA_PRUNE_MAX_COUNT=1000
+EXECUTIONS_DATA_SAVE_ON_SUCCESS=none
+EXECUTIONS_DATA_SAVE_ON_ERROR=none
+EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=false
+EXECUTIONS_DATA_SAVE_ON_PROGRESS=false
+```
+
+La retencion maxima inicial es siete dias y 1000 ejecuciones. Local conserva
+errores y ejecuciones manuales sinteticas por hasta 24 horas/100 ejecuciones.
+La configuracion reduce persistencia, pero no permite prometer que un workflow
+futuro nunca guarde datos: ese workflow debera validar que sus nodos, errores y
+expresiones no incorporen pacientes, payloads ni headers en logs.
+
+## Acceso administrativo
+
+En produccion n8n no publica `5678`. Su editor debe alcanzarse solo mediante
+VPN, red administrativa o tunel autenticado, con HTTPS si cruza una red. La
+cuenta propietaria y MFA, cuando la plataforma lo permita, se configuran fuera
+de Git. No habilitar el tunel administrativo hasta confirmar autenticacion y
+cuenta propietaria; una UI sin autenticacion no es aceptable. El Compose local
+publica exclusivamente `127.0.0.1:5678`.
+
+## Configuracion local
+
+`scripts/start-n8n-local.ps1` lee unicamente `n8n/.env`, valida una lista cerrada
+de variables, elimina del proceso variables clinicas heredadas y exige:
+
+- `N8N_ENCRYPTION_KEY` de al menos 32 caracteres;
+- `N8N_LISTEN_ADDRESS` en loopback;
+- `GENERIC_TIMEZONE=America/Guatemala`;
+- URLs dedicadas de backend y sistema;
+- n8n local exactamente en `2.26.4`.
+
+Copiar `n8n/.env.example` a `n8n/.env`; este ultimo esta ignorado por Git. La
+integracion del backend permanece deshabilitada por defecto y solo deben usarse
+datos sinteticos. El script no lee `backend/.env` y no inicia si falta la
+configuracion minima o la dependencia local.
+
+## Configuracion productiva de ejemplo
+
+`docker-compose.production.example.yml` es un artefacto revisable, no un
+despliegue. Exige secretos externos por interpolacion, usa redes y volumenes con
+nombres explicitos, reinicio `unless-stopped` y health checks sin credenciales.
+`deploy/.env.example` es solo inventario; los valores vacios deben inyectarse
+desde un gestor de secretos o el entorno protegido, no desde Git.
 
 ## Generacion y rotacion
 
@@ -167,11 +309,12 @@ Solo conserva tipo, resultado, motivo controlado, cantidad, rango y
 informativa no convierte una consulta valida en error. Los intentos con key
 incorrecta no crean filas de auditoria.
 
-## Pendiente para Sprint 5B.2
+## Pendiente para el workflow
 
-- crear y versionar el workflow;
-- configurar credenciales y destinatario;
-- endurecer n8n, retencion y cifrado;
-- terminar red Docker, firewall, HTTPS, proxy y `trust proxy`;
-- impedir la exposicion publica del prefijo de automatizaciones;
-- retirar la referencia obsoleta a `AUTOMATION_SECRET` del Compose local.
+- crear y revisar el workflow funcional en otro sprint;
+- configurar la credencial Header Auth y cualquier proveedor/destinatario;
+- validar que nodos y errores no persistan payloads;
+- desplegar TLS, firewall, VPN/tunel y backups probados;
+- comprobar en el host elegido que las subredes de ejemplo no colisionen;
+- decidir un mecanismo de salida de red minimo para el proveedor futuro;
+- probar la topologia con Docker en un entorno no productivo.

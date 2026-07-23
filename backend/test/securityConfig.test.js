@@ -238,14 +238,15 @@ test('Docker Compose exige secretos externos y no contiene defaults utilizables'
   const source = fs.readFileSync(path.join(ROOT, 'docker-compose.yml'), 'utf8');
   const jwtLines = source.split(/\r?\n/).filter((line) => /^\s*JWT_SECRET:/.test(line));
   const dbPasswordLines = source.split(/\r?\n/).filter((line) => /^\s*(?:POSTGRES_PASSWORD|DB_PASSWORD):/.test(line));
-  const automationLines = source.split(/\r?\n/).filter((line) => /^\s*AUTOMATION_SECRET:/.test(line));
+  const n8nEncryptionLines = source.split(/\r?\n/).filter((line) => /^\s*N8N_ENCRYPTION_KEY:/.test(line));
 
   assert.ok(jwtLines.length > 0);
   assert.ok(dbPasswordLines.length > 0);
-  assert.ok(automationLines.length > 0);
-  for (const line of [...jwtLines, ...dbPasswordLines, ...automationLines]) {
-    assert.match(line, /\$\{[A-Z_]+:\?/);
+  assert.ok(n8nEncryptionLines.length > 0);
+  for (const line of [...jwtLines, ...dbPasswordLines, ...n8nEncryptionLines]) {
+    assert.match(line, /\$\{[A-Z0-9_]+:\?/);
   }
+  assert.doesNotMatch(source, /AUTOMATION_SECRET/);
   assert.match(source, /ENTORNO DE DESARROLLO LOCAL EXCLUSIVAMENTE/);
   assert.match(source, /NODE_ENV:\s*development/);
 });
@@ -254,12 +255,14 @@ test('archivos env de ejemplo dejan vacios todos los secretos', () => {
   const files = [
     path.join(ROOT, '.env.example'),
     path.join(ROOT, 'backend', '.env.example'),
+    path.join(ROOT, 'n8n', '.env.example'),
+    path.join(ROOT, 'deploy', '.env.example'),
   ];
   const secretNames = new Set([
     'POSTGRES_PASSWORD',
     'DB_PASSWORD',
     'JWT_SECRET',
-    'AUTOMATION_SECRET',
+    'N8N_ENCRYPTION_KEY',
     'N8N_API_KEY_HASH_CURRENT',
     'N8N_API_KEY_HASH_NEXT',
     'SEED_DIRECTOR_PASSWORD',

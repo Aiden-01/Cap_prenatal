@@ -117,7 +117,18 @@ El repositorio selecciona el ultimo control por `embarazo_id` mediante
 `fecha DESC, numero_control DESC, id DESC`, filtra exclusivamente embarazos
 activos y nunca selecciona datos nominales. El endpoint legacy responde `404`.
 La auditoria de consulta es informativa y best effort. No se modifico la base de
-datos; workflow, red productiva, proxy y n8n quedan para Sprint 5B.2.
+datos.
+
+La topologia de Sprint 5B.2A separa `proxy_public`, `app_internal`,
+`data_internal` y `automation_internal`. El proxy y n8n solo comparten el
+backend; n8n no comparte red ni credenciales con PostgreSQL. En produccion solo
+el proxy publica un puerto. Nginx bloquea `/api/automatizaciones/` antes del
+proxy `/api/`, mientras n8n usa `http://backend:3001` por su red privada.
+
+Express confia headers reenviados unicamente cuando la direccion del socket
+pertenece a `TRUSTED_PROXY_CIDRS`; nunca usa `trust proxy=true`. El middleware
+M2M ignora esa resolucion y conserva el socket directo como origen. El workflow
+funcional, credenciales reales, TLS, VPN y despliegue siguen fuera de alcance.
 
 ## Modulo de referencia
 

@@ -34,8 +34,10 @@ const {
 const { csrfMiddleware } = require('./middleware/auth');
 const { errorHandler } = require('./middleware/errorHandler');
 const { AppError } = require('./utils/appError');
+const { createStrictTrustProxy } = require('./utils/proxyTrust');
 
 const app = express();
+app.set('trust proxy', createStrictTrustProxy(config.trustedProxyCidrs));
 const allowedOrigins = config.frontendOrigins;
 const automatizacionesRoutes = createAutomatizacionesRouter({
   config: config.automation,

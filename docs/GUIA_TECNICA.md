@@ -982,7 +982,7 @@ PDF_EXCEL_ENGINE=excel
 
 ## Automatizaciones y n8n
 
-Sprint 5B.1 incorpora un endpoint interno versionado bajo:
+El endpoint interno versionado es:
 
 ```text
 GET /api/automatizaciones/v1/proximas-citas?offset_days=1&window_days=1
@@ -1002,8 +1002,23 @@ autentican la ruta. En desarrollo o deshabilitada responde `404`.
 La consulta usa el ultimo control determinista por embarazo activo y responde
 solo conteos por fecha, sin IDs, datos personales, clinicos, HTML o Markdown.
 El endpoint legacy `/api/automatizaciones/proximas-citas` responde `404`.
-Todavia no existe workflow productivo; red, proxy y n8n se endureceran en
-Sprint 5B.2. Contrato completo en `docs/N8N.md`.
+
+Sprint 5B.2A incorpora una topologia de ejemplo con cuatro redes Docker:
+`proxy_public`, `app_internal`, `data_internal` y `automation_internal`.
+PostgreSQL, backend y n8n no publican puertos en produccion; Nginx es el unico
+servicio publicado y bloquea el prefijo `/api/automatizaciones/`. n8n usa el
+nombre interno `backend:3001` y no comparte red con PostgreSQL.
+
+`trust proxy` es una funcion CIDR estricta alimentada por
+`TRUSTED_PROXY_CIDRS`; no se configura como `true`. El endpoint M2M sigue
+validando `req.socket.remoteAddress` y no confia en `X-Forwarded-For`.
+
+n8n queda fijado en `2.26.4`, usa volumen persistente, exige
+`N8N_ENCRYPTION_KEY` y aplica poda de ejecuciones. En produccion no publica su
+UI; el acceso administrativo requiere VPN, red privada o tunel y HTTPS. El
+script local lee solo `n8n/.env` y liga el proceso a loopback. Todavia no existe
+workflow funcional ni se configuraron correos. Contrato y operacion completa en
+`docs/N8N.md`.
 
 ## Laboratorios
 
@@ -1061,6 +1076,7 @@ Fuera de alcance actual:
 | `PORT` | Puerto backend. Default `3001`. |
 | `FRONTEND_URL` | Origenes permitidos por CORS, separados por coma. |
 | `COOKIE_SAMESITE` | Politica SameSite de cookies. Default `lax`. |
+| `TRUSTED_PROXY_CIDRS` | Proxies HTTP estrictamente confiables; vacio significa no confiar en ninguno. |
 | `JSON_BODY_LIMIT` | Limite del body JSON. Default `1mb`. |
 | `CHATBOT_LOGGING_ENABLED` | Activa metadata JSONL de Lia solo con `true`. Default desactivado. |
 | `CHATBOT_RUNTIME_DIR` | Directorio privado de runtime de Lia. Default `backend/runtime/chatbot/`. |
@@ -1078,7 +1094,11 @@ Fuera de alcance actual:
 | `APPOINTMENT_NOTIFICATION_TIMEZONE` | Solo `America/Guatemala` en v1. |
 | `AUTOMATION_RATE_LIMIT_WINDOW_MS` | Ventana del limite M2M. Default `900000`. |
 | `AUTOMATION_RATE_LIMIT_MAX` | Solicitudes M2M por ventana. Default `6`. |
-| `AUTOMATION_SECRET` | Obsoleto; el backend no lo usa. |
+| `N8N_ENCRYPTION_KEY` | Clave estable exclusiva de n8n; nunca se entrega al backend. |
+| `CAP_BACKEND_AUTOMATION_URL` | URL privada `backend:3001` que recibe n8n. |
+| `CAP_SYSTEM_BASE_URL` | URL HTTPS del sistema usada por n8n. |
+| `EXECUTIONS_DATA_PRUNE` | Habilita poda de ejecuciones n8n. |
+| `EXECUTIONS_DATA_MAX_AGE` | Retencion maxima de n8n en horas. |
 | `PDF_RATE_LIMIT_WINDOW_MS` | Ventana por usuario para PDF clinico. Default `300000`. |
 | `PDF_RATE_LIMIT` | Generaciones PDF permitidas por ventana. Default `20`. |
 | `PDF_EXCEL_ENGINE` | `auto`, `excel` o `libreoffice`. |

@@ -1,165 +1,181 @@
-GUIA PROVISIONAL DE DESPLIEGUE EN AWS CON N8N
+GUIA DE TOPOLOGIA PRODUCTIVA DE EJEMPLO CON N8N
 Proyecto: CAP Prenatal - CAP El Chal
+Sprint: 5B.2A
 
-ESTADO DE ESTA GUIA
--------------------
+ADVERTENCIA
+-----------
 
-El repositorio no contiene todavia una configuracion de produccion. El archivo
-docker-compose.yml es exclusivamente local: publica puertos, fija
-NODE_ENV=development y no debe exponerse a Internet ni ejecutarse en un servidor
-productivo.
-
-No seguir versiones anteriores de esta guia que indicaban crear backend/.env y
-levantar el Compose local en AWS. El archivo backend/.env no se copia a la imagen
-y no sustituye la inyeccion segura de variables al contenedor.
-
-El despliegue productivo queda bloqueado hasta un sprint posterior que incorpore
-la topologia, TLS, redes privadas, usuarios no privilegiados y configuracion de
-n8n apropiados para produccion.
+docker-compose.production.example.yml es una configuracion revisable, no un
+despliegue listo para produccion. No se ejecuto Docker, no se desplego en AWS,
+no se configuraron credenciales reales, no existe workflow y no se enviaron
+correos. No hubo cambios de base de datos.
 
 
-1. Arquitectura futura minima
------------------------------
+1. TOPOLOGIA
+------------
 
-  - Frontend detras de HTTPS.
-  - Backend en red privada, sin publicar directamente el puerto de la API.
-  - PostgreSQL en red privada y con credenciales propias del entorno.
-  - n8n protegido y separado de la exposicion publica innecesaria.
-  - Gestor de secretos o variables protegidas del proveedor.
-  - Solo 80/443 publicos; SSH restringido a direcciones administradas.
+Internet/navegador
+        |
+        v
+proxy Nginx :80/:443 -- app_internal --> backend :3001
+                                             |
+                                             +-- data_internal --> PostgreSQL
+                                             |
+n8n -- automation_internal ------------------+
 
+Redes:
 
-2. Variables que debera inyectar el entorno
---------------------------------------------
+- proxy_public: proxy.
+- app_internal 172.30.10.0/24: proxy y backend.
+- data_internal 172.30.20.0/24: backend y PostgreSQL.
+- automation_internal 172.30.30.0/24: n8n y backend.
 
-Backend:
-
-  NODE_ENV
-  JWT_SECRET
-  ACCESS_TOKEN_TTL_MINUTES
-  SESSION_IDLE_TIMEOUT_MINUTES
-  SESSION_WARNING_MINUTES
-  SESSION_ABSOLUTE_HOURS
-  SESSION_ACTIVITY_UPDATE_SECONDS
-  FRONTEND_URL
-  COOKIE_SAMESITE
-  DB_SSL
-  DB_SSL_REJECT_UNAUTHORIZED
-
-Conexion PostgreSQL, una de estas dos modalidades:
-
-  DATABASE_URL
-
-o todas las siguientes:
-
-  DB_HOST
-  DB_PORT
-  DB_NAME
-  DB_USER
-  DB_PASSWORD
-
-Integracion n8n v1:
-
-  N8N_INTEGRATION_ENABLED
-  N8N_API_KEY_HASH_CURRENT
-  N8N_API_KEY_HASH_NEXT
-  N8N_ALLOWED_CIDRS
-  APPOINTMENT_NOTIFICATION_START_OFFSET_DAYS
-  APPOINTMENT_NOTIFICATION_WINDOW_DAYS
-  APPOINTMENT_NOTIFICATION_TIMEZONE
-  AUTOMATION_RATE_LIMIT_WINDOW_MS
-  AUTOMATION_RATE_LIMIT_MAX
-
-No escribir valores en esta guia, Compose, Dockerfile, comandos de shell, tickets
-o logs. La API key original existe solo en la credencial de n8n; el backend
-recibe exclusivamente su hash SHA-256. AUTOMATION_SECRET es obsoleto.
+Las tres redes internas usan internal=true. n8n no comparte red con
+PostgreSQL. Verificar antes del despliegue que estas subredes no colisionen con
+VPC, VPN o redes Docker existentes.
 
 
-3. Validacion del backend
+2. PUERTOS
+----------
+
+Produccion:
+
+- proxy: publica 80. TLS debe terminar en el proxy o balanceador administrado.
+- backend: solo expose 3001; sin ports.
+- PostgreSQL: solo expose 5432; sin ports.
+- n8n: solo expose 5678; sin ports.
+
+La UI n8n se administra solo mediante VPN, red administrativa o tunel
+autenticado, con HTTPS si cruza red. Nunca publicar 5678 directamente.
+El proceso n8n usa HTTP dentro de la red Docker; el HTTPS administrativo debe
+terminar en el componente privado de VPN/tunel/proxy que se agregue al entorno.
+No abrir ese acceso hasta verificar la cuenta propietaria y la autenticacion de
+n8n; una UI sin autenticacion no cumple este diseño.
+
+
+3. PROXY Y ENDPOINT INTERNO
+---------------------------
+
+frontend/nginx.conf bloquea antes del /api/ general:
+
+  /api/automatizaciones/
+
+La regla devuelve 404 JSON uniforme, es case-insensitive y trabaja sobre la URI
+normalizada con merge_slashes activado. Las rutas humanas restantes continúan
+enviandose a backend:3001.
+
+n8n omite el proxy publico y usa:
+
+  http://backend:3001/api/automatizaciones/v1/proximas-citas
+
+
+4. TRUST PROXY
+--------------
+
+TRUSTED_PROXY_CIDRS=172.30.10.0/24 autoriza exclusivamente la subred del proxy
+humano. Express usa una funcion CIDR estricta y nunca trust proxy=true.
+
+El endpoint M2M no usa req.ip ni X-Forwarded-For: valida siempre la direccion
+del socket directo de automation_internal contra:
+
+  N8N_ALLOWED_CIDRS=172.30.30.0/24
+
+
+5. SEPARACION DE SECRETOS
 -------------------------
 
-El backend valida la configuracion antes de cargar rutas. En produccion rechaza:
+Backend recibe:
 
-  - NODE_ENV ausente o desconocido.
-  - JWT_SECRET ausente, corto o con marcadores de ejemplo/desarrollo.
-  - Configuracion PostgreSQL incompleta o predecible.
-  - DB_SSL con un valor distinto de true/false.
-  - FRONTEND_URL con HTTP, loopback, comodines, credenciales, rutas, query o
-    fragmentos.
-  - COOKIE_SAMESITE fuera de los valores admitidos.
-  - Hash CURRENT ausente o invalido cuando n8n esta habilitado.
-  - Allowlist CIDR vacia o invalida cuando n8n esta habilitado.
-  - Offset, ventana, timezone o rate limit fuera de sus limites.
+- JWT_SECRET.
+- POSTGRES_PASSWORD o credenciales DB equivalentes.
+- N8N_API_KEY_HASH_CURRENT/NEXT.
 
-Los errores identifican la variable invalida sin imprimir su valor.
+n8n recibe:
 
-Antes de iniciar la nueva version se debe ejecutar deliberadamente, desde backend:
+- N8N_ENCRYPTION_KEY.
+- URLs y configuracion propia.
+- Politica de retencion.
 
-  npm run db:migrate
+n8n no recibe credenciales PostgreSQL clinicas, JWT, CSRF, sesiones, SMTP del
+backend, seed ni hashes M2M. La API key original queda solamente como credencial
+Header Auth en n8n.
 
-El ejecutor aplica schema.sql, descubre en orden las migraciones versionadas
-pendientes y registra su checksum en schema_migrations; esto incluye
-007_auth_sessions.sql. No ejecutar el comando contra una base real sin respaldo,
-ventana y validacion del entorno. Los JWT anteriores, que no contienen sid, dejan
-de ser compatibles y los usuarios deben autenticarse otra vez. La limpieza manual
-de sesiones antiguas puede ejecutarse posteriormente con npm run sessions:cleanup
-desde backend; no es requisito para autenticar.
-
-El access dura 10 minutos por defecto, la inactividad 15 minutos y la sesion
-absoluta 8 horas. Este ultimo valor no restringe horarios laborales: al vencer,
-el usuario puede iniciar una sesion nueva inmediatamente.
-
-Un despliegue institucional interno puede usar un nombre DNS interno o una IP
-privada en FRONTEND_URL, siempre mediante HTTPS. El certificado debe ser confiable
-en todos los equipos que usen el sistema; se recomienda un nombre DNS interno en
-lugar de una IP para facilitar certificados y mantenimiento. Permitir una direccion
-privada concreta no equivale a permitir cualquier origen: CORS compara solamente
-los origenes exactos configurados.
+deploy/.env.example es inventario sin secretos. En produccion, inyectar valores
+mediante gestor de secretos, archivos protegidos o entorno administrado. No
+guardar secretos en Git, tickets, logs o el Compose.
 
 
-4. Cuenta inicial
------------------
+6. VERSION
+----------
 
-El seed ya no contiene cuentas ni contrasenas conocidas. Solo crea, si no existe,
-una cuenta director definida mediante:
-
-  SEED_DIRECTOR_NAME
-  SEED_DIRECTOR_USERNAME
-  SEED_DIRECTOR_PASSWORD
-
-En produccion se requiere ademas SEED_CONFIRM_PRODUCTION con la confirmacion
-deliberada documentada en docs/ROTACION_SECRETOS.md. Una cuenta existente no
-recibe una contrasena nueva al volver a ejecutar el seed.
+n8n queda fijado en 2.26.4, coincidente con el lockfile. No se afirma que sea la
+version mas reciente. Antes de actualizar, revisar notas de version, respaldar,
+probar restauracion y compatibilidad, actualizar todos los puntos fijados y
+evitar saltos automaticos de major.
 
 
-5. Rotacion obligatoria antes del futuro despliegue
----------------------------------------------------
+7. CIFRADO, PERSISTENCIA Y BACKUP
+---------------------------------
 
-Seguir docs/ROTACION_SECRETOS.md. Los secretos usados anteriormente estuvieron
-presentes en el historial Git y deben rotarse aunque el repositorio sea privado.
-Eliminar el archivo del ultimo commit no elimina sus versiones historicas.
+N8N_ENCRYPTION_KEY es obligatoria y debe ser estable. Perderla o regenerarla
+puede volver indescifrables las credenciales existentes.
+
+El volumen cap_prenatal_production_n8n_data es persistente. El contenedor usa
+UID/GID 1000:1000, no-new-privileges y exige permisos de settings. Definir en el
+host permisos, propietario y cifrado de respaldo compatibles con la plataforma.
+
+Respaldar por separado:
+
+- volumen n8n;
+- N8N_ENCRYPTION_KEY en gestor de secretos;
+- procedimiento de restauracion verificado.
+
+No colocar la unica copia de la clave dentro del mismo backup del volumen.
 
 
-6. n8n
-------
+8. RETENCION
+------------
 
-Sprint 5B.1 implementa solamente el endpoint interno agregado y retira el
-endpoint nominal anterior. Todavia no existe workflow productivo. Antes de
-produccion, Sprint 5B.2 debera definir cifrado, retencion, credenciales, red,
-proxy, HTTPS, trust proxy y rotacion operativa CURRENT/NEXT.
+Valores iniciales:
+
+- EXECUTIONS_DATA_PRUNE=true.
+- EXECUTIONS_DATA_MAX_AGE=168 horas.
+- EXECUTIONS_DATA_PRUNE_MAX_COUNT=1000.
+- SAVE_ON_SUCCESS=none.
+- SAVE_ON_ERROR=none.
+- SAVE_MANUAL_EXECUTIONS=false.
+- SAVE_ON_PROGRESS=false.
+
+El workflow futuro debe confirmar que nodos, errores y expresiones no persisten
+pacientes, inputs, outputs, headers o payloads. La configuracion por si sola no
+garantiza ausencia total de persistencia.
 
 
-7. Criterio de habilitacion futuro
-----------------------------------
+9. HEALTH CHECKS
+----------------
 
-Antes de publicar el sistema se debera verificar, como minimo:
+- PostgreSQL: pg_isready.
+- Backend: GET /api/health.
+- n8n: GET interno /healthz.
+- Proxy: GET local /healthz.
 
-  - Imagenes y configuracion productivas revisadas.
-  - Secretos inyectados desde un canal protegido.
-  - JWT antiguos rechazados despues de la rotacion.
-  - PostgreSQL, backend y n8n no expuestos directamente.
-  - HTTPS y origen CORS productivo confirmados.
-  - Migracion y seed ejecutados como tareas deliberadas, no al arrancar.
-  - Pruebas y restauracion operativa aprobadas.
+No usan API keys, login, consultas clinicas ni el endpoint de citas.
 
-Fin de la guia provisional.
+
+10. HABILITACION FUTURA
+-----------------------
+
+Antes de desplegar:
+
+1. Revisar y adaptar subredes.
+2. Implementar TLS y firewall.
+3. Configurar VPN/tunel y autenticacion administrativa n8n.
+4. Inyectar secretos por canal protegido.
+5. Crear backups y probar restauracion.
+6. Validar imagenes y notas de version.
+7. Probar Compose en un entorno no productivo.
+8. Confirmar que solo el proxy publica puertos.
+9. Validar 404 publico y acceso privado desde n8n.
+10. Mantener N8N_INTEGRATION_ENABLED=false hasta aprobar el workflow.
+
+No ejecutar migraciones o seed automaticamente al iniciar contenedores.

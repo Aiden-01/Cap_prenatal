@@ -1,30 +1,143 @@
-GUIA N8N LOCAL - ESTADO DESPUES DE SPRINT 5B.1
+GUIA N8N LOCAL - SPRINT 5B.2A
+Proyecto: CAP Prenatal - CAP El Chal
 
-La guia anterior fue retirada porque describia un endpoint nominal obsoleto,
-AUTOMATION_SECRET y un workflow de correo que ya no deben utilizarse.
+ESTADO
+------
 
-Estado actual:
+- No existe workflow funcional.
+- No se configuraron credenciales reales, SMTP ni destinatarios.
+- No se enviaron correos.
+- La integracion del backend permanece deshabilitada en desarrollo.
+- Usar exclusivamente datos sinteticos.
 
-- No existe workflow n8n productivo.
-- No debe crearse ni activarse un workflow durante Sprint 5B.1.
-- La integracion permanece deshabilitada en desarrollo.
-- GET /api/automatizaciones/proximas-citas responde 404.
-- El contrato futuro es GET /api/automatizaciones/v1/proximas-citas.
-- El endpoint v1 solo funciona en produccion habilitada, con API key hash,
-  allowlist de red y rate limit.
-- No devuelve pacientes individuales.
-- No se configuraron SMTP ni destinatarios.
 
-La especificacion segura del endpoint, variables, rotacion y respuesta agregada
-esta en docs/N8N.md.
+1. VERSION FIJADA
+-----------------
 
-Sprint 5B.2 debera:
+La dependencia local y la imagen Docker usan n8n 2.26.4. No se usa latest,
+rango semver ni descarga implicita con npx. Esta version coincide con el
+package-lock actual; no se afirma que sea la mas reciente.
 
-- crear y versionar el workflow;
-- configurar la credencial X-CAP-Automation-Key dentro de n8n;
-- definir destinatario y proveedor de correo;
-- endurecer n8n, Docker, proxy, HTTPS, firewall y trust proxy;
-- retirar del Compose la referencia obsoleta a AUTOMATION_SECRET.
+Antes de actualizar:
 
-No copiar secretos productivos entre computadoras. Git sincroniza codigo y
-documentacion, no credenciales ni datos locales de n8n.
+1. Revisar notas de version y cambios incompatibles.
+2. Respaldar el directorio/volumen n8n y probar restauracion.
+3. Validar nodos y credenciales en un entorno aislado.
+4. Actualizar package.json, lock y ambos Compose en el mismo cambio.
+5. Ejecutar las pruebas de infraestructura.
+
+
+2. CONFIGURACION DEDICADA
+-------------------------
+
+Copiar:
+
+  n8n/.env.example
+
+a:
+
+  n8n/.env
+
+El archivo real queda ignorado por Git. Completar N8N_ENCRYPTION_KEY con al
+menos 32 caracteres aleatorios. La clave debe ser estable: regenerarla despues
+de crear credenciales puede impedir descifrarlas.
+
+No agregar a n8n/.env:
+
+- DB_PASSWORD, DATABASE_URL o POSTGRES_* clinicos.
+- JWT, CSRF o SESSION secrets.
+- SMTP del backend.
+- SEED_*.
+- N8N_API_KEY_HASH_CURRENT/NEXT.
+- AUTOMATION_SECRET.
+- La API key M2M original.
+
+La API key futura se almacenara como credencial Header Auth dentro de n8n, no
+como variable compartida.
+
+
+3. INICIO MEDIANTE POWERSHELL
+-----------------------------
+
+Desde la raiz:
+
+  npm run n8n:local
+
+scripts/start-n8n-local.ps1:
+
+- lee unicamente n8n/.env;
+- acepta una lista cerrada de variables;
+- elimina variables clinicas heredadas del proceso;
+- exige N8N_ENCRYPTION_KEY;
+- exige America/Guatemala;
+- exige N8N_LISTEN_ADDRESS en loopback;
+- valida las URLs dedicadas;
+- exige n8n local 2.26.4;
+- no usa backend/.env;
+- no usa npx;
+- no inicia si falta configuracion o instalacion local.
+
+Instalar dependencias desde el lockfile antes del primer uso:
+
+  npm install
+
+
+4. INICIO MEDIANTE DOCKER LOCAL
+-------------------------------
+
+docker-compose.yml sigue siendo exclusivamente local. Requiere los secretos
+vacios indicados por .env.example y publica solo en loopback:
+
+  Frontend:   127.0.0.1:8080
+  Backend:    127.0.0.1:3001
+  PostgreSQL: 127.0.0.1:5432
+  n8n:        127.0.0.1:5678
+
+El contenedor n8n recibe solo variables declaradas en su bloque environment.
+No recibe secretos del backend aunque Compose lea el archivo raiz para
+interpolacion.
+
+Las redes locales estan separadas:
+
+- app_internal: frontend y backend.
+- data_internal: backend y PostgreSQL.
+- automation_internal: n8n y backend.
+
+n8n no comparte la red de PostgreSQL. Su URL privada futura es:
+
+  http://backend:3001/api/automatizaciones/v1/proximas-citas
+
+No ejecutar Docker como parte de este sprint.
+
+
+5. RETENCION LOCAL
+------------------
+
+La configuracion local conserva solo errores y ejecuciones manuales sinteticas,
+con poda habilitada, maximo 24 horas y 100 ejecuciones. No usar datos reales de
+pacientes. La configuracion no sustituye la revision de privacidad del workflow
+futuro.
+
+
+6. ACCESO
+---------
+
+La UI local se liga a 127.0.0.1. No cambiarla a 0.0.0.0. Si se necesita acceso
+desde otra computadora, usar un tunel autenticado y HTTPS; no publicar 5678 en
+la red.
+
+
+7. RESPALDO
+-----------
+
+.n8n-local y el volumen Docker n8n_data contienen configuracion y credenciales
+cifradas. Respaldarlos por separado de N8N_ENCRYPTION_KEY, restringir permisos
+y probar restauracion. Git sincroniza codigo y ejemplos, nunca el directorio
+local, credenciales o claves.
+
+
+8. PENDIENTE
+------------
+
+El workflow, credencial M2M, proveedor, destinatario y validacion de que ningun
+nodo persista payloads se implementaran en otro sprint.
