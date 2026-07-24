@@ -135,7 +135,6 @@ tiene embarazos, responde `200` con el siguiente estado estable, sin ejecutar
   "ficha_riesgo": null,
   "plan_parto": null,
   "vacunas": [],
-  "referencias": [],
   "is_read_only": false,
   "is_embarazo_actual": false
 }
@@ -248,16 +247,20 @@ Base: `/pacientes/:pacienteId/morbilidad`
 | `PUT` | `/:id` | Actualiza evento. |
 | `DELETE` | `/:id` | Elimina evento. |
 
-## Referencias
+## Referencias clinicas
 
-Base: `/pacientes/:pacienteId/referencias`
+No existe un modulo ni endpoint independiente de referencias. El destino de una
+referencia por riesgo se registra en
+`fichas_riesgo_obstetrico.referida_a`; el tratamiento o referencia por
+morbilidad se documenta en
+`morbilidad_embarazo.tratamiento_referencia`.
+`pacientes.viene_referida` y `pacientes.referida_de` conservan exclusivamente la
+procedencia de la paciente.
 
-| Metodo | Ruta | Descripcion |
-| --- | --- | --- |
-| `GET` | `/` | Lista referencias. |
-| `POST` | `/` | Crea referencia. |
-| `PUT` | `/:id` | Actualiza referencia. |
-| `DELETE` | `/:id` | Elimina referencia. |
+Cualquier metodo enviado a
+`/pacientes/:pacienteId/referencias` llega al manejador global y responde
+`404` con `code: "ROUTE_NOT_FOUND"`, sin redireccion, sugerencias ni SQL. El
+expediente completo no contiene una propiedad `referencias`.
 
 ## PDF institucional
 

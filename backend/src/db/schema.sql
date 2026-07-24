@@ -644,17 +644,6 @@ ALTER TABLE planes_parto ADD COLUMN IF NOT EXISTS acompana_parto VARCHAR(80);
 -- Sin cambios estructurales respecto a v1.0
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS referencias_efectuadas (
-  id                SERIAL PRIMARY KEY,
-  paciente_id       INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
-  fecha             DATE NOT NULL,
-  lugar_referencia  VARCHAR(200) NOT NULL,
-  diagnostico       TEXT,
-  registrado_por    INTEGER REFERENCES usuarios(id),
-  created_at        TIMESTAMPTZ DEFAULT NOW(),
-  updated_at        TIMESTAMPTZ DEFAULT NOW()
-);
-
 CREATE TABLE IF NOT EXISTS fichas_riesgo_obstetrico (
   id                                SERIAL PRIMARY KEY,
   paciente_id                       INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
@@ -1011,9 +1000,6 @@ ALTER TABLE fichas_riesgo_obstetrico
 ALTER TABLE planes_parto
   ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
 
-ALTER TABLE referencias_efectuadas
-  ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
-
 ALTER TABLE vacunas_paciente
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
@@ -1109,7 +1095,6 @@ CREATE INDEX IF NOT EXISTS idx_embarazos_paciente      ON embarazos(paciente_id)
 CREATE INDEX IF NOT EXISTS idx_controles_embarazo      ON controles_prenatales(embarazo_id);
 CREATE INDEX IF NOT EXISTS idx_riesgo_embarazo         ON fichas_riesgo_obstetrico(embarazo_id);
 CREATE INDEX IF NOT EXISTS idx_vacunas_paciente       ON vacunas_paciente(paciente_id);
-CREATE INDEX IF NOT EXISTS idx_referencias_paciente   ON referencias_efectuadas(paciente_id);
 CREATE INDEX IF NOT EXISTS idx_usuarios_username      ON usuarios(username);
 
 -- ============================================================

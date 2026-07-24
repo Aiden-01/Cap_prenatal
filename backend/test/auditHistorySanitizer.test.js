@@ -138,6 +138,33 @@ test('13. Observaciones no conservan texto', () => {
   assertValueRemoved('observaciones', 'observacion_sintetica_secreta');
 });
 
+test('evento historico de referencias se reconoce y elimina lugar y diagnostico', () => {
+  const item = sanitized(row({
+    modulo: 'referencias',
+    entidad_afectada: 'referencia',
+    tabla: 'referencias_efectuadas',
+    datos_anteriores: {
+      lugar_referencia: 'Destino clinico sintetico anterior',
+      diagnostico: 'Diagnostico sintetico anterior',
+    },
+    datos_nuevos: {
+      lugar_referencia: 'Destino clinico sintetico nuevo',
+      diagnostico: 'Diagnostico sintetico nuevo',
+    },
+  }));
+
+  assert.equal(item.context.entidad, 'referencia');
+  assert.equal(item.context.categoria, 'clinica');
+  assert.deepEqual(
+    item.nextRow.datos_nuevos.campos_sensibles_modificados,
+    ['diagnostico', 'lugar_referencia']
+  );
+  assert.doesNotMatch(
+    JSON.stringify(item.nextRow),
+    /Destino clinico sintetico|Diagnostico sintetico/
+  );
+});
+
 test('14. Password se elimina', () => {
   const payload = sanitized(creation({
     username: 'cuenta_sintetica',

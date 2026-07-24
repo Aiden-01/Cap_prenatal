@@ -35,7 +35,7 @@ function createHarness({ query = null, closeError = null } = {}) {
   };
 }
 
-test('descubre migraciones versionadas en orden e incluye 007_auth_sessions', () => {
+test('descubre migraciones versionadas en orden e incluye 007 y 008', () => {
   const files = discoverMigrationFiles({
     migrationsDir: 'migrations-test',
     readDirectory: () => [
@@ -56,6 +56,12 @@ test('descubre migraciones versionadas en orden e incluye 007_auth_sessions', ()
   assert.equal(files.at(-1).path, path.join('migrations-test', '007_auth_sessions.sql'));
   assert.equal(
     discoverMigrationFiles().some(({ filename }) => filename === '007_auth_sessions.sql'),
+    true
+  );
+  assert.equal(
+    discoverMigrationFiles().some(
+      ({ filename }) => filename === '008_retirar_referencias_efectuadas.sql'
+    ),
     true
   );
 });

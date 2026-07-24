@@ -20,7 +20,7 @@ El nucleo contextual ya esta conectado mediante `registrarEventoPrivado` a
 los productores no clinicos de autenticacion, usuarios, passwords, roles,
 permisos, sesiones, PDF y exportaciones de reportes, ademas de pacientes,
 embarazos, controles prenatales con sus laboratorios embebidos, riesgo
-obstetrico, vacunas, morbilidad, plan de parto, puerperio, referencias y
+obstetrico, vacunas, morbilidad, plan de parto, puerperio y
 comunidades. El camino privado exige
 `categoria`, `entidad` y `evento`, construye el payload con
 `buildAuditPayload`, ejecuta `auditSanitizer` inmediatamente antes de
@@ -237,8 +237,6 @@ valida su forma antes de entregarlos al repositorio.
 - Puerperio: upsert, actualizacion y eliminacion. Cuando el upsert cambia el
   embarazo de `activo` a `puerperio`, ambos DML y ambos eventos comparten el
   mismo cliente y se revierten juntos.
-- Referencias: creacion, actualizacion y eliminacion existentes. El modelo
-  actual pertenece a la paciente y no contiene `embarazo_id`.
 - Comunidades: creacion, actualizacion y transiciones de estado; fue el ultimo
   productor productivo adicional localizado por el barrido legacy.
 
@@ -261,7 +259,6 @@ Comparten la transaccion y usan `obligatorio: true`:
 - creacion o actualizacion del plan de parto existente;
 - creacion, actualizacion y eliminacion de puerperio, incluida su transicion de
   embarazo cuando ocurre;
-- creacion, actualizacion y eliminacion de referencias;
 - creacion, actualizacion y cambio de estado de comunidades;
 - las auditorias de sesion que ya eran parte de una operacion atomica, excepto
   expiracion o inactividad automatica.
@@ -324,9 +321,9 @@ rollback.
   diagnostico, tratamiento, observaciones e informacion de madre o recien
   nacido nunca conservan valor. La transicion de embarazo queda en un evento
   separado que solo conserva `estado_embarazo` dentro de la lista cerrada.
-- Referencias: `referencia_id` y `paciente_id` internos y nombres de campos.
-  Motivo, diagnostico, destino, estado, traslado, observaciones, identidad y
-  texto libre nunca conservan valor. No se inventa `embarazo_id`.
+- Eventos historicos de referencias: tabla, entidad y modulo siguen
+  clasificandose, pero motivo, diagnostico, destino, estado, traslado,
+  observaciones, identidad y texto libre nunca conservan valor.
 - Comunidades: ID interno y nombres de campos; solo `activo` conserva una
   transicion booleana en el contexto administrativo exacto.
 
@@ -387,8 +384,10 @@ negativas que demuestren que la regla no se aplica fuera de su contexto.
 
 - No quedan productores productivos usando el camino legado. La definicion
   central se conserva por compatibilidad y una prueba impide reintroducirla.
-- Las referencias pertenecen estructuralmente a la paciente. Asociarlas a un
-  embarazo requiere una migracion de BD y queda para un sprint separado.
+- El CRUD independiente de referencias fue retirado. La funcion clinica real
+  permanece en Riesgo obstetrico (`referida_a`) y Morbilidad
+  (`tratamiento_referencia`); procedencia permanece en
+  `viene_referida`/`referida_de`.
 - No existen actualmente rutas HTTP de eliminacion de paciente, embarazo o plan
   de parto. El
   contrato privado de eliminacion esta validado, pero este sprint no crea endpoints.
@@ -399,8 +398,7 @@ negativas que demuestren que la regla no se aplica fuera de su contexto.
 
 ## Trabajo posterior
 
-1. Disenar la asociacion referencia-embarazo con migracion y auditoria de datos.
-2. Aplicar el artefacto de saneamiento historico unicamente en Sprint 4C.2B,
+1. Aplicar el artefacto de saneamiento historico unicamente en Sprint 4C.2B,
    despues de backup verificado, restauracion aislada y dry-run aprobado.
 
 Cada fase debe mantener el contrato publico de `registrarEvento` hasta que sus
@@ -408,6 +406,12 @@ consumidores sean migrados y probados explicitamente.
 
 Sprint 4B.3E no cambio base de datos, `schema.sql`, migraciones, registros
 historicos, `.env` ni `.env.example`.
+
+Sprint 6B-R1 retiro solamente productores y mapeos operativos de referencias.
+El saneador conserva `referencias_efectuadas` y la entidad `referencia`; la
+proteccion de usuarios conserva eventos historicos sin consultar la tabla
+retirada. La migracion 008 no modifica `auditoria_eventos`, aborta si la tabla
+contiene filas y aun no se ha aplicado en PC1 ni PC2.
 
 ## Artefacto historico Sprint 4C.2A
 

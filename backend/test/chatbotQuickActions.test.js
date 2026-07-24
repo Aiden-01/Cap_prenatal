@@ -142,6 +142,18 @@ test('saludo dentro del expediente usa embarazo y permisos actuales', () => {
   ]);
 });
 
+test('accion de referencias dirige a Riesgo o Morbilidad sin ruta independiente', () => {
+  const action = CHATBOT_QUICK_ACTIONS.howReference;
+  assert.match(action.label, /Riesgo obstétrico o Morbilidad/);
+  assert.match(action.message, /Riesgo obstétrico o Morbilidad/);
+  assert.equal(action.type, 'message');
+  assert.equal(Object.hasOwn(action, 'target'), false);
+  assert.equal(
+    Object.values(CHATBOT_QUICK_ACTION_TARGETS).some((target) => /referencias/i.test(target)),
+    false
+  );
+});
+
 test('lista de pacientes y puerperio usan acciones propias sin control prenatal nuevo', () => {
   const patientList = generateQuickActions({
     intent: 'saludo',

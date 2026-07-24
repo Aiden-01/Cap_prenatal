@@ -116,7 +116,11 @@ const CHATBOT_QUICK_ACTIONS = Object.freeze({
   ),
   howPuerperium: message('how-register-puerperium', 'Registrar puerperio', '¿Cómo registro el puerperio?'),
   howLaboratory: message('how-view-laboratory', 'Ver laboratorios', '¿Dónde veo los laboratorios?'),
-  howReference: message('how-register-reference', 'Registrar una referencia', '¿Cómo registro una referencia?'),
+  howReference: message(
+    'how-register-reference',
+    'Referencia desde Riesgo obstétrico o Morbilidad',
+    '¿Cómo registro una referencia desde Riesgo obstétrico o Morbilidad?'
+  ),
   howMorbidity: message('how-register-morbidity', 'Registrar morbilidad', '¿Cómo registro una morbilidad?'),
   howMspasForm: message(
     'how-mspas-form',

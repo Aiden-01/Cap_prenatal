@@ -2,7 +2,7 @@
 
 Aplicacion web fullstack para la gestion digital de expedientes clinicos prenatales del Centro de Atencion Permanente (CAP) El Chal, Peten, Guatemala.
 
-El sistema permite registrar pacientes, embarazos, controles prenatales, riesgo obstetrico, laboratorios, vacunas, plan de parto, puerperio, morbilidad, referencias, reportes y documentos PDF alineados a formatos institucionales del MSPAS/CAP.
+El sistema permite registrar pacientes, embarazos, controles prenatales, riesgo obstetrico, laboratorios, vacunas, plan de parto, puerperio, morbilidad, reportes y documentos PDF alineados a formatos institucionales del MSPAS/CAP.
 
 ## Contexto
 
@@ -125,7 +125,7 @@ Backend:
 | --- | --- |
 | `npm run dev` | Servidor Express con nodemon. |
 | `npm start` | Servidor Express sin recarga automatica. |
-| `npm run db:migrate` | Aplica `schema.sql` y las migraciones versionadas pendientes, incluida `007_auth_sessions.sql`. |
+| `npm run db:migrate` | Aplica `schema.sql` y las migraciones versionadas pendientes, incluidas `007_auth_sessions.sql` y `008_retirar_referencias_efectuadas.sql`. |
 | `npm run db:seed` | Inicializa catalogos y, si no existe, una cuenta director configurada por entorno. |
 | `npm run db:seed-demo-patients` | Crea pacientes demo. |
 | `npm run test:embarazo-activo` | Validacion manual del flujo de embarazo activo. |
@@ -185,7 +185,6 @@ cap_prenatal/
 - Plan de parto.
 - Puerperio.
 - Morbilidad.
-- Referencias.
 - Mapa de riesgo.
 - Reportes y exportacion Excel.
 - PDF institucional MSPAS/CAP.
@@ -196,6 +195,10 @@ cap_prenatal/
 
 - La paciente puede tener varios embarazos, pero solo uno activo a la vez.
 - El expediente se carga para un embarazo seleccionado. Si la URL trae `?embarazo_id=`, se consulta ese embarazo; si no, el backend resuelve el embarazo visible preferente.
+- Las referencias clinicas se documentan en `fichas_riesgo_obstetrico.referida_a`
+  o `morbilidad_embarazo.tratamiento_referencia`; no existe un modulo
+  independiente. `pacientes.viene_referida` y `pacientes.referida_de` describen
+  procedencia y no deben reinterpretarse.
 - Los embarazos cerrados son de solo lectura.
 - Los endpoints de escritura deben validar permisos y registrar auditoria cuando modifican estado.
 - La auditoria no debe guardar contrasenas, tokens ni snapshots clinicos innecesariamente grandes.
@@ -218,9 +221,16 @@ el usuario puede iniciar sesion nuevamente de inmediato.
 Contraseña, desactivacion, rol, permisos, eliminacion, logout y logout-all
 revocan las sesiones correspondientes. Antes de desplegar se debe ejecutar
 `npm run db:migrate` desde `backend`: el comando descubre y registra por checksum
-las migraciones versionadas pendientes, incluida `007_auth_sessions.sql`. No se
-ejecuta automaticamente al arrancar ni debe apuntarse a una base real sin el plan
-operativo correspondiente. La limpieza futura/manual se ejecuta con
+las migraciones versionadas pendientes. La migracion
+`008_retirar_referencias_efectuadas.sql` toma un bloqueo exclusivo, muestra solo
+el conteo agregado y aborta sin borrar datos si encuentra una o mas filas. El
+backend nuevo no abre el puerto mientras 008 no figure en `schema_migrations`;
+ese registro solo se confirma tras retirar o comprobar ausente la tabla
+obsoleta. Debe aplicarse antes de desplegar el backend nuevo y no
+debe apuntarse a una base real sin backup, verificacion previa del conteo y
+ventana operativa. A fecha de Sprint 6B-R1, 008 no se ha aplicado en PC1 ni PC2.
+El esquema final contiene 16 tablas operativas y una tabla tecnica
+`schema_migrations`. La limpieza futura/manual de sesiones se ejecuta con
 `npm run sessions:cleanup` desde `backend` y nunca elimina sesiones activas.
 
 ## Docker

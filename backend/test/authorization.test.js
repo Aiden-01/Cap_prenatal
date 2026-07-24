@@ -198,12 +198,6 @@ const routeContracts = {
     ["router.put('/:id',   verificarPermiso('controles.editar')"],
     ["router.delete('/:id',verificarPermiso('controles.editar')"],
   ],
-  'referencias.js': [
-    ["router.get('/',       verificarPermiso('pacientes.ver')"],
-    ["router.post('/',      verificarPermiso('controles.crear')"],
-    ["router.put('/:id',    verificarPermiso('controles.editar')"],
-    ["router.delete('/:id', verificarPermiso('controles.editar')"],
-  ],
 };
 
 for (const [file, expectations] of Object.entries(routeContracts)) {
@@ -214,6 +208,15 @@ for (const [file, expectations] of Object.entries(routeContracts)) {
     }
   });
 }
+
+test('pacientes no monta un router de referencias obsoleto', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../src/routes/pacientes.js'),
+    'utf8'
+  );
+  assert.doesNotMatch(source, /referenciasRouter|\/:pacienteId\/referencias/);
+  assert.equal(fs.existsSync(path.join(__dirname, '../src/routes/referencias.js')), false);
+});
 
 test('plan de parto y puerperio protegen lectura, upsert y cambios', () => {
   const source = fs.readFileSync(

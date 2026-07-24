@@ -318,7 +318,7 @@ const chatbotKnowledge = [
   },
   {
     id: 'referencias',
-    title: 'Referencias',
+    title: 'Referencia desde Riesgo obstétrico o Morbilidad',
     keywords: [
       'referencia',
       'referir',
@@ -329,7 +329,7 @@ const chatbotKnowledge = [
       'contrarreferencia',
     ],
     answer:
-      'Para dejar constancia de una referencia:\n1. Abre el expediente de la paciente.\n2. Si es por morbilidad, entra en "Morbilidad" y registra el tratamiento/referencia.\n3. Si es por ficha de riesgo, entra en "Riesgo obstétrico" y completa "Referida a".\n4. Guarda el formulario.\n\nAnota el lugar de referencia de forma clara para que quede visible en el expediente.',
+      'Para dejar constancia de una referencia usa el formulario clínico que corresponda:\n1. Abre el expediente de la paciente.\n2. En "Riesgo obstétrico", registra el destino en el campo "Referida a" (referida_a).\n3. En "Morbilidad", documenta el tratamiento o referencia en "Tratamiento/referencia" (tratamiento_referencia).\n4. Guarda el formulario.\n\nNo existe un módulo independiente de referencias.',
     suggestions: [],
   },
   {

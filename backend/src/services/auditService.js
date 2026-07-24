@@ -29,7 +29,6 @@ const MODULO_POR_ENTIDAD = {
   morbilidad_embarazo: 'morbilidad',
   fichas_riesgo_obstetrico: 'riesgo_obstetrico',
   planes_parto: 'plan_parto',
-  referencias_efectuadas: 'referencias',
   usuario_permisos: 'permisos',
   usuarios: 'usuarios',
   comunidades: 'comunidades',
@@ -78,7 +77,6 @@ const PRIVATE_TABLES = Object.freeze({
   morbilidad: 'morbilidad_embarazo',
   plan_parto: 'planes_parto',
   puerperio: 'controles_puerperio',
-  referencia: 'referencias_efectuadas',
   comunidad: 'comunidades',
 });
 

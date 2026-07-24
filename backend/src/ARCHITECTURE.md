@@ -65,7 +65,6 @@ Los siguientes modulos ya tienen separacion en controller/service/repository/val
 - vacunas
 - riesgo obstetrico
 - morbilidad
-- referencias
 - auth
 - usuarios
 - permisos
@@ -75,6 +74,10 @@ Los siguientes modulos ya tienen separacion en controller/service/repository/val
 - chatbot
 
 Los resultados de laboratorio no constituyen un modulo HTTP independiente. Forman parte del modelo y flujo de controles prenatales: se capturan con cada control y se consultan desde los controles y el expediente. Los datos sensibles de VIH mantienen su filtrado por permisos.
+
+Tampoco existe un modulo independiente de referencias. Riesgo obstetrico usa
+`referida_a`, Morbilidad usa `tratamiento_referencia` y Pacientes conserva
+`viene_referida`/`referida_de` como procedencia.
 
 ## Reporteria
 
@@ -187,10 +190,10 @@ nuevo justo antes del repositorio.
 Productores en este camino: autenticacion, usuarios, passwords, roles,
 permisos, sesiones, PDF, exportaciones/reportes, automatizaciones, pacientes, embarazos y
 controles prenatales con laboratorios embebidos, riesgo obstetrico, vacunas,
-morbilidad, plan de parto, puerperio, referencias y comunidades.
+morbilidad, plan de parto, puerperio y comunidades.
 Password, rol, estado, permisos, eliminacion de usuario y escrituras de paciente
 o embarazo, y las escrituras existentes de control prenatal, riesgo, vacuna,
-morbilidad, plan de parto, puerperio, referencia o comunidad escriben
+morbilidad, plan de parto, puerperio o comunidad escriben
 auditoria obligatoria en la misma transaccion. Login,
 expiracion automatica, documentos/reportes y consultas de automatizacion son
 best effort.
@@ -249,10 +252,17 @@ cliente. El upsert bloquea el embarazo; si este sigue activo, cambia solo a
 la transicion se confirman o revierten juntos. Un control equivalente omite DML
 y evento, y nunca duplica la transicion dentro del payload puerperal.
 
-Referencias conserva el CRUD paciente-only existente. Creacion, actualizacion y
-eliminacion son atomicas con auditoria y solo entregan nombres de campos. La
-tabla `referencias_efectuadas` no tiene `embarazo_id`; crear esa asociacion
-requiere una migracion separada y no se infiere desde el embarazo visible.
+El CRUD paciente-only de referencias fue retirado en Sprint 6B-R1. No hay ruta
+tombstone ni propiedad `referencias` en el expediente. Todos los metodos sobre
+la URL anterior llegan al 404 global `ROUTE_NOT_FOUND`. Los mapeos del productor
+privado se retiraron, mientras el saneador y las politicas conservan el
+reconocimiento de eventos historicos de entidad `referencia`.
+
+El esquema final contiene 16 tablas operativas mas `schema_migrations`. La
+migracion `008_retirar_referencias_efectuadas.sql` bloquea y cuenta antes de
+retirar la tabla vacia, aborta si hay filas y no usa `CASCADE`. El arranque exige
+que 008 este registrada; el runner solo registra el exito tras retirar o
+comprobar ausente la tabla. 008 aun no fue aplicada en PC1 ni PC2.
 
 Comunidades era el ultimo consumidor productivo del adaptador legacy detectado
 por el barrido. Sus escrituras usan ahora contexto administrativo privado,

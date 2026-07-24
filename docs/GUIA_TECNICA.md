@@ -103,7 +103,7 @@ Respuesta de error esperada:
 Autenticacion, usuarios, passwords, roles, permisos, sesiones, PDF,
 exportaciones/reportes, pacientes, embarazos, controles prenatales con sus
 laboratorios embebidos, riesgo obstetrico, vacunas, morbilidad, plan de parto,
-puerperio, referencias y comunidades usan
+puerperio y comunidades usan
 `registrarEventoPrivado`.
 El contrato exige
 `categoria`, `entidad` y `evento`, construye el diff o metadata con la politica
@@ -137,9 +137,8 @@ El payload privado conserva `politica_version: 1` y metadata minima:
 - puerperio: IDs y nombres de campos; signos vitales, sangrado, dolor,
   lactancia, diagnostico, tratamiento, observaciones y datos del recien nacido
   no conservan valor. La transicion de embarazo es un evento separado;
-- referencias: ID y paciente internos y nombres de campos. El esquema no posee
-  `embarazo_id`; destino, diagnostico, estado, traslado y texto no conservan
-  valor;
+- eventos historicos de referencia: el saneador sigue reconociendo la entidad y
+  reduce lugar, diagnostico, estado, traslado y texto a nombres de campos;
 - comunidades: ID y nombres de campos; solo `activo` conserva una transicion
   booleana bajo el contexto administrativo exacto.
 
@@ -150,7 +149,7 @@ HTML, temporal, query libre ni filas nominales.
 Password, rol, estado, permisos, eliminacion de usuario y escrituras de paciente
 o embarazo, y las escrituras existentes de controles, riesgo, vacunas,
 morbilidad o plan de parto son eventos obligatorios dentro de la transaccion.
-Puerperio, referencias y comunidades tambien son obligatorios. Una falla
+Puerperio y comunidades tambien son obligatorios. Una falla
 revierte la escritura clinica completa. Login, expiraciones automaticas y
 documentos/reportes son best effort. Una falla informativa no invalida una
 descarga ya generada.
@@ -878,17 +877,25 @@ diagnostico, tratamiento, observaciones y datos del recien nacido nunca llegan
 como valores. Cambios equivalentes en vacios, numeros, fechas, horas, booleanos
 o espacios no generan DML ni evento.
 
-### Referencias
+### Referencias clinicas y retiro del CRUD
 
-Referencias conserva el CRUD existente bajo la paciente. Cada escritura y su
-auditoria privada obligatoria son atomicas; los eventos guardan el ID interno,
-`paciente_id` y nombres de campos, nunca destino, motivo, diagnostico, estado,
-traslado, identidad ni texto libre.
+Sprint 6B-R1 retiro por completo el CRUD independiente. No existe ruta
+tombstone, pestana ni propiedad `referencias` en el expediente. Todos los
+metodos sobre `/api/pacientes/:pacienteId/referencias` llegan al manejador
+global con `404` y `ROUTE_NOT_FOUND`, sin SQL ni redireccion.
 
-`referencias_efectuadas` no contiene `embarazo_id`. Este sprint no agrega la
-columna ni infiere un embarazo desde la interfaz. La asociacion definitiva
-requiere un sprint separado con migracion de BD y tratamiento de datos
-existentes.
+La funcion clinica real permanece en `fichas_riesgo_obstetrico.referida_a` y
+`morbilidad_embarazo.tratamiento_referencia`. Los campos
+`pacientes.viene_referida` y `pacientes.referida_de` siguen describiendo
+procedencia.
+
+El esquema final tiene 16 tablas operativas mas `schema_migrations`. La
+migracion `008_retirar_referencias_efectuadas.sql` usa timeouts locales,
+bloqueo `ACCESS EXCLUSIVE` y conteo agregado. Aborta sin borrar datos si hay
+filas; si la tabla esta vacia la elimina sin `CASCADE`; si esta ausente finaliza
+de forma segura. El backend nuevo no arranca si 008 no esta registrada, y el
+runner solo la registra despues de retirar o comprobar ausente la tabla. 008
+aun no se ha aplicado en PC1 ni PC2.
 
 ## PDF y reportes
 
@@ -1070,7 +1077,7 @@ Fuera de alcance actual:
 - Para escrituras clinicas, registrar auditoria.
 - Los productores migrados, incluidos pacientes y embarazos, deben usar
   `registrarEventoPrivado`; esto incluye controles y laboratorios embebidos,
-  riesgo obstetrico, vacunas, morbilidad, plan de parto, puerperio, referencias
+  riesgo obstetrico, vacunas, morbilidad, plan de parto, puerperio
   y comunidades. `registrarEvento` y `utils/auditoria.js` son compatibilidad
   central obsoleta y no deben tener consumidores productivos.
 - No guardar tokens, contrasenas ni secretos en logs o auditoria.
@@ -1143,8 +1150,10 @@ PostgreSQL.
 
 Antes del despliegue, `npm run db:migrate` desde `backend` aplica el schema base y
 las migraciones versionadas pendientes en orden. Cada archivo queda registrado
-por nombre y checksum en `schema_migrations`; `007_auth_sessions.sql` forma parte
-de este flujo y no debe ejecutarse manualmente por separado.
+por nombre y checksum en `schema_migrations`; `007_auth_sessions.sql` y
+`008_retirar_referencias_efectuadas.sql` forman parte de este flujo y no deben
+ejecutarse manualmente por separado. 008 requiere backup, verificacion de
+conteo y despliegue del backend nuevo solo despues de completarse.
 
 El refresh tiene 48 bytes aleatorios, se guarda solo como SHA-256 y rota bajo
 bloqueo transaccional. Reutilizar un valor anterior revoca la sesion. La cookie

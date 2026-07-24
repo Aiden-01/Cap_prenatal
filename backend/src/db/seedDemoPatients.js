@@ -220,17 +220,7 @@ async function recreateDemoPatient(client, data, userId) {
     riskValues
   );
 
-  for (const referencia of data.referencias) {
-    step = `referencia_${referencia.fecha}`;
-    await client.query(
-      `INSERT INTO referencias_efectuadas (
-        paciente_id, fecha, lugar_referencia, diagnostico, registrado_por
-      ) VALUES ($1,$2,$3,$4,$5)`,
-      [pacienteId, referencia.fecha, referencia.lugar_referencia, referencia.diagnostico, userId]
-    );
-  }
-
-    return { pacienteId, embarazoId };
+  return { pacienteId, embarazoId };
   } catch (error) {
     error.message = `${error.message} [paso: ${step}]`;
     throw error;
@@ -896,13 +886,6 @@ const demoPatients = [
       referida_a: 'CAP El Chal - seguimiento interno',
       nombre_personal_atendio: 'Dra. Carla Medina',
     },
-    referencias: [
-      {
-        fecha: '2026-05-30',
-        lugar_referencia: 'Laboratorio distrital',
-        diagnostico: 'Control de uroanálisis por IVU.',
-      },
-    ],
   },
   {
     paciente: {
@@ -1562,13 +1545,6 @@ const demoPatients = [
       referida_a: 'Hospital de Dolores',
       nombre_personal_atendio: 'Dra. Carla Medina',
     },
-    referencias: [
-      {
-        fecha: '2026-05-09',
-        lugar_referencia: 'Hospital de Dolores',
-        diagnostico: 'Valoración por Rh negativo y control especializado.',
-      },
-    ],
   },
 ];
 

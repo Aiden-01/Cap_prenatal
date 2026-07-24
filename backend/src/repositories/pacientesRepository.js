@@ -201,7 +201,6 @@ async function obtenerExpedienteCompleto(pacienteId, embarazoId) {
     riesgo,
     planParto,
     vacunas,
-    referencias,
   ] = await Promise.all([
     pool.query('SELECT * FROM pacientes WHERE id = $1', [pacienteId]),
     pool.query('SELECT * FROM embarazos WHERE paciente_id = $1 ORDER BY numero_embarazo DESC', [pacienteId]),
@@ -212,7 +211,6 @@ async function obtenerExpedienteCompleto(pacienteId, embarazoId) {
     pool.query('SELECT * FROM fichas_riesgo_obstetrico WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1', [embarazoId]),
     pool.query('SELECT * FROM planes_parto WHERE embarazo_id = $1 ORDER BY fecha DESC LIMIT 1', [embarazoId]),
     pool.query('SELECT * FROM vacunas_paciente WHERE embarazo_id = $1 ORDER BY tipo_vacuna, numero_dosis', [embarazoId]),
-    pool.query('SELECT * FROM referencias_efectuadas WHERE paciente_id = $1 ORDER BY fecha DESC', [pacienteId]),
   ]);
 
   return {
@@ -225,7 +223,6 @@ async function obtenerExpedienteCompleto(pacienteId, embarazoId) {
     ficha_riesgo: riesgo.rows[0] || null,
     plan_parto: planParto.rows[0] || null,
     vacunas: vacunas.rows,
-    referencias: referencias.rows,
   };
 }
 

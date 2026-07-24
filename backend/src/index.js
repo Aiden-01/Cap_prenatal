@@ -31,6 +31,8 @@ const chatbotRoutes = require('./routes/chatbot');
 const {
   createAutomatizacionesRouter,
 } = require('./routes/automatizaciones');
+const pool = require('./db/pool');
+const { assertSchemaCompatible } = require('./db/schemaCompatibility');
 const { csrfMiddleware } = require('./middleware/auth');
 const { errorHandler } = require('./middleware/errorHandler');
 const { AppError } = require('./utils/appError');
@@ -103,6 +105,26 @@ app.use((req, _res, next) => {
 
 app.use(errorHandler);
 
-app.listen(config.port, () => {
-  console.log(`Servidor iniciado en el puerto ${config.port} (${config.nodeEnv})`);
-});
+async function startServer() {
+  await assertSchemaCompatible(pool);
+  return app.listen(config.port, () => {
+    console.log(`Servidor iniciado en el puerto ${config.port} (${config.nodeEnv})`);
+  });
+}
+
+if (require.main === module) {
+  startServer().catch(async (error) => {
+    console.error('No se pudo iniciar el servidor:', error.message);
+    process.exitCode = 1;
+    try {
+      await pool.end();
+    } catch (closeError) {
+      console.error('No se pudo cerrar PostgreSQL:', closeError.message);
+    }
+  });
+}
+
+module.exports = {
+  app,
+  startServer,
+};

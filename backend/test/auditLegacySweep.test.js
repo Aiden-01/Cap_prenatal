@@ -98,12 +98,17 @@ test('productores privados no entregan req.body, headers, cookies o secretos a a
   assert.match(auditSource, /sanitizeAuditValue\(payload\)/);
 });
 
-test('referencias conserva su modelo paciente-only sin inventar embarazo_id', () => {
-  for (const relativePath of [
-    'services/referenciasService.js',
-    'repositories/referenciasRepository.js',
-  ]) {
-    const source = fs.readFileSync(path.join(SOURCE_ROOT, relativePath), 'utf8');
-    assert.doesNotMatch(source, /embarazo_id|embarazoId/);
-  }
+test('auditoria retira productores de referencias y conserva reconocimiento historico', () => {
+  const auditSource = fs.readFileSync(
+    path.join(SOURCE_ROOT, 'services/auditService.js'),
+    'utf8'
+  );
+  const historicalSource = fs.readFileSync(
+    path.join(SOURCE_ROOT, 'services/audit/auditHistorySanitizer.js'),
+    'utf8'
+  );
+
+  assert.doesNotMatch(auditSource, /referencias_efectuadas|referencia:\s*['"]referencias/);
+  assert.match(historicalSource, /referencias_efectuadas:\s*['"]referencia['"]/);
+  assert.match(historicalSource, /referencia:\s*['"]referencia['"]/);
 });

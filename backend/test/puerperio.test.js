@@ -6,8 +6,6 @@ const { HttpError } = require('../src/utils/httpError');
 
 const PUERPERIO_SERVICE_PATH = require.resolve('../src/services/puerperioService');
 const PUERPERIO_REPOSITORY_PATH = require.resolve('../src/repositories/puerperioRepository');
-const REFERENCIAS_SERVICE_PATH = require.resolve('../src/services/referenciasService');
-const REFERENCIAS_REPOSITORY_PATH = require.resolve('../src/repositories/referenciasRepository');
 const COMUNIDADES_SERVICE_PATH = require.resolve('../src/services/comunidadesService');
 const COMUNIDADES_REPOSITORY_PATH = require.resolve('../src/repositories/comunidadesRepository');
 const AUDIT_PATH = require.resolve('../src/services/auditService');
@@ -58,18 +56,6 @@ const VALID_PUERPERIO = {
   token: 'token-en-body',
 };
 
-const VALID_REFERENCIA = {
-  fecha: '2026-06-18',
-  lugar_referencia: 'Hospital Destino Sintetico',
-  diagnostico: 'Diagnostico de referencia sintetico',
-  prioridad: 'urgente',
-  traslado: 'Ambulancia sintetica',
-  observaciones: 'Observacion de traslado sintetica',
-  cui: '2999999999999',
-  numero_expediente: 'EXP-SINTETICO',
-  token: 'token-referencia',
-};
-
 function cacheModule(modulePath, exports) {
   const previous = require.cache[modulePath];
   require.cache[modulePath] = {
@@ -101,11 +87,6 @@ const SERVICE_CONFIG = Object.freeze({
     servicePath: PUERPERIO_SERVICE_PATH,
     repositoryPath: PUERPERIO_REPOSITORY_PATH,
     repositoryLabel: 'puerperioRepository',
-  },
-  referencias: {
-    servicePath: REFERENCIAS_SERVICE_PATH,
-    repositoryPath: REFERENCIAS_REPOSITORY_PATH,
-    repositoryLabel: 'referenciasRepository',
   },
   comunidades: {
     servicePath: COMUNIDADES_SERVICE_PATH,
@@ -540,173 +521,6 @@ test('embarazo cerrado o control de otro embarazo no ejecutan DML ni auditoria',
   assert.equal(audits, 0);
 });
 
-test('crear referencia guarda solo campos_registrados y nunca inventa embarazo_id', async () => {
-  const recorder = privateAuditRecorder();
-  let inserted;
-
-  await withService('referencias', {
-    repository: {
-      insertar: async (data) => {
-        inserted = data;
-        return { id: 1001, ...data };
-      },
-    },
-    audit: recorder.audit,
-  }, async (service) => service.guardarReferencia({
-    pacienteId: 41,
-    body: VALID_REFERENCIA,
-    req: ACTOR,
-  }));
-
-  assert.equal('embarazo_id' in inserted, false);
-  const payload = privatePayload(recorder.events[0], {
-    entity: 'referencia',
-    table: 'referencias_efectuadas',
-    action: 'crear',
-    id: 1001,
-    patientId: 41,
-  });
-  assert.deepEqual(payload.campos_registrados, ['diagnostico', 'fecha', 'lugar_referencia']);
-  const serialized = JSON.stringify(recorder.events[0]);
-  for (const forbidden of [
-    'Hospital Destino Sintetico',
-    'Diagnostico de referencia',
-    'urgente',
-    'Ambulancia sintetica',
-    'Observacion de traslado',
-    '2999999999999',
-    'EXP-SINTETICO',
-    'token-referencia',
-    'Bearer secreto-puerperio',
-  ]) assert.equal(serialized.includes(forbidden), false);
-});
-
-test('referencia actualiza solo el delta y omite cambios equivalentes', async () => {
-  const recorder = privateAuditRecorder();
-  const before = {
-    id: 1002,
-    paciente_id: 41,
-    fecha: '2026-06-18',
-    lugar_referencia: 'Hospital Destino Sintetico',
-    diagnostico: null,
-  };
-  let updatedArgs;
-
-  await withService('referencias', {
-    repository: {
-      obtenerPorIdYPaciente: async () => before,
-      actualizar: async (args) => {
-        updatedArgs = args;
-        return { referencia: { ...before, ...args.data }, rowCount: 1 };
-      },
-    },
-    audit: recorder.audit,
-  }, async (service) => service.actualizarReferencia({
-    pacienteId: 41,
-    id: 1002,
-    body: {
-      fecha: '2026-06-18T00:00:00.000Z',
-      lugar_referencia: 'Hospital Regional Sintetico',
-      diagnostico: '',
-    },
-    req: ACTOR,
-  }));
-
-  assert.deepEqual(updatedArgs.campos, ['lugar_referencia']);
-  const payload = privatePayload(recorder.events[0], {
-    entity: 'referencia',
-    table: 'referencias_efectuadas',
-    action: 'actualizar',
-    id: 1002,
-    patientId: 41,
-  });
-  assert.deepEqual(payload.campos_sensibles_modificados, ['lugar_referencia']);
-  assert.equal(JSON.stringify(payload).includes('Hospital Regional Sintetico'), false);
-
-  let writes = 0;
-  let audits = 0;
-  await withService('referencias', {
-    repository: {
-      obtenerPorIdYPaciente: async () => before,
-      actualizar: async () => { writes += 1; },
-    },
-    audit: async () => { audits += 1; },
-  }, async (service) => service.actualizarReferencia({
-    pacienteId: 41,
-    id: 1002,
-    body: {
-      fecha: '2026-06-18T00:00:00.000Z',
-      lugar_referencia: '  Hospital   Destino Sintetico  ',
-      diagnostico: '',
-    },
-    req: ACTOR,
-  }));
-  assert.equal(writes, 0);
-  assert.equal(audits, 0);
-});
-
-test('eliminar referencia conserva campos_eliminados sin snapshot ni embarazo', async () => {
-  const recorder = privateAuditRecorder();
-  const row = { id: 1003, paciente_id: 41, ...VALID_REFERENCIA };
-
-  await withService('referencias', {
-    repository: {
-      eliminar: async () => ({ referencia: row, rowCount: 1 }),
-    },
-    audit: recorder.audit,
-  }, async (service) => service.eliminarReferencia({
-    pacienteId: 41,
-    id: 1003,
-    req: ACTOR,
-  }));
-
-  const payload = privatePayload(recorder.events[0], {
-    entity: 'referencia',
-    table: 'referencias_efectuadas',
-    action: 'eliminar',
-    id: 1003,
-    patientId: 41,
-  });
-  assert.deepEqual(payload.campos_eliminados, ['diagnostico', 'fecha', 'lugar_referencia']);
-  assert.equal(recorder.events[0].embarazoId, null);
-  assert.equal(JSON.stringify(payload).includes('Hospital Destino Sintetico'), false);
-});
-
-test('fallo de auditoria revierte la referencia clinica', async () => {
-  let stored = null;
-  const transaction = [];
-  const recorder = privateAuditRecorder({ fail: true });
-
-  await assert.rejects(withService('referencias', {
-    repository: {
-      enTransaccion: async (operation) => {
-        transaction.push('BEGIN');
-        try {
-          const result = await operation({ transaction: true });
-          transaction.push('COMMIT');
-          return result;
-        } catch (error) {
-          stored = null;
-          transaction.push('ROLLBACK');
-          throw error;
-        }
-      },
-      insertar: async (data) => {
-        stored = { id: 1004, ...data };
-        return stored;
-      },
-    },
-    audit: recorder.audit,
-  }, async (service) => service.guardarReferencia({
-    pacienteId: 41,
-    body: VALID_REFERENCIA,
-    req: ACTOR,
-  })), /audit insert failed/);
-
-  assert.equal(stored, null);
-  assert.deepEqual(transaction, ['BEGIN', 'ROLLBACK']);
-});
-
 test('comunidades, ultimo productor adicional, usa auditoria privada atomica y minima', async () => {
   const recorder = privateAuditRecorder();
   const data = {
@@ -762,7 +576,6 @@ test('comunidades, ultimo productor adicional, usa auditoria privada atomica y m
 test('repositorios clinicos y de comunidades confirman, revierten y liberan transacciones', async () => {
   for (const repositoryPath of [
     PUERPERIO_REPOSITORY_PATH,
-    REFERENCIAS_REPOSITORY_PATH,
     COMUNIDADES_REPOSITORY_PATH,
   ]) {
     const successCalls = [];

@@ -9,7 +9,6 @@ const USUARIO_TIENE_HISTORIAL_SQL = `(
   OR EXISTS (SELECT 1 FROM morbilidad_embarazo m WHERE m.registrado_por = u.id OR m.updated_by = u.id)
   OR EXISTS (SELECT 1 FROM fichas_riesgo_obstetrico f WHERE f.registrado_por = u.id OR f.updated_by = u.id)
   OR EXISTS (SELECT 1 FROM planes_parto pp WHERE pp.registrado_por = u.id OR pp.updated_by = u.id)
-  OR EXISTS (SELECT 1 FROM referencias_efectuadas re WHERE re.registrado_por = u.id OR re.updated_by = u.id)
   OR EXISTS (
     SELECT 1 FROM auditoria_eventos ae
     WHERE ae.usuario_id = u.id
@@ -127,6 +126,7 @@ async function eliminar(id, db = pool) {
 }
 
 module.exports = {
+  USUARIO_TIENE_HISTORIAL_SQL,
   listar,
   crear,
   obtenerPorId,

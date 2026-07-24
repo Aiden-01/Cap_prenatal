@@ -292,7 +292,6 @@ test('GET de expediente sin embarazo es repetible, solo lectura y devuelve contr
     ficha_riesgo: null,
     plan_parto: null,
     vacunas: [],
-    referencias: [],
   };
 
   await withPacientesService({
@@ -327,7 +326,7 @@ test('GET de expediente sin embarazo es repetible, solo lectura y devuelve contr
     assert.deepEqual(first.controles_puerperio, []);
     assert.deepEqual(first.morbilidad, []);
     assert.deepEqual(first.vacunas, []);
-    assert.deepEqual(first.referencias, []);
+    assert.equal(Object.hasOwn(first, 'referencias'), false);
     assert.equal(first.ficha_riesgo, null);
     assert.equal(first.plan_parto, null);
     assert.equal(first.embarazo_seleccionado, null);
@@ -382,11 +381,24 @@ test('repositorio de expediente con embarazo null ejecuta exclusivamente SELECT'
     assert.deepEqual(first.embarazos, []);
     assert.deepEqual(first.controles_prenatales, []);
     assert.deepEqual(first.controles_puerperio, []);
+    assert.equal(Object.hasOwn(first, 'referencias'), false);
+    assert.deepEqual(Object.keys(first), [
+      'paciente',
+      'embarazos',
+      'embarazo_activo',
+      'controles_prenatales',
+      'controles_puerperio',
+      'morbilidad',
+      'ficha_riesgo',
+      'plan_parto',
+      'vacunas',
+    ]);
   });
 
-  assert.equal(queries.length, 20);
+  assert.equal(queries.length, 18);
   assert.ok(queries.every(({ sql }) => /^\s*SELECT\b/i.test(sql)));
   assert.equal(queries.some(({ sql }) => /\b(?:INSERT|UPDATE|DELETE)\b/i.test(sql)), false);
+  assert.equal(queries.some(({ sql }) => /referencias_efectuadas/i.test(sql)), false);
   const selectedPregnancyQueries = queries.filter(({ sql }) => (
     /WHERE id = \$1/.test(sql) || /WHERE embarazo_id = \$1/.test(sql)
   ));

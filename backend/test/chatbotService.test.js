@@ -528,6 +528,15 @@ for (const problem of KNOWN_PROBLEM_CASES) {
   });
 }
 
+test('Lia explica la referencia en los dos formularios reales', () => {
+  const result = answerQuestion('¿Cómo registro una referencia?');
+  assert.equal(result.intent, 'referencias');
+  assert.match(result.answer, /referida_a/);
+  assert.match(result.answer, /tratamiento_referencia/);
+  assert.match(result.answer, /No existe un módulo independiente de referencias/);
+  assert.doesNotMatch(result.answer, /\/referencias/);
+});
+
 test('FPP extrae una fecha ISO válida y responde con 280 días', () => {
   const parsed = parseFurDate('Mi FUR fue 2026-01-10');
   assert.equal(parsed.toISOString(), '2026-01-10T00:00:00.000Z');

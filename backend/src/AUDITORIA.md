@@ -6,7 +6,7 @@ Desde Sprint 4B.3E todos los productores productivos usan el camino privado:
   passwords, roles, permisos, sesiones, PDF, exportaciones/reportes,
   automatizaciones, pacientes,
   embarazos, controles prenatales/laboratorios embebidos, riesgo obstetrico,
-  vacunas, morbilidad, plan de parto, puerperio, referencias y comunidades.
+  vacunas, morbilidad, plan de parto, puerperio y comunidades.
   Requiere
   contexto explicito, construye payload por allowlist, sanea antes del
   repositorio y nunca captura IP, user-agent, headers ni body.
@@ -41,7 +41,7 @@ El procedimiento operativo esta en
 Los eventos informativos siguen siendo best effort. Los cambios de password,
 rol, estado del usuario, permisos, eliminacion de usuario y todas las escrituras
 de paciente, embarazo, control prenatal, riesgo, vacuna, morbilidad, plan de
-parto, puerperio, referencia o comunidad migradas usan la misma conexion que
+parto, puerperio o comunidad migradas usan la misma conexion que
 la operacion principal
 y `obligatorio: true`; una falla de auditoria provoca rollback. Una solicitud de
 permisos o actualizacion de paciente sin delta no escribe un evento.
@@ -100,7 +100,7 @@ La auditoria debe responder:
 - Crear o actualizar plan de parto mediante su upsert existente. No existe
   eliminacion HTTP para esta entidad.
 - Crear, actualizar o eliminar vacunas y morbilidad.
-- Crear, actualizar o eliminar puerperio y referencias.
+- Crear, actualizar o eliminar puerperio.
 - Login exitoso.
 - Login fallido.
 - Intento de login con usuario inactivo.
@@ -199,9 +199,9 @@ nominal.
   tratamiento, observaciones y datos del recien nacido nunca conservan valor.
   Si el upsert cambia el embarazo, un evento separado conserva exclusivamente
   `estado_embarazo: activo -> puerperio`; ambos eventos comparten transaccion.
-- Referencias: conserva `referencia_id`, `paciente_id` y nombres de campos.
-  Destino, diagnostico, motivo, estado, traslado y texto libre no conservan
-  valor. El esquema actual no posee `embarazo_id` y este sprint no lo inventa.
+- Eventos historicos de referencias: el saneador conserva el reconocimiento de
+  tabla, entidad y modulo, pero destino, diagnostico, motivo, estado, traslado y
+  texto libre no conservan valores.
 - Comunidades: conserva ID y nombres de campos; solo la transicion booleana de
   `activo` puede guardar valores bajo el contexto administrativo exacto.
 
@@ -210,9 +210,18 @@ conserva por compatibilidad y `auditLegacySweep.test.js` impide nuevos usos,
 `INSERT` directos o accesos de productores al repositorio. Los historicos no
 fueron saneados. No existen rutas
 HTTP actuales para eliminar pacientes, embarazos o planes de parto y no se
-agregaron en este sprint. No hubo cambios de base de datos, migraciones ni ENV
-en Sprint 4B.3E. Asociar referencias a un embarazo queda para una migracion de
-BD separada.
+agregaron en este sprint.
+
+Sprint 6B-R1 retiro los productores futuros y los mapeos privados exclusivos
+del CRUD de referencias. `auditHistorySanitizer` sigue reconociendo
+`referencias_efectuadas`, la entidad `referencia` y el modulo historico
+`referencias`; no se borran ni modifican eventos existentes. La consulta de
+proteccion de usuarios conserva ese nombre dentro de `auditoria_eventos`, pero
+ya no consulta la tabla clinica eliminada. Por ello un usuario relacionado con
+un evento historico sigue sin poder eliminarse.
+
+La migracion 008 no modifica `auditoria_eventos`. A fecha de Sprint 6B-R1 no se
+ha aplicado en PC1 ni PC2.
 
 ## Criterio funcional para PDF institucional
 

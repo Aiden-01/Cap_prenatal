@@ -47,6 +47,32 @@ como maximo la cuenta director indicada y no cambia su contrasena si ya existe.
 En produccion exige una confirmacion adicional documentada en
 `docs/ROTACION_SECRETOS.md`.
 
+## Estado final y migracion 008
+
+`schema.sql` declara 17 tablas publicas: 16 operativas y la tabla tecnica
+`schema_migrations`. El conteo se valida tanto analizando las sentencias
+`CREATE TABLE` como contra `pg_tables` en una instalacion PostgreSQL temporal.
+
+`008_retirar_referencias_efectuadas.sql` usa `lock_timeout = 5s` y
+`statement_timeout = 30s`. Si la tabla historica no existe, registra la
+migracion sin cambios. Si existe, toma `ACCESS EXCLUSIVE`, muestra unicamente
+el conteo agregado y aborta toda la transaccion cuando el conteo es mayor que
+cero. Solo una tabla vacia se retira, sin `CASCADE`; una dependencia inesperada
+tambien provoca rollback.
+
+La aplicacion nueva comprueba al arrancar que 008 este registrada; el runner
+solo crea ese registro despues de retirar o comprobar ausente la tabla
+obsoleta. Orden operativo obligatorio:
+
+1. detener el backend anterior;
+2. verificar backup y conteo de forma autorizada;
+3. ejecutar `npm run db:migrate`;
+4. confirmar 008 y el conteo final;
+5. desplegar/iniciar el backend nuevo.
+
+008 aun no se ha aplicado en PC1 ni PC2. No debe ejecutarse en ninguna de esas
+bases como parte de pruebas de desarrollo.
+
 ## Modelo conceptual
 
 ```text
@@ -68,7 +94,6 @@ planes_parto
 vacunas_paciente
 morbilidad_embarazo
 controles_puerperio
-referencias_efectuadas
 ```
 
 ## Tablas principales
@@ -87,7 +112,6 @@ referencias_efectuadas
 | `vacunas_paciente` | Vacunas asociadas a paciente/embarazo. |
 | `morbilidad_embarazo` | Eventos de morbilidad. |
 | `controles_puerperio` | Atenciones de puerperio. |
-| `referencias_efectuadas` | Referencias a otros servicios. |
 | `comunidades` | Catalogo geografico/comunitario. |
 | `comunidades_aliases` | Alias para normalizar comunidades. |
 | `auditoria_eventos` | Trazabilidad de operaciones. |
@@ -132,7 +156,9 @@ Reglas:
 | Vacunas | Muchas por embarazo. |
 | Morbilidad | Muchas por embarazo. |
 | Puerperio | Muchas por embarazo. |
-| Referencias | Muchas por paciente y/o embarazo segun flujo. |
+| Referencia por riesgo | `fichas_riesgo_obstetrico.referida_a`. |
+| Tratamiento o referencia por morbilidad | `morbilidad_embarazo.tratamiento_referencia`. |
+| Procedencia | `pacientes.viene_referida` y `pacientes.referida_de`. |
 | PDF | Lee el embarazo seleccionado. |
 
 ## Indices y unicidad
