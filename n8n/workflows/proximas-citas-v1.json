@@ -1,0 +1,1437 @@
+{
+  "name": "CAP Prenatal | Próximas citas agregadas | v1",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 6,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "1c28dfc4-2945-4d5e-a839-27cf7e1c0ec2",
+      "name": "Ejecutar diariamente a las 06:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -2600,
+        0
+      ],
+      "notes": "Horario diario. La zona horaria se fija en America/Guatemala en los ajustes del workflow."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const workflowVersion = 1;\nconst offsetDays = 1;\nconst windowDays = 1;\nconst recipientAlias = String(($vars && $vars.CAP_NOTIFICATION_RECIPIENT_ALIAS) || 'responsable_salud_reproductiva').trim();\nconst backendRaw = String($env.CAP_BACKEND_AUTOMATION_URL || '').trim();\nconst fail = (detail) => [{ json: { workflow_version: workflowVersion, result: 'configuration_error', reason_code: 'CONFIGURATION_ERROR', configuration_valid: false, validation_detail: detail } }];\nif (!backendRaw) return fail('backend_url_missing');\nif (!/^[a-z0-9_]{3,64}$/.test(recipientAlias)) return fail('recipient_alias_invalid');\nlet backend;\ntry { backend = new URL(backendRaw); } catch { return fail('backend_url_invalid'); }\nif (!['http:', 'https:'].includes(backend.protocol)) return fail('backend_url_scheme_invalid');\nif (backend.username || backend.password || backend.search || backend.hash) return fail('backend_url_components_invalid');\nif (backend.pathname.replace(/\\/$/, '') !== '/api/automatizaciones/v1/proximas-citas') return fail('backend_url_path_invalid');\nconst manual = $execution.mode === 'manual';\nif (!manual && backend.hostname.toLowerCase() !== 'backend') return fail('backend_url_not_private_service');\nreturn [{ json: { workflow_version: workflowVersion, configuration_valid: true, backend_url: backend.toString().replace(/\\/$/, ''), offset_days: offsetDays, window_days: windowDays, recipient_alias: recipientAlias } }];"
+      },
+      "id": "4af7bc3c-27a9-4b0a-b3f1-5c977ddcbdb5",
+      "name": "Preparar parámetros y configuración",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2370,
+        0
+      ],
+      "notes": "Lee únicamente CAP_BACKEND_AUTOMATION_URL y el alias operativo; no enumera el entorno ni incorpora secretos."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e13be40f-b7ab-44c9-9798-3e2995865210",
+              "leftValue": "={{ $json.configuration_valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f8890d91-803a-4adc-8647-43b0bfad586e",
+      "name": "¿Configuración inicial válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2140,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.backend_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "offset_days",
+              "value": "={{ $json.offset_days }}"
+            },
+            {
+              "name": "window_days",
+              "value": "={{ $json.window_days }}"
+            }
+          ]
+        },
+        "sendHeaders": false,
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          },
+          "sendCredentialsOnCrossOriginRedirect": false,
+          "timeout": 10000
+        }
+      },
+      "id": "77670f8b-6d0e-423c-89f7-fd13d2964509",
+      "name": "Consultar backend - intento 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1900,
+        -120
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Asignar manualmente una credencial Header Auth cuyo nombre de header sea X-CAP-Automation-Key. El JSON no contiene la key ni un ID de credencial."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().map(({ json }) => ({ json: { workflow_version: 1, result: 'configuration_error', reason_code: 'CONFIGURATION_ERROR', validation_detail: json.validation_detail } }));"
+      },
+      "id": "928b8ab9-65ed-4f7f-8c1e-31e4ad34145d",
+      "name": "Salida configuración inicial",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1900,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const attempt = 1;\nconst raw = $json;\nconst keys = raw && typeof raw === 'object' && !Array.isArray(raw) ? Object.keys(raw) : [];\nconst controlledCode = typeof raw?.code === 'string' ? raw.code : '';\nconst errorObject = keys.length === 1 && raw.error && typeof raw.error === 'object' && !Array.isArray(raw.error) ? raw.error : null;\nconst errorText = keys.length === 1 ? (typeof raw.error === 'string' ? raw.error : String(errorObject?.message || errorObject?.description || '')) : '';\nconst errorCode = String(errorObject?.code || '');\nconst finish = (result, reasonCode, retry) => [{ json: { workflow_version: 1, request_ok: false, should_retry: retry, attempt, result, reason_code: reasonCode } }];\nconst passToContract = () => [{ json: { workflow_version: 1, request_ok: true, should_retry: false, attempt, response: raw } }];\nif (controlledCode === 'AUTOMATION_INVALID_RANGE') return finish('invalid_range', controlledCode, false);\nif (controlledCode === 'AUTOMATION_UNAUTHORIZED') return finish('unauthorized', controlledCode, false);\nif (controlledCode === 'ROUTE_NOT_FOUND') return finish('configuration_error', controlledCode, false);\nif (controlledCode === 'AUTOMATION_RATE_LIMITED') return finish('rate_limited', controlledCode, false);\nif (controlledCode === 'AUTOMATION_INTERNAL_ERROR') return finish('backend_unavailable', controlledCode, true);\nif (errorText || errorObject) {\n  const lower = `${errorText} ${errorCode}`.toLowerCase();\n  if (/credential|http header auth/.test(lower)) return finish('configuration_error', 'HEADER_AUTH_NOT_CONFIGURED', false);\n  if (/invalid json|not valid json|json parse|unexpected token/.test(lower)) return finish('contract_invalid', 'CONTRACT_INVALID', false);\n  const status = Number(errorObject?.statusCode || errorObject?.httpCode || errorObject?.response?.statusCode || (errorText.match(/(?:status(?: code)?[^0-9]{0,12}|\\b)([45][0-9]{2})\\b/i) || [])[1]);\n  if (status === 400) return finish('invalid_range', 'AUTOMATION_INVALID_RANGE', false);\n  if (status === 401) return finish('unauthorized', 'AUTOMATION_UNAUTHORIZED', false);\n  if (status === 404) return finish('configuration_error', 'ROUTE_NOT_FOUND', false);\n  if (status === 429) return finish('rate_limited', 'AUTOMATION_RATE_LIMITED', false);\n  if (status >= 500 && status <= 599) return finish('backend_unavailable', 'BACKEND_UNAVAILABLE', true);\n  if (status >= 400 && status <= 499) return finish('configuration_error', 'BACKEND_REQUEST_REJECTED', false);\n  if (/timeout|timed out|econn|enotfound|eai_again|socket|network|connection|fetch failed|certificate|\\btls\\b|\\bdns\\b/.test(lower) || /^(?:E[A-Z0-9_]+|ERR_[A-Z0-9_]+)$/.test(errorCode)) return finish('backend_unavailable', 'BACKEND_UNAVAILABLE', true);\n  return passToContract();\n}\nreturn passToContract();"
+      },
+      "id": "bb77a6d9-d828-4be2-9c48-236551f47851",
+      "name": "Clasificar respuesta - intento 1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1660,
+        -120
+      ],
+      "notes": "Solo conserva el body agregado durante el paso inmediato de validación. Los errores se reducen a resultado y código controlados."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1080a7c9-8856-4597-8c63-001417549522",
+              "leftValue": "={{ $json.request_ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "cbe1c935-2240-4665-b4e6-f27577729b86",
+      "name": "¿Consulta 1 correcta?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1420,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e84f3d33-10df-41c8-86cc-3aa0db906350",
+              "leftValue": "={{ $json.should_retry }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7daf2f14-2c2f-453f-bd97-6972c6d08e2e",
+      "name": "¿Reintentar consulta 1?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1180,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "minutes"
+      },
+      "id": "61f3ca04-8b32-421e-bc46-ebc17835c206",
+      "name": "Esperar 1 minuto",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -940,
+        -20
+      ],
+      "webhookId": "b652c510-83f7-4ada-b809-bd40419fe65b"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $node[\"Preparar parámetros y configuración\"].json.backend_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "offset_days",
+              "value": 1
+            },
+            {
+              "name": "window_days",
+              "value": 1
+            }
+          ]
+        },
+        "sendHeaders": false,
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          },
+          "sendCredentialsOnCrossOriginRedirect": false,
+          "timeout": 10000
+        }
+      },
+      "id": "3fe83450-1632-43f4-9999-825880888ef5",
+      "name": "Consultar backend - intento 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -700,
+        -20
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Usa la misma credencial Header Auth que el intento 1. No se reintentan 400, 401, 404 ni 429."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const attempt = 2;\nconst raw = $json;\nconst keys = raw && typeof raw === 'object' && !Array.isArray(raw) ? Object.keys(raw) : [];\nconst controlledCode = typeof raw?.code === 'string' ? raw.code : '';\nconst errorObject = keys.length === 1 && raw.error && typeof raw.error === 'object' && !Array.isArray(raw.error) ? raw.error : null;\nconst errorText = keys.length === 1 ? (typeof raw.error === 'string' ? raw.error : String(errorObject?.message || errorObject?.description || '')) : '';\nconst errorCode = String(errorObject?.code || '');\nconst finish = (result, reasonCode, retry) => [{ json: { workflow_version: 1, request_ok: false, should_retry: retry, attempt, result, reason_code: reasonCode } }];\nconst passToContract = () => [{ json: { workflow_version: 1, request_ok: true, should_retry: false, attempt, response: raw } }];\nif (controlledCode === 'AUTOMATION_INVALID_RANGE') return finish('invalid_range', controlledCode, false);\nif (controlledCode === 'AUTOMATION_UNAUTHORIZED') return finish('unauthorized', controlledCode, false);\nif (controlledCode === 'ROUTE_NOT_FOUND') return finish('configuration_error', controlledCode, false);\nif (controlledCode === 'AUTOMATION_RATE_LIMITED') return finish('rate_limited', controlledCode, false);\nif (controlledCode === 'AUTOMATION_INTERNAL_ERROR') return finish('backend_unavailable', controlledCode, true);\nif (errorText || errorObject) {\n  const lower = `${errorText} ${errorCode}`.toLowerCase();\n  if (/credential|http header auth/.test(lower)) return finish('configuration_error', 'HEADER_AUTH_NOT_CONFIGURED', false);\n  if (/invalid json|not valid json|json parse|unexpected token/.test(lower)) return finish('contract_invalid', 'CONTRACT_INVALID', false);\n  const status = Number(errorObject?.statusCode || errorObject?.httpCode || errorObject?.response?.statusCode || (errorText.match(/(?:status(?: code)?[^0-9]{0,12}|\\b)([45][0-9]{2})\\b/i) || [])[1]);\n  if (status === 400) return finish('invalid_range', 'AUTOMATION_INVALID_RANGE', false);\n  if (status === 401) return finish('unauthorized', 'AUTOMATION_UNAUTHORIZED', false);\n  if (status === 404) return finish('configuration_error', 'ROUTE_NOT_FOUND', false);\n  if (status === 429) return finish('rate_limited', 'AUTOMATION_RATE_LIMITED', false);\n  if (status >= 500 && status <= 599) return finish('backend_unavailable', 'BACKEND_UNAVAILABLE', true);\n  if (status >= 400 && status <= 499) return finish('configuration_error', 'BACKEND_REQUEST_REJECTED', false);\n  if (/timeout|timed out|econn|enotfound|eai_again|socket|network|connection|fetch failed|certificate|\\btls\\b|\\bdns\\b/.test(lower) || /^(?:E[A-Z0-9_]+|ERR_[A-Z0-9_]+)$/.test(errorCode)) return finish('backend_unavailable', 'BACKEND_UNAVAILABLE', true);\n  return passToContract();\n}\nreturn passToContract();"
+      },
+      "id": "719836e5-d38b-4856-93de-e6b68613a965",
+      "name": "Clasificar respuesta - intento 2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -460,
+        -20
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "320a7ed7-920b-4c0a-9c72-e01296585972",
+              "leftValue": "={{ $json.request_ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "6e31c88f-32d7-44cc-93f7-2cf68b820277",
+      "name": "¿Consulta 2 correcta?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -220,
+        -20
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9dcb54e0-ebef-4152-a1ee-d154e5033052",
+              "leftValue": "={{ $json.should_retry }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "6e324626-7a70-48f8-bda3-034dc157e7a0",
+      "name": "¿Reintentar consulta 2?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        20,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "minutes"
+      },
+      "id": "6157506b-5468-46e1-8c30-abcd66cbf07b",
+      "name": "Esperar 5 minutos",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        80
+      ],
+      "webhookId": "1118d7a9-5573-42af-b927-236119633ec6"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $node[\"Preparar parámetros y configuración\"].json.backend_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "offset_days",
+              "value": 1
+            },
+            {
+              "name": "window_days",
+              "value": 1
+            }
+          ]
+        },
+        "sendHeaders": false,
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          },
+          "sendCredentialsOnCrossOriginRedirect": false,
+          "timeout": 10000
+        }
+      },
+      "id": "74ad96c1-2294-44cd-804c-6c55cae5cfa7",
+      "name": "Consultar backend - intento 3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        500,
+        80
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Tercer y último intento HTTP."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const attempt = 3;\nconst raw = $json;\nconst keys = raw && typeof raw === 'object' && !Array.isArray(raw) ? Object.keys(raw) : [];\nconst controlledCode = typeof raw?.code === 'string' ? raw.code : '';\nconst errorObject = keys.length === 1 && raw.error && typeof raw.error === 'object' && !Array.isArray(raw.error) ? raw.error : null;\nconst errorText = keys.length === 1 ? (typeof raw.error === 'string' ? raw.error : String(errorObject?.message || errorObject?.description || '')) : '';\nconst errorCode = String(errorObject?.code || '');\nconst finish = (result, reasonCode) => [{ json: { workflow_version: 1, request_ok: false, should_retry: false, attempt, result, reason_code: reasonCode } }];\nconst passToContract = () => [{ json: { workflow_version: 1, request_ok: true, should_retry: false, attempt, response: raw } }];\nif (controlledCode === 'AUTOMATION_INVALID_RANGE') return finish('invalid_range', controlledCode);\nif (controlledCode === 'AUTOMATION_UNAUTHORIZED') return finish('unauthorized', controlledCode);\nif (controlledCode === 'ROUTE_NOT_FOUND') return finish('configuration_error', controlledCode);\nif (controlledCode === 'AUTOMATION_RATE_LIMITED') return finish('rate_limited', controlledCode);\nif (controlledCode === 'AUTOMATION_INTERNAL_ERROR') return finish('backend_unavailable', controlledCode);\nif (errorText || errorObject) {\n  const lower = `${errorText} ${errorCode}`.toLowerCase();\n  if (/credential|http header auth/.test(lower)) return finish('configuration_error', 'HEADER_AUTH_NOT_CONFIGURED');\n  if (/invalid json|not valid json|json parse|unexpected token/.test(lower)) return finish('contract_invalid', 'CONTRACT_INVALID');\n  const status = Number(errorObject?.statusCode || errorObject?.httpCode || errorObject?.response?.statusCode || (errorText.match(/(?:status(?: code)?[^0-9]{0,12}|\\b)([45][0-9]{2})\\b/i) || [])[1]);\n  if (status === 400) return finish('invalid_range', 'AUTOMATION_INVALID_RANGE');\n  if (status === 401) return finish('unauthorized', 'AUTOMATION_UNAUTHORIZED');\n  if (status === 404) return finish('configuration_error', 'ROUTE_NOT_FOUND');\n  if (status === 429) return finish('rate_limited', 'AUTOMATION_RATE_LIMITED');\n  if (status >= 500 && status <= 599) return finish('backend_unavailable', 'BACKEND_UNAVAILABLE');\n  if (status >= 400 && status <= 499) return finish('configuration_error', 'BACKEND_REQUEST_REJECTED');\n  if (/timeout|timed out|econn|enotfound|eai_again|socket|network|connection|fetch failed|certificate|\\btls\\b|\\bdns\\b/.test(lower) || /^(?:E[A-Z0-9_]+|ERR_[A-Z0-9_]+)$/.test(errorCode)) return finish('backend_unavailable', 'BACKEND_UNAVAILABLE');\n  return passToContract();\n}\nreturn passToContract();"
+      },
+      "id": "6cb77f13-cacc-4eed-ae7c-3675e5035522",
+      "name": "Clasificar respuesta - intento 3",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b46418d2-d3aa-4404-b00c-13a26606d585",
+              "leftValue": "={{ $json.request_ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7777c610-ee76-40ae-9c57-5b225f3a01fc",
+      "name": "¿Consulta 3 correcta?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        980,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().map(({ json }) => ({ json: { workflow_version: 1, result: json.result, reason_code: json.reason_code } }));"
+      },
+      "id": "c5199807-c1bd-4865-b777-6435af635379",
+      "name": "Salida controlada de backend",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        300
+      ],
+      "notes": "No conserva body, URL, headers, mensajes crudos ni stack."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const payload = $json.response;\nconst fail = (detail) => [{ json: { workflow_version: 1, contract_valid: false, result: 'contract_invalid', reason_code: 'CONTRACT_INVALID', validation_detail: detail } }];\nconst plainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);\nconst normalized = (value) => String(value).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();\nconst validDate = (value) => {\n  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;\n  const [year, month, day] = value.split('-').map(Number);\n  const date = new Date(Date.UTC(year, month - 1, day));\n  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;\n};\nconst forbiddenFields = new Set(['paciente_id', 'embarazo_id', 'nombre', 'nombres', 'apellidos', 'expediente', 'cui', 'telefono', 'direccion', 'comunidad', 'territorio', 'riesgo', 'diagnostico', 'observaciones', 'html', 'markdown', 'controles', 'laboratorios']);\nconst findForbidden = (value) => {\n  if (Array.isArray(value)) {\n    for (const entry of value) { const found = findForbidden(entry); if (found) return found; }\n    return null;\n  }\n  if (!plainObject(value)) return null;\n  for (const [key, child] of Object.entries(value)) {\n    if (forbiddenFields.has(normalized(key))) return normalized(key);\n    const found = findForbidden(child);\n    if (found) return found;\n  }\n  return null;\n};\nconst forbidden = findForbidden(payload);\nif (forbidden) return fail(`forbidden_field:${forbidden}`);\nif (!plainObject(payload)) return fail('root_not_object');\nconst exactKeys = (value, expected) => {\n  const actual = Object.keys(value).sort();\n  const wanted = [...expected].sort();\n  return actual.length === wanted.length && actual.every((key, index) => key === wanted[index]);\n};\nif (!exactKeys(payload, ['schema_version', 'generated_at', 'timezone', 'range', 'total', 'summary_by_date', 'secure_path'])) return fail('root_fields_invalid');\nif (payload.schema_version !== 1) return fail('schema_version_invalid');\nif (payload.timezone !== 'America/Guatemala') return fail('timezone_invalid');\nconst generatedMatch = typeof payload.generated_at === 'string' ? payload.generated_at.match(/^(\\d{4}-\\d{2}-\\d{2})T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$/) : null;\nif (!generatedMatch || !validDate(generatedMatch[1]) || Number.isNaN(Date.parse(payload.generated_at))) return fail('generated_at_invalid');\nif (!plainObject(payload.range) || !exactKeys(payload.range, ['from', 'to'])) return fail('range_fields_invalid');\nif (!validDate(payload.range.from) || !validDate(payload.range.to) || payload.range.from > payload.range.to) return fail('range_invalid');\nif (!Number.isInteger(payload.total) || payload.total < 0 || payload.total > 10000) return fail('total_invalid');\nif (!Array.isArray(payload.summary_by_date)) return fail('summary_not_array');\nlet sum = 0;\nlet previous = '';\nfor (const entry of payload.summary_by_date) {\n  if (!plainObject(entry) || !exactKeys(entry, ['date', 'total'])) return fail('summary_fields_invalid');\n  if (!validDate(entry.date)) return fail('summary_date_invalid');\n  if (entry.date < payload.range.from || entry.date > payload.range.to) return fail('summary_date_out_of_range');\n  if (previous && entry.date <= previous) return fail('summary_dates_not_ascending');\n  if (!Number.isInteger(entry.total) || entry.total < 0 || entry.total > 10000) return fail('summary_total_invalid');\n  previous = entry.date;\n  sum += entry.total;\n}\nif (sum !== payload.total) return fail('summary_sum_mismatch');\nif (payload.secure_path !== '/dashboard') return fail('secure_path_invalid');\nreturn [{ json: { workflow_version: 1, contract_valid: true, range_from: payload.range.from, range_to: payload.range.to, total: payload.total, secure_path: payload.secure_path, recipient_alias: $node['Preparar parámetros y configuración'].json.recipient_alias } }];"
+      },
+      "id": "0e948ea4-aed9-4f81-a238-8bb1ac91ec4d",
+      "name": "Validar contrato estrictamente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        -80
+      ],
+      "notes": "Máximo razonable: 10000 citas. La salida descarta generated_at y summary_by_date después de validar; solo conserva rango, total y secure_path."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "005b64bb-53b7-4c6f-a32f-160f612f03b7",
+              "leftValue": "={{ $json.contract_valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "09a13423-0182-4173-be10-7f319397f97a",
+      "name": "¿Contrato válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1460,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().map(({ json }) => ({ json: { workflow_version: 1, result: 'contract_invalid', reason_code: 'CONTRACT_INVALID', validation_detail: json.validation_detail } }));"
+      },
+      "id": "97198235-ddd8-457e-8d82-057fb6a99306",
+      "name": "Salida contrato inválido",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ 'v1|' + $json.range_from + '|' + $json.range_to + '|' + $json.recipient_alias }}",
+        "dataPropertyName": "idempotency_hash",
+        "encoding": "hex"
+      },
+      "id": "fbc82108-7578-44ea-8e3b-ee9536d0fd81",
+      "name": "Calcular clave SHA-256",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        -180
+      ],
+      "notes": "SHA-256 de v1|range.from|range.to|recipient_alias. Nunca usa el correo real."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const input = $json;\nconst staticData = $getWorkflowStaticData('global');\nconst now = Date.now();\nconst maxAgeMs = 45 * 24 * 60 * 60 * 1000;\nconst maxEntries = 90;\nconst existing = staticData.sent_v1 && typeof staticData.sent_v1 === 'object' && !Array.isArray(staticData.sent_v1) ? staticData.sent_v1 : {};\nconst recent = Object.entries(existing)\n  .filter(([hash, timestamp]) => /^[a-f0-9]{64}$/.test(hash) && Number.isFinite(timestamp) && now - timestamp <= maxAgeMs)\n  .sort((a, b) => b[1] - a[1])\n  .slice(0, maxEntries);\nstaticData.sent_v1 = Object.fromEntries(recent);\nconst duplicate = Object.prototype.hasOwnProperty.call(staticData.sent_v1, input.idempotency_hash);\nreturn [{ json: { workflow_version: 1, duplicate, range_from: input.range_from, range_to: input.range_to, total: input.total, secure_path: input.secure_path, idempotency_hash: input.idempotency_hash } }];"
+      },
+      "id": "453e1131-55f4-4362-9ded-f7e66b08cd62",
+      "name": "Comprobar duplicado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1940,
+        -180
+      ],
+      "notes": "Static data es una deduplicación de mejor esfuerzo, no un candado transaccional. Conserva como máximo 90 hashes por 45 días y nunca guarda payload, correo o destinatario."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5763e691-f5a0-4d6c-8546-16ba9270cf3d",
+              "leftValue": "={{ $json.duplicate }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4c731419-4a31-416d-8648-bae89159aee0",
+      "name": "¿Ya fue enviado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2180,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().map(({ json }) => ({ json: { workflow_version: 1, result: 'duplicate_skipped', reason_code: 'already_sent', range_from: json.range_from, range_to: json.range_to, total: json.total, idempotency_hash: json.idempotency_hash } }));"
+      },
+      "id": "b1d40830-f17a-407d-8196-4952b423709a",
+      "name": "Salida duplicada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "66ecf43b-11e7-4137-9df4-85b99502ab8e",
+              "leftValue": "={{ $json.total }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "77170da9-e852-431d-8192-9f6e9ae63db9",
+      "name": "¿Total es cero?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2420,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().map(({ json }) => ({ json: { workflow_version: 1, result: 'no_results', reason_code: 'no_appointments', range_from: json.range_from, range_to: json.range_to, total: 0, idempotency_hash: json.idempotency_hash } }));"
+      },
+      "id": "cf098c61-e4a9-4887-ac8f-559ed63eb26b",
+      "name": "Salida sin citas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2660,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const input = $json;\nconst fail = (detail) => [{ json: { workflow_version: 1, mail_configuration_valid: false, result: 'configuration_error', reason_code: 'CONFIGURATION_ERROR', validation_detail: detail, range_from: input.range_from, range_to: input.range_to, total: input.total, idempotency_hash: input.idempotency_hash } }];\nconst baseRaw = String($env.CAP_SYSTEM_BASE_URL || '').trim();\nif (!baseRaw) return fail('system_base_url_missing');\nlet base;\ntry { base = new URL(baseRaw); } catch { return fail('system_base_url_invalid'); }\nif (!['http:', 'https:'].includes(base.protocol)) return fail('system_base_url_scheme_invalid');\nif (base.username || base.password || base.search || base.hash) return fail('system_base_url_components_invalid');\nconst manual = $execution.mode === 'manual';\nconst localHost = ['localhost', '127.0.0.1', '::1'].includes(base.hostname.toLowerCase());\nif (base.protocol !== 'https:' && !(manual && localHost)) return fail('system_base_url_https_required');\nconst mailTo = String(($vars && $vars.CAP_NOTIFICATION_RECIPIENT) || 'responsable@example.invalid').trim();\nconst mailFrom = String(($vars && $vars.CAP_NOTIFICATION_FROM) || 'cap-prenatal@example.invalid').trim();\nconst singleEmail = (value) => /^[^\\s@,;\\r\\n]+@[^\\s@,;\\r\\n]+\\.[^\\s@,;\\r\\n]+$/.test(value) && !value.toLowerCase().endsWith('@example.invalid');\nif (!singleEmail(mailTo)) return fail('recipient_not_configured');\nif (!singleEmail(mailFrom)) return fail('sender_not_configured');\nconst rangeLabel = input.range_from === input.range_to ? input.range_from : `${input.range_from} a ${input.range_to}`;\nconst baseWithoutSlash = base.toString().replace(/\\/$/, '');\nconst subject = `CAP Prenatal | Próximas citas — ${rangeLabel}`;\nconst text = `Se identificaron ${input.total} citas prenatales programadas para ${rangeLabel}.\\n\\nIngrese al sistema CAP Prenatal para consultar el detalle:\\n${baseWithoutSlash}${input.secure_path}\\n\\nEste es un mensaje automático. No responda a este correo.`;\nreturn [{ json: { workflow_version: 1, mail_configuration_valid: true, range_from: input.range_from, range_to: input.range_to, total: input.total, idempotency_hash: input.idempotency_hash, mail_to: mailTo, mail_from: mailFrom, mail_subject: subject, mail_text: text } }];"
+      },
+      "id": "45a88dc9-8a36-4603-a103-b42aa0456297",
+      "name": "Construir correo agregado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2660,
+        -20
+      ],
+      "notes": "Usa CAP_SYSTEM_BASE_URL y variables operativas de n8n. En ejecución programada exige HTTPS. Solo en prueba manual permite HTTP de loopback."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f008479b-db55-43e9-a0f4-c18aa48d8116",
+              "leftValue": "={{ $json.mail_configuration_valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "07822b5e-24e6-48c4-b8c3-13ee07cebe0f",
+      "name": "¿Correo configurado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2900,
+        -20
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().map(({ json }) => ({ json: { workflow_version: 1, result: 'configuration_error', reason_code: 'CONFIGURATION_ERROR', validation_detail: json.validation_detail, range_from: json.range_from, range_to: json.range_to, total: json.total, idempotency_hash: json.idempotency_hash } }));"
+      },
+      "id": "72d0543c-0fcf-48ae-8527-c324984502ed",
+      "name": "Salida configuración de correo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3140,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "fromEmail": "={{ $json.mail_from }}",
+        "toEmail": "={{ $json.mail_to }}",
+        "subject": "={{ $json.mail_subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.mail_text }}",
+        "options": {
+          "appendAttribution": false,
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "c1fc72af-fb42-46d5-a671-7b278ed8b7e8",
+      "name": "Enviar resumen - intento 1",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        3140,
+        -80
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Asignar manualmente una credencial SMTP. Sin ella y sin variables operativas válidas no puede enviar."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw = $json;\nconst source = $node['Comprobar duplicado'].json;\nconst errorText = raw && Object.keys(raw).length === 1 && typeof raw.error === 'string' ? raw.error : '';\nif (!errorText) return [{ json: { workflow_version: 1, mail_ok: true, retry_mail: false, range_from: source.range_from, range_to: source.range_to, total: source.total, idempotency_hash: source.idempotency_hash } }];\nconst lower = errorText.toLowerCase();\nconst ambiguous = /timeout|timed out|socket|econnreset|connection closed|unknown delivery|after data/.test(lower);\nconst transientCode = /\\b(?:421|450|451|452)\\b/.test(lower);\nconst preAcceptanceStage = /recipient|sender|rcpt|mail from/.test(lower);\nconst retryMail = !ambiguous && transientCode && preAcceptanceStage;\nconst configuration = /credential|smtp credential|authentication missing/.test(lower);\nreturn [{ json: { workflow_version: 1, mail_ok: false, retry_mail: retryMail, result: configuration ? 'configuration_error' : 'mail_failed', reason_code: configuration ? 'SMTP_NOT_CONFIGURED' : 'MAIL_FAILED', range_from: source.range_from, range_to: source.range_to, total: source.total, idempotency_hash: source.idempotency_hash } }];"
+      },
+      "id": "5d93c244-323f-4005-ad6a-16817b544d6e",
+      "name": "Clasificar envío - intento 1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3380,
+        -80
+      ],
+      "notes": "El resultado SMTP bruto se descarta. Solo un 421/450/451/452 asociado claramente a MAIL FROM/RCPT puede reintentarse. Timeouts ambiguos nunca se reintentan."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d510b6b4-18df-4f3b-b10c-e6a67f201886",
+              "leftValue": "={{ $json.mail_ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c0f664c5-0003-44c3-a693-b61873635044",
+      "name": "¿Envío 1 confirmado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3620,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9f8a6bc7-5711-4bb3-840b-9aafdfd24b54",
+              "leftValue": "={{ $json.retry_mail }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "25db8365-1680-4bc6-9652-7e274063aeb4",
+      "name": "¿Reintentar correo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3860,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "minutes"
+      },
+      "id": "5746b4b6-f133-4b25-93c6-c3578d7a3ff2",
+      "name": "Esperar antes del último envío",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4100,
+        0
+      ],
+      "webhookId": "de8e374c-d6ac-4593-ae54-58d1cded2169"
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "fromEmail": "={{ $node[\"Construir correo agregado\"].json.mail_from }}",
+        "toEmail": "={{ $node[\"Construir correo agregado\"].json.mail_to }}",
+        "subject": "={{ $node[\"Construir correo agregado\"].json.mail_subject }}",
+        "emailFormat": "text",
+        "text": "={{ $node[\"Construir correo agregado\"].json.mail_text }}",
+        "options": {
+          "appendAttribution": false,
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "317554f5-5989-49c7-aea4-46ca315c50d3",
+      "name": "Enviar resumen - intento 2",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        4340,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Último intento; solo se alcanza tras rechazo SMTP transitorio claramente previo a aceptación."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw = $json;\nconst source = $node['Comprobar duplicado'].json;\nconst errorText = raw && Object.keys(raw).length === 1 && typeof raw.error === 'string' ? raw.error : '';\nif (!errorText) return [{ json: { workflow_version: 1, mail_ok: true, range_from: source.range_from, range_to: source.range_to, total: source.total, idempotency_hash: source.idempotency_hash } }];\nconst lower = errorText.toLowerCase();\nconst configuration = /credential|smtp credential|authentication missing/.test(lower);\nreturn [{ json: { workflow_version: 1, mail_ok: false, result: configuration ? 'configuration_error' : 'mail_failed', reason_code: configuration ? 'SMTP_NOT_CONFIGURED' : 'MAIL_FAILED', range_from: source.range_from, range_to: source.range_to, total: source.total, idempotency_hash: source.idempotency_hash } }];"
+      },
+      "id": "6fa7d0c2-4dd5-4db3-a01d-f4eb4753eeb5",
+      "name": "Clasificar envío - intento 2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4580,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8c15e604-ed8b-4736-8b09-e67c79233fb6",
+              "leftValue": "={{ $json.mail_ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d53d7fae-3434-4d15-b10d-577233d8d50c",
+      "name": "¿Envío 2 confirmado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4820,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const input = $json;\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.sent_v1 || typeof staticData.sent_v1 !== 'object' || Array.isArray(staticData.sent_v1)) staticData.sent_v1 = {};\nstaticData.sent_v1[input.idempotency_hash] = Date.now();\nconst entries = Object.entries(staticData.sent_v1).sort((a, b) => b[1] - a[1]).slice(0, 90);\nstaticData.sent_v1 = Object.fromEntries(entries);\nreturn [{ json: { workflow_version: 1, result: 'sent', reason_code: 'notification_sent', range_from: input.range_from, range_to: input.range_to, total: input.total, idempotency_hash: input.idempotency_hash } }];"
+      },
+      "id": "60d1759f-65cc-4256-8580-95e109142a6c",
+      "name": "Marcar enviado y finalizar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5060,
+        -120
+      ],
+      "notes": "Es el único nodo que agrega la clave actual a static data y solo se ejecuta después de envío confirmado."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().map(({ json }) => ({ json: { workflow_version: 1, result: json.result || 'mail_failed', reason_code: json.reason_code || 'MAIL_FAILED', range_from: json.range_from, range_to: json.range_to, total: json.total, idempotency_hash: json.idempotency_hash } }));"
+      },
+      "id": "18a4171e-d515-44f2-9875-2b51990b61b3",
+      "name": "Salida error de correo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5060,
+        140
+      ],
+      "notes": "No genera un segundo correo ni conserva respuesta SMTP."
+    }
+  ],
+  "connections": {
+    "Ejecutar diariamente a las 06:00": {
+      "main": [
+        [
+          {
+            "node": "Preparar parámetros y configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar parámetros y configuración": {
+      "main": [
+        [
+          {
+            "node": "¿Configuración inicial válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Configuración inicial válida?": {
+      "main": [
+        [
+          {
+            "node": "Consultar backend - intento 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salida configuración inicial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar backend - intento 1": {
+      "main": [
+        [
+          {
+            "node": "Clasificar respuesta - intento 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar respuesta - intento 1": {
+      "main": [
+        [
+          {
+            "node": "¿Consulta 1 correcta?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Consulta 1 correcta?": {
+      "main": [
+        [
+          {
+            "node": "Validar contrato estrictamente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Reintentar consulta 1?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Reintentar consulta 1?": {
+      "main": [
+        [
+          {
+            "node": "Esperar 1 minuto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salida controlada de backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar 1 minuto": {
+      "main": [
+        [
+          {
+            "node": "Consultar backend - intento 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar backend - intento 2": {
+      "main": [
+        [
+          {
+            "node": "Clasificar respuesta - intento 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar respuesta - intento 2": {
+      "main": [
+        [
+          {
+            "node": "¿Consulta 2 correcta?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Consulta 2 correcta?": {
+      "main": [
+        [
+          {
+            "node": "Validar contrato estrictamente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Reintentar consulta 2?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Reintentar consulta 2?": {
+      "main": [
+        [
+          {
+            "node": "Esperar 5 minutos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salida controlada de backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar 5 minutos": {
+      "main": [
+        [
+          {
+            "node": "Consultar backend - intento 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar backend - intento 3": {
+      "main": [
+        [
+          {
+            "node": "Clasificar respuesta - intento 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar respuesta - intento 3": {
+      "main": [
+        [
+          {
+            "node": "¿Consulta 3 correcta?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Consulta 3 correcta?": {
+      "main": [
+        [
+          {
+            "node": "Validar contrato estrictamente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salida controlada de backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar contrato estrictamente": {
+      "main": [
+        [
+          {
+            "node": "¿Contrato válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Contrato válido?": {
+      "main": [
+        [
+          {
+            "node": "Calcular clave SHA-256",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salida contrato inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular clave SHA-256": {
+      "main": [
+        [
+          {
+            "node": "Comprobar duplicado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comprobar duplicado": {
+      "main": [
+        [
+          {
+            "node": "¿Ya fue enviado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Ya fue enviado?": {
+      "main": [
+        [
+          {
+            "node": "Salida duplicada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Total es cero?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Total es cero?": {
+      "main": [
+        [
+          {
+            "node": "Salida sin citas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Construir correo agregado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construir correo agregado": {
+      "main": [
+        [
+          {
+            "node": "¿Correo configurado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Correo configurado?": {
+      "main": [
+        [
+          {
+            "node": "Enviar resumen - intento 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salida configuración de correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar resumen - intento 1": {
+      "main": [
+        [
+          {
+            "node": "Clasificar envío - intento 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar envío - intento 1": {
+      "main": [
+        [
+          {
+            "node": "¿Envío 1 confirmado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Envío 1 confirmado?": {
+      "main": [
+        [
+          {
+            "node": "Marcar enviado y finalizar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Reintentar correo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Reintentar correo?": {
+      "main": [
+        [
+          {
+            "node": "Esperar antes del último envío",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salida error de correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar antes del último envío": {
+      "main": [
+        [
+          {
+            "node": "Enviar resumen - intento 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar resumen - intento 2": {
+      "main": [
+        [
+          {
+            "node": "Clasificar envío - intento 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar envío - intento 2": {
+      "main": [
+        [
+          {
+            "node": "¿Envío 2 confirmado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Envío 2 confirmado?": {
+      "main": [
+        [
+          {
+            "node": "Marcar enviado y finalizar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salida error de correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Guatemala",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false,
+    "callerPolicy": "none",
+    "availableInMCP": false
+  },
+  "versionId": "253cc168-d3bb-4bbf-8e31-a6936fd3db6b",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

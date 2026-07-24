@@ -164,6 +164,13 @@ test('produccion poda ejecuciones y no guarda payloads completos', () => {
   assert.match(n8n, /EXECUTIONS_DATA_SAVE_ON_PROGRESS:\s*"false"/);
 });
 
+test('instancia productiva n8n limita concurrencia operativa a 1', () => {
+  assert.match(
+    serviceBlock(productionCompose, 'n8n'),
+    /N8N_CONCURRENCY_PRODUCTION_LIMIT:\s*"1"/
+  );
+});
+
 test('timezone de n8n y citas queda fijada en America/Guatemala', () => {
   for (const source of [localCompose, productionCompose, read('n8n', '.env.example')]) {
     assert.match(source, /GENERIC_TIMEZONE(?::|=)\s*America\/Guatemala/);

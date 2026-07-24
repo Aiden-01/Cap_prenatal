@@ -1,12 +1,13 @@
-GUIA N8N LOCAL - SPRINT 5B.2A
+GUIA N8N LOCAL - SPRINT 5B.2B
 Proyecto: CAP Prenatal - CAP El Chal
 
 ESTADO
 ------
 
-- No existe workflow funcional.
+- Existe n8n/workflows/proximas-citas-v1.json, inactivo por defecto.
 - No se configuraron credenciales reales, SMTP ni destinatarios.
 - No se enviaron correos.
+- No se importo ni se inicio n8n o Docker durante este sprint.
 - La integracion del backend permanece deshabilitada en desarrollo.
 - Usar exclusivamente datos sinteticos.
 
@@ -52,8 +53,9 @@ No agregar a n8n/.env:
 - AUTOMATION_SECRET.
 - La API key M2M original.
 
-La API key futura se almacenara como credencial Header Auth dentro de n8n, no
-como variable compartida.
+La API key se almacenara como credencial Header Auth dentro de n8n, no como
+variable compartida. El workflow versionado no contiene la key ni un ID local
+de credencial.
 
 
 3. INICIO MEDIANTE POWERSHELL
@@ -113,10 +115,10 @@ No ejecutar Docker como parte de este sprint.
 5. RETENCION LOCAL
 ------------------
 
-La configuracion local conserva solo errores y ejecuciones manuales sinteticas,
-con poda habilitada, maximo 24 horas y 100 ejecuciones. No usar datos reales de
-pacientes. La configuracion no sustituye la revision de privacidad del workflow
-futuro.
+La instancia local conserva solo errores y ejecuciones manuales sinteticas, con
+poda habilitada, maximo 24 horas y 100 ejecuciones. El workflow v1 aplica una
+politica aun mas estricta y deshabilita guardado de exito, error, ejecuciones
+manuales y progreso. No usar datos reales de pacientes.
 
 
 6. ACCESO
@@ -136,8 +138,93 @@ y probar restauracion. Git sincroniza codigo y ejemplos, nunca el directorio
 local, credenciales o claves.
 
 
-8. PENDIENTE
-------------
+8. IMPORTAR EL WORKFLOW
+-----------------------
 
-El workflow, credencial M2M, proveedor, destinatario y validacion de que ningun
-nodo persista payloads se implementaran en otro sprint.
+1. Abrir la UI local solo en 127.0.0.1:5678.
+2. Importar n8n/workflows/proximas-citas-v1.json.
+3. Confirmar que el nombre termina en v1 y aparece inactivo.
+4. Confirmar horario diario 06:00 y America/Guatemala.
+5. No publicar/activar.
+6. Confirmar que no exista pinData.
+
+El flujo consulta manana con offset_days=1/window_days=1, valida estrictamente
+la respuesta agregada, calcula SHA-256, comprueba static data, termina sin
+correo cuando total=0 y solo marca la clave despues de un envio confirmado.
+
+
+9. CREDENCIAL HEADER AUTH
+-------------------------
+
+Crear una credencial generica Header Auth:
+
+  Header name: X-CAP-Automation-Key
+  Header value: <key M2M guardada por canal seguro>
+
+Asignarla a los tres nodos "Consultar backend - intento N". No pegar la key en
+la URL, query, expresiones, notas o variables. La key original queda solo en la
+credencial n8n; el backend recibe sus hashes CURRENT/NEXT.
+
+
+10. CORREO Y PARAMETROS OPERATIVOS
+----------------------------------
+
+Crear una credencial SMTP sintetica o aprobada y asignarla a ambos nodos
+"Enviar resumen - intento N". No exportar host, usuario, password, token o IDs
+locales de credenciales.
+
+Crear variables de proyecto n8n:
+
+  CAP_NOTIFICATION_RECIPIENT
+  CAP_NOTIFICATION_FROM
+  CAP_NOTIFICATION_RECIPIENT_ALIAS
+
+El alias puede ser responsable_salud_reproductiva y no debe contener el correo.
+Los placeholders responsable@example.invalid y cap-prenatal@example.invalid
+son deliberadamente no funcionales. CAP_SYSTEM_BASE_URL debe ser HTTPS en una
+ejecucion programada. javascript:, data: y file: se rechazan.
+
+
+11. PRUEBA SINTETICA
+--------------------
+
+Antes de abrir n8n:
+
+  node --test backend/test/n8nWorkflow.test.js
+
+La suite ejecuta el validador con contratos sinteticos, incluidos total=0,
+campos adicionales, suma incorrecta y campos prohibidos. No requiere Docker,
+n8n, SMTP o PostgreSQL.
+
+Para una prueba manual posterior, usar un mock local con la ruta exacta
+/api/automatizaciones/v1/proximas-citas y una respuesta sintetica total=0.
+Configurar temporalmente CAP_BACKEND_AUTOMATION_URL hacia ese mock. Verificar
+resultado no_results y que ningun nodo SMTP se ejecute. No usar capturas o
+datos reales.
+
+
+12. PRIVACIDAD, IDEMPOTENCIA Y CONCURRENCIA
+-------------------------------------------
+
+El workflow no recibe pacientes individuales y no conserva body completo,
+headers o respuesta SMTP en salidas. Produccion tampoco guarda ejecuciones.
+Los logs permitidos se limitan a codigos, cantidades, rangos y hashes.
+
+Static data conserva solo hasta 90 hashes/timestamps por 45 dias. Es de mejor
+esfuerzo y no es una garantia transaccional. La concurrencia operativa debe
+quedar en 1 y solo puede existir una copia activa; la configuracion productiva
+de este sprint usa N8N_CONCURRENCY_PRODUCTION_LIMIT=1.
+
+
+13. ACTIVACION Y EGRESS PENDIENTES
+----------------------------------
+
+No activar sin autorizacion institucional, proveedor/destinatario aprobados,
+concurrencia confirmada y egress restringido. Opciones:
+
+A. Relay SMTP institucional dentro de automation_internal.
+B. Red de egress dedicada y firewall limitado al proveedor SMTP aprobado.
+C. Servicio institucional accesible desde red privada.
+
+Se prefiere A o B con allowlist estricta. No conectar n8n a data_internal o
+PostgreSQL, no publicar 5678 y no agregar una red publica general.

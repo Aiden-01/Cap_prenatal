@@ -19,6 +19,7 @@
     "test:authorization": "node --test test/authorization.test.js",
     "test:automatizaciones": "node --test test/automatizaciones.test.js",
     "test:n8n-infrastructure": "node --test test/n8nInfrastructure.test.js",
+    "test:n8n-workflow": "node --test test/n8nWorkflow.test.js",
     "test:security-config": "node --test test/securityConfig.test.js test/seedSecurity.test.js",
     "test:migrate": "node --test test/migrate.test.js",
     "test:permissions-audit": "node --test test/permissionsAudit.test.js",

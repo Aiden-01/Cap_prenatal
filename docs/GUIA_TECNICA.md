@@ -1016,9 +1016,26 @@ validando `req.socket.remoteAddress` y no confia en `X-Forwarded-For`.
 n8n queda fijado en `2.26.4`, usa volumen persistente, exige
 `N8N_ENCRYPTION_KEY` y aplica poda de ejecuciones. En produccion no publica su
 UI; el acceso administrativo requiere VPN, red privada o tunel y HTTPS. El
-script local lee solo `n8n/.env` y liga el proceso a loopback. Todavia no existe
-workflow funcional ni se configuraron correos. Contrato y operacion completa en
-`docs/N8N.md`.
+script local lee solo `n8n/.env` y liga el proceso a loopback.
+
+Sprint 5B.2B agrega `n8n/workflows/proximas-citas-v1.json`. Permanece inactivo,
+sin credenciales y sin correos reales. Se agenda a las 06:00
+`America/Guatemala`, consulta manana, valida la respuesta con lista cerrada de
+campos y termina sin SMTP si `total=0`. Tres requests como maximo cubren
+conectividad/5xx con esperas de 1 y 5 minutos; 400/401/404/429 no se reintentan.
+
+La deduplicacion usa SHA-256 de `v1|from|to|recipient_alias` en static data,
+marca solo despues de envio confirmado y poda a 90 hashes/45 dias. Es de mejor
+esfuerzo, no transaccional. La concurrencia operativa del workflow debe quedar
+en 1; la instancia productiva de ejemplo fija
+`N8N_CONCURRENCY_PRODUCTION_LIMIT=1`.
+
+El correo es texto agregado con total, fecha/rango y enlace HTTPS a
+`/dashboard`. Header Auth, SMTP, destinatario y remitente se configuran
+manualmente fuera del JSON. El workflow no tiene `pinData`, PostgreSQL, acceso
+a `data_internal`, comandos, pacientes o datos clinicos. El egress SMTP sigue
+pendiente y debe resolverse con relay institucional o firewall limitado.
+Contrato, importacion y operacion completa en `docs/N8N.md` y `n8n/README.md`.
 
 ## Laboratorios
 
@@ -1038,7 +1055,9 @@ Fuera de alcance actual:
 
 - Multitenancy para varios centros de salud.
 - Diagnostico o seguimiento confirmado de VIH; el sistema solo registra tamizaje segun flujo prenatal.
-- Gestion externa completa de n8n; el proyecto documenta la integracion y el endpoint, pero los workflows se administran aparte.
+- Administracion productiva completa de n8n; el repositorio versiona el
+  workflow v1, pero credenciales, variables, activacion y operacion permanecen
+  fuera de Git.
 - Distribucion comercial del sistema.
 
 ## Convenciones de desarrollo
@@ -1097,6 +1116,7 @@ Fuera de alcance actual:
 | `N8N_ENCRYPTION_KEY` | Clave estable exclusiva de n8n; nunca se entrega al backend. |
 | `CAP_BACKEND_AUTOMATION_URL` | URL privada `backend:3001` que recibe n8n. |
 | `CAP_SYSTEM_BASE_URL` | URL HTTPS del sistema usada por n8n. |
+| `N8N_CONCURRENCY_PRODUCTION_LIMIT` | Limite global productivo de la instancia n8n; `1` en este sprint. |
 | `EXECUTIONS_DATA_PRUNE` | Habilita poda de ejecuciones n8n. |
 | `EXECUTIONS_DATA_MAX_AGE` | Retencion maxima de n8n en horas. |
 | `PDF_RATE_LIMIT_WINDOW_MS` | Ventana por usuario para PDF clinico. Default `300000`. |

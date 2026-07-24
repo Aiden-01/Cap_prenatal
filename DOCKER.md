@@ -79,6 +79,19 @@ La imagen n8n y la dependencia local estan fijadas en `2.26.4`. Revisar notas de
 version, respaldar el volumen y probar restauracion antes de cualquier
 actualizacion.
 
+El workflow versionado `n8n/workflows/proximas-citas-v1.json` no se monta,
+importa o activa automaticamente desde ningun Compose. Debe importarse
+manualmente y siempre aparece inactivo, sin Header Auth ni SMTP. La
+configuracion productiva limita la concurrencia global de esta instancia a 1
+con `N8N_CONCURRENCY_PRODUCTION_LIMIT=1`; n8n 2.26.4 no serializa un limite
+por-workflow dentro del JSON.
+
+No agregar n8n a `data_internal`, no darle credenciales PostgreSQL y no publicar
+5678. El correo futuro requiere una decision separada de egress: relay SMTP
+institucional en la red privada, red dedicada con firewall limitado al
+proveedor aprobado o servicio institucional privado. Este sprint no agrega una
+red publica ni configura SMTP.
+
 Consulte `docs/ROTACION_SECRETOS.md` antes de preparar cualquier entorno nuevo.
 
 ## Nota sobre PDF

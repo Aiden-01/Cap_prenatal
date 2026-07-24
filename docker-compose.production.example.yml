@@ -109,6 +109,7 @@ services:
       EXECUTIONS_DATA_SAVE_ON_ERROR: none
       EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS: "false"
       EXECUTIONS_DATA_SAVE_ON_PROGRESS: "false"
+      N8N_CONCURRENCY_PRODUCTION_LIMIT: "1"
       CAP_BACKEND_AUTOMATION_URL: http://backend:3001/api/automatizaciones/v1/proximas-citas
       CAP_SYSTEM_BASE_URL: "${CAP_SYSTEM_BASE_URL:?Defina la URL HTTPS del sistema}"
     expose:

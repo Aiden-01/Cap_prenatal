@@ -1,14 +1,15 @@
 GUIA DE TOPOLOGIA PRODUCTIVA DE EJEMPLO CON N8N
 Proyecto: CAP Prenatal - CAP El Chal
-Sprint: 5B.2A
+Sprint: 5B.2B
 
 ADVERTENCIA
 -----------
 
 docker-compose.production.example.yml es una configuracion revisable, no un
 despliegue listo para produccion. No se ejecuto Docker, no se desplego en AWS,
-no se configuraron credenciales reales, no existe workflow y no se enviaron
-correos. No hubo cambios de base de datos.
+no se configuraron credenciales reales y no se enviaron correos. El workflow
+n8n/workflows/proximas-citas-v1.json existe versionado, pero esta inactivo y no
+se importo. No hubo cambios de base de datos o archivos .env reales.
 
 
 1. TOPOLOGIA
@@ -95,6 +96,7 @@ n8n recibe:
 - N8N_ENCRYPTION_KEY.
 - URLs y configuracion propia.
 - Politica de retencion.
+- Limite de concurrencia productiva 1.
 
 n8n no recibe credenciales PostgreSQL clinicas, JWT, CSRF, sesiones, SMTP del
 backend, seed ni hashes M2M. La API key original queda solamente como credencial
@@ -145,10 +147,12 @@ Valores iniciales:
 - SAVE_ON_ERROR=none.
 - SAVE_MANUAL_EXECUTIONS=false.
 - SAVE_ON_PROGRESS=false.
+- N8N_CONCURRENCY_PRODUCTION_LIMIT=1.
 
-El workflow futuro debe confirmar que nodos, errores y expresiones no persisten
-pacientes, inputs, outputs, headers o payloads. La configuracion por si sola no
-garantiza ausencia total de persistencia.
+El workflow v1 tambien deshabilita guardado de exito, error, manual y progreso.
+No devuelve headers, descarta inmediatamente errores y respuestas despues de
+validar y solo produce codigos, cantidades, rangos y hashes. No contiene
+pinData.
 
 
 9. HEALTH CHECKS
@@ -162,8 +166,44 @@ garantiza ausencia total de persistencia.
 No usan API keys, login, consultas clinicas ni el endpoint de citas.
 
 
-10. HABILITACION FUTURA
+10. WORKFLOW VERSIONADO
 -----------------------
+
+El workflow se ejecutara todos los dias a las 06:00 America/Guatemala y consulta
+unicamente manana con offset_days=1/window_days=1. Valida el contrato v1, no
+recibe pacientes individuales, no usa PostgreSQL y produce un solo correo de
+texto agregado. total=0 finaliza sin SMTP.
+
+La autenticacion usa una credencial Header Auth:
+
+  X-CAP-Automation-Key
+
+La key original queda solo en n8n y no se incluye en el JSON o entorno del
+backend. Destinatario, remitente y alias son variables de proyecto n8n; SMTP es
+una credencial separada. Los placeholders example.invalid bloquean el envio.
+
+Static data usa SHA-256 de v1|from|to|alias, guarda solo hash/timestamp y marca
+despues del envio confirmado. Es mejor esfuerzo, no una garantia transaccional.
+N8N_CONCURRENCY_PRODUCTION_LIMIT=1 y una unica copia activa reducen la carrera;
+revisar el impacto global antes de alojar otros workflows en esta instancia.
+
+
+11. SALIDA SMTP PENDIENTE
+-------------------------
+
+No agregar egress general. Evaluar, en este orden:
+
+A. Relay SMTP institucional unido a automation_internal.
+B. Red de egress dedicada con firewall limitado al proveedor aprobado.
+C. Servicio institucional accesible desde red privada.
+
+No conectar n8n a data_internal, PostgreSQL o una red publica sin controles.
+No publicar 5678. El workflow solo permite un reintento SMTP ante rechazo
+transitorio claramente previo a aceptacion; un timeout ambiguo no se reintenta.
+
+
+12. IMPORTACION Y HABILITACION FUTURA
+-------------------------------------
 
 Antes de desplegar:
 
@@ -176,6 +216,14 @@ Antes de desplegar:
 7. Probar Compose en un entorno no productivo.
 8. Confirmar que solo el proxy publica puertos.
 9. Validar 404 publico y acceso privado desde n8n.
-10. Mantener N8N_INTEGRATION_ENABLED=false hasta aprobar el workflow.
+10. Importar el JSON y confirmar active=false y ausencia de pinData.
+11. Crear y asignar Header Auth en los tres requests.
+12. Crear y asignar SMTP en ambos nodos de correo.
+13. Configurar destinatario/remitente/alias fuera del JSON.
+14. Verificar CAP_SYSTEM_BASE_URL con HTTPS.
+15. Ejecutar pruebas estaticas y un mock sintetico total=0.
+16. Confirmar retencion, concurrencia 1 y egress limitado.
+17. Mantener N8N_INTEGRATION_ENABLED=false y el workflow inactivo hasta
+    autorizacion institucional.
 
 No ejecutar migraciones o seed automaticamente al iniciar contenedores.

@@ -2,10 +2,12 @@
 
 ## Estado
 
-Sprint 5B.2A agrega configuraciones local y productiva de ejemplo para separar
-n8n, backend, PostgreSQL y el proxy. No se desplego esta topologia, no existe un
-workflow funcional, no se configuraron credenciales reales, no se enviaron
-correos y no hubo cambios de base de datos.
+Sprint 5B.2B agrega el workflow versionado
+`n8n/workflows/proximas-citas-v1.json` sobre la infraestructura aislada de
+5B.2A. El artefacto esta inactivo, no contiene credenciales, no se importo, no
+se desplego, no inicio n8n o Docker y no envio correos. Tampoco hubo cambios de
+base de datos, migraciones, `schema.sql`, frontend funcional o archivos `.env`
+reales.
 
 El endpoint anterior:
 
@@ -220,9 +222,10 @@ EXECUTIONS_DATA_SAVE_ON_PROGRESS=false
 
 La retencion maxima inicial es siete dias y 1000 ejecuciones. Local conserva
 errores y ejecuciones manuales sinteticas por hasta 24 horas/100 ejecuciones.
-La configuracion reduce persistencia, pero no permite prometer que un workflow
-futuro nunca guarde datos: ese workflow debera validar que sus nodos, errores y
-expresiones no incorporen pacientes, payloads ni headers en logs.
+Adicionalmente, el workflow v1 fija `saveDataSuccessExecution=none`,
+`saveDataErrorExecution=none`, `saveManualExecutions=false` y
+`saveExecutionProgress=false`. Sus nodos HTTP no devuelven headers y las ramas
+de error reducen inmediatamente el error a codigos controlados.
 
 ## Acceso administrativo
 
@@ -309,12 +312,106 @@ Solo conserva tipo, resultado, motivo controlado, cantidad, rango y
 informativa no convierte una consulta valida en error. Los intentos con key
 incorrecta no crean filas de auditoria.
 
-## Pendiente para el workflow
+## Workflow de proximas citas v1
 
-- crear y revisar el workflow funcional en otro sprint;
-- configurar la credencial Header Auth y cualquier proveedor/destinatario;
-- validar que nodos y errores no persistan payloads;
+El Schedule Trigger se ejecuta diariamente a las `06:00` en
+`America/Guatemala`. Consulta exclusivamente manana con `offset_days=1` y
+`window_days=1`, y genera como maximo un resumen agregado. Si `total=0`
+finaliza como `no_results` sin alcanzar SMTP.
+
+Diagrama:
+
+```text
+Schedule -> preparar parametros -> GET interno (hasta 3 intentos)
+         -> validar contrato -> SHA-256 -> comprobar static data
+         -> duplicado | sin citas | construir correo
+         -> SMTP (maximo 2 intentos restringidos) -> marcar enviado
+```
+
+Los requests esperan 10 segundos, no siguen redirects y no incluyen headers en
+el resultado. Solo conectividad y HTTP 5xx se reintentan, despues de 1 y 5
+minutos. `400`, `401`, `404` y `429` terminan inmediatamente con salida
+controlada. Un JSON invalido o una violacion del contrato produce
+`CONTRACT_INVALID`; nunca se marca idempotencia ni se envia correo.
+
+## Validacion y privacidad del contrato
+
+Se exige exactamente `schema_version=1`, zona `America/Guatemala`, ISO valido,
+rango `YYYY-MM-DD` ascendente, total entero entre 0 y 10000, resumen por fecha
+ascendente cuya suma coincide con el total y `secure_path=/dashboard`. La raiz,
+el rango y cada elemento no admiten campos adicionales.
+
+Una busqueda recursiva rechaza campos de paciente, embarazo, nombre, apellidos,
+expediente, CUI, telefono, direccion, comunidad, territorio, riesgo,
+diagnostico, observaciones, HTML, Markdown, controles o laboratorios. Despues
+de validar se descartan `generated_at` y `summary_by_date`; solo siguen rango,
+total, ruta y hash. No hay `pinData`, fixtures sensibles, nodos PostgreSQL,
+Execute Command ni lectura de todo el entorno.
+
+Las salidas conservan unicamente version, resultado, codigo, rango, cantidad y,
+cuando existe, hash. No contienen key, headers, URL, destinatario, texto,
+respuesta JSON, respuesta SMTP ni stack.
+
+## Correo e idempotencia
+
+El correo es texto simple:
+
+```text
+Asunto: CAP Prenatal | Proximas citas — YYYY-MM-DD
+
+Se identificaron N citas prenatales programadas para YYYY-MM-DD.
+
+Ingrese al sistema CAP Prenatal para consultar el detalle:
+https://cap-prenatal.example.invalid/dashboard
+
+Este es un mensaje automatico. No responda a este correo.
+```
+
+La URL real proviene de `CAP_SYSTEM_BASE_URL`; una ejecucion programada exige
+HTTPS y rechaza `javascript:`, `data:` y `file:`. Destinatario y remitente se
+configuran como variables de proyecto n8n
+`CAP_NOTIFICATION_RECIPIENT`/`CAP_NOTIFICATION_FROM`. Los placeholders
+`example.invalid` bloquean el envio.
+
+La clave es SHA-256 de
+`v1|range.from|range.to|recipient_alias`. Static data guarda solo hash y
+timestamp, hasta 90 claves/45 dias, y agrega la actual despues del envio
+confirmado. Static data es de mejor esfuerzo y no es una garantia transaccional.
+La concurrencia operativa del workflow debe quedar en 1; la configuracion de
+esta instancia fija `N8N_CONCURRENCY_PRODUCTION_LIMIT=1` porque n8n 2.26.4 no
+serializa un limite por-workflow en el JSON.
+
+SMTP solo admite un reintento adicional ante un codigo transitorio
+`421/450/451/452` asociado claramente a `MAIL FROM` o `RCPT`. Timeout, socket
+cerrado o aceptacion ambigua no se reintentan. El resultado SMTP bruto se
+descarta.
+
+## Importacion, autorizacion y egress pendiente
+
+La guia paso a paso esta en `n8n/README.md`. Antes de activar se debe:
+
+1. importar y confirmar `active=false`;
+2. crear Header Auth con `X-CAP-Automation-Key`;
+3. crear SMTP aprobado y asignarlo a ambos nodos;
+4. configurar destinatario/remitente/alias mediante variables n8n;
+5. verificar URL privada del backend y URL HTTPS del sistema;
+6. ejecutar primero las pruebas sinteticas sin n8n y despues un mock con
+   `total=0`;
+7. confirmar ausencia de `pinData`, politica de ejecuciones y concurrencia 1;
+8. obtener autorizacion institucional.
+
+No se habilito egress general. Las opciones son relay SMTP institucional en la
+red privada, egress dedicado con firewall limitado al proveedor aprobado o un
+servicio institucional accesible desde red privada. Se prefiere relay o egress
+limitado. n8n no debe conectarse a `data_internal` o PostgreSQL, publicar 5678
+ni recibir una red publica sin controles.
+
+## Pendiente operativo
+
+- importar y revisar visualmente el workflow en un entorno aislado;
+- crear las credenciales y variables reales fuera de Git;
+- aprobar proveedor, remitente, destinatario y egress;
 - desplegar TLS, firewall, VPN/tunel y backups probados;
-- comprobar en el host elegido que las subredes de ejemplo no colisionen;
-- decidir un mecanismo de salida de red minimo para el proveedor futuro;
-- probar la topologia con Docker en un entorno no productivo.
+- comprobar que las subredes no colisionen;
+- probar la topologia con Docker fuera de este sprint;
+- activar solo despues de autorizacion institucional.
