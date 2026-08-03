@@ -248,7 +248,7 @@ CREATE TABLE IF NOT EXISTS pacientes (
 -- MÓDULO 2 — VACUNAS
 -- Página 1-4, sección Vacunas
 -- Previo embarazo | Durante embarazo | Postparto/aborto
--- Vacunas: Td y Tdap | Influenza | SPR/SR
+-- Vacunas: TD | Tdap | Influenza | SR/SPR
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS embarazos (
@@ -304,18 +304,28 @@ CREATE TABLE IF NOT EXISTS vacunas_paciente (
   paciente_id     INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
   embarazo_id     INTEGER REFERENCES embarazos(id) ON DELETE CASCADE,
 
-  -- Tipo: td_tdap | influenza | spr_sr
-  tipo_vacuna     VARCHAR(20) NOT NULL CHECK (tipo_vacuna IN ('td_tdap','influenza','spr_sr')),
+  -- Tipo: td | tdap | influenza | spr_sr
+  tipo_vacuna     VARCHAR(20) NOT NULL CONSTRAINT vacunas_paciente_tipo_vacuna_check
+                    CHECK (tipo_vacuna IN ('td','tdap','influenza','spr_sr')),
 
   -- Momento: previo_embarazo | durante_embarazo | postparto_aborto
   momento         VARCHAR(25) NOT NULL CHECK (momento IN ('previo_embarazo','durante_embarazo','postparto_aborto')),
 
-  -- Dosis dentro del momento (primera, segunda, tercera para Td/Tdap)
-  numero_dosis    INTEGER DEFAULT 1,
+  -- Posicion clinica de la dosis dentro del esquema correspondiente
+  numero_dosis    INTEGER NOT NULL DEFAULT 1,
   fecha_dosis     DATE,
 
   registrado_por  INTEGER REFERENCES usuarios(id),
-  created_at      TIMESTAMPTZ DEFAULT NOW()
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT vacunas_paciente_numero_dosis_clinica_check CHECK (
+    (tipo_vacuna = 'td' AND numero_dosis BETWEEN 1 AND 5)
+    OR (tipo_vacuna = 'tdap' AND numero_dosis = 1)
+    OR (tipo_vacuna = 'spr_sr' AND numero_dosis BETWEEN 1 AND 2)
+    OR (tipo_vacuna = 'influenza' AND numero_dosis = 1)
+  ),
+  CONSTRAINT vacunas_paciente_fecha_clinica_check CHECK (
+    tipo_vacuna = 'influenza' OR fecha_dosis IS NOT NULL
+  )
 );
 
 -- ============================================================
@@ -1088,7 +1098,19 @@ ALTER TABLE controles_puerperio DROP CONSTRAINT IF EXISTS controles_puerperio_pa
 CREATE UNIQUE INDEX IF NOT EXISTS ux_riesgo_embarazo_unico ON fichas_riesgo_obstetrico(embarazo_id);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_plan_parto_embarazo_unico ON planes_parto(embarazo_id);
 CREATE INDEX IF NOT EXISTS idx_riesgo_paciente        ON fichas_riesgo_obstetrico(paciente_id);
-CREATE UNIQUE INDEX IF NOT EXISTS ux_vacunas_embarazo_dosis ON vacunas_paciente(embarazo_id, tipo_vacuna, momento, numero_dosis);
+DROP INDEX IF EXISTS ux_vacunas_embarazo_dosis;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_vacunas_td_paciente_posicion
+  ON vacunas_paciente(paciente_id, numero_dosis)
+  WHERE tipo_vacuna = 'td';
+CREATE UNIQUE INDEX IF NOT EXISTS ux_vacunas_spr_sr_paciente_posicion
+  ON vacunas_paciente(paciente_id, numero_dosis)
+  WHERE tipo_vacuna = 'spr_sr';
+DROP INDEX IF EXISTS ux_vacunas_tdap_embarazo;
+CREATE UNIQUE INDEX ux_vacunas_tdap_embarazo
+  ON vacunas_paciente(embarazo_id)
+  WHERE tipo_vacuna = 'tdap'
+    AND embarazo_id IS NOT NULL
+    AND momento IN ('durante_embarazo', 'postparto_aborto');
 CREATE UNIQUE INDEX IF NOT EXISTS ux_controles_embarazo_numero ON controles_prenatales(embarazo_id, numero_control);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_puerperio_embarazo_numero ON controles_puerperio(embarazo_id, numero_atencion);
 CREATE INDEX IF NOT EXISTS idx_embarazos_paciente      ON embarazos(paciente_id);

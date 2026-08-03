@@ -4241,6 +4241,12 @@ h1, h2, h3, h4 {
   font-size: 0.84rem;
 }
 
+.vaccines-table .badge {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .vaccines-table tbody tr:last-child td {
   border-bottom: none;
 }
@@ -4282,6 +4288,812 @@ h1, h2, h3, h4 {
   font-size: 0.82rem;
 }
 
+/* ── Flujo clínico de vacunación ───────────────────────────── */
+.vaccine-form-page {
+  width: min(100%, 1080px);
+  margin: 0 auto;
+  padding: 1.5rem clamp(0.85rem, 2.6vw, 2rem) 2.5rem;
+}
+
+.vaccine-form-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.vaccine-form-header > div,
+.vaccine-section-heading > div,
+.vaccine-status-heading > div {
+  min-width: 0;
+}
+
+.vaccine-form-header h1 {
+  margin-top: 0.12rem;
+  color: var(--text);
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  line-height: 1.18;
+}
+
+.vaccine-form-header p,
+.vaccine-section-heading p {
+  margin-top: 0.3rem;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.vaccine-step-label {
+  color: var(--primary);
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.vaccine-flow {
+  display: grid;
+  gap: 1rem;
+}
+
+.vaccine-flow-section,
+.vaccine-status-card,
+.vaccine-selected-history,
+.vaccine-save-result {
+  min-width: 0;
+  padding: clamp(1rem, 2.4vw, 1.35rem);
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.vaccine-section-heading,
+.vaccine-status-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.vaccine-section-heading h2,
+.vaccine-status-heading h2 {
+  margin-top: 0.12rem;
+  color: var(--text);
+  font-size: 1.05rem;
+  line-height: 1.28;
+}
+
+.vaccine-section-heading > p {
+  max-width: 390px;
+  text-align: right;
+}
+
+.vaccine-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.vaccine-choice {
+  position: relative;
+  min-width: 0;
+  min-height: 6rem;
+  padding: 0.95rem 2.5rem 0.95rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface2) 24%, var(--surface));
+  color: var(--text);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s, box-shadow 0.18s, transform 0.18s;
+}
+
+.vaccine-choice:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 52%, var(--border));
+  transform: translateY(-1px);
+}
+
+.vaccine-choice:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 24%, transparent);
+  outline-offset: 2px;
+}
+
+.vaccine-choice.is-selected {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary-lt) 62%, var(--surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.vaccine-choice:disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
+}
+
+.vaccine-choice-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: var(--primary);
+  background: var(--primary-lt);
+}
+
+.vaccine-choice strong,
+.vaccine-choice small {
+  display: block;
+}
+
+.vaccine-choice strong {
+  margin-bottom: 0.2rem;
+  font-size: 0.93rem;
+}
+
+.vaccine-choice small {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.vaccine-choice-check {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  color: var(--accent);
+}
+
+.vaccine-selector-instruction {
+  margin-bottom: 0.55rem;
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.vaccine-suggestion {
+  width: fit-content;
+  margin-bottom: 0.75rem;
+  padding: 0.38rem 0.62rem;
+  border-radius: 999px;
+  background: var(--primary-lt);
+  color: var(--primary-dk);
+  font-size: 0.74rem;
+}
+
+.vaccine-dose-grid,
+.vaccine-moment-grid {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.vaccine-dose-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.vaccine-moment-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.vaccine-dose-choice,
+.vaccine-moment-choice {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface2) 30%, var(--surface));
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+}
+
+.vaccine-dose-choice {
+  min-height: 5rem;
+  padding: 0.7rem;
+  display: grid;
+  align-content: start;
+  gap: 0.2rem;
+}
+
+.vaccine-moment-choice {
+  min-height: 6.1rem;
+  padding: 0.8rem;
+}
+
+.vaccine-dose-choice > span {
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--surface2);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+.vaccine-dose-choice strong,
+.vaccine-dose-choice small,
+.vaccine-moment-choice strong,
+.vaccine-moment-choice small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.vaccine-dose-choice strong,
+.vaccine-moment-choice strong {
+  font-size: 0.8rem;
+}
+
+.vaccine-dose-choice small,
+.vaccine-moment-choice small {
+  margin-top: 0.2rem;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.vaccine-dose-choice:hover:not(:disabled),
+.vaccine-moment-choice:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+}
+
+.vaccine-dose-choice:focus-visible,
+.vaccine-moment-choice:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 24%, transparent);
+  outline-offset: 2px;
+}
+
+.vaccine-dose-choice.is-selected,
+.vaccine-moment-choice.is-selected {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary-lt) 64%, var(--surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.vaccine-dose-choice.is-selected > span {
+  background: var(--primary);
+  color: #fff;
+}
+
+.vaccine-dose-choice:disabled,
+.vaccine-moment-choice:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.vaccine-form-divider {
+  height: 1px;
+  margin: 1.1rem 0;
+  background: color-mix(in srgb, var(--border) 75%, transparent);
+}
+
+.vaccine-date-row {
+  max-width: 22rem;
+  margin-top: 1rem;
+}
+
+.vaccine-status-card {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--primary-lt) 42%, transparent), transparent 55%),
+    var(--surface);
+}
+
+.vaccine-status-heading .badge {
+  flex: 0 0 auto;
+  margin-top: 0.15rem;
+}
+
+.vaccine-progress {
+  margin: 1.2rem 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  list-style: none;
+}
+
+.vaccine-progress li {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 0.38rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.vaccine-progress li::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 0.92rem;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--border);
+}
+
+.vaccine-progress li:first-child::before {
+  display: none;
+}
+
+.vaccine-progress li > span {
+  position: relative;
+  z-index: 1;
+  width: 1.85rem;
+  height: 1.85rem;
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  font-size: 0.73rem;
+  font-weight: 850;
+}
+
+.vaccine-progress li.is-complete > span {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.vaccine-progress li.is-complete::before {
+  background: var(--accent);
+}
+
+.vaccine-progress li.is-next > span {
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.vaccine-progress li.is-missing > span {
+  border-style: dashed;
+  border-color: var(--warn);
+  color: var(--warn);
+  background: var(--warn-lt);
+}
+
+.vaccine-progress li em {
+  color: var(--warn);
+  font-size: 0.57rem;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.vaccine-progress small {
+  font-size: 0.68rem;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.vaccine-status-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.vaccine-status-facts > div,
+.vaccine-readonly-field {
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface2) 42%, var(--surface));
+}
+
+.vaccine-status-facts span,
+.vaccine-status-facts strong,
+.vaccine-readonly-field span,
+.vaccine-readonly-field strong,
+.vaccine-readonly-field small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.vaccine-status-facts span,
+.vaccine-readonly-field span {
+  margin-bottom: 0.18rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.vaccine-status-facts strong,
+.vaccine-readonly-field strong {
+  color: var(--text);
+  font-size: 0.87rem;
+}
+
+.vaccine-status-facts.is-compact {
+  margin-top: 0.65rem;
+}
+
+.vaccine-tdap-context {
+  margin-top: 0.85rem;
+}
+
+.vaccine-clinical-message,
+.vaccine-blocking-message,
+.vaccine-save-success {
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--info) 30%, var(--border));
+  border-radius: var(--radius-md);
+  background: var(--info-lt);
+  color: var(--info);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.6rem;
+  font-size: 0.82rem;
+}
+
+.vaccine-clinical-message.is-success,
+.vaccine-save-success {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  background: var(--accent-lt);
+  color: var(--accent);
+}
+
+.vaccine-clinical-message.is-warning,
+.vaccine-blocking-message {
+  border-color: color-mix(in srgb, var(--warn) 38%, var(--border));
+  background: var(--warn-lt);
+  color: var(--warn);
+}
+
+.vaccine-context-note,
+.vaccine-field-hint {
+  margin-top: 0.55rem;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.vaccine-field-hint {
+  margin-top: 0;
+}
+
+.vaccine-context-note.is-danger {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.vaccine-application-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 0.75rem;
+}
+
+.vaccine-readonly-field {
+  min-height: 5.3rem;
+}
+
+.vaccine-readonly-field small {
+  margin-top: 0.22rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.vaccine-appointment {
+  margin-top: 0.9rem;
+  padding: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 32%, var(--border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--primary-lt) 55%, var(--surface));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  color: var(--text);
+}
+
+.vaccine-appointment.is-confirmed {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent-lt) 65%, var(--surface));
+}
+
+.vaccine-appointment.is-warning {
+  border-color: color-mix(in srgb, var(--warn) 48%, var(--border));
+  background: color-mix(in srgb, var(--warn-lt) 72%, var(--surface));
+}
+
+.vaccine-appointment.is-warning .vaccine-appointment-icon {
+  color: var(--warn);
+}
+
+.vaccine-appointment-icon {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: var(--primary);
+  background: var(--surface);
+}
+
+.vaccine-appointment p {
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.79rem;
+  line-height: 1.45;
+}
+
+.vaccine-appointment small {
+  display: block;
+  margin-top: 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.69rem;
+}
+
+.vaccine-save-result {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.vaccine-save-success {
+  margin-top: 0;
+}
+
+.vaccine-save-success p {
+  margin-top: 0.18rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.vaccine-history-empty {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.vaccine-history-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  list-style: none;
+}
+
+.vaccine-history-list li {
+  min-width: 0;
+  padding: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: var(--radius-md);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.55rem;
+}
+
+.vaccine-history-list li > span {
+  color: var(--accent);
+}
+
+.vaccine-history-list strong,
+.vaccine-history-list small {
+  display: block;
+}
+
+.vaccine-history-list strong {
+  color: var(--text);
+  font-size: 0.83rem;
+}
+
+.vaccine-history-list small {
+  margin-top: 0.12rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+.vaccine-history-list li.is-unregistered {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--warn-lt) 42%, var(--surface));
+}
+
+.vaccine-history-list li.is-pending {
+  opacity: 0.76;
+}
+
+.vaccine-history-list li.is-unregistered > span {
+  color: var(--warn);
+}
+
+.vaccine-scheme-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.vaccine-scheme-summary-grid > article {
+  min-width: 0;
+  padding: 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface2) 32%, var(--surface));
+}
+
+.vaccine-scheme-summary-grid ol {
+  margin-top: 0.55rem;
+  display: grid;
+  gap: 0.35rem;
+  list-style: none;
+}
+
+.vaccine-scheme-summary-grid li {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.vaccine-scheme-summary-grid li.is-registered svg {
+  color: var(--accent);
+}
+
+.vaccine-scheme-summary-grid li.is-unregistered {
+  color: var(--warn);
+}
+
+.vaccine-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.vaccine-page-loading {
+  min-height: 16rem;
+  padding: 3rem 1rem;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.vaccine-return-notice {
+  min-width: 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--border));
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--accent-lt) 72%, var(--surface));
+  color: var(--accent);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.7rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.vaccine-return-notice strong,
+.vaccine-return-notice p {
+  overflow-wrap: anywhere;
+}
+
+.vaccine-return-notice p {
+  margin-top: 0.2rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.vaccine-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  min-width: 0;
+  min-height: 100dvh;
+  padding: max(0.5rem, env(safe-area-inset-top)) max(0.5rem, env(safe-area-inset-right)) max(0.5rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));
+  background: rgba(15, 23, 42, 0.62);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.vaccine-clinical-dialog {
+  width: min(32rem, 100%);
+  max-width: 100%;
+  max-height: calc(100dvh - 1rem);
+  min-width: 0;
+  padding: clamp(1rem, 4vw, 1.5rem);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--border));
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 28px 90px rgba(15, 23, 42, 0.34);
+  overflow-x: hidden;
+  overflow-y: auto;
+  animation: bannerIn 0.2s ease both;
+}
+
+.vaccine-clinical-dialog-icon {
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 0.75rem;
+  border-radius: 999px;
+  background: var(--warn-lt);
+  color: var(--warn);
+  display: grid;
+  place-items: center;
+}
+
+.vaccine-clinical-dialog h2 {
+  font-size: clamp(1.2rem, 5vw, 1.5rem);
+  line-height: 1.2;
+}
+
+.vaccine-clinical-dialog-reason {
+  margin-top: 0.55rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.vaccine-clinical-dialog-facts {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.vaccine-clinical-dialog-facts > div {
+  min-width: 0;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface2);
+}
+
+.vaccine-clinical-dialog-facts dt {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.vaccine-clinical-dialog-facts dd {
+  margin-top: 0.18rem;
+  font-size: 0.88rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.vaccine-clinical-dialog-guidance {
+  margin-top: 0.85rem;
+  padding: 0.8rem;
+  border-left: 4px solid var(--warn);
+  border-radius: var(--radius-md);
+  background: var(--warn-lt);
+}
+
+.vaccine-clinical-dialog-guidance p {
+  color: var(--text);
+  font-size: 0.83rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.vaccine-clinical-dialog-guidance p + p {
+  margin-top: 0.45rem;
+}
+
+.vaccine-clinical-dialog-actions {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.vaccine-clinical-dialog-actions .btn-primary {
+  min-width: 8.5rem;
+  min-height: 2.75rem;
+  justify-content: center;
+}
+
 @media (max-width: 720px) {
   .vaccines-card-heading,
   .vaccines-register-button {
@@ -4290,6 +5102,176 @@ h1, h2, h3, h4 {
 
   .vaccines-register-button {
     justify-content: center;
+  }
+
+  .vaccine-form-page {
+    padding-inline: 0.75rem;
+  }
+
+  .vaccine-form-header {
+    grid-template-columns: 1fr;
+  }
+
+  .vaccine-form-header > .btn-secondary {
+    width: max-content;
+  }
+
+  .vaccine-section-heading,
+  .vaccine-status-heading {
+    display: grid;
+  }
+
+  .vaccine-section-heading > p {
+    text-align: left;
+  }
+
+  .vaccine-choice-grid,
+  .vaccine-application-grid,
+  .vaccine-history-list,
+  .vaccine-moment-grid,
+  .vaccine-scheme-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vaccine-dose-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vaccine-status-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .vaccines-table-wrap {
+    overflow: visible;
+    padding-inline: 0.55rem;
+  }
+
+  .vaccines-table {
+    min-width: 0;
+    display: block;
+  }
+
+  .vaccines-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .vaccines-table tbody,
+  .vaccines-table tr,
+  .vaccines-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .vaccines-table tr {
+    margin-bottom: 0.65rem;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+  }
+
+  .vaccines-table tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .vaccines-table td,
+  .vaccines-table tbody tr:last-child td {
+    min-width: 0;
+    padding: 0.48rem 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 46%, transparent);
+    display: grid;
+    grid-template-columns: minmax(5.4rem, 36%) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.6rem;
+    overflow-wrap: anywhere;
+  }
+
+  .vaccines-table td:last-child,
+  .vaccines-table tbody tr:last-child td:last-child {
+    border-bottom: 0;
+  }
+
+  .vaccines-table td::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-size: 0.67rem;
+    font-weight: 850;
+    text-transform: uppercase;
+  }
+
+  .vaccines-actions,
+  .vaccines-actions .btn-secondary {
+    width: 100%;
+  }
+
+  .vaccines-actions .btn-secondary {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 420px) {
+  .vaccine-form-page {
+    padding: 0.85rem 0.5rem 1.5rem;
+  }
+
+  .vaccine-flow-section,
+  .vaccine-status-card,
+  .vaccine-selected-history,
+  .vaccine-save-result,
+  .vaccines-card {
+    padding: 0.8rem;
+  }
+
+  .vaccine-choice {
+    padding-left: 0.75rem;
+  }
+
+  .vaccine-dose-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vaccine-date-row {
+    max-width: none;
+  }
+
+  .vaccine-clinical-dialog-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .vaccine-clinical-dialog-actions,
+  .vaccine-clinical-dialog-actions .btn-primary {
+    width: 100%;
+  }
+
+  .vaccine-progress {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding: 0.25rem 0.15rem 0.45rem;
+  }
+
+  .vaccine-progress small {
+    font-size: 0.58rem;
+  }
+
+  .vaccine-form-actions,
+  .vaccine-form-actions .btn-primary,
+  .vaccine-form-actions .btn-secondary {
+    width: 100%;
+  }
+
+  .vaccine-form-actions .btn-primary,
+  .vaccine-form-actions .btn-secondary {
+    justify-content: center;
+  }
+
+  .vaccines-table td,
+  .vaccines-table tbody tr:last-child td {
+    grid-template-columns: 1fr;
+    gap: 0.18rem;
   }
 }
 

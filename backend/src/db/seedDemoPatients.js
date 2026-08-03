@@ -342,7 +342,7 @@ const demoPatients = [
       observaciones: 'Paciente demo con expediente completo para pruebas funcionales.',
     },
     vacunas: [
-      { tipo_vacuna: 'td_tdap', momento: 'durante_embarazo', numero_dosis: 1, fecha_dosis: '2026-05-03' },
+      { tipo_vacuna: 'td', momento: 'durante_embarazo', numero_dosis: 1, fecha_dosis: '2026-05-03' },
       { tipo_vacuna: 'influenza', momento: 'durante_embarazo', numero_dosis: 1, fecha_dosis: '2026-05-03' },
       { tipo_vacuna: 'spr_sr', momento: 'previo_embarazo', numero_dosis: 1, fecha_dosis: '2025-11-20' },
     ],
@@ -1001,8 +1001,8 @@ const demoPatients = [
       observaciones: 'Paciente demo adolescente, expediente completo con riesgo obstétrico.',
     },
     vacunas: [
-      { tipo_vacuna: 'td_tdap', momento: 'durante_embarazo', numero_dosis: 1, fecha_dosis: '2026-05-08' },
-      { tipo_vacuna: 'td_tdap', momento: 'durante_embarazo', numero_dosis: 2, fecha_dosis: '2026-06-08' },
+      { tipo_vacuna: 'td', momento: 'durante_embarazo', numero_dosis: 1, fecha_dosis: '2026-05-08' },
+      { tipo_vacuna: 'td', momento: 'durante_embarazo', numero_dosis: 2, fecha_dosis: '2026-06-08' },
       { tipo_vacuna: 'influenza', momento: 'durante_embarazo', numero_dosis: 1, fecha_dosis: '2026-05-08' },
     ],
     controles: [

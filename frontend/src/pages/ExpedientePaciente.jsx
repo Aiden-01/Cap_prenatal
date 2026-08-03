@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
@@ -11,7 +11,8 @@ import {
   Syringe, Activity, FlaskConical, Baby, FileText, Printer,
   CalendarDays, ChevronRight, Droplets, LockKeyhole, Microscope,
   ShieldCheck, TestTube2, ChevronDown, Car,
-  PackageCheck, ClipboardCheck, MapPin, PenLine, Clock, UserRound
+  PackageCheck, ClipboardCheck, MapPin, PenLine, Clock, UserRound,
+  CircleDashed,
 } from "lucide-react";
 import { getErrorMessage } from "../utils/errorMessage";
 import {
@@ -24,6 +25,13 @@ import {
   pregnancyActionLabel,
   selectedPregnancy,
 } from "../utils/pregnancyState";
+import {
+  VACCINE_TYPES,
+  getVaccineStatus,
+  vaccineDoseLabel,
+  vaccineLabel,
+  vaccineMomentLabel,
+} from "../utils/vaccineSchedule";
 
 // ─── HELPERS ────────────────────────────────────────────────
 function Row({ label, value }) {
@@ -567,20 +575,47 @@ function MorbilidadBlock({ icon: Icon, title, children }) {
 }
 
 const VACCINE_GROUPS = [
-  { id: "previo_embarazo", label: "Previo embarazo" },
-  { id: "durante_embarazo", label: "Durante embarazo" },
+  { id: "previo_embarazo", label: "Previo al embarazo" },
+  { id: "durante_embarazo", label: "Durante el embarazo" },
   { id: "postparto_aborto", label: "Postparto/Aborto" },
 ];
-
-function vaccineLabel(value) {
-  return (value || "-").replaceAll("_", " ").toUpperCase();
-}
 
 function vaccineGroups(vaccines = []) {
   return VACCINE_GROUPS.map((group) => ({
     ...group,
     items: vaccines.filter((vaccine) => vaccine.momento === group.id),
   }));
+}
+
+function pregnancyStateLabel(value) {
+  return { activo: "Activo", puerperio: "Puerperio", cerrado: "Cerrado" }[value] || "Histórico";
+}
+
+function VaccineSchemeSummary({ history, pregnancyId }) {
+  const statuses = [VACCINE_TYPES.TD, VACCINE_TYPES.SPR_SR]
+    .map((type) => ({ type, status: getVaccineStatus(type, history, { pregnancyId }) }))
+    .filter(({ status }) => status?.completed > 0);
+  if (!statuses.length) return null;
+  return (
+    <section className="vaccines-card vaccine-scheme-summary">
+      <div className="vaccines-card-heading"><h3>Posiciones documentadas del esquema</h3></div>
+      <div className="vaccine-scheme-summary-grid">
+        {statuses.map(({ type, status }) => (
+          <article key={type}>
+            <strong>{vaccineLabel(type)}</strong>
+            <ol>
+              {status.positionStates.map((item) => (
+                <li className={`is-${item.state}`} key={item.position}>
+                  {item.record ? <CheckCircle size={15} /> : <CircleDashed size={15} />}
+                  <span>{item.label}: {item.record ? fecha(item.record.fecha_dosis) : item.state === "unregistered" ? "No registrada en el sistema" : "Pendiente"}</span>
+                </li>
+              ))}
+            </ol>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function buildCompletitudFromExp(exp, pacienteId) {
@@ -629,6 +664,7 @@ function buildCompletitudFromExp(exp, pacienteId) {
 export default function ExpedientePaciente() {
   const { id }     = useParams();
   const navigate   = useNavigate();
+  const location   = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const toast      = useGlobalToast();
   const { usuario } = useAuth();
@@ -636,6 +672,7 @@ export default function ExpedientePaciente() {
   const [exp, setExp]       = useState(null);
   const [loadedRequestKey, setLoadedRequestKey] = useState("");
   const [loadError, setLoadError] = useState("");
+  const [vaccineNotice] = useState(() => location.state?.vaccineNotice || null);
   const [printing, setPrinting] = useState(false);
   const [creatingPregnancy, setCreatingPregnancy] = useState(false);
   const [antecedentesVacunas, setAntecedentesVacunas] = useState([]);
@@ -656,6 +693,11 @@ export default function ExpedientePaciente() {
   const selectedEmbarazoId = searchParams.get("embarazo_id") || "";
   const requestKey = `${id}:${selectedEmbarazoId || "actual"}`;
   const loading = loadedRequestKey !== requestKey;
+
+  useEffect(() => {
+    if (!vaccineNotice) return;
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+  }, [location.pathname, location.search, navigate, vaccineNotice]);
 
   const cargarExpediente = () => {
     api.get(`/pacientes/${id}/expediente`, {
@@ -719,6 +761,11 @@ export default function ExpedientePaciente() {
     exp?.is_embarazo_actual
     ?? embarazoSeleccionadoId === String(exp?.embarazo_actual?.id || "")
   );
+  const relacionVacunaSeleccionada = estadoEmbarazo === "puerperio"
+    ? "Puerperio seleccionado"
+    : isEmbarazoActual
+      ? "Embarazo actual"
+      : `Embarazo ${embarazoSeleccionado?.numero_embarazo || "seleccionado"}`;
   const expedienteDesactualizado = Boolean(
     exp && selectedEmbarazoId &&
     String(exp.embarazo_seleccionado?.id || exp.embarazo_activo?.id || '') !== String(selectedEmbarazoId)
@@ -731,7 +778,7 @@ export default function ExpedientePaciente() {
   }, [estadoEmbarazo, expedienteDesactualizado, loading, setPregnancyStatus]);
 
   useEffect(() => {
-    if (!exp || isReadOnly || !embarazoSeleccionado?.id) return;
+    if (!exp || !embarazoSeleccionado?.id) return;
     const controller = new AbortController();
     api.get(`/pacientes/${id}/vacunas/antecedentes`, {
       params: { excluir_embarazo_id: embarazoSeleccionado.id },
@@ -742,7 +789,7 @@ export default function ExpedientePaciente() {
         if (err?.code !== "ERR_CANCELED") setAntecedentesVacunas([]);
       });
     return () => controller.abort();
-  }, [id, exp, isReadOnly, embarazoSeleccionado?.id]);
+  }, [id, exp, embarazoSeleccionado?.id]);
 
   if (loading || expedienteDesactualizado) return (
     <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
@@ -1805,8 +1852,16 @@ export default function ExpedientePaciente() {
       ══════════════════════════════════════════ */}
       {hasEmbarazo && tab === "vacunas" && (
         <div className="vaccines-module">
-          {!isReadOnly && (
-            <section className="vaccines-card">
+          {vaccineNotice ? (
+            <section className="vaccine-return-notice" role="status" aria-live="polite">
+              <CheckCircle size={22} aria-hidden="true" />
+              <div>
+                <strong>{vaccineNotice.message}</strong>
+                {vaccineNotice.recommendationMessage ? <p>{vaccineNotice.recommendationMessage}</p> : null}
+              </div>
+            </section>
+          ) : null}
+          <section className="vaccines-card">
               <div className="vaccines-card-heading">
                 <h3>Antecedentes de vacunación de la paciente</h3>
               </div>
@@ -1821,21 +1876,25 @@ export default function ExpedientePaciente() {
               ) : (
                 <div className="vaccines-table-wrap">
                   <table className="vaccines-table">
-                    <thead><tr><th>Vacuna</th><th>Momento</th><th>Dosis</th><th>Fecha</th><th>Origen</th></tr></thead>
+                    <thead><tr><th>Vacuna</th><th>Momento</th><th>Aplicación</th><th>Fecha</th><th>Origen</th></tr></thead>
                     <tbody>{antecedentesVacunas.map((v) => (
                       <tr key={v.id}>
-                        <td>{vaccineLabel(v.tipo_vacuna)}</td>
-                        <td>{v.momento?.replaceAll("_", " ")}</td>
-                        <td>{v.numero_dosis}</td>
-                        <td>{fecha(v.fecha_dosis)}</td>
-                        <td><span className="badge badge-blue">{v.embarazo_origen_numero ? `Embarazo ${v.embarazo_origen_numero} · ${v.embarazo_origen_estado}` : "Antecedente · solo lectura"}</span></td>
+                        <td data-label="Vacuna">{vaccineLabel(v.tipo_vacuna)}</td>
+                        <td data-label="Momento">{vaccineMomentLabel(v.momento)}</td>
+                        <td data-label="Aplicación">{vaccineDoseLabel(v.tipo_vacuna, v.numero_dosis)}</td>
+                        <td data-label="Fecha">{fecha(v.fecha_dosis)}</td>
+                        <td data-label="Origen"><span className="badge badge-blue">{v.embarazo_origen_numero ? `Embarazo ${v.embarazo_origen_numero} · ${pregnancyStateLabel(v.embarazo_origen_estado)}` : "Antecedente · solo lectura"}</span></td>
                       </tr>
                     ))}</tbody>
                   </table>
                 </div>
               )}
-            </section>
-          )}
+          </section>
+
+          <VaccineSchemeSummary
+            history={[...antecedentesVacunas, ...(exp.vacunas || [])]}
+            pregnancyId={embarazoSeleccionado?.id}
+          />
 
           <section className="vaccines-card vaccines-main-card">
             <div className="vaccines-card-heading">
@@ -1881,19 +1940,23 @@ export default function ExpedientePaciente() {
                               <thead>
                                 <tr>
                                   <th>Vacuna</th>
-                                  <th>No. dosis</th>
+                                  <th>Aplicación</th>
                                   <th>Fecha</th>
+                                  <th>Momento</th>
+                                  <th>Relación</th>
                                   {!isReadOnly && <th>Acciones</th>}
                                 </tr>
                               </thead>
                               <tbody>
                                 {group.items.map((v) => (
                                   <tr key={v.id}>
-                                    <td><span className="vaccine-name"><Syringe size={14} /> {vaccineLabel(v.tipo_vacuna)}</span></td>
-                                    <td>{v.numero_dosis}</td>
-                                    <td>{fecha(v.fecha_dosis)}</td>
+                                    <td data-label="Vacuna"><span className="vaccine-name"><Syringe size={14} /> {vaccineLabel(v.tipo_vacuna)}</span></td>
+                                    <td data-label="Aplicación">{vaccineDoseLabel(v.tipo_vacuna, v.numero_dosis)}</td>
+                                    <td data-label="Fecha">{fecha(v.fecha_dosis)}</td>
+                                    <td data-label="Momento">{vaccineMomentLabel(v.momento)}</td>
+                                    <td data-label="Relación"><span className="badge badge-blue">{relacionVacunaSeleccionada}</span></td>
                                     {!isReadOnly && (
-                                      <td>
+                                      <td data-label="Acciones">
                                         <div className="vaccines-actions">
                                           <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/vacunas/${v.id}/editar`))}>
                                             <Pencil size={13} /> Editar

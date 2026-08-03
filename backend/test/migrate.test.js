@@ -35,7 +35,7 @@ function createHarness({ query = null, closeError = null } = {}) {
   };
 }
 
-test('descubre migraciones versionadas en orden e incluye 007 y 008', () => {
+test('descubre migraciones versionadas en orden e incluye 007, 008, 009 y 010', () => {
   const files = discoverMigrationFiles({
     migrationsDir: 'migrations-test',
     readDirectory: () => [
@@ -61,6 +61,18 @@ test('descubre migraciones versionadas en orden e incluye 007 y 008', () => {
   assert.equal(
     discoverMigrationFiles().some(
       ({ filename }) => filename === '008_retirar_referencias_efectuadas.sql'
+    ),
+    true
+  );
+  assert.equal(
+    discoverMigrationFiles().some(
+      ({ filename }) => filename === '009_vax2_reglas_vacunas.sql'
+    ),
+    true
+  );
+  assert.equal(
+    discoverMigrationFiles().some(
+      ({ filename }) => filename === '010_vax31_historias_parciales.sql'
     ),
     true
   );

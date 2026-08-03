@@ -1,43 +1,89 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ChevronLeft, Save } from "lucide-react";
+import { AlertTriangle, ChevronLeft, Save } from "lucide-react";
 import api from "../api/axios";
+import {
+  AppointmentCard,
+  ClinicalStatus,
+  DoseSelector,
+  IntervalWarningCard,
+  MomentSelector,
+  VaccineHistory,
+  VaccineSelector,
+} from "../components/VaccineFlow";
+import VaccineClinicalDialog from "../components/VaccineClinicalDialog";
 import { useGlobalToast } from "../context/ToastContext";
-import { getErrorMessage } from "../utils/errorMessage";
 import { useFieldErrors } from "../hooks/useFieldErrors";
+import { calculateGestationalAge } from "../utils/gestationalAge";
+import { getGuatemalaDateInputValue } from "../utils/guatemalaTime";
+import {
+  VACCINE_MOMENTS,
+  VACCINE_TYPES,
+  assessVaccineInterval,
+  assessVaccineMoment,
+  clinicalDateFromRecord,
+  firstAvailablePosition,
+  formatClinicalDateSpanish,
+  getAppointmentRecommendation,
+  getVaccineStatus,
+  hasMissingPreviousPositions,
+  vaccineDefinition,
+  vaccineDoseLabel,
+  vaccineLabel,
+} from "../utils/vaccineSchedule";
+import {
+  clinicalAlertFromIntervalAssessment,
+  createVaccineClinicalAlert,
+  getVaccineErrorPresentation,
+} from "../utils/vaccineError";
+import {
+  buildVaccineRequestData,
+  firstMissingVaccineField,
+  normalizeVaccineDate,
+} from "../utils/vaccineFormState";
 
-const INIT = {
-  tipo_vacuna: "td_tdap",
-  momento: "durante_embarazo",
-  numero_dosis: 1,
+const INIT = Object.freeze({
+  tipo_vacuna: "",
+  momento: "",
+  numero_dosis: null,
   fecha_dosis: "",
-};
+});
 
-const INIT_TD_TDAP_FECHAS = { 1: "", 2: "", 3: "" };
-
-const FIELD_LABELS = {
+const FIELD_LABELS = Object.freeze({
   tipo_vacuna: "Tipo de vacuna",
-  momento: "Momento",
-  numero_dosis: "No. dosis",
-  fecha_dosis: "Fecha dosis",
-};
+  momento: "Momento de aplicación",
+  numero_dosis: "Posición de dosis",
+  fecha_dosis: "Fecha de aplicación",
+  embarazo_id: "Embarazo relacionado",
+});
 
-function inferVacunaFieldErrors(err) {
-  const code = err?.response?.data?.code;
-  const message = getErrorMessage(err, "");
-  if (code === "DUPLICATE_RESOURCE" && message.toLowerCase().includes("vacuna")) {
-    return { numero_dosis: message };
-  }
-  return {};
+function inferVacunaFieldErrors(error) {
+  const presentation = getVaccineErrorPresentation(error);
+  return presentation.field ? { [presentation.field]: presentation.message } : {};
 }
 
-function Field({ label, children, error }) {
-  return <div className="form-group"><label className="input-label">{label}</label>{children}{error && <div className="field-error-text">{error}</div>}</div>;
+function Field({ id, label, children, error, hint }) {
+  return (
+    <div className="form-group">
+      <label className="input-label" htmlFor={id}>{label}</label>
+      {children}
+      {hint ? <div className="vaccine-field-hint">{hint}</div> : null}
+      {error ? <div className="field-error-text">{error}</div> : null}
+    </div>
+  );
 }
 
-const stopNumberWheel = (event) => {
-  event.currentTarget.blur();
-};
+function focusVaccineField(field) {
+  const selectors = {
+    tipo_vacuna: '[aria-label="Tipo de vacuna"] button',
+    numero_dosis: '[aria-label="Posición de dosis"] button',
+    momento: '[aria-label="Momento de aplicación"] button',
+    fecha_dosis: "#vaccine-application-date",
+  };
+  const target = document.querySelector(selectors[field] || `[name="${field}"]`);
+  target?.scrollIntoView({ behavior: "smooth", block: "center" });
+  target?.focus();
+}
 
 export default function VacunaForm() {
   const { id, vacunaId } = useParams();
@@ -47,164 +93,322 @@ export default function VacunaForm() {
   const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=vacunas`;
   const toast = useGlobalToast();
   const [form, setForm] = useState(INIT);
-  const [tdTdapFechas, setTdTdapFechas] = useState(INIT_TD_TDAP_FECHAS);
-  const [loading, setLoading] = useState(false);
+  const [expediente, setExpediente] = useState(null);
   const [historialVacunas, setHistorialVacunas] = useState([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [clinicalAlert, setClinicalAlert] = useState(null);
+  const submitButtonRef = useRef(null);
   const fieldErrors = useFieldErrors(FIELD_LABELS, inferVacunaFieldErrors);
   const editando = Boolean(vacunaId);
-  const isTdTdapBatch = !editando && form.tipo_vacuna === "td_tdap";
-  const maxDosis = form.tipo_vacuna === "td_tdap" ? 3 : 10;
-  const dosisCount = Math.min(Number(form.numero_dosis || 1), maxDosis);
-  const set = (k, v) => fieldErrors.setFormValue(setForm, k, v);
-
-  const setTipoVacuna = (value) => {
-    setForm((f) => ({
-      ...f,
-      tipo_vacuna: value,
-      numero_dosis: value === "td_tdap" ? Math.min(Number(f.numero_dosis || 1), 3) : f.numero_dosis,
-    }));
-    fieldErrors.clearFieldError("tipo_vacuna");
-    fieldErrors.clearFieldError("numero_dosis");
-  };
-
-  const setNumeroDosis = (value) => {
-    const parsed = value === "" ? "" : Number(value);
-    if (parsed === "") {
-      set("numero_dosis", "");
-      return;
-    }
-    set("numero_dosis", Math.max(1, Math.min(parsed, maxDosis)));
-  };
-
-  const setTdTdapFecha = (dosis, value) => {
-    setTdTdapFechas((prev) => ({ ...prev, [dosis]: value }));
-    fieldErrors.clearFieldError("fecha_dosis");
-  };
+  const pregnancy = expediente?.embarazo_seleccionado || expediente?.embarazo_activo || null;
+  const pregnancyState = String(pregnancy?.estado || "").toLowerCase();
+  const readOnly = Boolean(expediente?.is_read_only || pregnancyState === "cerrado");
+  const today = getGuatemalaDateInputValue();
 
   useEffect(() => {
     if (!embarazoId) {
       toast("Selecciona un embarazo antes de registrar vacunas", "error");
       navigate(`/pacientes/${id}?tab=vacunas`, { replace: true });
-      return;
+      return undefined;
     }
+    const controller = new AbortController();
+    let active = true;
     const vacunaRequest = editando
-      ? api.get(`/pacientes/${id}/vacunas/${vacunaId}`, { params: { embarazo_id: embarazoId } })
+      ? api.get(`/pacientes/${id}/vacunas/${vacunaId}`, { params: { embarazo_id: embarazoId }, signal: controller.signal })
       : Promise.resolve({ data: null });
     Promise.all([
       vacunaRequest,
-      api.get(`/pacientes/${id}/expediente`, { params: { embarazo_id: embarazoId } }),
+      api.get(`/pacientes/${id}/expediente`, { params: { embarazo_id: embarazoId }, signal: controller.signal }),
+      api.get(`/pacientes/${id}/vacunas/antecedentes`, { signal: controller.signal }),
     ])
-      .then(([{ data }, { data: expediente }]) => {
-        if (expediente?.is_read_only) {
-          toast("El embarazo esta cerrado y es de solo lectura", "error");
-          navigate(expedientePath, { replace: true });
-          return;
+      .then(([{ data: vaccine }, { data: patientRecord }, { data: history }]) => {
+        if (!active) return;
+        setLoadError("");
+        setExpediente(patientRecord);
+        setHistorialVacunas(Array.isArray(history) ? history : []);
+        if (editando && vaccine) {
+          setForm({ ...INIT, ...vaccine, fecha_dosis: clinicalDateFromRecord(vaccine) });
         }
-        if (editando) setForm({ ...INIT, ...data, fecha_dosis: data.fecha_dosis ? data.fecha_dosis.split("T")[0] : "" });
       })
-      .catch(() => toast("Error al cargar vacuna", "error"));
-  }, [id, vacunaId, editando, embarazoId, expedientePath, navigate, toast]);
+      .catch((error) => {
+        if (active && error?.code !== "ERR_CANCELED") {
+          setLoadError("No fue posible cargar el contexto de vacunación.");
+          toast("Error al cargar vacuna", "error");
+        }
+      })
+      .finally(() => {
+        if (active) setInitialLoading(false);
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [id, vacunaId, editando, embarazoId, navigate, toast]);
 
-  useEffect(() => {
-    if (editando) return;
-    api.get(`/pacientes/${id}/vacunas/antecedentes`)
-      .then(({ data }) => setHistorialVacunas(Array.isArray(data) ? data : []))
-      .catch(() => setHistorialVacunas([]));
-  }, [id, editando]);
+  const historyWithoutCurrent = useMemo(() => (
+    editando
+      ? historialVacunas.filter((record) => String(record.id) !== String(vacunaId))
+      : historialVacunas
+  ), [editando, historialVacunas, vacunaId]);
 
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!editando) {
-      const fechas = form.tipo_vacuna === "td_tdap"
-        ? Array.from({ length: Math.max(1, Math.min(Number(form.numero_dosis || 1), 3)) }, (_, index) => ({
-            numero_dosis: index + 1,
-            fecha_dosis: tdTdapFechas[index + 1] || "",
-          }))
-        : [{ numero_dosis: Number(form.numero_dosis), fecha_dosis: form.fecha_dosis || "" }];
-      const existeSimilar = fechas.some((dosis) => historialVacunas.some((vacuna) =>
-        vacuna.tipo_vacuna === form.tipo_vacuna &&
-        Number(vacuna.numero_dosis) === Number(dosis.numero_dosis) &&
-        String(vacuna.fecha_dosis || "").split("T")[0] === dosis.fecha_dosis
-      ));
-      if (existeSimilar && !window.confirm("Ya existe un antecedente con el mismo tipo, dosis y fecha. ¿Deseas registrarlo de todas formas?")) return;
+  const status = useMemo(() => getVaccineStatus(
+    form.tipo_vacuna,
+    historialVacunas,
+    { pregnancyId: pregnancy?.id || embarazoId }
+  ), [form.tipo_vacuna, historialVacunas, pregnancy?.id, embarazoId]);
+
+  const selectableStatus = useMemo(() => getVaccineStatus(
+    form.tipo_vacuna,
+    historyWithoutCurrent,
+    { pregnancyId: pregnancy?.id || embarazoId }
+  ), [form.tipo_vacuna, historyWithoutCurrent, pregnancy?.id, embarazoId]);
+
+  const selectedDefinition = vaccineDefinition(form.tipo_vacuna);
+  const isInfluenza = form.tipo_vacuna === VACCINE_TYPES.INFLUENZA;
+  const selectedDose = Number(form.numero_dosis || 0);
+  const currentGestationalAge = calculateGestationalAge(pregnancy?.fur, today);
+  const applicationGestationalAge = calculateGestationalAge(pregnancy?.fur, form.fecha_dosis);
+  const momentAssessment = assessVaccineMoment(pregnancy, form.fecha_dosis, form.momento);
+  const missingPreviousPositions = hasMissingPreviousPositions(selectableStatus, selectedDose);
+  const relatedPriorTdapExists = form.tipo_vacuna === VACCINE_TYPES.TDAP
+    && selectableStatus?.applications.some((record) => (
+      String(record.embarazo_id) === String(pregnancy?.id || embarazoId)
+      && record.momento === VACCINE_MOMENTS.BEFORE_PREGNANCY
+    ));
+  const currentTdapExists = form.tipo_vacuna === VACCINE_TYPES.TDAP
+    && Boolean(selectableStatus?.schemeApplications.length);
+  const duplicatePosition = [VACCINE_TYPES.TD, VACCINE_TYPES.SPR_SR].includes(form.tipo_vacuna)
+    && selectableStatus?.registeredPositions.includes(selectedDose);
+  const maximumSchemeReached = [VACCINE_TYPES.TD, VACCINE_TYPES.SPR_SR].includes(form.tipo_vacuna)
+    && selectableStatus?.completed >= selectedDefinition?.maximum;
+  const tdapDuplicate = form.tipo_vacuna === VACCINE_TYPES.TDAP && (
+    form.momento === VACCINE_MOMENTS.BEFORE_PREGNANCY
+      ? relatedPriorTdapExists
+      : form.momento ? currentTdapExists : false
+  );
+  const unavailablePositions = new Set(
+    [VACCINE_TYPES.TD, VACCINE_TYPES.SPR_SR].includes(form.tipo_vacuna)
+      ? selectableStatus?.registeredPositions || []
+      : tdapDuplicate ? [1] : []
+  );
+  const previewRecommendation = getAppointmentRecommendation(
+    form.tipo_vacuna,
+    selectedDose,
+    form.fecha_dosis,
+    { existingPositions: selectableStatus?.registeredPositions || [] }
+  );
+  const intervalAssessment = assessVaccineInterval(
+    form.tipo_vacuna,
+    selectedDose,
+    form.fecha_dosis,
+    historyWithoutCurrent
+  );
+  const intervalAlert = clinicalAlertFromIntervalAssessment(intervalAssessment);
+
+  let preflightClinicalAlert = null;
+  if (maximumSchemeReached) {
+    const reason = `El esquema de ${vaccineLabel(form.tipo_vacuna)} ya tiene todas sus posiciones registradas.`;
+    preflightClinicalAlert = createVaccineClinicalAlert("Esquema completado", reason, form.tipo_vacuna, selectedDose);
+  } else if (duplicatePosition) {
+    const reason = `Ya existe una ${vaccineDoseLabel(form.tipo_vacuna, selectedDose)} de ${vaccineLabel(form.tipo_vacuna)} para esta paciente.`;
+    preflightClinicalAlert = createVaccineClinicalAlert("Dosis ya registrada", reason, form.tipo_vacuna, selectedDose);
+  } else if (tdapDuplicate) {
+    const reason = form.momento === VACCINE_MOMENTS.BEFORE_PREGNANCY
+      ? "Ya existe una Tdap previa relacionada con este embarazo."
+      : "Ya existe una Tdap durante o después de este embarazo.";
+    preflightClinicalAlert = createVaccineClinicalAlert("Dosis ya registrada", reason, VACCINE_TYPES.TDAP, 1);
+  } else if (momentAssessment.state === "contradictory") {
+    preflightClinicalAlert = createVaccineClinicalAlert(
+      "Momento de aplicación incompatible",
+      momentAssessment.message,
+      form.tipo_vacuna,
+      selectedDose
+    );
+  } else if (form.tipo_vacuna === VACCINE_TYPES.TDAP
+    && form.momento === VACCINE_MOMENTS.DURING_PREGNANCY
+    && applicationGestationalAge
+    && applicationGestationalAge.totalDays < 140) {
+    const reason = `La paciente tendría ${applicationGestationalAge.weeks} semanas y ${applicationGestationalAge.days} días. Tdap se permite desde las 20 semanas.`;
+    preflightClinicalAlert = createVaccineClinicalAlert("Vacuna no permitida", reason, VACCINE_TYPES.TDAP, 1);
+  } else if (form.tipo_vacuna === VACCINE_TYPES.SPR_SR
+    && form.momento === VACCINE_MOMENTS.DURING_PREGNANCY) {
+    const reason = "SR/SPR no puede registrarse como aplicada durante el embarazo.";
+    preflightClinicalAlert = createVaccineClinicalAlert("Vacuna no permitida", reason, VACCINE_TYPES.SPR_SR, selectedDose);
+  } else if (intervalAlert) {
+    preflightClinicalAlert = intervalAlert;
+  }
+
+  const closeClinicalAlert = useCallback(() => setClinicalAlert(null), []);
+
+  const selectVaccine = (type) => {
+    const nextStatus = getVaccineStatus(type, historyWithoutCurrent, { pregnancyId: pregnancy?.id || embarazoId });
+    const suggested = type === VACCINE_TYPES.INFLUENZA
+      ? 1
+      : nextStatus?.nextDose || firstAvailablePosition(nextStatus) || 1;
+    setForm((current) => ({
+      ...current,
+      tipo_vacuna: type,
+      numero_dosis: editando && type === current.tipo_vacuna ? current.numero_dosis : suggested,
+    }));
+    fieldErrors.clearFieldError("tipo_vacuna");
+    fieldErrors.clearFieldError("numero_dosis");
+  };
+
+  const selectDose = (dose) => {
+    setForm((current) => ({ ...current, numero_dosis: dose }));
+    fieldErrors.clearFieldError("numero_dosis");
+  };
+
+  const selectMoment = (moment) => {
+    setForm((current) => ({ ...current, momento: moment }));
+    fieldErrors.clearFieldError("momento");
+  };
+
+  const setApplicationDate = (value) => {
+    setForm((current) => ({ ...current, fecha_dosis: normalizeVaccineDate(value) }));
+    fieldErrors.clearFieldError("fecha_dosis");
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (loading || initialLoading || readOnly) return;
+    const missing = firstMissingVaccineField(form);
+    if (missing) {
+      fieldErrors.setErrorsFromResponse({
+        response: { data: { details: [{ campo: missing.field, mensaje: missing.message }] } },
+      });
+      requestAnimationFrame(() => focusVaccineField(missing.field));
+      return;
+    }
+    if (preflightClinicalAlert) {
+      setClinicalAlert(preflightClinicalAlert);
+      return;
     }
     setLoading(true);
     fieldErrors.clearFieldErrors();
+    const requestData = buildVaccineRequestData(form);
     try {
-      if (editando) {
-        await api.put(`/pacientes/${id}/vacunas/${vacunaId}`, form, { params: { embarazo_id: embarazoId } });
-      } else if (form.tipo_vacuna === "td_tdap") {
-        const totalDosis = Math.max(1, Math.min(Number(form.numero_dosis || 1), 3));
-        await Promise.all(Array.from({ length: totalDosis }, (_, index) => {
-          const numeroDosis = index + 1;
-          return api.post(`/pacientes/${id}/vacunas`, {
-            ...form,
-            numero_dosis: numeroDosis,
-            fecha_dosis: tdTdapFechas[numeroDosis] || "",
-          }, { params: { embarazo_id: embarazoId } });
-        }));
-      } else {
-        await api.post(`/pacientes/${id}/vacunas`, form, { params: { embarazo_id: embarazoId } });
-      }
-      toast(editando ? "Vacuna actualizada" : "Vacuna registrada", "success");
-      navigate(expedientePath);
-    } catch (err) {
-      toast(fieldErrors.setErrorsFromResponse(err, "Error al guardar vacuna").message, "error");
-    } finally {
+      const response = editando
+        ? await api.put(`/pacientes/${id}/vacunas/${vacunaId}`, requestData, { params: { embarazo_id: embarazoId } })
+        : await api.post(`/pacientes/${id}/vacunas`, requestData, { params: { embarazo_id: embarazoId } });
+      const accepted = response.data;
+      const acceptedPositions = [...new Set([
+        ...(selectableStatus?.registeredPositions || []),
+        Number(accepted.numero_dosis),
+      ])];
+      const recommendation = getAppointmentRecommendation(
+        accepted.tipo_vacuna,
+        accepted.numero_dosis,
+        clinicalDateFromRecord(accepted),
+        { existingPositions: acceptedPositions }
+      );
+      const message = editando
+        ? "Aplicación actualizada correctamente."
+        : accepted.tipo_vacuna === VACCINE_TYPES.INFLUENZA
+          ? "Aplicación de Influenza registrada correctamente."
+          : `${vaccineDoseLabel(accepted.tipo_vacuna, accepted.numero_dosis)} de ${vaccineLabel(accepted.tipo_vacuna)} registrada correctamente.`;
+      const recommendationMessage = recommendation
+        ? `Próxima aplicación recomendada: ${recommendation.nextLabel}, a partir del ${formatClinicalDateSpanish(recommendation.minimumDate, { includeWeekday: false })}.`
+        : "";
+      toast(message, "success");
+      navigate(expedientePath, {
+        replace: true,
+        state: { vaccineNotice: { message, recommendationMessage } },
+      });
+    } catch (error) {
+      const presentation = getVaccineErrorPresentation(error, {
+        type: form.tipo_vacuna,
+        dose: selectedDose,
+        applicationDate: form.fecha_dosis,
+      });
       setLoading(false);
+      if (presentation.clinicalAlert) {
+        fieldErrors.clearFieldErrors();
+        setClinicalAlert(presentation.clinicalAlert);
+      } else {
+        const parsed = fieldErrors.setErrorsFromResponse(error, "No fue posible guardar la vacuna");
+        toast(presentation.message || parsed.message, "error");
+        if (parsed.firstField) requestAnimationFrame(() => focusVaccineField(parsed.firstField));
+      }
     }
   };
 
+  if (initialLoading) return <div className="vaccine-page-loading">Cargando contexto de vacunación...</div>;
+
   return (
-    <div>
-      <div style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1.5rem" }}>
-        <button className="btn-secondary" onClick={() => navigate(expedientePath)}><ChevronLeft size={15} /> Volver</button>
-        <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>{editando ? "Editar Vacuna" : "Registrar Vacuna"}</h1>
-      </div>
-      <form className="card" onSubmit={submit}>
-        {fieldErrors.summary.length > 0 && (
-          <div className="error-box" style={{ marginBottom: "1rem" }}>
-            <strong>Revisa estos datos:</strong>{" "}
-            {fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" | ")}
-          </div>
-        )}
-        <div className="form-section-body col-4">
-          <Field label="Tipo de vacuna" error={fieldErrors.fieldError("tipo_vacuna")}>
-            <select className={fieldErrors.inputClass("tipo_vacuna")} value={form.tipo_vacuna} onChange={(e) => setTipoVacuna(e.target.value)}>
-              <option value="td_tdap">Td/Tdap</option>
-              <option value="influenza">Influenza</option>
-              <option value="spr_sr">SPR/SR</option>
-            </select>
-          </Field>
-          <Field label="Momento" error={fieldErrors.fieldError("momento")}>
-            <select className={fieldErrors.inputClass("momento")} value={form.momento} onChange={(e) => set("momento", e.target.value)}>
-              <option value="previo_embarazo">Previo embarazo</option>
-              <option value="durante_embarazo">Durante embarazo</option>
-              <option value="postparto_aborto">Postparto/Aborto</option>
-            </select>
-          </Field>
-          <Field label="No. dosis" error={fieldErrors.fieldError("numero_dosis")}>
-            <input className={fieldErrors.inputClass("numero_dosis")} type="number" min="1" max={maxDosis} value={form.numero_dosis ?? ""} onWheel={stopNumberWheel} onChange={(e) => setNumeroDosis(e.target.value)} />
-          </Field>
-          {isTdTdapBatch ? (
-            Array.from({ length: dosisCount }, (_, index) => {
-              const dosis = index + 1;
-              return (
-                <Field key={dosis} label={`Fecha dosis ${dosis}`} error={fieldErrors.fieldError("fecha_dosis")}>
-                  <input className={fieldErrors.inputClass("fecha_dosis")} type="date" value={tdTdapFechas[dosis] ?? ""} onChange={(e) => setTdTdapFecha(dosis, e.target.value)} />
+    <div className="vaccine-form-page">
+      <header className="vaccine-form-header">
+        <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}><ChevronLeft size={15} /> Volver</button>
+        <div><span className="vaccine-step-label">Vacunación segura</span><h1>{editando ? "Editar vacuna" : "Registrar vacuna"}</h1><p>Registra la información que consta en el carné o antecedente presentado.</p></div>
+      </header>
+
+      {loadError ? <div className="error-box">{loadError}</div> : null}
+
+      <form className="vaccine-flow" onSubmit={submit} noValidate>
+        <section className="vaccine-flow-section">
+          <div className="vaccine-section-heading"><div><span className="vaccine-step-label">Paso 1</span><h2>Selecciona la vacuna</h2></div><p>TD y Tdap se registran como vacunas diferentes.</p></div>
+          <VaccineSelector selected={form.tipo_vacuna} onSelect={selectVaccine} disabled={loading || readOnly} />
+          {fieldErrors.fieldError("tipo_vacuna") ? <div className="field-error-text">{fieldErrors.fieldError("tipo_vacuna")}</div> : null}
+        </section>
+
+        {form.tipo_vacuna && status ? (
+          <>
+            <ClinicalStatus type={form.tipo_vacuna} status={status} pregnancy={pregnancy} currentGestationalAge={currentGestationalAge} applicationGestationalAge={applicationGestationalAge} readOnly={readOnly} />
+
+            <section className="vaccine-flow-section vaccine-application-section">
+              <div className="vaccine-section-heading"><div><span className="vaccine-step-label">Paso 3</span><h2>Documenta la aplicación</h2></div><p>La información será verificada al guardar.</p></div>
+
+              {!isInfluenza ? (
+                <>
+                  <DoseSelector
+                    definition={selectedDefinition}
+                    selected={selectedDose}
+                    suggestedDose={selectableStatus?.nextDose}
+                    unavailablePositions={unavailablePositions}
+                    onSelect={selectDose}
+                    disabled={loading || readOnly}
+                  />
+                  {fieldErrors.fieldError("numero_dosis") ? <div className="field-error-text">{fieldErrors.fieldError("numero_dosis")}</div> : null}
+                  {missingPreviousPositions ? <div className="vaccine-clinical-message is-warning"><AlertTriangle size={18} /><span>Las dosis anteriores no constan en el sistema. Verifica el carné o antecedente presentado por la paciente.</span></div> : null}
+                </>
+              ) : null}
+
+              <div className="vaccine-form-divider" />
+              <MomentSelector selected={form.momento} onSelect={selectMoment} disabled={loading || readOnly} />
+              {fieldErrors.fieldError("momento") ? <div className="field-error-text">{fieldErrors.fieldError("momento")}</div> : null}
+
+              <div className="vaccine-date-row">
+                <Field id="vaccine-application-date" label="Fecha de aplicación" error={fieldErrors.fieldError("fecha_dosis")} hint="Fecha clínica sin hora. No puede ser futura.">
+                  <input id="vaccine-application-date" name="fecha_dosis" className={fieldErrors.inputClass("fecha_dosis")} type="date" max={today} required value={form.fecha_dosis} disabled={loading || readOnly} onChange={(event) => setApplicationDate(event.target.value)} />
                 </Field>
-              );
-            })
-          ) : (
-            <Field label="Fecha dosis" error={fieldErrors.fieldError("fecha_dosis")}>
-              <input className={fieldErrors.inputClass("fecha_dosis")} type="date" value={form.fecha_dosis ?? ""} onChange={(e) => set("fecha_dosis", e.target.value)} />
-            </Field>
-          )}
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem" }}>
-          <button className="btn-primary" disabled={loading}><Save size={15} /> {loading ? "Guardando..." : "Guardar"}</button>
-        </div>
+              </div>
+
+              {form.momento === VACCINE_MOMENTS.BEFORE_PREGNANCY && form.tipo_vacuna === VACCINE_TYPES.TDAP ? <p className="vaccine-context-note">Esta Tdap quedará como antecedente previo y no consumirá la aplicación correspondiente al embarazo actual.</p> : null}
+              {momentAssessment.state === "unverifiable" ? <div className="vaccine-clinical-message is-warning"><AlertTriangle size={18} /><span>{momentAssessment.message}</span></div> : null}
+              {editando ? <p className="vaccine-context-note"><strong>Importante:</strong> modificar la fecha, posición o momento puede alterar la cronología conocida. La información será verificada al guardar.</p> : null}
+              {preflightClinicalAlert && preflightClinicalAlert.kind !== "interval" ? <div className="vaccine-blocking-message" role="alert"><AlertTriangle size={19} /><span>{preflightClinicalAlert.reason}</span></div> : null}
+              {fieldErrors.summary.length > 0 ? <div className="error-box" role="alert"><strong>Revisa estos datos:</strong> {fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" | ")}</div> : null}
+              {intervalAlert ? <IntervalWarningCard alert={intervalAlert} /> : <AppointmentCard recommendation={previewRecommendation} preview />}
+            </section>
+
+            <VaccineHistory type={form.tipo_vacuna} status={status} pregnancy={pregnancy} />
+
+            <footer className="vaccine-form-actions">
+              <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>Volver al historial</button>
+              <button ref={submitButtonRef} type="submit" className="btn-primary" disabled={loading || initialLoading || readOnly}><Save size={15} /> {loading ? "Guardando..." : editando ? "Guardar cambios" : "Registrar aplicación"}</button>
+            </footer>
+          </>
+        ) : null}
       </form>
+      {clinicalAlert ? (
+        <VaccineClinicalDialog
+          alert={clinicalAlert}
+          onClose={closeClinicalAlert}
+          returnFocusRef={submitButtonRef}
+        />
+      ) : null}
     </div>
   );
 }

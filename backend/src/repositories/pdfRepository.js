@@ -91,7 +91,7 @@ async function obtenerFichaMspasData({ pacienteId, embarazoId }) {
        FROM vacunas_paciente vp
        JOIN embarazos e ON e.id = vp.embarazo_id
        WHERE vp.embarazo_id = $1 AND e.paciente_id = $2
-       ORDER BY vp.tipo_vacuna, vp.momento, vp.numero_dosis`,
+       ORDER BY vp.fecha_dosis ASC NULLS LAST, vp.id ASC`,
       [embarazoId, pacienteId]
     ),
     pool.query(

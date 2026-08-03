@@ -1,10 +1,39 @@
 const pool = require('../db/pool');
 
+async function bloquearPaciente(pacienteId, db = pool) {
+  const { rows } = await db.query(
+    'SELECT id FROM pacientes WHERE id = $1 FOR UPDATE',
+    [pacienteId]
+  );
+  return rows[0] || null;
+}
+
+async function listarHistoriaClinica(pacienteId, db = pool) {
+  const { rows } = await db.query(
+    `SELECT * FROM vacunas_paciente
+     WHERE paciente_id = $1 AND tipo_vacuna IN ('td', 'tdap', 'spr_sr')
+     ORDER BY fecha_dosis ASC NULLS LAST, id ASC`,
+    [pacienteId]
+  );
+  return rows;
+}
+
+async function listarEmbarazosPaciente(pacienteId, db = pool) {
+  const { rows } = await db.query(
+    `SELECT id, paciente_id, estado, fur, fpp, fecha_inicio, fecha_cierre
+     FROM embarazos
+     WHERE paciente_id = $1
+     ORDER BY numero_embarazo ASC, id ASC`,
+    [pacienteId]
+  );
+  return rows;
+}
+
 async function listarPorEmbarazo(embarazoId) {
   const { rows } = await pool.query(
     `SELECT * FROM vacunas_paciente
      WHERE embarazo_id = $1
-     ORDER BY tipo_vacuna, momento, numero_dosis`,
+     ORDER BY tipo_vacuna, momento, fecha_dosis ASC NULLS LAST, id ASC`,
     [embarazoId]
   );
   return rows;
@@ -36,30 +65,13 @@ async function listarAntecedentes({ pacienteId, excluirEmbarazoId = null }) {
   return rows;
 }
 
-async function obtenerPorDosis({ embarazoId, tipoVacuna, momento, numeroDosis }, db = pool) {
+async function insertar(data, db = pool) {
   const { rows } = await db.query(
-    `SELECT * FROM vacunas_paciente
-     WHERE embarazo_id = $1 AND tipo_vacuna = $2 AND momento = $3 AND numero_dosis = $4`,
-    [embarazoId, tipoVacuna, momento, numeroDosis]
-  );
-  return rows[0] || null;
-}
-
-async function upsert(data, db = pool) {
-  const { rows } = await db.query(
-    `WITH embarazo_editable AS (
-       SELECT id FROM embarazos WHERE id=$2 AND paciente_id=$1
-         AND estado IN ('activo', 'puerperio') FOR UPDATE
-     )
-     INSERT INTO vacunas_paciente (
-      paciente_id, embarazo_id, tipo_vacuna, momento, numero_dosis, fecha_dosis, registrado_por, updated_by
-    ) SELECT $1,$2,$3,$4,$5,$6,$7,$8 FROM embarazo_editable
-    ON CONFLICT (embarazo_id, tipo_vacuna, momento, numero_dosis)
-    DO UPDATE SET
-      fecha_dosis = EXCLUDED.fecha_dosis,
-      updated_at = NOW(),
-      updated_by = EXCLUDED.updated_by
-    RETURNING *`,
+    `INSERT INTO vacunas_paciente (
+       paciente_id, embarazo_id, tipo_vacuna, momento, numero_dosis,
+       fecha_dosis, registrado_por, updated_by
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     RETURNING *`,
     [
       data.paciente_id,
       data.embarazo_id,
@@ -135,12 +147,14 @@ async function enTransaccion(callback) {
 }
 
 module.exports = {
+  bloquearPaciente,
+  listarHistoriaClinica,
+  listarEmbarazosPaciente,
   listarPorEmbarazo,
   obtenerPorIdYEmbarazo,
   obtenerPorId,
   listarAntecedentes,
-  obtenerPorDosis,
-  upsert,
+  insertar,
   actualizar,
   eliminar,
   enTransaccion,

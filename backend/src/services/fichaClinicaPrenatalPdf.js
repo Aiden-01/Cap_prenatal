@@ -458,17 +458,36 @@ function drawPersonalDiabetesMark(page, font, p, c) {
   if (cfg) drawMark(page, font, cfg, `antecDiabetesTipo${tipo}`);
 }
 
-function hasVaccine(vacunas, tipoVacuna, momento) {
-  return vacunas.some((v) => v.tipo_vacuna === tipoVacuna && v.momento === momento);
+function isTdOrTdap(tipoVacuna) {
+  return tipoVacuna === 'td' || tipoVacuna === 'tdap';
 }
 
-function findVaccine(vacunas, tipoVacuna, momentos, numeroDosis) {
-  const momentosPermitidos = Array.isArray(momentos) ? momentos : [momentos];
-  return vacunas.find((v) => (
-    v.tipo_vacuna === tipoVacuna &&
-    momentosPermitidos.includes(v.momento) &&
-    Number(v.numero_dosis || 1) === numeroDosis
-  ));
+function compareVaccineDates(left, right) {
+  const leftDate = safe(left?.fecha_dosis).slice(0, 10) || '9999-12-31';
+  const rightDate = safe(right?.fecha_dosis).slice(0, 10) || '9999-12-31';
+  return leftDate.localeCompare(rightDate) || Number(left?.id || 0) - Number(right?.id || 0);
+}
+
+function prepareOfficialVaccineData(vacunas = []) {
+  const supported = vacunas
+    .filter((record) => (
+      isTdOrTdap(record?.tipo_vacuna)
+      || record?.tipo_vacuna === 'influenza'
+      || record?.tipo_vacuna === 'spr_sr'
+    ))
+    .sort(compareVaccineDates);
+  const rows = [
+    { key: 'tdOrTdap', prefix: 'vacunaTdTdap', records: supported.filter((record) => isTdOrTdap(record.tipo_vacuna)) },
+    { key: 'influenza', prefix: 'vacunaInfluenza', records: supported.filter((record) => record.tipo_vacuna === 'influenza') },
+    { key: 'sprSr', prefix: 'vacunaSprSr', records: supported.filter((record) => record.tipo_vacuna === 'spr_sr') },
+  ];
+  return {
+    rows,
+    previous: supported.filter((record) => record.momento === 'previo_embarazo'),
+    duringOrPostpartum: supported.filter((record) => (
+      record.momento === 'durante_embarazo' || record.momento === 'postparto_aborto'
+    )),
+  };
 }
 
 function drawVaccineCell(page, font, active, cfg, label) {
@@ -476,36 +495,29 @@ function drawVaccineCell(page, font, active, cfg, label) {
 }
 
 function drawVaccines(page, font, vacunas = [], c) {
-  const rows = [
-    ['td_tdap', 'vacunaTdTdap'],
-    ['influenza', 'vacunaInfluenza'],
-    ['spr_sr', 'vacunaSprSr'],
-  ];
+  const printable = prepareOfficialVaccineData(vacunas);
 
-  rows.forEach(([tipo, prefix]) => {
-    const previo = hasVaccine(vacunas, tipo, 'previo_embarazo');
-    const durante = hasVaccine(vacunas, tipo, 'durante_embarazo');
-    const postparto = hasVaccine(vacunas, tipo, 'postparto_aborto');
+  printable.rows.forEach(({ records, prefix }) => {
+    const previo = records.some((record) => record.momento === 'previo_embarazo');
+    const durante = records.some((record) => record.momento === 'durante_embarazo');
+    const postparto = records.some((record) => record.momento === 'postparto_aborto');
     drawVaccineCell(page, font, !previo && !durante && !postparto, c.marks.booleans[`${prefix}No`], `${prefix}No`);
     drawVaccineCell(page, font, previo, c.marks.booleans[`${prefix}Previo`], `${prefix}Previo`);
     drawVaccineCell(page, font, durante, c.marks.booleans[`${prefix}Durante`], `${prefix}Durante`);
     drawVaccineCell(page, font, postparto, c.marks.booleans[`${prefix}Postparto`], `${prefix}Postparto`);
   });
 
-  const previoVacunas = vacunas
-    .filter((v) => v.tipo_vacuna === 'td_tdap' && v.momento === 'previo_embarazo')
-    .sort((a, b) => Number(a.numero_dosis || 1) - Number(b.numero_dosis || 1));
-  if (previoVacunas[0]) {
-    drawTextBox(page, font, previoVacunas[previoVacunas.length - 1].numero_dosis, c.vaccineDates.previoDosis, 'vacunaPrevio:dosis');
-    drawDate(page, font, previoVacunas[0].fecha_dosis, c.vaccineDates.previoFecha1, 'vacunaPrevio:fecha1');
+  if (printable.previous[0]) {
+    drawTextBox(page, font, printable.previous.length, c.vaccineDates.previoDosis, 'vacunaPrevio:dosis');
+    drawDate(page, font, printable.previous[0].fecha_dosis, c.vaccineDates.previoFecha1, 'vacunaPrevio:fecha1');
   }
-  if (previoVacunas[1]) {
-    drawDate(page, font, previoVacunas[1].fecha_dosis, c.vaccineDates.previoFecha2, 'vacunaPrevio:fecha2');
+  if (printable.previous[1]) {
+    drawDate(page, font, printable.previous[1].fecha_dosis, c.vaccineDates.previoFecha2, 'vacunaPrevio:fecha2');
   }
 
-  [1, 2, 3].forEach((numeroDosis) => {
-    const vacuna = findVaccine(vacunas, 'td_tdap', ['durante_embarazo', 'postparto_aborto'], numeroDosis);
-    if (vacuna) drawDate(page, font, vacuna.fecha_dosis, c.vaccineDates[`duranteFecha${numeroDosis}`], `vacunaDurante:fecha${numeroDosis}`);
+  printable.duringOrPostpartum.slice(0, 3).forEach((vacuna, index) => {
+    const position = index + 1;
+    drawDate(page, font, vacuna.fecha_dosis, c.vaccineDates[`duranteFecha${position}`], `vacunaDurante:fecha${position}`);
   });
 }
 
@@ -1059,8 +1071,11 @@ module.exports = {
     drawWrappedTextWithFirstLineOffset,
     markYesNo,
     drawMark,
+    drawVaccines,
     fitText,
+    isTdOrTdap,
     layoutAdaptiveText,
+    prepareOfficialVaccineData,
     safe,
     seleccionarMorbilidades,
     drawPage3,

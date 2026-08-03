@@ -42,6 +42,18 @@ function uniqueMessage(err) {
     return 'Ya existe una vacuna con esos datos para esta paciente';
   }
 
+  if (err.constraint === 'ux_vacunas_tdap_embarazo') {
+    return 'Ya existe una aplicacion de Tdap para este embarazo.';
+  }
+
+  if (err.constraint === 'ux_vacunas_td_paciente_posicion') {
+    return 'Ya existe esa posicion de TD para esta paciente.';
+  }
+
+  if (err.constraint === 'ux_vacunas_spr_sr_paciente_posicion') {
+    return 'Ya existe esa posicion de SR/SPR para esta paciente.';
+  }
+
   if (err.constraint === 'ux_controles_embarazo_numero') {
     return 'Ya existe un control con ese numero para esta paciente';
   }
@@ -59,6 +71,18 @@ function uniqueMessage(err) {
 
 function fromPostgresError(err) {
   if (err.code === '23505') {
+    if (err.constraint === 'ux_vacunas_tdap_embarazo') {
+      return new AppError(409, uniqueMessage(err), {
+        code: 'TDAP_ALREADY_EXISTS',
+        details: { maximum: 1 },
+      });
+    }
+    if (err.constraint === 'ux_vacunas_td_paciente_posicion') {
+      return new AppError(409, uniqueMessage(err), { code: 'TD_POSITION_ALREADY_EXISTS' });
+    }
+    if (err.constraint === 'ux_vacunas_spr_sr_paciente_posicion') {
+      return new AppError(409, uniqueMessage(err), { code: 'SPR_SR_POSITION_ALREADY_EXISTS' });
+    }
     return new AppError(409, uniqueMessage(err), { code: 'DUPLICATE_RESOURCE' });
   }
 

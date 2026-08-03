@@ -29,7 +29,7 @@ const ACTOR = {
 };
 
 const VALID_VACCINE = {
-  tipo_vacuna: 'td_tdap',
+  tipo_vacuna: 'influenza',
   momento: 'durante_embarazo',
   numero_dosis: 1,
   fecha_dosis: '2026-06-15',
@@ -74,6 +74,16 @@ async function withClinicalService(kind, {
   const repositoryLabel = isRisk ? 'riesgoRepository' : 'vacunasRepository';
   const repositoryWithTransaction = {
     enTransaccion: async (operation) => operation({ transaction: true, kind }),
+    bloquearPaciente: async (pacienteId) => ({ id: pacienteId }),
+    listarHistoriaClinica: async () => [],
+    listarEmbarazosPaciente: async (pacienteId) => ([{
+      id: 91,
+      paciente_id: pacienteId,
+      estado: 'activo',
+      fur: '2026-01-01',
+      fecha_inicio: '2026-01-01',
+      fecha_cierre: null,
+    }]),
     ...repository,
   };
   const restore = [
@@ -455,8 +465,7 @@ test('vacuna crea evento privado solo con campos_registrados', async () => {
 
   await withClinicalService('vaccine', {
     repository: {
-      obtenerPorDosis: async () => null,
-      upsert: async (data) => {
+      insertar: async (data) => {
         savedData = data;
         return { id: 601, ...data };
       },
@@ -480,6 +489,7 @@ test('vacuna crea evento privado solo con campos_registrados', async () => {
     id: 601,
   });
   assert.deepEqual(payload.campos_registrados, [
+    'embarazo_id',
     'fecha_dosis',
     'momento',
     'numero_dosis',
@@ -488,7 +498,7 @@ test('vacuna crea evento privado solo con campos_registrados', async () => {
   assert.deepEqual(Object.keys(payload).sort(), ['campos_registrados', 'politica_version', 'resultado']);
   const serialized = JSON.stringify(recorder.events[0]);
   for (const forbidden of [
-    'td_tdap',
+    'influenza',
     'durante_embarazo',
     '2026-06-15',
     'Dato de interfaz',
@@ -498,7 +508,7 @@ test('vacuna crea evento privado solo con campos_registrados', async () => {
   ]) assert.equal(serialized.includes(forbidden), false);
 });
 
-test('vacuna actualiza solo nombres modificados sin tipo, dosis, fecha ni valores', async () => {
+test('vacuna actualiza solo nombres modificados sin tipo, valor interno, fecha ni valores', async () => {
   const recorder = privateAuditRecorder();
   const before = {
     id: 602,
@@ -525,16 +535,16 @@ test('vacuna actualiza solo nombres modificados sin tipo, dosis, fecha ni valore
     req: ACTOR,
   }));
 
-  assert.deepEqual(updatedArgs.campos, ['numero_dosis', 'fecha_dosis']);
+  assert.deepEqual(updatedArgs.campos, ['fecha_dosis']);
   const payload = privatePayload(recorder.events[0], {
     entity: 'vacuna',
     table: 'vacunas_paciente',
     action: 'actualizar',
     id: 602,
   });
-  assert.deepEqual(payload.campos_sensibles_modificados, ['fecha_dosis', 'numero_dosis']);
+  assert.deepEqual(payload.campos_sensibles_modificados, ['fecha_dosis']);
   const serialized = JSON.stringify(payload);
-  for (const forbidden of ['td_tdap', 'durante_embarazo', '2026-06-15', '2026-07-01']) {
+  for (const forbidden of ['influenza', 'durante_embarazo', '2026-06-15', '2026-07-01']) {
     assert.equal(serialized.includes(forbidden), false);
   }
   assert.equal(serialized.includes('"anterior"'), false);
@@ -580,36 +590,30 @@ test('vacuna equivalente y advertencia de similar no ejecutan DML ni auditoria',
   assert.equal(audits, 0);
 });
 
-test('upsert equivalente de vacuna no crea evento falso', async () => {
-  const before = {
-    id: 604,
-    paciente_id: 41,
-    embarazo_id: 91,
-    tipo_vacuna: 'td_tdap',
-    momento: 'durante_embarazo',
-    numero_dosis: 1,
-    fecha_dosis: null,
-  };
+test('una aplicación de Influenza equivalente crea un registro nuevo', async () => {
   let writes = 0;
   let audits = 0;
 
   await withClinicalService('vaccine', {
     repository: {
-      obtenerPorDosis: async () => before,
-      upsert: async () => { writes += 1; },
+      insertar: async (data) => {
+        writes += 1;
+        return { id: 604, ...data };
+      },
     },
     audit: async () => { audits += 1; },
   }, async (service) => {
-    assert.equal(await service.guardarVacuna({
+    const created = await service.guardarVacuna({
       pacienteId: 41,
       embarazoId: 91,
-      body: { ...VALID_VACCINE, fecha_dosis: '' },
+      body: VALID_VACCINE,
       req: ACTOR,
-    }), before);
+    });
+    assert.equal(created.id, 604);
   });
 
-  assert.equal(writes, 0);
-  assert.equal(audits, 0);
+  assert.equal(writes, 1);
+  assert.equal(audits, 1);
 });
 
 test('fallo de auditoria revierte atomicamente la vacuna', async () => {
@@ -631,8 +635,7 @@ test('fallo de auditoria revierte atomicamente la vacuna', async () => {
           throw error;
         }
       },
-      obtenerPorDosis: async () => null,
-      upsert: async (data) => {
+      insertar: async (data) => {
         stored = { id: 605, ...data };
         return stored;
       },
@@ -679,12 +682,13 @@ test('vacuna elimina con campos_eliminados y sin snapshot', async () => {
     id: 606,
   });
   assert.deepEqual(payload.campos_eliminados, [
+    'embarazo_id',
     'fecha_dosis',
     'momento',
     'numero_dosis',
     'tipo_vacuna',
   ]);
-  assert.equal(JSON.stringify(payload).includes('td_tdap'), false);
+  assert.equal(JSON.stringify(payload).includes('influenza'), false);
   assert.equal(JSON.stringify(payload).includes('2026-06-15'), false);
 });
 
@@ -786,8 +790,7 @@ test('vacunas permanecen aisladas por embarazo y el cerrado no genera auditoria'
 
   await assert.rejects(withClinicalService('vaccine', {
     repository: {
-      obtenerPorDosis: async () => null,
-      upsert: async () => { writes += 1; },
+      insertar: async () => { writes += 1; },
     },
     pregnancies: {
       validarEmbarazoEditable: async () => { throw closedPregnancyError(); },

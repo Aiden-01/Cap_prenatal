@@ -245,7 +245,7 @@ const chatbotKnowledge = [
       'dosis',
     ],
     answer:
-      'Para registrar una vacuna:\n1. Abre el expediente de la paciente.\n2. Entra en la pestaña "Vacunas".\n3. Presiona "Registrar vacuna".\n4. Selecciona el tipo: Td/Tdap, Influenza o SPR/SR.\n5. Selecciona el momento: previo embarazo, durante embarazo o postparto/aborto.\n6. Ingresa No. de dosis y fecha de dosis.\n7. Presiona "Guardar".',
+      'Para registrar una vacuna:\n1. Abre el expediente de la paciente.\n2. Entra en la pestaña "Vacunas".\n3. Presiona "Registrar vacuna".\n4. Selecciona el tipo: TD, Tdap, Influenza o SR/SPR.\n5. Selecciona el momento: previo embarazo, durante embarazo o postparto/aborto.\n6. Ingresa No. de dosis y fecha de dosis.\n7. Presiona "Guardar".',
     suggestions: [],
   },
   {
