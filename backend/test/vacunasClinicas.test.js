@@ -400,6 +400,57 @@ test('dos solicitudes concurrentes para la misma posición TD dejan un solo regi
   });
 });
 
+test('solicitudes concurrentes protegen SR/SPR y Tdap por sus reglas clínicas', async () => {
+  const cases = [
+    {
+      body: vaccine(VACCINE_TYPES.SPR_SR, 2, '2025-12-01', {
+        momento: VACCINE_MOMENTS.BEFORE_PREGNANCY,
+      }),
+      code: 'SPR_SR_POSITION_ALREADY_EXISTS',
+    },
+    {
+      body: vaccine(VACCINE_TYPES.TDAP, 1, '2026-05-21'),
+      code: 'TDAP_ALREADY_EXISTS',
+    },
+  ];
+
+  for (const scenario of cases) {
+    await withClinicalService({}, async (service, history) => {
+      const input = {
+        pacienteId: 41,
+        embarazoId: 91,
+        body: scenario.body,
+        req: REQUEST,
+      };
+      const results = await Promise.allSettled([
+        service.guardarVacuna(input),
+        service.guardarVacuna(input),
+      ]);
+      assert.equal(results.filter(({ status }) => status === 'fulfilled').length, 1);
+      assert.equal(results.find(({ status }) => status === 'rejected').reason.code, scenario.code);
+      assert.equal(history().length, 1);
+    });
+  }
+});
+
+test('dos Influenza concurrentes legítimas permanecen como registros independientes', async () => {
+  await withClinicalService({}, async (service, history) => {
+    const input = {
+      pacienteId: 41,
+      embarazoId: 91,
+      body: vaccine(VACCINE_TYPES.INFLUENZA, 1, '2026-06-01'),
+      req: REQUEST,
+    };
+    const results = await Promise.all([
+      service.guardarVacuna(input),
+      service.guardarVacuna(input),
+    ]);
+    assert.equal(new Set(results.map(({ id }) => id)).size, 2);
+    assert.equal(history().length, 2);
+    assert.ok(history().every(({ numero_dosis }) => numero_dosis === 1));
+  });
+});
+
 test('Influenza inserta aplicaciones independientes con valor interno 1', async () => {
   const pregnancies = [
     pregnancy(91),
@@ -464,7 +515,7 @@ test('Influenza edita y elimina únicamente el registro seleccionado por ID', as
   });
 });
 
-test('validadores requieren posición explícita y permiten editar embarazo relacionado', () => {
+test('validadores requieren posición explícita, fecha para toda vacuna y permiten editar embarazo relacionado', () => {
   assert.equal(vacunaSchema.safeParse({
     tipo_vacuna: VACCINE_TYPES.TD,
     momento: VACCINE_MOMENTS.DURING_PREGNANCY,
@@ -482,6 +533,16 @@ test('validadores requieren posición explícita y permiten editar embarazo rela
     numero_dosis: 2,
     fecha_dosis: '2026-06-01',
   }).success, false);
+  assert.equal(vacunaSchema.safeParse({
+    tipo_vacuna: VACCINE_TYPES.INFLUENZA,
+    momento: VACCINE_MOMENTS.DURING_PREGNANCY,
+    numero_dosis: 1,
+  }).success, false);
+  assert.equal(vacunaUpdateSchema.safeParse({
+    tipo_vacuna: VACCINE_TYPES.INFLUENZA,
+    momento: VACCINE_MOMENTS.DURING_PREGNANCY,
+    fecha_dosis: '',
+  }).success, false);
 });
 
 test('migración 011 libera únicamente aplicaciones de Influenza', () => {
@@ -496,6 +557,18 @@ test('migración 011 libera únicamente aplicaciones de Influenza', () => {
   assert.doesNotMatch(migration, /DROP INDEX IF EXISTS ux_vacunas_spr_sr_paciente_posicion/);
   assert.doesNotMatch(migration, /DROP INDEX IF EXISTS ux_vacunas_tdap_embarazo/);
   assert.doesNotMatch(migration, /DELETE FROM vacunas_paciente/);
+});
+
+test('migración 012 exige fecha sin borrar ni inventar datos históricos', () => {
+  const migration = fs.readFileSync(path.join(
+    __dirname,
+    '../src/db/migrations/012_vax5_correccion_final.sql'
+  ), 'utf8');
+  assert.match(migration, /CHECK \(fecha_dosis IS NOT NULL\) NOT VALID/);
+  assert.match(migration, /VALIDATE CONSTRAINT vacunas_paciente_fecha_clinica_check/);
+  assert.match(migration, /WHERE fecha_dosis IS NULL/);
+  assert.doesNotMatch(migration, /DELETE FROM vacunas_paciente/);
+  assert.doesNotMatch(migration, /UPDATE vacunas_paciente/);
 });
 
 test('migración 010 protege posiciones por paciente y limita Tdap clínica por embarazo', () => {
@@ -517,6 +590,7 @@ test('schema nuevo conserva los tres momentos oficiales y los índices VAX-3.1',
   assert.match(schema, /ux_vacunas_spr_sr_paciente_posicion/);
   assert.match(schema, /momento IN \('durante_embarazo', 'postparto_aborto'\)/);
   assert.match(schema, /tipo_vacuna = 'influenza' AND numero_dosis = 1/);
+  assert.match(schema, /vacunas_paciente_fecha_clinica_check CHECK \(fecha_dosis IS NOT NULL\)/);
   assert.match(schema, /DROP INDEX IF EXISTS ux_vacunas_embarazo_dosis/);
   assert.doesNotMatch(schema, /CREATE UNIQUE INDEX IF NOT EXISTS ux_vacunas_embarazo_dosis/);
 });

@@ -34,11 +34,12 @@ const validateClinicalDose = (data, ctx, { requireDate = false } = {}) => {
       message: `${data.tipo_vacuna === VACCINE_TYPES.SPR_SR ? 'SR/SPR' : data.tipo_vacuna.toUpperCase()} permite maximo ${rule.maximum} dosis`,
     });
   }
-  if (requireDate && rule && !data.fecha_dosis) {
+  const dateWasSubmitted = Object.prototype.hasOwnProperty.call(data, 'fecha_dosis');
+  if ((requireDate || dateWasSubmitted) && !data.fecha_dosis) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['fecha_dosis'],
-      message: 'La fecha de aplicacion es obligatoria para esta vacuna',
+      message: 'La fecha de aplicacion es obligatoria para toda vacuna',
     });
   }
 };

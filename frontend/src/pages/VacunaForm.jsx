@@ -13,6 +13,7 @@ import {
 } from "../components/VaccineFlow";
 import VaccineClinicalDialog from "../components/VaccineClinicalDialog";
 import { useGlobalToast } from "../context/ToastContext";
+import { useAuth } from "../hooks/useAuth";
 import { useFieldErrors } from "../hooks/useFieldErrors";
 import { calculateGestationalAge } from "../utils/gestationalAge";
 import { getGuatemalaDateInputValue } from "../utils/guatemalaTime";
@@ -92,6 +93,7 @@ export default function VacunaForm() {
   const embarazoId = searchParams.get("embarazo_id") || "";
   const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=vacunas`;
   const toast = useGlobalToast();
+  const { usuario } = useAuth();
   const [form, setForm] = useState(INIT);
   const [expediente, setExpediente] = useState(null);
   const [historialVacunas, setHistorialVacunas] = useState([]);
@@ -100,11 +102,14 @@ export default function VacunaForm() {
   const [loadError, setLoadError] = useState("");
   const [clinicalAlert, setClinicalAlert] = useState(null);
   const submitButtonRef = useRef(null);
+  const submittingRef = useRef(false);
   const fieldErrors = useFieldErrors(FIELD_LABELS, inferVacunaFieldErrors);
   const editando = Boolean(vacunaId);
+  const writePermission = editando ? "controles.editar" : "controles.crear";
+  const canWrite = Boolean(usuario?.permisos?.includes(writePermission));
   const pregnancy = expediente?.embarazo_seleccionado || expediente?.embarazo_activo || null;
   const pregnancyState = String(pregnancy?.estado || "").toLowerCase();
-  const readOnly = Boolean(expediente?.is_read_only || pregnancyState === "cerrado");
+  const readOnly = Boolean(expediente?.is_read_only || pregnancyState === "cerrado" || !canWrite);
   const today = getGuatemalaDateInputValue();
 
   useEffect(() => {
@@ -273,7 +278,7 @@ export default function VacunaForm() {
 
   const submit = async (event) => {
     event.preventDefault();
-    if (loading || initialLoading || readOnly) return;
+    if (submittingRef.current || loading || initialLoading || readOnly) return;
     const missing = firstMissingVaccineField(form);
     if (missing) {
       fieldErrors.setErrorsFromResponse({
@@ -286,6 +291,7 @@ export default function VacunaForm() {
       setClinicalAlert(preflightClinicalAlert);
       return;
     }
+    submittingRef.current = true;
     setLoading(true);
     fieldErrors.clearFieldErrors();
     const requestData = buildVaccineRequestData(form);
@@ -323,6 +329,7 @@ export default function VacunaForm() {
         dose: selectedDose,
         applicationDate: form.fecha_dosis,
       });
+      submittingRef.current = false;
       setLoading(false);
       if (presentation.clinicalAlert) {
         fieldErrors.clearFieldErrors();
@@ -345,6 +352,7 @@ export default function VacunaForm() {
       </header>
 
       {loadError ? <div className="error-box">{loadError}</div> : null}
+      {!canWrite ? <div className="error-box">No tienes permiso para {editando ? "editar" : "registrar"} vacunas.</div> : null}
 
       <form className="vaccine-flow" onSubmit={submit} noValidate>
         <section className="vaccine-flow-section">
@@ -397,7 +405,7 @@ export default function VacunaForm() {
 
             <footer className="vaccine-form-actions">
               <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>Volver al historial</button>
-              <button ref={submitButtonRef} type="submit" className="btn-primary" disabled={loading || initialLoading || readOnly}><Save size={15} /> {loading ? "Guardando..." : editando ? "Guardar cambios" : "Registrar aplicación"}</button>
+              {canWrite ? <button ref={submitButtonRef} type="submit" className="btn-primary" disabled={loading || initialLoading || readOnly}><Save size={15} /> {loading ? "Guardando..." : editando ? "Guardar cambios" : "Registrar aplicación"}</button> : null}
             </footer>
           </>
         ) : null}

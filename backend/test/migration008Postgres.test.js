@@ -127,7 +127,7 @@ isolatedTest('migracion 008 en cuatro bases PostgreSQL temporales', async (t) =>
 
       const first = await runMigration(url);
       assert.equal(first.ok, true);
-      assert.match(first.entries.log[0], /5 aplicada\(s\), 0 omitida\(s\)/);
+      assert.match(first.entries.log[0], /9 aplicada\(s\), 0 omitida\(s\)/);
 
       await withClient(url, async (client) => {
         const { rows } = await client.query(
@@ -152,7 +152,7 @@ isolatedTest('migracion 008 en cuatro bases PostgreSQL temporales', async (t) =>
 
       const second = await runMigration(url);
       assert.equal(second.ok, true);
-      assert.match(second.entries.log[0], /0 aplicada\(s\), 5 omitida\(s\)/);
+      assert.match(second.entries.log[0], /0 aplicada\(s\), 9 omitida\(s\)/);
       await withClient(url, async (client) => {
         const { rows } = await client.query(
           `SELECT COUNT(*)::integer AS total, MIN(checksum) AS checksum

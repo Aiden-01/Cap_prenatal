@@ -224,12 +224,20 @@ los criterios bajo `factores_riesgo` y solo agrega el nombre `tiene_riesgo` si
 cambia el resultado. El mapa, contadores y dashboard consultan ese resultado;
 no ejecutan DML derivado ni generan eventos duplicados.
 
-Las vacunas del embarazo seleccionado usan la misma transaccion para bloqueo,
-upsert/actualizacion/eliminacion y auditoria. Solo se envian marcadores internos
-por nombre de campo al constructor privado; tipo, momento, dosis y fecha nunca
-llegan al repositorio de auditoria. `GET /vacunas/antecedentes` conserva la
-separacion historica existente y es solo lectura, por lo que no tiene productor
-de auditoria ni entidad privada adicional.
+Las vacunas del embarazo seleccionado usan la misma transaccion para bloqueo de
+paciente y embarazo, insercion/actualizacion/eliminacion por ID y auditoria. El
+servicio proyecta y revalida la historia longitudinal antes del DML. Los indices
+parciales protegen posiciones TD y SR/SPR por paciente, y Tdap durante/postparto
+por embarazo; Influenza no tiene indice de unicidad clinica y cada POST crea una
+fila independiente con `numero_dosis = 1`. La serializacion por paciente evita
+carreras entre validacion y escritura sin bloquear aplicaciones legitimas de
+Influenza.
+
+Solo se envian marcadores internos por nombre de campo al constructor privado;
+tipo, momento, dosis y fecha nunca llegan al repositorio de auditoria. Un fallo
+de auditoria obligatoria revierte el DML. `GET /vacunas/antecedentes` conserva
+la separacion historica existente y es solo lectura, por lo que no tiene
+productor de auditoria ni entidad privada adicional.
 
 Morbilidad mantiene sus rutas reales de lista, detalle, creacion, actualizacion
 y eliminacion. Las tres escrituras bloquean el embarazo y comparten cliente con

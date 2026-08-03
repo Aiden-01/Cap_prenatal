@@ -186,7 +186,11 @@ nominal.
 - Vacunas: creacion/eliminacion conserva nombres y actualizacion solo el delta
   efectivo. Tipo, momento, dosis y fecha nunca conservan valor. Antecedentes de
   otros embarazos y filas legacy son de solo lectura y no generan auditoria de
-  modificacion.
+  modificacion. Cada creacion de Influenza genera su propio evento y su propio
+  ID; editar o eliminar afecta y audita solo ese ID. Cambios de posicion TD,
+  momento o embarazo relacionado registran los nombres de campos modificados.
+  Un rechazo clinico anterior al DML no crea exito, y un fallo al insertar la
+  auditoria obligatoria revierte la operacion completa.
 - Morbilidad: creacion/eliminacion conserva nombres y actualizacion solo el
   delta real. Motivo, historia, diagnostico/impresion, tratamiento, referencia,
   medicamentos, dosis, observaciones, fechas y texto libre nunca conservan valor.

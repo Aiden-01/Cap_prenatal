@@ -752,6 +752,7 @@ export default function ExpedientePaciente() {
   const puedeEditarPacientes = Boolean(usuario?.permisos?.includes("pacientes.editar"));
   const puedeConsultarControles = Boolean(usuario?.permisos?.includes("pacientes.ver"));
   const puedeCrearControles = Boolean(usuario?.permisos?.includes("controles.crear"));
+  const puedeEditarControles = Boolean(usuario?.permisos?.includes("controles.editar"));
   const puedeCrearEmbarazo = canCreatePregnancy(exp, puedeEditarPacientes);
   const etiquetaCrearEmbarazo = pregnancyActionLabel(exp);
   const embarazoSeleccionadoId = embarazoSeleccionado?.id ? String(embarazoSeleccionado.id) : "";
@@ -1899,7 +1900,7 @@ export default function ExpedientePaciente() {
           <section className="vaccines-card vaccines-main-card">
             <div className="vaccines-card-heading">
               <h3>Vacunas registradas en este embarazo</h3>
-              {!isReadOnly && (
+              {!isReadOnly && puedeCrearControles && (
                 <button className="btn-primary vaccines-register-button" onClick={() => navigate(rutaClinica(`/pacientes/${id}/vacunas/nuevo`))}>
                   <Plus size={14} /> Registrar vacuna
                 </button>
@@ -1944,7 +1945,7 @@ export default function ExpedientePaciente() {
                                   <th>Fecha</th>
                                   <th>Momento</th>
                                   <th>Relación</th>
-                                  {!isReadOnly && <th>Acciones</th>}
+                                  {!isReadOnly && puedeEditarControles && <th>Acciones</th>}
                                 </tr>
                               </thead>
                               <tbody>
@@ -1955,7 +1956,7 @@ export default function ExpedientePaciente() {
                                     <td data-label="Fecha">{fecha(v.fecha_dosis)}</td>
                                     <td data-label="Momento">{vaccineMomentLabel(v.momento)}</td>
                                     <td data-label="Relación"><span className="badge badge-blue">{relacionVacunaSeleccionada}</span></td>
-                                    {!isReadOnly && (
+                                    {!isReadOnly && puedeEditarControles && (
                                       <td data-label="Acciones">
                                         <div className="vaccines-actions">
                                           <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/vacunas/${v.id}/editar`))}>

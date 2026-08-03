@@ -92,6 +92,39 @@ test('ausencia total marca No y las fechas se dibujan en orden cronológico', ()
   assert.deepEqual(years.map(({ x }) => x), [402, 485, 570]);
 });
 
+test('exceso de fechas usa los primeros dos antecedentes y las primeras tres aplicaciones actuales', () => {
+  const drawn = [];
+  const page = {
+    getHeight: () => 936,
+    drawText: (value, options) => drawn.push({ value, ...options }),
+  };
+  const font = { widthOfTextAtSize: (value) => String(value).length * 3 };
+  drawVaccines(page, font, [
+    record('td', '2020-01-01', 'previo_embarazo', { id: 1 }),
+    record('td', '2021-01-01', 'previo_embarazo', { id: 2 }),
+    record('influenza', '2022-01-01', 'previo_embarazo', { id: 3 }),
+    record('tdap', '2023-01-01', 'durante_embarazo', { id: 4 }),
+    record('influenza', '2024-01-01', 'durante_embarazo', { id: 5 }),
+    record('influenza', '2025-01-01', 'durante_embarazo', { id: 6 }),
+    record('spr_sr', '2026-01-01', 'postparto_aborto', { id: 7 }),
+  ], coords.pages[1]);
+  assert.deepEqual(
+    drawn.filter(({ value }) => /^20\d{2}$/.test(value)).map(({ value }) => value),
+    ['2020', '2021', '2023', '2024', '2025']
+  );
+});
+
+test('fecha vacía no imprime Invalid Date ni rompe el PDF', () => {
+  const drawn = [];
+  const page = {
+    getHeight: () => 936,
+    drawText: (value, options) => drawn.push({ value, ...options }),
+  };
+  const font = { widthOfTextAtSize: (value) => String(value).length * 3 };
+  drawVaccines(page, font, [record('influenza', null)], coords.pages[1]);
+  assert.equal(drawn.some(({ value }) => /Invalid Date/i.test(String(value))), false);
+});
+
 test('plantilla permanece byte por byte y coordenadas oficiales no cambian', () => {
   const root = path.join(__dirname, '../src');
   const template = fs.readFileSync(path.join(root, 'assets/mspas/ficha_clinica_embarazo_puerperio.pdf'));

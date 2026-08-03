@@ -179,13 +179,42 @@ Restricciones importantes que el backend traduce a mensajes claros:
 - Plan de parto unico por embarazo.
 - Numero de control unico por embarazo.
 - Numero de atencion puerperio unico por embarazo.
-- Vacuna/dosis unica segun regla de negocio.
+- Posicion TD unica por paciente mediante `ux_vacunas_td_paciente_posicion`.
+- Posicion SR/SPR unica por paciente mediante `ux_vacunas_spr_sr_paciente_posicion`.
+- Tdap durante/postparto unica por embarazo mediante `ux_vacunas_tdap_embarazo`;
+  una Tdap previa queda fuera de ese indice parcial.
+- Influenza no tiene indice unico: cada fila es una aplicacion independiente con
+  `numero_dosis = 1`.
+- Catalogo, momento, posicion y fecha clinica de vacunas protegidos por checks.
 
 La politica de aplicacion admite un embarazo nuevo solo si no existe otro en
 estado `activo` o `puerperio`. El POST bloquea la fila de la paciente con
 `SELECT ... FOR UPDATE` antes de comprobar ambos estados, por lo que dos POST
 concurrentes que usen el flujo normal quedan serializados. La restriccion
 `UNIQUE (paciente_id, numero_embarazo)` protege tambien la numeracion historica.
+
+### Estructura definitiva de vacunas
+
+`vacunas_paciente` almacena solo `td`, `tdap`, `influenza` y `spr_sr`. No existen
+columnas ni tablas de temporada. El numero interno admite TD 1-5, Tdap 1,
+SR/SPR 1-2 e Influenza 1. `momento` admite `previo_embarazo`,
+`durante_embarazo` y `postparto_aborto`; `fecha_dosis` es obligatoria para toda
+aplicacion.
+
+Las migraciones son inmutables y se aplican en orden por checksum:
+
+- `009_vax2_reglas_vacunas.sql`: catalogo y constraints clinicos base.
+- `010_vax31_historias_parciales.sql`: posiciones longitudinales parciales e
+  indice Tdap limitado a durante/postparto.
+- `011_vax4_influenza_aplicaciones_independientes.sql`: elimina la unicidad
+  generica, normaliza Influenza a 1 y conserva los indices especificos.
+- `012_vax5_correccion_final.sql`: corrige la excepcion que permitia Influenza
+  sin fecha. Agrega el check como `NOT VALID` para no borrar ni inventar fechas
+  historicas y lo valida automaticamente cuando no existen filas nulas.
+
+`schema.sql` representa la instalacion nueva final. En una actualizacion, el
+migrador toma un advisory lock, ejecuta cada archivo en transaccion, registra
+checksum una sola vez y revierte el archivo completo ante error.
 
 El indice parcial existente `ux_embarazo_activo_paciente` cubre unicamente
 `WHERE estado = 'activo'`; no impide por si solo combinaciones con `puerperio`

@@ -245,7 +245,7 @@ const chatbotKnowledge = [
       'dosis',
     ],
     answer:
-      'Para registrar una vacuna:\n1. Abre el expediente de la paciente.\n2. Entra en la pestaña "Vacunas".\n3. Presiona "Registrar vacuna".\n4. Selecciona el tipo: TD, Tdap, Influenza o SR/SPR.\n5. Selecciona el momento: previo embarazo, durante embarazo o postparto/aborto.\n6. Ingresa No. de dosis y fecha de dosis.\n7. Presiona "Guardar".',
+      'Para registrar una vacuna:\n1. Abre el expediente de la paciente.\n2. Entra en la pestaña "Vacunas".\n3. Presiona "Registrar vacuna".\n4. Selecciona el tipo: TD, Tdap, Influenza o SR/SPR.\n5. Selecciona el momento: previo embarazo, durante embarazo o postparto/aborto.\n6. Para TD o SR/SPR selecciona la posición documentada; Tdap es una aplicación única e Influenza es una aplicación simple. Ingresa siempre la fecha de aplicación.\n7. Presiona "Guardar".',
     suggestions: [],
   },
   {
@@ -262,7 +262,7 @@ const chatbotKnowledge = [
       'vacuna quedo incorrecta',
     ],
     answer:
-      'Para editar una vacuna:\n1. Abre el expediente de la paciente.\n2. Entra en la pestaña "Vacunas".\n3. Busca la vacuna registrada.\n4. Presiona "Editar".\n5. Corrige tipo, momento, dosis o fecha.\n6. Presiona "Guardar".\n\nVerifica fecha, tipo de vacuna y dosis antes de guardar.',
+      'Para editar una vacuna:\n1. Abre el expediente de la paciente.\n2. Entra en la pestaña "Vacunas".\n3. Busca la aplicación registrada.\n4. Presiona "Editar".\n5. Corrige tipo, momento, fecha o posición cuando la vacuna la utilice. Influenza no tiene selector de dosis.\n6. Presiona "Guardar".\n\nVerifica la fecha, el tipo y el momento antes de guardar.',
     suggestions: [],
   },
   {

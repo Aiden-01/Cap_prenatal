@@ -226,14 +226,37 @@ La lectura se realiza dentro del expediente y la creacion o actualizacion desde 
 
 Base: `/pacientes/:pacienteId/vacunas`
 
-| Metodo | Ruta | Descripcion |
-| --- | --- | --- |
-| `GET` | `/` | Lista vacunas del embarazo. |
-| `POST` | `/` | Crea vacuna. |
-| `GET` | `/antecedentes` | Lista antecedentes de vacunacion de otros embarazos o registros sin embarazo, excluyendo opcionalmente el embarazo actual. |
-| `GET` | `/:id` | Obtiene vacuna. |
-| `PUT` | `/:id` | Actualiza vacuna. |
-| `DELETE` | `/:id` | Elimina vacuna. |
+| Metodo | Ruta | Permiso | Descripcion |
+| --- | --- | --- | --- |
+| `GET` | `/?embarazo_id=:id` | `pacientes.ver` | Lista vacunas del embarazo seleccionado. |
+| `POST` | `/?embarazo_id=:id` | `controles.crear` | Crea una aplicacion nueva. Influenza nunca reemplaza otra fila. |
+| `GET` | `/antecedentes?excluir_embarazo_id=:id` | `pacientes.ver` | Lista antecedentes de otros embarazos o filas sin embarazo. |
+| `GET` | `/:id?embarazo_id=:id` | `pacientes.ver` | Obtiene una aplicacion del embarazo seleccionado. |
+| `PUT` | `/:id?embarazo_id=:id` | `controles.editar` | Actualiza exclusivamente el ID solicitado y revalida la historia. |
+| `DELETE` | `/:id?embarazo_id=:id` | `controles.editar` | Elimina exclusivamente el ID solicitado. |
+
+Body de creacion:
+
+```json
+{
+  "tipo_vacuna": "td | tdap | influenza | spr_sr",
+  "momento": "previo_embarazo | durante_embarazo | postparto_aborto",
+  "numero_dosis": 1,
+  "fecha_dosis": "YYYY-MM-DD"
+}
+```
+
+`embarazo_id`, momento y fecha son obligatorios para escribir. Influenza usa
+internamente `numero_dosis = 1`, pero el frontend no muestra selector de dosis.
+TD admite posiciones 1 a 5 y SR/SPR 1 a 2; sus primeras filas locales pueden
+ser posiciones posteriores. Tdap usa posicion interna 1 y una Tdap previa no
+consume la aplicacion durante/postparto del embarazo relacionado.
+
+El backend aplica intervalos calendario, 20 semanas para Tdap durante embarazo,
+prohibicion de SR/SPR durante embarazo, coherencia del momento y solo lectura
+para embarazos cerrados. Conflictos clinicos responden `409` con `code` y
+`details`; validaciones de body responden `400`. La ausencia de permiso responde
+`403` aun si se manipula directamente la URL o el payload.
 
 ## Morbilidad
 

@@ -93,3 +93,24 @@ test("campos simples enfocan el primer control inválido sin deshabilitar silenc
   assert.match(form, /disabled=\{loading \|\| initialLoading \|\| readOnly\}/);
   assert.doesNotMatch(form, /disabled=\{!canSubmit\}/);
 });
+
+test("doble envío se bloquea de forma síncrona y se restaura tras error", async () => {
+  const form = await source("src/pages/VacunaForm.jsx");
+  const submit = form.slice(form.indexOf("const submit = async"), form.indexOf("if (initialLoading)"));
+  assert.match(form, /const submittingRef = useRef\(false\)/);
+  assert.match(submit, /if \(submittingRef\.current \|\| loading/);
+  assert.ok(submit.indexOf("submittingRef.current = true") < submit.indexOf("api.put"));
+  assert.ok(submit.indexOf("submittingRef.current = true") < submit.indexOf("api.post"));
+  assert.match(submit, /catch \(error\)[\s\S]*?submittingRef\.current = false[\s\S]*?setLoading\(false\)/);
+  assert.match(form, /loading \? "Guardando\.\.\."/);
+});
+
+test("acciones de vacunas respetan permisos de creación y edición", async () => {
+  const form = await source("src/pages/VacunaForm.jsx");
+  const record = await source("src/pages/ExpedientePaciente.jsx");
+  assert.match(form, /writePermission = editando \? "controles\.editar" : "controles\.crear"/);
+  assert.match(form, /canWrite \? <button ref=\{submitButtonRef\}/);
+  assert.match(record, /!isReadOnly && puedeCrearControles && \(/);
+  assert.match(record, /!isReadOnly && puedeEditarControles && <th>Acciones<\/th>/);
+  assert.match(record, /!isReadOnly && puedeEditarControles && \(/);
+});

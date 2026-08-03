@@ -830,16 +830,68 @@ Los antecedentes de vacunacion se leen desde:
 GET /api/pacientes/:pacienteId/vacunas/antecedentes?excluir_embarazo_id=:id
 ```
 
-Reglas:
+Catalogo y reglas definitivas:
 
-- Las vacunas del embarazo seleccionado son editables solo si el embarazo esta `activo` o `puerperio`.
-- Las vacunas de otros embarazos se muestran como antecedentes.
-- Una vacuna sin `embarazo_id` se considera antecedente de solo lectura.
-- Para crear, actualizar o eliminar vacunas, `embarazo_id` es obligatorio.
-- Crear, actualizar o eliminar comparte transaccion con la auditoria privada; un
-  fallo de auditoria revierte la vacuna.
-- El evento conserva solo nombres de campos. Una advertencia de vacuna similar
-  o la lectura de antecedentes no genera una modificacion auditada.
+- `td`: cinco posiciones longitudinales por paciente (Dosis 1, Dosis 2, Dosis
+  3, Refuerzo 1 y Refuerzo 2). El primer registro local puede ser cualquiera y
+  los huecos se describen como no registrados. Los intervalos acumulados son un
+  mes, seis meses, diez anos y diez anos, siempre por calendario.
+- `tdap`: una aplicacion durante embarazo o postparto/aborto por embarazo. Se
+  admite durante embarazo desde 20 semanas. Una fila previa es antecedente y no
+  consume la aplicacion del embarazo actual.
+- `spr_sr`: dos posiciones longitudinales por paciente; puede iniciar en Dosis
+  2, exige un mes calendario si constan ambas y no se permite durante embarazo.
+- `influenza`: aplicacion simple repetible. No tiene selector de dosis, esquema,
+  temporada, campana, intervalo, limite anual, cita ni estado completado. Cada
+  guardado confirmado inserta una fila distinta y edicion/eliminacion usan ID.
+
+El usuario elige `previo_embarazo`, `durante_embarazo` o `postparto_aborto`.
+Momento y fecha `YYYY-MM-DD` son obligatorios y se contrastan con FUR/inicio y
+cierre cuando esos datos existen. La edad gestacional se calcula en la fecha de
+aplicacion. Meses y anos usan calendario con ajuste de fin de mes y bisiestos;
+la fecha habil sugerida mueve sabado o domingo al lunes y no incorpora feriados.
+
+Las vacunas propias del embarazo seleccionado son editables solo si el embarazo
+esta `activo` o `puerperio`. Las de otros embarazos y las filas sin
+`embarazo_id` se presentan como antecedentes de solo lectura. Para crear,
+actualizar o eliminar, `embarazo_id` es obligatorio. Cambiar fecha, posicion,
+momento, tipo o embarazo proyecta y revalida la historia longitudinal completa.
+
+Cada escritura abre transaccion, bloquea paciente y embarazo, ejecuta DML y
+auditoria obligatoria en el mismo cliente. Los indices parciales protegen TD,
+SR/SPR y Tdap ante concurrencia. Influenza no posee unicidad clinica: dos POST
+legitimos pueden crear dos filas; el formulario usa un candado sincronico para
+que un doble clic no emita el segundo POST accidental.
+
+El frontend oculta Registrar con ausencia de `controles.crear` y
+Editar/Eliminar con ausencia de `controles.editar`; el backend vuelve a validar
+siempre. Tras guardar usa `replace: true`, regresa a `tab=vacunas`, recarga el
+expediente y muestra confirmacion persistente. El dialogo clinico central cubre
+intervalos, duplicados, Tdap antes de 20 semanas, Tdap existente, SR/SPR durante
+embarazo, momento incompatible y esquema completo; atrapa foco, admite Escape,
+devuelve foco y funciona desde 320 px sin mostrar terminologia tecnica.
+
+Crear, actualizar o eliminar comparte transaccion con la auditoria privada; un
+fallo de auditoria revierte la vacuna. El evento conserva ID, paciente,
+embarazo, accion y nombres de campos, nunca valores clinicos. Una lectura o un
+rechazo anterior al DML no genera una modificacion auditada.
+
+#### PDF oficial y capacidad fisica
+
+La combinacion TD/Tdap existe solo al preparar el PDF; la base conserva ambos
+tipos separados. El repositorio carga vacunas exclusivamente del embarazo y la
+paciente seleccionados, ordenadas por `fecha_dosis` e ID. El generador marca por
+fila TD/Tdap, Influenza y SR/SPR, imprime fechas sin conversion de zona horaria
+y marca "No" solo si esa fila no tiene registros aplicables.
+
+La plantilla, coordenadas y cuatro paginas no se modifican. Los casilleros de
+fecha son globales para la seccion: dos para `previo_embarazo` y tres para
+`durante_embarazo`/`postparto_aborto`. La politica vigente es determinista:
+orden cronologico ascendente, desempate por ID y primeros registros aplicables
+(primeros dos previos y primeros tres durante/postparto). Los registros
+adicionales permanecen en base e historial, pero no caben en el formato. No se
+agregan filas, paginas ni casilleros. Una fecha historica vacia se omite sin
+imprimir `Invalid Date`; la migracion 012 impide nuevas aplicaciones sin fecha.
 
 ### Morbilidad
 

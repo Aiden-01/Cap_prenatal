@@ -97,6 +97,16 @@ test('catalogo declara exactamente las seis guias iniciales con estructura segur
   }
 });
 
+test('guía de vacunas conserva catálogo definitivo e Influenza simple', () => {
+  const vaccineHelp = chatbotKnowledge.find(({ id }) => id === 'vacunas').answer;
+  const vaccineEditHelp = chatbotKnowledge.find(({ id }) => id === 'editar_vacuna').answer;
+  assert.match(vaccineHelp, /TD, Tdap, Influenza o SR\/SPR/);
+  assert.match(vaccineHelp, /Influenza es una aplicación simple/);
+  assert.match(vaccineHelp, /Ingresa siempre la fecha de aplicación/);
+  assert.match(vaccineEditHelp, /Influenza no tiene selector de dosis/);
+  assert.doesNotMatch(`${vaccineHelp}\n${vaccineEditHelp}`, /No\. de dosis/);
+});
+
 for (const [guideId, message] of GUIDE_STARTS) {
   test(`inicia la guia ${guideId} mostrando solo el primer paso`, () => {
     const guide = chatbotGuides[guideId];

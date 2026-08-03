@@ -204,6 +204,28 @@ cap_prenatal/
 - La auditoria no debe guardar contrasenas, tokens ni snapshots clinicos innecesariamente grandes.
 - Los campos sensibles de VIH se filtran segun permisos.
 
+## Modulo de vacunas
+
+El catalogo persistido es `td`, `tdap`, `influenza` y `spr_sr`. TD y Tdap son
+vacunas distintas en base de datos y solo se combinan en la fila visual TD/Tdap
+del PDF oficial. TD conserva cinco posiciones longitudinales; SR/SPR, dos;
+Tdap permite una aplicacion durante embarazo o postparto por embarazo; e
+Influenza es una aplicacion simple, repetible e independiente, sin temporada,
+campana, limite anual, esquema ordinal ni proxima cita.
+
+El primer registro local de TD o SR/SPR puede ser una posicion posterior: una
+ausencia se presenta como "no registrada en el sistema", no como vacuna no
+aplicada. Los intervalos se calculan por meses o anos calendario y la fecha
+clinica se maneja como `YYYY-MM-DD`, sin conversion UTC visible. Las escrituras
+requieren momento y fecha, bloquean paciente/embarazo, revalidan la historia y
+guardan auditoria dentro de la misma transaccion.
+
+Las migraciones `009` a `012` establecen el catalogo, historias parciales,
+Influenza repetible y fecha obligatoria. Despues de actualizar el codigo se debe
+ejecutar `npm run db:migrate` desde `backend`; no se agregaron dependencias para
+este modulo. El detalle de reglas, indices, frontend y capacidad del PDF esta en
+`docs/GUIA_TECNICA.md`, `docs/API.md` y `docs/BASE_DATOS.md`.
+
 ## Sesiones de seguridad
 
 El login crea una fila en PostgreSQL (`auth_sessions`), un access JWT de 10

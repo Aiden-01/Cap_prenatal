@@ -323,9 +323,7 @@ CREATE TABLE IF NOT EXISTS vacunas_paciente (
     OR (tipo_vacuna = 'spr_sr' AND numero_dosis BETWEEN 1 AND 2)
     OR (tipo_vacuna = 'influenza' AND numero_dosis = 1)
   ),
-  CONSTRAINT vacunas_paciente_fecha_clinica_check CHECK (
-    tipo_vacuna = 'influenza' OR fecha_dosis IS NOT NULL
-  )
+  CONSTRAINT vacunas_paciente_fecha_clinica_check CHECK (fecha_dosis IS NOT NULL)
 );
 
 -- ============================================================
