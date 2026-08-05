@@ -1,5 +1,6 @@
 node_modules
 .n8n-local/
+/.codex-machine
 # Variables locales y secretos. Solo los archivos de ejemplo se versionan.
 .env
 .env.*
