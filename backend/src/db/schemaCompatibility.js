@@ -1,6 +1,20 @@
+const fs = require('fs');
 const pool = require('./pool');
+const {
+  DEFAULT_MIGRATIONS_DIR,
+  checksum,
+  discoverMigrationFiles,
+} = require('./migrate');
 
-const REQUIRED_MIGRATION = '008_retirar_referencias_efectuadas.sql';
+const REQUIRED_MIGRATIONS = Object.freeze([
+  '008_retirar_referencias_efectuadas.sql',
+  '009_vax2_reglas_vacunas.sql',
+  '010_vax31_historias_parciales.sql',
+  '011_vax4_influenza_aplicaciones_independientes.sql',
+  '012_vax5_correccion_final.sql',
+]);
+const REQUIRED_MIGRATION = REQUIRED_MIGRATIONS[0];
+const MIGRATION_COMMAND = 'npm run db:migrate';
 
 class SchemaCompatibilityError extends Error {
   constructor(message) {
@@ -10,31 +24,104 @@ class SchemaCompatibilityError extends Error {
   }
 }
 
-async function assertSchemaCompatible(db = pool) {
-  const { rows: relationRows } = await db.query(
-    "SELECT to_regclass('public.schema_migrations') AS migration_registry"
+function loadRequiredMigrations({
+  migrationsDir = DEFAULT_MIGRATIONS_DIR,
+  readDirectory = fs.readdirSync,
+  readMigration = fs.readFileSync,
+} = {}) {
+  const discovered = new Map(
+    discoverMigrationFiles({ migrationsDir, readDirectory })
+      .map((migration) => [migration.filename, migration])
   );
-  const relations = relationRows[0] || {};
+  const missingFiles = REQUIRED_MIGRATIONS.filter((filename) => !discovered.has(filename));
 
-  if (relations.migration_registry === null) {
+  if (missingFiles.length > 0) {
     throw new SchemaCompatibilityError(
-      'El backend requiere el registro de migraciones y la migracion 008. No se iniciara el servidor.'
+      `El despliegue no incluye migraciones requeridas: ${missingFiles.join(', ')}.`
     );
   }
 
-  const { rows: migrationRows } = await db.query(
-    'SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE filename = $1) AS applied',
-    [REQUIRED_MIGRATION]
-  );
-  if (migrationRows[0]?.applied !== true) {
-    throw new SchemaCompatibilityError(
-      'El backend requiere que la migracion 008 este aplicada. No se iniciara el servidor.'
+  return REQUIRED_MIGRATIONS.map((filename) => {
+    const migration = discovered.get(filename);
+    return {
+      filename,
+      checksum: checksum(readMigration(migration.path, 'utf8')),
+    };
+  });
+}
+
+function migrationInstruction(message) {
+  return `${message} Ejecute el flujo oficial con "${MIGRATION_COMMAND}" antes de iniciar el servidor.`;
+}
+
+async function queryMigrationRegistry(db, requiredMigrations) {
+  try {
+    const { rows: relationRows = [] } = await db.query(
+      "SELECT to_regclass('public.schema_migrations') AS migration_registry"
     );
+    if (relationRows[0]?.migration_registry === null) {
+      throw new SchemaCompatibilityError(migrationInstruction(
+        'El backend requiere el registro schema_migrations y las migraciones 008 a 012.'
+      ));
+    }
+
+    const filenames = requiredMigrations.map(({ filename }) => filename);
+    const { rows = [] } = await db.query(
+      `SELECT filename, checksum
+       FROM schema_migrations
+       WHERE filename = ANY($1::text[])`,
+      [filenames]
+    );
+    return rows;
+  } catch (error) {
+    if (error instanceof SchemaCompatibilityError) throw error;
+    throw new SchemaCompatibilityError(migrationInstruction(
+      'No se pudo validar un registro schema_migrations compatible.'
+    ));
+  }
+}
+
+async function assertSchemaCompatible(
+  db = pool,
+  { requiredMigrations = loadRequiredMigrations() } = {}
+) {
+  const migrationRows = await queryMigrationRegistry(db, requiredMigrations);
+  const appliedMigrations = new Map();
+  let registryIsCompatible = true;
+
+  for (const row of migrationRows) {
+    if (
+      typeof row.filename !== 'string'
+      || typeof row.checksum !== 'string'
+      || appliedMigrations.has(row.filename)
+    ) {
+      registryIsCompatible = false;
+      continue;
+    }
+    appliedMigrations.set(row.filename, row.checksum);
+  }
+
+  const pendingOrModified = requiredMigrations
+    .filter(({ filename, checksum: expectedChecksum }) => (
+      appliedMigrations.get(filename) !== expectedChecksum
+    ))
+    .map(({ filename }) => filename);
+
+  if (!registryIsCompatible || pendingOrModified.length > 0) {
+    const detail = pendingOrModified.length > 0
+      ? `Migraciones pendientes o incompatibles: ${pendingOrModified.join(', ')}.`
+      : 'El registro schema_migrations es incompatible.';
+    throw new SchemaCompatibilityError(migrationInstruction(
+      `El backend requiere las migraciones 008 a 012 aplicadas con su checksum versionado. ${detail}`
+    ));
   }
 }
 
 module.exports = {
+  MIGRATION_COMMAND,
   REQUIRED_MIGRATION,
+  REQUIRED_MIGRATIONS,
   SchemaCompatibilityError,
   assertSchemaCompatible,
+  loadRequiredMigrations,
 };

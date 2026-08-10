@@ -268,9 +268,11 @@ reconocimiento de eventos historicos de entidad `referencia`.
 
 El esquema final contiene 16 tablas operativas mas `schema_migrations`. La
 migracion `008_retirar_referencias_efectuadas.sql` bloquea y cuenta antes de
-retirar la tabla vacia, aborta si hay filas y no usa `CASCADE`. El arranque exige
-que 008 este registrada; el runner solo registra el exito tras retirar o
-comprobar ausente la tabla. 008 aun no fue aplicada en PC1 ni PC2.
+retirar la tabla vacia, aborta si hay filas y no usa `CASCADE`. El codigo actual
+exige que las migraciones `008` a `012` esten registradas con el checksum de sus
+archivos versionados antes de abrir el puerto HTTP. Esta compuerta solo consulta
+el registro y nunca ejecuta migraciones; cada entorno actualiza su propia base
+con `npm run db:migrate`, sin copiar bases entre PCs.
 
 Comunidades era el ultimo consumidor productivo del adaptador legacy detectado
 por el barrido. Sus escrituras usan ahora contexto administrativo privado,

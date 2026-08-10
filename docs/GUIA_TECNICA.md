@@ -945,9 +945,11 @@ El esquema final tiene 16 tablas operativas mas `schema_migrations`. La
 migracion `008_retirar_referencias_efectuadas.sql` usa timeouts locales,
 bloqueo `ACCESS EXCLUSIVE` y conteo agregado. Aborta sin borrar datos si hay
 filas; si la tabla esta vacia la elimina sin `CASCADE`; si esta ausente finaliza
-de forma segura. El backend nuevo no arranca si 008 no esta registrada, y el
-runner solo la registra despues de retirar o comprobar ausente la tabla. 008
-aun no se ha aplicado en PC1 ni PC2.
+de forma segura. Antes de abrir el puerto, el backend comprueba por nombre y
+checksum que `008`, `009`, `010`, `011` y `012` esten registradas. La comprobacion
+es de solo lectura y no ejecuta DDL, DML ni migraciones automaticas. Cada entorno
+mantiene su propia base y aplica pendientes con `npm run db:migrate`; no se
+copian bases entre PCs.
 
 ## PDF y reportes
 
@@ -1202,8 +1204,8 @@ PostgreSQL.
 
 Antes del despliegue, `npm run db:migrate` desde `backend` aplica el schema base y
 las migraciones versionadas pendientes en orden. Cada archivo queda registrado
-por nombre y checksum en `schema_migrations`; `007_auth_sessions.sql` y
-`008_retirar_referencias_efectuadas.sql` forman parte de este flujo y no deben
+por nombre y checksum en `schema_migrations`; `007_auth_sessions.sql` y las
+migraciones estructurales `008` a `012` forman parte de este flujo y no deben
 ejecutarse manualmente por separado. 008 requiere backup, verificacion de
 conteo y despliegue del backend nuevo solo despues de completarse.
 

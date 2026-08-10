@@ -125,7 +125,7 @@ Backend:
 | --- | --- |
 | `npm run dev` | Servidor Express con nodemon. |
 | `npm start` | Servidor Express sin recarga automatica. |
-| `npm run db:migrate` | Aplica `schema.sql` y las migraciones versionadas pendientes, incluidas `007_auth_sessions.sql` y `008_retirar_referencias_efectuadas.sql`. |
+| `npm run db:migrate` | Aplica `schema.sql` y las migraciones versionadas pendientes, incluidas las migraciones estructurales `008` a `012`. |
 | `npm run db:seed` | Inicializa catalogos y, si no existe, una cuenta director configurada por entorno. |
 | `npm run db:seed-demo-patients` | Crea pacientes demo. |
 | `npm run test:embarazo-activo` | Validacion manual del flujo de embarazo activo. |
@@ -246,11 +246,12 @@ revocan las sesiones correspondientes. Antes de desplegar se debe ejecutar
 las migraciones versionadas pendientes. La migracion
 `008_retirar_referencias_efectuadas.sql` toma un bloqueo exclusivo, muestra solo
 el conteo agregado y aborta sin borrar datos si encuentra una o mas filas. El
-backend nuevo no abre el puerto mientras 008 no figure en `schema_migrations`;
-ese registro solo se confirma tras retirar o comprobar ausente la tabla
-obsoleta. Debe aplicarse antes de desplegar el backend nuevo y no
-debe apuntarse a una base real sin backup, verificacion previa del conteo y
-ventana operativa. A fecha de Sprint 6B-R1, 008 no se ha aplicado en PC1 ni PC2.
+codigo actual no abre el puerto hasta confirmar por nombre y checksum las
+migraciones `008` a `012` en `schema_migrations`. La validacion de arranque es
+de solo lectura: nunca ejecuta migraciones automaticamente y, ante pendientes,
+indica usar `npm run db:migrate`. Cada entorno mantiene su propia base; no se
+copian bases entre PCs. Segun el estado operativo vigente, las bases locales ya
+fueron actualizadas mediante el flujo oficial de migraciones.
 El esquema final contiene 16 tablas operativas y una tabla tecnica
 `schema_migrations`. La limpieza futura/manual de sesiones se ejecuta con
 `npm run sessions:cleanup` desde `backend` y nunca elimina sesiones activas.

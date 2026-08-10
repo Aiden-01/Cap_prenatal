@@ -7,7 +7,9 @@ const express = require('express');
 
 const {
   REQUIRED_MIGRATION,
+  REQUIRED_MIGRATIONS,
   assertSchemaCompatible,
+  loadRequiredMigrations,
 } = require('../src/db/schemaCompatibility');
 const {
   checksum,
@@ -176,7 +178,8 @@ test('usuarios conserva proteccion historica sin consultar la tabla eliminada', 
   );
 });
 
-test('el backend exige el registro exitoso de 008 antes de escuchar', async () => {
+test('el backend exige el registro exitoso de 008 a 012 antes de escuchar', async () => {
+  const requiredState = loadRequiredMigrations();
   const missingRegistryCalls = [];
   await assert.rejects(
     assertSchemaCompatible({
@@ -190,7 +193,7 @@ test('el backend exige el registro exitoso de 008 antes de escuchar', async () =
       },
     }),
     (error) => error.code === 'SCHEMA_MIGRATION_REQUIRED'
-      && /registro de migraciones/.test(error.message)
+      && /registro schema_migrations/.test(error.message)
   );
   assert.equal(missingRegistryCalls.length, 1);
 
@@ -202,11 +205,13 @@ test('el backend exige el registro exitoso de 008 antes de escuchar', async () =
             rows: [{ migration_registry: 'schema_migrations' }],
           };
         }
-        return { rows: [{ applied: false }] };
+        return {
+          rows: requiredState.filter(({ filename }) => filename !== REQUIRED_MIGRATION),
+        };
       },
     }),
     (error) => error.code === 'SCHEMA_MIGRATION_REQUIRED'
-      && /requiere que la migracion 008/.test(error.message)
+      && /008_retirar_referencias_efectuadas\.sql/.test(error.message)
   );
 
   const successCalls = [];
@@ -218,10 +223,10 @@ test('el backend exige el registro exitoso de 008 antes de escuchar', async () =
           rows: [{ migration_registry: 'schema_migrations' }],
         };
       }
-      return { rows: [{ applied: true }] };
+      return { rows: requiredState };
     },
   });
-  assert.deepEqual(successCalls[1].params, [REQUIRED_MIGRATION]);
+  assert.deepEqual(successCalls[1].params, [REQUIRED_MIGRATIONS]);
 });
 
 test('schema final declara 16 tablas operativas mas schema_migrations', () => {

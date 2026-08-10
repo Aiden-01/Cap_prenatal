@@ -47,7 +47,7 @@ como maximo la cuenta director indicada y no cambia su contrasena si ya existe.
 En produccion exige una confirmacion adicional documentada en
 `docs/ROTACION_SECRETOS.md`.
 
-## Estado final y migracion 008
+## Estado final y compatibilidad de migraciones 008 a 012
 
 `schema.sql` declara 17 tablas publicas: 16 operativas y la tabla tecnica
 `schema_migrations`. El conteo se valida tanto analizando las sentencias
@@ -60,18 +60,29 @@ el conteo agregado y aborta toda la transaccion cuando el conteo es mayor que
 cero. Solo una tabla vacia se retira, sin `CASCADE`; una dependencia inesperada
 tambien provoca rollback.
 
-La aplicacion nueva comprueba al arrancar que 008 este registrada; el runner
-solo crea ese registro despues de retirar o comprobar ausente la tabla
-obsoleta. Orden operativo obligatorio:
+El codigo actual comprueba al arrancar que las migraciones `008` a `012` esten
+registradas con el checksum de sus archivos versionados. La comprobacion solo
+ejecuta `SELECT`: no crea ni altera tablas, no modifica datos y no aplica
+migraciones automaticamente. El runner solo registra 008 despues de retirar o
+comprobar ausente la tabla obsoleta. Orden operativo obligatorio:
 
 1. detener el backend anterior;
 2. verificar backup y conteo de forma autorizada;
 3. ejecutar `npm run db:migrate`;
-4. confirmar 008 y el conteo final;
+4. confirmar 008 a 012 y el conteo final;
 5. desplegar/iniciar el backend nuevo.
 
-008 aun no se ha aplicado en PC1 ni PC2. No debe ejecutarse en ninguna de esas
-bases como parte de pruebas de desarrollo.
+Cada entorno mantiene su propia base y ejecuta `npm run db:migrate` de forma
+independiente; las bases no se copian entre PCs. Segun el estado operativo
+vigente, las bases locales ya fueron actualizadas mediante este flujo. Las
+pruebas automatizadas de compatibilidad usan dobles o PostgreSQL temporal
+aislado, nunca una base real.
+
+El historial Git muestra que el proyecto inicial aplicaba directamente
+`schema.sql` y no tenia archivos incrementales. La primera migracion versionada
+agregada fue `004_comunidades_catalogo.sql`; por ello 001 a 003 no son archivos
+perdidos del runner actual, sino una numeracion que comenzo en 004 al introducir
+el sistema incremental.
 
 ## Modelo conceptual
 
