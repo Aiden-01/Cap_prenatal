@@ -6,7 +6,6 @@
     "test:vistas-bi": "npm --prefix backend run test:vistas-bi"
   },
   "dependencies": {
-    "exceljs": "^4.4.0",
     "react-datepicker": "^9.1.0",
     "react-day-picker": "^9.14.0"
   },
