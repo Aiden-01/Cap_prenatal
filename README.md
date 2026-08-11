@@ -250,8 +250,13 @@ codigo actual no abre el puerto hasta confirmar por nombre y checksum las
 migraciones `008` a `012` en `schema_migrations`. La validacion de arranque es
 de solo lectura: nunca ejecuta migraciones automaticamente y, ante pendientes,
 indica usar `npm run db:migrate`. Cada entorno mantiene su propia base; no se
-copian bases entre PCs. Segun el estado operativo vigente, las bases locales ya
-fueron actualizadas mediante el flujo oficial de migraciones.
+copian bases entre PCs. Estado operativo registrado para este cierre: la
+migracion `008` ya fue aplicada en las PCs Casa y Trabajo. En la base local de
+desarrollo de PC Trabajo/AIDEN29, una consulta de solo lectura confirmo que
+`009` a `012` tambien estan registradas y sus checksums coinciden con los
+archivos versionados; una migracion ya registrada no debe volver a ejecutarse
+manualmente. Esta verificacion no se conecto a la base de PC Casa ni permite
+inferir un estado nuevo para ese entorno.
 El esquema final contiene 16 tablas operativas y una tabla tecnica
 `schema_migrations`. La limpieza futura/manual de sesiones se ejecuta con
 `npm run sessions:cleanup` desde `backend` y nunca elimina sesiones activas.

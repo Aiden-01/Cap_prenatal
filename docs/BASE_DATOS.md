@@ -73,10 +73,14 @@ comprobar ausente la tabla obsoleta. Orden operativo obligatorio:
 5. desplegar/iniciar el backend nuevo.
 
 Cada entorno mantiene su propia base y ejecuta `npm run db:migrate` de forma
-independiente; las bases no se copian entre PCs. Segun el estado operativo
-vigente, las bases locales ya fueron actualizadas mediante este flujo. Las
-pruebas automatizadas de compatibilidad usan dobles o PostgreSQL temporal
-aislado, nunca una base real.
+independiente; las bases no se copian entre PCs. Estado operativo registrado
+para este cierre: `008` ya fue aplicada en las PCs Casa y Trabajo. En la base
+local de desarrollo de PC Trabajo/AIDEN29, una consulta de solo lectura
+confirmo que `009` a `012` tambien estan registradas con los checksums de los
+archivos versionados; no deben volver a ejecutarse manualmente. Esta consulta
+no se conecto a PC Casa ni revalido `009` a `012` en ese entorno. Las pruebas
+automatizadas de compatibilidad usan dobles o PostgreSQL temporal aislado,
+nunca una base real.
 
 El historial Git muestra que el proyecto inicial aplicaba directamente
 `schema.sql` y no tenia archivos incrementales. La primera migracion versionada

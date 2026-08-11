@@ -120,3 +120,8 @@ LIBREOFFICE_PATH=/usr/bin/soffice
 ```
 
 Las conversiones externas de LibreOffice y PowerShell/Excel tienen un timeout interno de 120 segundos. Si se excede, el backend termina solo el arbol de procesos creado por esa conversion, elimina su directorio temporal y devuelve un error generico. En Windows la terminacion usa el PID de la instancia creada; nunca finaliza globalmente `Excel.exe`.
+
+Esta configuracion y sus pruebas aisladas no equivalen a una validacion real de
+Docker. Siguen pendientes el build y arranque de la imagen, el usuario efectivo,
+el healthcheck y las conversiones reales con Chromium y LibreOffice en un host
+que tenga Docker disponible.

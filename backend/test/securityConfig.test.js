@@ -17,7 +17,6 @@ function developmentEnv(overrides = {}) {
   return {
     NODE_ENV: 'development',
     JWT_SECRET: 'qN4v8xR2mK7pT9zW3cF6hJ1sL5yB0dG4',
-    JWT_EXPIRES_IN: '8h',
     DB_HOST: 'localhost',
     DB_PORT: '5432',
     DB_NAME: 'cap_prenatal',
@@ -247,6 +246,7 @@ test('Docker Compose exige secretos externos y no contiene defaults utilizables'
     assert.match(line, /\$\{[A-Z0-9_]+:\?/);
   }
   assert.doesNotMatch(source, /AUTOMATION_SECRET/);
+  assert.doesNotMatch(source, /JWT_EXPIRES_IN/);
   assert.match(source, /ENTORNO DE DESARROLLO LOCAL EXCLUSIVAMENTE/);
   assert.match(source, /NODE_ENV:\s*development/);
 });

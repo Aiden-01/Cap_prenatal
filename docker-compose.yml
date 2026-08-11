@@ -43,7 +43,6 @@ services:
       DB_SSL: "false"
       DB_SSL_REJECT_UNAUTHORIZED: "false"
       JWT_SECRET: "${JWT_SECRET:?Defina JWT_SECRET en el archivo .env local}"
-      JWT_EXPIRES_IN: 8h
       PORT: 3001
       NODE_ENV: development
       FRONTEND_URL: "${FRONTEND_URL:-http://localhost:8080,http://localhost:5173}"
