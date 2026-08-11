@@ -180,9 +180,10 @@ el origen del endpoint M2M, que siempre usa `req.socket.remoteAddress`.
 
 ## n8n, secretos y version
 
-La imagen y la dependencia local estan fijadas en `2.26.4`. Se eligio esta
-version porque es la que ya resuelve el lockfile del proyecto; no se afirma que
-sea la version mas reciente. No se usa `latest`, rango semver ni descarga
+La imagen y la dependencia local estan fijadas exactamente en `2.34.4`. Se
+eligio porque npm y GitHub la publican como `latest` oficial dentro de 2.x y la
+auditoria de npm la propone como correccion compatible para los avisos directos
+de `2.26.4`. No se usa una etiqueta Docker mutable, rango semver ni descarga
 implicita mediante `npx`.
 
 Para actualizar:
@@ -197,6 +198,33 @@ n8n recibe solamente variables dedicadas. No recibe PostgreSQL clinico, JWT,
 sesiones, SMTP, seed ni hashes CURRENT/NEXT. La API key original debe crearse
 como credencial Header Auth dentro de n8n; el backend recibe unicamente los
 hashes SHA-256.
+
+En `2.34.4`, `WEBHOOK_URL` fue reemplazada por `N8N_WEBHOOK_URL` y
+`N8N_RUNNERS_ENABLED` ya no es necesaria. La configuracion fija runners
+internos con timeout de 60 segundos, cookies seguras en produccion, paquetes
+comunitarios deshabilitados, diagnosticos/plantillas deshabilitados y acceso
+global a `$env` bloqueado. Las URLs no secretas de CAP viven en variables de
+proyecto n8n para que el workflow no requiera abrir el entorno del proceso.
+
+### Compatibilidad de variables 2.26.4 a 2.34.4
+
+| Clasificacion | Variables/configuracion | Resultado |
+|---|---|---|
+| Sin cambio | `GENERIC_TIMEZONE`, `TZ`, `N8N_ENCRYPTION_KEY`, host, puerto, protocolo, listen address y editor base URL | Se conservan; Guatemala y cifrado estable siguen siendo obligatorios. |
+| Sin cambio | poda, retencion, guardado de ejecuciones y `N8N_CONCURRENCY_PRODUCTION_LIMIT` | Se conservan; produccion no guarda payloads y limita concurrencia a 1. |
+| Renombrada | `WEBHOOK_URL` | Sustituida por `N8N_WEBHOOK_URL`; la anterior queda prohibida por pruebas. |
+| Retirada | `N8N_RUNNERS_ENABLED` | Eliminada por deprecacion; runners quedan en `N8N_RUNNERS_MODE=internal`. |
+| Ajustada | task runners | Timeout explicito de 60 segundos; sin broker externo ni token compartido. |
+| Endurecida | cookies | `N8N_SECURE_COOKIE=true` y SameSite strict en produccion; solo local HTTP usa secure=false. |
+| Endurecida | nodos y paquetes | `$env` bloqueado; paquetes comunitarios/no verificados deshabilitados. |
+| Sin cambio | diagnosticos, notificaciones, plantillas y logging | Telemetria y salidas externas deshabilitadas; log a consola, JSON en produccion. |
+| Sin cambio | base de datos n8n | SQLite propia en volumen persistente; nunca PostgreSQL clinico. |
+| Manual | user management, SMTP y credenciales Header Auth | Se configuran dentro de n8n y quedan cifradas; no se exportan al JSON o Compose. |
+
+No aparecio una variable nueva obligatoria para este workflow. La migracion de
+las dos URLs CAP a `$vars` es intencional: no son secretos y permite mantener
+el entorno del proceso cerrado. `N8N_ENCRYPTION_KEY` no cambia durante una
+actualizacion de una instancia existente.
 
 `N8N_ENCRYPTION_KEY` es obligatoria, estable y secreta. Debe respaldarse en un
 gestor independiente del volumen. Regenerarla despues de crear credenciales
@@ -244,8 +272,8 @@ de variables, elimina del proceso variables clinicas heredadas y exige:
 - `N8N_ENCRYPTION_KEY` de al menos 32 caracteres;
 - `N8N_LISTEN_ADDRESS` en loopback;
 - `GENERIC_TIMEZONE=America/Guatemala`;
-- URLs dedicadas de backend y sistema;
-- n8n local exactamente en `2.26.4`.
+- `N8N_BLOCK_ENV_ACCESS_IN_NODE=true` y runners internos;
+- n8n local exactamente en `2.34.4`.
 
 Copiar `n8n/.env.example` a `n8n/.env`; este ultimo esta ignorado por Git. La
 integracion del backend permanece deshabilitada por defecto y solo deben usarse
@@ -367,19 +395,19 @@ https://cap-prenatal.example.invalid/dashboard
 Este es un mensaje automatico. No responda a este correo.
 ```
 
-La URL real proviene de `CAP_SYSTEM_BASE_URL`; una ejecucion programada exige
-HTTPS y rechaza `javascript:`, `data:` y `file:`. Destinatario y remitente se
-configuran como variables de proyecto n8n
-`CAP_NOTIFICATION_RECIPIENT`/`CAP_NOTIFICATION_FROM`. Los placeholders
-`example.invalid` bloquean el envio.
+La URL real proviene de la variable de proyecto n8n `CAP_SYSTEM_BASE_URL`; una
+ejecucion programada exige HTTPS y rechaza `javascript:`, `data:` y `file:`.
+`CAP_BACKEND_AUTOMATION_URL`, destinatario, remitente y alias tambien son
+variables de proyecto n8n. Los placeholders `example.invalid` bloquean el
+envio.
 
 La clave es SHA-256 de
 `v1|range.from|range.to|recipient_alias`. Static data guarda solo hash y
 timestamp, hasta 90 claves/45 dias, y agrega la actual despues del envio
 confirmado. Static data es de mejor esfuerzo y no es una garantia transaccional.
 La concurrencia operativa del workflow debe quedar en 1; la configuracion de
-esta instancia fija `N8N_CONCURRENCY_PRODUCTION_LIMIT=1` porque n8n 2.26.4 no
-serializa un limite por-workflow en el JSON.
+esta instancia fija `N8N_CONCURRENCY_PRODUCTION_LIMIT=1` porque el JSON
+versionado no serializa un limite por-workflow.
 
 SMTP solo admite un reintento adicional ante un codigo transitorio
 `421/450/451/452` asociado claramente a `MAIL FROM` o `RCPT`. Timeout, socket

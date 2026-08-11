@@ -1074,10 +1074,10 @@ nombre interno `backend:3001` y no comparte red con PostgreSQL.
 `TRUSTED_PROXY_CIDRS`; no se configura como `true`. El endpoint M2M sigue
 validando `req.socket.remoteAddress` y no confia en `X-Forwarded-For`.
 
-n8n queda fijado en `2.26.4`, usa volumen persistente, exige
-`N8N_ENCRYPTION_KEY` y aplica poda de ejecuciones. En produccion no publica su
-UI; el acceso administrativo requiere VPN, red privada o tunel y HTTPS. El
-script local lee solo `n8n/.env` y liga el proceso a loopback.
+n8n queda fijado exactamente en `2.34.4`, usa volumen persistente, exige
+`N8N_ENCRYPTION_KEY`, bloquea `$env` y aplica poda de ejecuciones. En produccion
+no publica su UI; el acceso administrativo requiere VPN, red privada o tunel y
+HTTPS. El script local lee solo `n8n/.env` y liga el proceso a loopback.
 
 Sprint 5B.2B agrega `n8n/workflows/proximas-citas-v1.json`. Permanece inactivo,
 sin credenciales y sin correos reales. Se agenda a las 06:00
@@ -1175,8 +1175,9 @@ Fuera de alcance actual:
 | `AUTOMATION_RATE_LIMIT_WINDOW_MS` | Ventana del limite M2M. Default `900000`. |
 | `AUTOMATION_RATE_LIMIT_MAX` | Solicitudes M2M por ventana. Default `6`. |
 | `N8N_ENCRYPTION_KEY` | Clave estable exclusiva de n8n; nunca se entrega al backend. |
-| `CAP_BACKEND_AUTOMATION_URL` | URL privada `backend:3001` que recibe n8n. |
-| `CAP_SYSTEM_BASE_URL` | URL HTTPS del sistema usada por n8n. |
+| `CAP_BACKEND_AUTOMATION_URL` | Variable de proyecto n8n con URL privada `backend:3001`. |
+| `CAP_SYSTEM_BASE_URL` | Variable de proyecto n8n con URL HTTPS del sistema. |
+| `N8N_WEBHOOK_URL` | Base URL controlada de webhooks; reemplaza `WEBHOOK_URL`. |
 | `N8N_CONCURRENCY_PRODUCTION_LIMIT` | Limite global productivo de la instancia n8n; `1` en este sprint. |
 | `EXECUTIONS_DATA_PRUNE` | Habilita poda de ejecuciones n8n. |
 | `EXECUTIONS_DATA_MAX_AGE` | Retencion maxima de n8n en horas. |

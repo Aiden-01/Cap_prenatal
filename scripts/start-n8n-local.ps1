@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $envPath = Join-Path $repositoryRoot "n8n\.env"
-$requiredN8nVersion = "2.26.4"
+$requiredN8nVersion = "2.34.4"
 
 $allowedVariables = @(
   "N8N_ENCRYPTION_KEY",
@@ -11,22 +11,30 @@ $allowedVariables = @(
   "N8N_PROTOCOL",
   "N8N_LISTEN_ADDRESS",
   "N8N_EDITOR_BASE_URL",
-  "WEBHOOK_URL",
+  "N8N_WEBHOOK_URL",
+  "N8N_RELEASE_TYPE",
+  "N8N_SECURE_COOKIE",
+  "N8N_SAMESITE_COOKIE",
   "GENERIC_TIMEZONE",
   "TZ",
   "N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS",
-  "N8N_RUNNERS_ENABLED",
+  "N8N_RUNNERS_MODE",
+  "N8N_RUNNERS_TASK_TIMEOUT",
+  "N8N_BLOCK_ENV_ACCESS_IN_NODE",
+  "N8N_COMMUNITY_PACKAGES_ENABLED",
+  "N8N_UNVERIFIED_PACKAGES_ENABLED",
   "N8N_DIAGNOSTICS_ENABLED",
   "N8N_VERSION_NOTIFICATIONS_ENABLED",
+  "N8N_TEMPLATES_ENABLED",
+  "N8N_LOG_LEVEL",
+  "N8N_LOG_OUTPUT",
   "EXECUTIONS_DATA_PRUNE",
   "EXECUTIONS_DATA_MAX_AGE",
   "EXECUTIONS_DATA_PRUNE_MAX_COUNT",
   "EXECUTIONS_DATA_SAVE_ON_SUCCESS",
   "EXECUTIONS_DATA_SAVE_ON_ERROR",
   "EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS",
-  "EXECUTIONS_DATA_SAVE_ON_PROGRESS",
-  "CAP_BACKEND_AUTOMATION_URL",
-  "CAP_SYSTEM_BASE_URL"
+  "EXECUTIONS_DATA_SAVE_ON_PROGRESS"
 )
 
 $essentialProcessVariables = @(
@@ -99,8 +107,11 @@ if ($env:N8N_LISTEN_ADDRESS -notin @("127.0.0.1", "::1")) {
 if ($env:GENERIC_TIMEZONE -ne "America/Guatemala") {
   throw "GENERIC_TIMEZONE debe ser America/Guatemala."
 }
-if (-not $env:CAP_BACKEND_AUTOMATION_URL -or -not $env:CAP_SYSTEM_BASE_URL) {
-  throw "Faltan las URLs dedicadas de CAP Prenatal."
+if ($env:N8N_BLOCK_ENV_ACCESS_IN_NODE -ne "true") {
+  throw "N8N_BLOCK_ENV_ACCESS_IN_NODE debe permanecer en true."
+}
+if ($env:N8N_RUNNERS_MODE -ne "internal") {
+  throw "N8N_RUNNERS_MODE local debe ser internal."
 }
 
 $n8nUserFolder = Join-Path $repositoryRoot ".n8n-local"

@@ -94,9 +94,13 @@ Backend recibe:
 n8n recibe:
 
 - N8N_ENCRYPTION_KEY.
-- URLs y configuracion propia.
+- N8N_WEBHOOK_URL, host y configuracion propia.
 - Politica de retencion.
 - Limite de concurrencia productiva 1.
+
+Las URLs de CAP no se exponen al proceso: CAP_BACKEND_AUTOMATION_URL y
+CAP_SYSTEM_BASE_URL son variables de proyecto n8n. El proceso bloquea acceso
+global a variables de entorno desde nodos y expresiones.
 
 n8n no recibe credenciales PostgreSQL clinicas, JWT, CSRF, sesiones, SMTP del
 backend, seed ni hashes M2M. La API key original queda solamente como credencial
@@ -110,10 +114,10 @@ guardar secretos en Git, tickets, logs o el Compose.
 6. VERSION
 ----------
 
-n8n queda fijado en 2.26.4, coincidente con el lockfile. No se afirma que sea la
-version mas reciente. Antes de actualizar, revisar notas de version, respaldar,
-probar restauracion y compatibilidad, actualizar todos los puntos fijados y
-evitar saltos automaticos de major.
+n8n queda fijado exactamente en 2.34.4, release latest oficial verificado el 11
+de agosto de 2026 y coincidente con el lockfile. Antes de actualizar de nuevo,
+revisar notas de version, respaldar, probar restauracion y compatibilidad,
+actualizar todos los puntos fijados y evitar saltos automaticos de major.
 
 
 7. CIFRADO, PERSISTENCIA Y BACKUP
@@ -220,7 +224,8 @@ Antes de desplegar:
 11. Crear y asignar Header Auth en los tres requests.
 12. Crear y asignar SMTP en ambos nodos de correo.
 13. Configurar destinatario/remitente/alias fuera del JSON.
-14. Verificar CAP_SYSTEM_BASE_URL con HTTPS.
+14. Configurar como variables de proyecto CAP_BACKEND_AUTOMATION_URL privada y
+    CAP_SYSTEM_BASE_URL con HTTPS.
 15. Ejecutar pruebas estaticas y un mock sintetico total=0.
 16. Confirmar retencion, concurrencia 1 y egress limitado.
 17. Mantener N8N_INTEGRATION_ENABLED=false y el workflow inactivo hasta

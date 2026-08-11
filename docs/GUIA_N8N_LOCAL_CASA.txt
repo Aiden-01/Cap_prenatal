@@ -15,9 +15,10 @@ ESTADO
 1. VERSION FIJADA
 -----------------
 
-La dependencia local y la imagen Docker usan n8n 2.26.4. No se usa latest,
-rango semver ni descarga implicita con npx. Esta version coincide con el
-package-lock actual; no se afirma que sea la mas reciente.
+La dependencia local y la imagen Docker usan exactamente n8n 2.34.4. No se usa
+una etiqueta Docker mutable, rango semver ni descarga implicita con npx. Esta
+version es el release latest oficial verificado el 11 de agosto de 2026 y
+coincide con el package-lock actual.
 
 Antes de actualizar:
 
@@ -73,8 +74,8 @@ scripts/start-n8n-local.ps1:
 - exige N8N_ENCRYPTION_KEY;
 - exige America/Guatemala;
 - exige N8N_LISTEN_ADDRESS en loopback;
-- valida las URLs dedicadas;
-- exige n8n local 2.26.4;
+- exige N8N_BLOCK_ENV_ACCESS_IN_NODE=true y runners internos;
+- exige n8n local 2.34.4;
 - no usa backend/.env;
 - no usa npx;
 - no inicia si falta configuracion o instalacion local.
@@ -175,6 +176,8 @@ locales de credenciales.
 
 Crear variables de proyecto n8n:
 
+  CAP_BACKEND_AUTOMATION_URL
+  CAP_SYSTEM_BASE_URL
   CAP_NOTIFICATION_RECIPIENT
   CAP_NOTIFICATION_FROM
   CAP_NOTIFICATION_RECIPIENT_ALIAS
@@ -198,7 +201,8 @@ n8n, SMTP o PostgreSQL.
 
 Para una prueba manual posterior, usar un mock local con la ruta exacta
 /api/automatizaciones/v1/proximas-citas y una respuesta sintetica total=0.
-Configurar temporalmente CAP_BACKEND_AUTOMATION_URL hacia ese mock. Verificar
+Configurar temporalmente la variable de proyecto CAP_BACKEND_AUTOMATION_URL
+hacia ese mock. Verificar
 resultado no_results y que ningun nodo SMTP se ejecute. No usar capturas o
 datos reales.
 

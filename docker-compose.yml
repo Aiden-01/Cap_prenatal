@@ -84,7 +84,7 @@ services:
       start_period: 20s
 
   n8n:
-    image: docker.n8n.io/n8nio/n8n:2.26.4
+    image: docker.n8n.io/n8nio/n8n:2.34.4
     container_name: cap-prenatal-n8n
     restart: unless-stopped
     depends_on:
@@ -98,11 +98,22 @@ services:
       N8N_PROTOCOL: http
       N8N_LISTEN_ADDRESS: 0.0.0.0
       N8N_EDITOR_BASE_URL: http://127.0.0.1:5678/
+      N8N_WEBHOOK_URL: http://127.0.0.1:5678/
+      N8N_RELEASE_TYPE: stable
+      N8N_SECURE_COOKIE: "false"
+      N8N_SAMESITE_COOKIE: strict
       N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
       N8N_ENCRYPTION_KEY: "${N8N_ENCRYPTION_KEY:?Defina N8N_ENCRYPTION_KEY en el archivo .env local}"
-      N8N_RUNNERS_ENABLED: "true"
+      N8N_RUNNERS_MODE: internal
+      N8N_RUNNERS_TASK_TIMEOUT: "60"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "true"
+      N8N_COMMUNITY_PACKAGES_ENABLED: "false"
+      N8N_UNVERIFIED_PACKAGES_ENABLED: "false"
       N8N_DIAGNOSTICS_ENABLED: "false"
       N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+      N8N_TEMPLATES_ENABLED: "false"
+      N8N_LOG_LEVEL: info
+      N8N_LOG_OUTPUT: console
       EXECUTIONS_DATA_PRUNE: "true"
       EXECUTIONS_DATA_MAX_AGE: "24"
       EXECUTIONS_DATA_PRUNE_MAX_COUNT: "100"
@@ -110,9 +121,6 @@ services:
       EXECUTIONS_DATA_SAVE_ON_ERROR: all
       EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS: "true"
       EXECUTIONS_DATA_SAVE_ON_PROGRESS: "false"
-      WEBHOOK_URL: http://127.0.0.1:5678/
-      CAP_BACKEND_AUTOMATION_URL: http://backend:3001/api/automatizaciones/v1/proximas-citas
-      CAP_SYSTEM_BASE_URL: http://127.0.0.1:8080
     ports:
       - "127.0.0.1:5678:5678"
     expose:

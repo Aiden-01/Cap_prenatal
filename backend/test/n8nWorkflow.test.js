@@ -60,16 +60,16 @@ function runMailBuilder({
     secure_path: '/dashboard',
     idempotency_hash: 'a'.repeat(64),
   },
-  env = { CAP_SYSTEM_BASE_URL: 'https://cap-prenatal.example.test' },
   vars = {
+    CAP_SYSTEM_BASE_URL: 'https://cap-prenatal.example.test',
     CAP_NOTIFICATION_RECIPIENT: 'responsable@example.test',
     CAP_NOTIFICATION_FROM: 'automatizacion@example.test',
   },
   execution = { mode: 'trigger' },
 } = {}) {
   const code = byName('Construir correo agregado').parameters.jsCode;
-  const execute = new Function('$json', '$env', '$vars', '$execution', code);
-  return execute(input, env, vars, execution)[0].json;
+  const execute = new Function('$json', '$vars', '$execution', code);
+  return execute(input, vars, execution)[0].json;
 }
 
 function runRequestClassifier(attempt, payload) {
@@ -84,15 +84,15 @@ function runInitialConfiguration({
   vars = {},
 }) {
   const code = byName('Preparar parámetros y configuración').parameters.jsCode;
-  const execute = new Function('$env', '$vars', '$execution', code);
+  const execute = new Function('$vars', '$execution', code);
   return execute(
-    { CAP_BACKEND_AUTOMATION_URL: backendUrl },
-    vars,
+    { ...vars, CAP_BACKEND_AUTOMATION_URL: backendUrl },
     execution
   )[0].json;
 }
 
 test('workflow JSON es válido, versionado, inactivo y sin datos fijados', () => {
+  assert.equal(workflow.id, 'capProxCitasV1A1');
   assert.equal(workflow.name, 'CAP Prenatal | Próximas citas agregadas | v1');
   assert.equal(workflow.active, false);
   assert.match(workflow.versionId, /^[0-9a-f-]{36}$/);
@@ -166,7 +166,7 @@ test('los tres requests usan URL configurada, Header Auth, rango fijo y timeout'
   }
 
   const prepared = byName('Preparar parámetros y configuración').parameters.jsCode;
-  assert.match(prepared, /\$env\.CAP_BACKEND_AUTOMATION_URL/);
+  assert.match(prepared, /\$vars\.CAP_BACKEND_AUTOMATION_URL/);
   assert.match(prepared, /offsetDays = 1/);
   assert.match(prepared, /windowDays = 1/);
   assert.doesNotMatch(requests.map((node) => node.parameters.url).join('\n'), /localhost|127\.0\.0\.1|nginx|proxy/i);
@@ -294,7 +294,7 @@ test('no existen nodos peligrosos, PostgreSQL ni lectura global del entorno', ()
     .join('\n');
   assert.doesNotMatch(types, /postgres/i);
   assert.doesNotMatch(types, /executeCommand/i);
-  assert.doesNotMatch(codeNodes, /process\.env|Object\.(?:keys|entries)\(\s*\$env\s*\)/);
+  assert.doesNotMatch(codeNodes, /process\.env|\$env|Object\.(?:keys|entries)\(\s*\$vars\s*\)/);
   for (const request of workflow.nodes.filter(
     (node) => node.type === 'n8n-nodes-base.httpRequest'
   )) {
@@ -490,13 +490,21 @@ test('URL del sistema exige HTTPS programado y bloquea esquemas peligrosos', () 
     'file:///tmp/dashboard',
   ]) {
     const result = runMailBuilder({
-      env: { CAP_SYSTEM_BASE_URL: url },
+      vars: {
+        CAP_SYSTEM_BASE_URL: url,
+        CAP_NOTIFICATION_RECIPIENT: 'responsable@example.test',
+        CAP_NOTIFICATION_FROM: 'automatizacion@example.test',
+      },
     });
     assert.equal(result.result, 'configuration_error');
   }
 
   const manual = runMailBuilder({
-    env: { CAP_SYSTEM_BASE_URL: 'http://127.0.0.1:8080' },
+    vars: {
+      CAP_SYSTEM_BASE_URL: 'http://127.0.0.1:8080',
+      CAP_NOTIFICATION_RECIPIENT: 'responsable@example.test',
+      CAP_NOTIFICATION_FROM: 'automatizacion@example.test',
+    },
     execution: { mode: 'manual' },
   });
   assert.equal(manual.mail_configuration_valid, true);

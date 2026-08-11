@@ -111,16 +111,19 @@ prueba manual admite HTTP cuando el host es loopback. Los esquemas
 
 1. Importar `n8n/workflows/proximas-citas-v1.json`.
 2. Confirmar antes de cualquier cambio que aparece inactivo.
+   El JSON incluye el ID estable `capProxCitasV1A1`, requerido por la
+   importación directa del CLI de n8n 2.34.4; no contiene datos ni secretos.
 3. Abrir cada nodo `Consultar backend - intento N`.
 4. Crear una credencial genérica `Header Auth` con nombre de header
    `X-CAP-Automation-Key` y la key original como valor. Asignar la misma
    credencial a los tres nodos. No copiarla a variables, expresiones o notas.
 5. Abrir ambos nodos `Enviar resumen - intento N`, crear una credencial SMTP
    aprobada y asignarla. No exportar nuevamente el workflow con IDs locales.
-6. Crear variables de proyecto n8n:
-   `CAP_NOTIFICATION_RECIPIENT`, `CAP_NOTIFICATION_FROM` y, opcionalmente,
+6. Crear variables de proyecto n8n: `CAP_BACKEND_AUTOMATION_URL`,
+   `CAP_SYSTEM_BASE_URL`, `CAP_NOTIFICATION_RECIPIENT`,
+   `CAP_NOTIFICATION_FROM` y, opcionalmente,
    `CAP_NOTIFICATION_RECIPIENT_ALIAS`. El alias predeterminado es
-   `responsable_salud_reproductiva`; no contiene el correo.
+   `responsable_salud_reproductiva`; no contiene el correo ni secretos.
 7. Confirmar `CAP_BACKEND_AUTOMATION_URL` como URL del backend en la red
    `automation_internal`, nunca proxy público, `localhost` productivo o IP fija.
    Confirmar `CAP_SYSTEM_BASE_URL` como URL HTTPS visible para el personal.
@@ -153,11 +156,15 @@ se guardan respuesta, resumen, cuerpo, correo real ni respuesta SMTP.
 
 Static data es de mejor esfuerzo y no es una garantía transaccional. No
 reemplaza una tabla de entregas y puede tener carreras si se ejecutan varios
-workers. n8n 2.26.4 no serializa un límite por-workflow dentro del JSON; por
-eso la concurrencia operativa debe quedar en 1 mediante
+workers. El JSON versionado no serializa un límite por-workflow; por eso la
+concurrencia operativa debe quedar en 1 mediante
 `N8N_CONCURRENCY_PRODUCTION_LIMIT=1` en la instancia de este sprint y debe
 existir una sola copia activa del workflow. Si la instancia alojara otros
 workflows, revisar el impacto global antes de activarlos.
+
+El workflow no usa `$env`. n8n mantiene `N8N_BLOCK_ENV_ACCESS_IN_NODE=true` y
+lee solo las variables de proyecto declaradas, además de las credenciales
+cifradas asignadas manualmente a cada nodo.
 
 ## Errores y privacidad
 

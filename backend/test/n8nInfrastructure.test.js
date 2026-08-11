@@ -62,15 +62,15 @@ async function withServer(app, callback) {
   }
 }
 
-test('imagen y dependencia n8n quedan fijadas exactamente en 2.26.4', () => {
+test('imagen y dependencia n8n quedan fijadas exactamente en 2.34.4', () => {
   const rootPackage = JSON.parse(read('package.json'));
   const rootLock = JSON.parse(read('package-lock.json'));
 
-  assert.equal(rootPackage.devDependencies.n8n, '2.26.4');
-  assert.equal(rootLock.packages[''].devDependencies.n8n, '2.26.4');
-  assert.equal(rootLock.packages['node_modules/n8n'].version, '2.26.4');
-  assert.match(localCompose, /image:\s*docker\.n8n\.io\/n8nio\/n8n:2\.26\.4/);
-  assert.match(productionCompose, /image:\s*docker\.n8n\.io\/n8nio\/n8n:2\.26\.4/);
+  assert.equal(rootPackage.devDependencies.n8n, '2.34.4');
+  assert.equal(rootLock.packages[''].devDependencies.n8n, '2.34.4');
+  assert.equal(rootLock.packages['node_modules/n8n'].version, '2.34.4');
+  assert.match(localCompose, /image:\s*docker\.n8n\.io\/n8nio\/n8n:2\.34\.4/);
+  assert.match(productionCompose, /image:\s*docker\.n8n\.io\/n8nio\/n8n:2\.34\.4/);
   assert.doesNotMatch(`${localCompose}\n${productionCompose}`, /n8nio\/n8n:latest/i);
 });
 
@@ -114,10 +114,9 @@ test('rutas humanas /api/ continúan encaminadas al backend', () => {
   assert.match(nginx, /location \/api\/\s*\{[\s\S]*proxy_pass http:\/\/backend:3001\/api\/;/);
 });
 
-test('n8n resuelve backend por nombre interno en la red de automatizacion', () => {
+test('n8n comparte exclusivamente la red privada necesaria con el backend', () => {
   const n8n = serviceBlock(productionCompose, 'n8n');
   const backend = serviceBlock(productionCompose, 'backend');
-  assert.match(n8n, /CAP_BACKEND_AUTOMATION_URL:\s*http:\/\/backend:3001\/api\/automatizaciones\/v1\/proximas-citas/);
   assert.match(n8n, /-\s+automation_internal/);
   assert.match(backend, /-\s+automation_internal/);
   assert.match(productionCompose, /automation_internal:[\s\S]*internal:\s*true/);
@@ -135,9 +134,32 @@ test('script local usa solo n8n/.env, lista cerrada y binario fijado', () => {
   assert.match(localScript, /\$allowedVariables/);
   assert.match(localScript, /\$permittedProcessVariables/);
   assert.match(localScript, /\$permittedProcessVariables -notcontains \$_.Name/);
-  assert.match(localScript, /\$requiredN8nVersion = "2\.26\.4"/);
+  assert.match(localScript, /\$requiredN8nVersion = "2\.34\.4"/);
   assert.doesNotMatch(localScript, /backend\\\.env|npx\s+n8n/i);
   assert.match(localScript, /Variable no permitida en n8n\/\.env/);
+});
+
+test('configuracion n8n 2.34.4 evita variables deprecadas y acceso global al entorno', () => {
+  for (const source of [
+    serviceBlock(localCompose, 'n8n'),
+    serviceBlock(productionCompose, 'n8n'),
+    read('n8n', '.env.example'),
+  ]) {
+    assert.match(source, /N8N_WEBHOOK_URL(?::|=)/);
+    assert.match(source, /N8N_RUNNERS_MODE(?::|=)\s*internal/);
+    assert.match(source, /N8N_RUNNERS_TASK_TIMEOUT(?::|=)\s*"?60"?/);
+    assert.match(source, /N8N_BLOCK_ENV_ACCESS_IN_NODE(?::|=)\s*"?true"?/);
+    assert.match(source, /N8N_COMMUNITY_PACKAGES_ENABLED(?::|=)\s*"?false"?/);
+    assert.match(source, /N8N_UNVERIFIED_PACKAGES_ENABLED(?::|=)\s*"?false"?/);
+    assert.doesNotMatch(source, /(^|\n)\s*WEBHOOK_URL(?::|=)/);
+    assert.doesNotMatch(source, /N8N_RUNNERS_ENABLED/);
+    assert.doesNotMatch(
+      source,
+      /(^|\n)\s*(?:CAP_BACKEND_AUTOMATION_URL|CAP_SYSTEM_BASE_URL)(?::|=)/
+    );
+  }
+  assert.match(serviceBlock(productionCompose, 'n8n'), /N8N_SECURE_COOKIE:\s*"true"/);
+  assert.match(serviceBlock(localCompose, 'n8n'), /N8N_SECURE_COOKIE:\s*"false"/);
 });
 
 test('N8N_ENCRYPTION_KEY es obligatoria en produccion y vacia en ejemplos', () => {

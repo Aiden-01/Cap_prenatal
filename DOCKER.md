@@ -75,16 +75,18 @@ inventario; no debe convertirse en almacen de secretos productivos. El backend
 acepta `DATABASE_URL` o todas las variables `DB_*`, pero valida la configuracion
 antes de cargar rutas.
 
-La imagen n8n y la dependencia local estan fijadas en `2.26.4`. Revisar notas de
-version, respaldar el volumen y probar restauracion antes de cualquier
-actualizacion.
+La imagen n8n y la dependencia local estan fijadas en `2.34.4`, release `latest`
+oficial del 7 de agosto de 2026 y correccion compatible propuesta por la
+auditoria de npm. Revisar notas de version, respaldar el volumen y probar
+restauracion antes de cualquier actualizacion posterior.
 
 El workflow versionado `n8n/workflows/proximas-citas-v1.json` no se monta,
 importa o activa automaticamente desde ningun Compose. Debe importarse
 manualmente y siempre aparece inactivo, sin Header Auth ni SMTP. La
 configuracion productiva limita la concurrencia global de esta instancia a 1
-con `N8N_CONCURRENCY_PRODUCTION_LIMIT=1`; n8n 2.26.4 no serializa un limite
-por-workflow dentro del JSON.
+con `N8N_CONCURRENCY_PRODUCTION_LIMIT=1`; el artefacto JSON no serializa un
+limite por-workflow. Las URLs de CAP se configuran como variables de proyecto
+n8n, mientras el acceso global a `$env` queda bloqueado.
 
 No agregar n8n a `data_internal`, no darle credenciales PostgreSQL y no publicar
 5678. El correo futuro requiere una decision separada de egress: relay SMTP
