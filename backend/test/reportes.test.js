@@ -274,10 +274,12 @@ test('HTML y renderer PDF fijan oficio 13 x 8.5, tabla completa y encabezado rep
   assert.doesNotMatch(html, /control_id|embarazo_id/);
 
   let pdfOptions;
+  let launchOptions;
   let closed = false;
   const service = createReportesPdfService({
     puppeteerClient: {
-      async launch() {
+      async launch(options) {
+        launchOptions = options;
         return {
           async newPage() {
             return {
@@ -291,6 +293,8 @@ test('HTML y renderer PDF fijan oficio 13 x 8.5, tabla completa y encabezado rep
     },
   });
   const pdf = await service.renderCensoPrimerControlPdf({ rows, ...PERIODO, generadoEn: 'ahora' });
+  assert.equal(launchOptions.headless, 'new');
+  assert.deepEqual(launchOptions.args, []);
   assert.equal(pdfOptions.width, '13in');
   assert.equal(pdfOptions.height, '8.5in');
   assert.equal(pdfOptions.preferCSSPageSize, true);

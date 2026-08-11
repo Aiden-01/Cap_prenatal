@@ -32,10 +32,14 @@ RUN apt-get update \
     xdg-utils \
   && rm -rf /var/lib/apt/lists/*
 
-COPY package*.json ./
+RUN chown node:node /app
+
+USER node
+
+COPY --chown=node:node package*.json ./
 RUN npm ci --omit=dev
 
-COPY src ./src
+COPY --chown=node:node src ./src
 
 EXPOSE 3001
 

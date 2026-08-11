@@ -96,7 +96,7 @@ Consulte `docs/ROTACION_SECRETOS.md` antes de preparar cualquier entorno nuevo.
 
 ## Nota sobre PDF
 
-Los PDF basados en Puppeteer quedan cubiertos por el contenedor porque instala Chromium y define `PUPPETEER_EXECUTABLE_PATH`.
+Los PDF basados en Puppeteer quedan cubiertos por el contenedor porque instala Chromium y define `PUPPETEER_EXECUTABLE_PATH`. La imagen termina con `USER node`: Node y Chromium no se ejecutan como root y Chromium conserva su sandbox, sin `--no-sandbox` ni `--disable-setuid-sandbox`.
 
 Los reportes basados en plantillas Excel tambien son compatibles con Docker/AWS mediante LibreOffice headless. El backend elige el motor con `PDF_EXCEL_ENGINE`:
 
@@ -116,3 +116,5 @@ En Docker se define:
 PDF_EXCEL_ENGINE=libreoffice
 LIBREOFFICE_PATH=/usr/bin/soffice
 ```
+
+Las conversiones externas de LibreOffice y PowerShell/Excel tienen un timeout interno de 120 segundos. Si se excede, el backend termina solo el arbol de procesos creado por esa conversion, elimina su directorio temporal y devuelve un error generico. En Windows la terminacion usa el PID de la instancia creada; nunca finaliza globalmente `Excel.exe`.

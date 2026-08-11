@@ -2,8 +2,6 @@ const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer');
 const ExcelJS = require('exceljs');
-const { execFile } = require('child_process');
-const { promisify } = require('util');
 const pdfService = require('../services/pdfService');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { AppError } = require('../utils/appError');
@@ -12,8 +10,9 @@ const { consumePdfQuota } = require('../middleware/pdfRateLimit');
 const { generarFichaClinicaPrenatalPdf } = require('../services/fichaClinicaPrenatalPdf');
 const { sendPdfResponse } = require('../utils/pdfResponse');
 const { randomTempBase, withPdfTempDir } = require('../utils/pdfTemp');
+const { buildPuppeteerLaunchOptions } = require('../utils/puppeteerLaunch');
+const { runDocumentProcess, terminateProcessByPid } = require('../utils/documentProcess');
 
-const execFileAsync = promisify(execFile);
 const TEXT_FORMAT_CELLS = new Set(['T8', 'V8', 'AE8:AN8', 'F61', 'G19:J19', 'P19:S19', 'Q19:T19', 'AK19:AN19']);
 const CENTER_FORMAT_RE = /^(N6|O6|P6|Q6|S6|T6|U6|V6|Y6|Z6|AA6|AB6|AA7:AB7|AA13:AB13|AE8:AN8|K18|X18|X19|E20|K20|Q20|X20|F21|M21)$/;
 
@@ -21,11 +20,7 @@ async function renderControlPdf(html, puppeteerClient) {
   let browser = null;
 
   try {
-    browser = await puppeteerClient.launch({
-      headless: 'new',
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    browser = await puppeteerClient.launch(buildPuppeteerLaunchOptions());
 
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
@@ -651,16 +646,14 @@ async function exportWithLibreOffice(templatePath, cellMap, tempDir, tempBase) {
   const generatedPdf = path.join(tempDir, `${tempBase}.pdf`);
 
   await writeExcelTemplate(templatePath, tempXlsx, cellMap);
-  await execFileAsync(libreOfficeExecutable(), [
+  await runDocumentProcess(libreOfficeExecutable(), [
     '--headless',
     '--convert-to',
     'pdf',
     '--outdir',
     tempDir,
     tempXlsx,
-  ], {
-    maxBuffer: 1024 * 1024 * 10,
-  });
+  ]);
 
   if (!fs.existsSync(generatedPdf)) {
     throw new Error('LibreOffice no genero el PDF esperado');
@@ -673,6 +666,7 @@ async function exportWithExcelCom(templatePath, cellMap, tempDir, tempBase) {
   const tempXlsx = path.join(tempDir, `${tempBase}.xlsx`);
   const tempPdf = path.join(tempDir, `${tempBase}.pdf`);
   const tempJson = path.join(tempDir, `${tempBase}.json`);
+  const tempPid = path.join(tempDir, `${tempBase}.excel.pid`);
 
   fs.copyFileSync(templatePath, tempXlsx);
   fs.writeFileSync(tempJson, JSON.stringify(cellMap), 'utf8');
@@ -682,6 +676,7 @@ $ErrorActionPreference = 'Stop'
 $xlsx = '${tempXlsx.replace(/'/g, "''")}'
 $pdf = '${tempPdf.replace(/'/g, "''")}'
 $jsonPath = '${tempJson.replace(/'/g, "''")}'
+$pidPath = '${tempPid.replace(/'/g, "''")}'
 $excel = $null
 $wb = $null
 try {
@@ -689,6 +684,17 @@ try {
   $excel = New-Object -ComObject Excel.Application
   $excel.Visible = $false
   $excel.DisplayAlerts = $false
+  Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class ExcelProcessId {
+  [DllImport("user32.dll")]
+  public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+}
+'@
+  [uint32]$excelPid = 0
+  [void][ExcelProcessId]::GetWindowThreadProcessId([IntPtr]$excel.Hwnd, [ref]$excelPid)
+  if ($excelPid -gt 0) { [System.IO.File]::WriteAllText($pidPath, [string]$excelPid) }
   $wb = $excel.Workbooks.Open($xlsx)
   $ws = $wb.Worksheets.Item(1)
   foreach ($prop in $map.PSObject.Properties) {
@@ -723,9 +729,12 @@ finally {
 }
 `;
 
-  await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', psScript], {
-    windowsHide: true,
-    maxBuffer: 1024 * 1024 * 10,
+  await runDocumentProcess('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', psScript], {
+    onTimeout: async () => {
+      if (!fs.existsSync(tempPid)) return;
+      const excelPid = Number(fs.readFileSync(tempPid, 'utf8').trim());
+      await terminateProcessByPid(excelPid, { platform: 'win32' });
+    },
   });
   return fs.readFileSync(tempPdf);
 }
@@ -1321,6 +1330,7 @@ const pdfController = createPdfController();
 
 module.exports = {
   createPdfController,
+  exportExcelTemplateToPdf,
   pdfControl: asyncHandler(pdfController.pdfControl),
   pdfMspas: asyncHandler(pdfController.pdfMspas),
   pdfPlanParto: asyncHandler(pdfController.pdfPlanParto),

@@ -1,4 +1,5 @@
 const puppeteer = require('puppeteer');
+const { buildPuppeteerLaunchOptions } = require('../utils/puppeteerLaunch');
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -103,11 +104,7 @@ function createReportesPdfService({ puppeteerClient = puppeteer } = {}) {
   async function renderCensoPrimerControlPdf(data) {
     let browser = null;
     try {
-      browser = await puppeteerClient.launch({
-        headless: 'new',
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      });
+      browser = await puppeteerClient.launch(buildPuppeteerLaunchOptions());
       const page = await browser.newPage();
       await page.setContent(buildCensoPrimerControlHtml(data), { waitUntil: 'networkidle0' });
       return await page.pdf({

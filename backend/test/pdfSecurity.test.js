@@ -634,6 +634,7 @@ function controlFixture() {
 
 test('Chromium se cierra despues de generar control y antes de responder', async () => {
   const events = [];
+  let launchOptions;
   const browser = {
     close: async () => events.push('close'),
     newPage: async () => ({
@@ -647,12 +648,19 @@ test('Chromium se cierra despues de generar control y antes de responder', async
   const controller = createPdfController({
     fsApi: { readFileSync: () => '<p>{{nombre}}</p>' },
     pdfService: { obtenerControlConPaciente: async () => controlFixture() },
-    puppeteerClient: { launch: async () => browser },
+    puppeteerClient: {
+      launch: async (options) => {
+        launchOptions = options;
+        return browser;
+      },
+    },
     registrarEventoPrivado: async () => events.push('audit'),
     sendPdfResponse: (_res, _pdf, filename) => events.push(`send:${filename}`),
   });
 
   await controller.pdfControl({ params: { pacienteId: 41, controlId: 17 }, query: { embarazo_id: 91 } }, responseStub());
+  assert.equal(launchOptions.headless, 'new');
+  assert.deepEqual(launchOptions.args, []);
   assert.deepEqual(events, ['setContent', 'pdf', 'close', 'audit', 'send:control-17.pdf']);
 });
 
