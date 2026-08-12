@@ -1,13 +1,18 @@
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
+  ArrowUpRight,
+  CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  MapPin,
   Search,
+  ShieldAlert,
   UserPlus,
+  UsersRound,
 } from "lucide-react";
 import api from "../api/axios";
 import { isValidPregnancyId } from "../utils/pregnancyState";
@@ -28,6 +33,17 @@ function getEstadoBadge(estado) {
   if (estado === "activo") return "badge-green";
   if (estado === "puerperio") return "badge-blue";
   return "badge";
+}
+
+function getPatientInitials(paciente) {
+  const words = [paciente.nombres, paciente.apellidos]
+    .filter(Boolean)
+    .join(" ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  return words.slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "P";
 }
 
 function getFppInfo(paciente) {
@@ -86,15 +102,6 @@ function getFppInfo(paciente) {
   };
 }
 
-const detailLabelStyle = {
-  display: "block",
-  color: "var(--text-muted)",
-  fontSize: "0.72rem",
-  fontWeight: 700,
-  textTransform: "uppercase",
-  letterSpacing: 0,
-};
-
 export default function Pacientes() {
   const [pacientes, setPacientes] = useState([]);
   const [total, setTotal] = useState(0);
@@ -102,6 +109,7 @@ export default function Pacientes() {
   const [pagina, setPagina] = useState(1);
   const [limite, setLimite] = useState(10);
   const [expandida, setExpandida] = useState(null);
+  const [openingPatient, setOpeningPatient] = useState(null);
   const [loadedQueryKey, setLoadedQueryKey] = useState("");
   const navigate = useNavigate();
   const queryKey = JSON.stringify([buscar, pagina, limite]);
@@ -126,9 +134,43 @@ export default function Pacientes() {
     return () => { cancelado = true; };
   }, [buscar, pagina, limite]);
 
+  useEffect(() => {
+    if (!openingPatient) return undefined;
+
+    const navigationTimer = window.setTimeout(() => {
+      navigate(`/pacientes/${openingPatient.id}`);
+    }, 1050);
+
+    return () => window.clearTimeout(navigationTimer);
+  }, [navigate, openingPatient]);
+
+  const openPatientFile = (patient, patientName) => {
+    if (openingPatient) return;
+
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      navigate(`/pacientes/${patient.id}`);
+      return;
+    }
+
+    setOpeningPatient({
+      id: patient.id,
+      name: patientName,
+      initials: getPatientInitials(patient),
+      fileNumber: patient.no_expediente || "Sin número",
+    });
+  };
+
   const totalPaginas = Math.max(1, Math.ceil(total / limite));
   const inicio = total === 0 ? 0 : (pagina - 1) * limite + 1;
   const fin = Math.min(pagina * limite, total);
+  const visibleStats = pacientes.reduce((stats, paciente) => {
+    const hasEmbarazo = isValidPregnancyId(paciente.embarazo_id);
+    const estado = hasEmbarazo ? (paciente.embarazo_estado || "sin embarazo") : "sin embarazo";
+    if (estado === "activo") stats.activas += 1;
+    if (paciente.tiene_riesgo) stats.riesgo += 1;
+    if (getFppInfo(paciente).urgent) stats.proximas += 1;
+    return stats;
+  }, { activas: 0, riesgo: 0, proximas: 0 });
 
   return (
     <div className="patients-page">
@@ -147,145 +189,171 @@ export default function Pacientes() {
         </button>
       </div>
 
-      <div className="card patients-search-card">
-        <Search size={16} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
-        <input
-          className="input-field"
-          placeholder="Buscar por nombre, apellido, No. expediente o CUI..."
-          value={buscar}
-          onChange={(e) => { setBuscar(e.target.value); setPagina(1); }}
-        />
+      <div className="card patients-census-tools">
+        <div className="patients-census-intro">
+          <span className="patients-census-kicker"><UsersRound size={15} /> Censo clínico</span>
+          <strong>Una lectura rápida antes de abrir el expediente</strong>
+          <p>Identifica seguimiento, riesgo y proximidad a la FPP sin perder el contexto de cada paciente.</p>
+        </div>
+
+        <label className="patients-search-field">
+          <Search size={17} aria-hidden="true" />
+          <input
+            className="input-field"
+            aria-label="Buscar pacientes"
+            placeholder="Buscar nombre, expediente o CUI..."
+            value={buscar}
+            onChange={(e) => { setBuscar(e.target.value); setPagina(1); }}
+          />
+          {buscar && <span>{pacientes.length} resultado{pacientes.length !== 1 ? "s" : ""}</span>}
+        </label>
+
+        <div className="patients-live-summary" aria-label="Resumen de pacientes visibles">
+          <div>
+            <span>En esta vista</span>
+            <strong>{pacientes.length}</strong>
+          </div>
+          <div>
+            <span>Embarazo activo</span>
+            <strong>{visibleStats.activas}</strong>
+          </div>
+          <div className="is-risk">
+            <span>Con riesgo</span>
+            <strong>{visibleStats.riesgo}</strong>
+          </div>
+          <div className="is-near">
+            <span>FPP cercana</span>
+            <strong>{visibleStats.proximas}</strong>
+          </div>
+        </div>
       </div>
 
-      <div className="card patients-table-card">
+      <section className="card patients-board" aria-label="Listado de pacientes">
         {loading ? (
-          <div style={{ padding: "2.5rem", textAlign: "center", color: "var(--text-muted)" }}>Cargando...</div>
+          <div className="patient-card-grid" aria-label="Cargando pacientes">
+            {Array.from({ length: 6 }, (_, index) => (
+              <div key={index} className="patient-card-skeleton" aria-hidden="true" />
+            ))}
+          </div>
         ) : pacientes.length === 0 ? (
-          <div style={{ padding: "2.5rem", textAlign: "center", color: "var(--text-muted)" }}>
-            No se encontraron pacientes.
+          <div className="patients-empty-state">
+            <span><Search size={22} /></span>
+            <strong>No se encontraron pacientes</strong>
+            <p>Prueba con otro nombre, número de expediente o CUI.</p>
           </div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table className="tabla">
-              <thead>
-                <tr>
-                  <th>No. Expediente</th>
-                  <th>Paciente</th>
-                  <th>Estado</th>
-                  <th>FUR</th>
-                  <th>FPP (est.)</th>
-                  <th aria-label="Detalle"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {pacientes.map((p) => {
-                  const hasEmbarazo = isValidPregnancyId(p.embarazo_id);
-                  const fppInfo = getFppInfo(p);
-                  const abierta = expandida === p.id;
-                  const estado = hasEmbarazo ? (p.embarazo_estado || "sin embarazo") : "sin embarazo";
+          <div className="patient-card-grid" role="list">
+            {pacientes.map((p, index) => {
+              const hasEmbarazo = isValidPregnancyId(p.embarazo_id);
+              const fppInfo = getFppInfo(p);
+              const abierta = expandida === p.id;
+              const estado = hasEmbarazo ? (p.embarazo_estado || "sin embarazo") : "sin embarazo";
+              const fur = formatDate(hasEmbarazo ? (p.embarazo_fur || p.fur) : null);
+              const nombreCompleto = `${p.nombres || ""} ${p.apellidos || ""}`.trim() || "Paciente sin nombre";
+              const ubicacion = p.comunidad || p.municipio || "Ubicación sin registrar";
+              const detailsId = `patient-details-${p.id}`;
 
-                  return (
-                    <Fragment key={p.id}>
-                      <tr style={{ cursor: "pointer" }} onClick={() => navigate(`/pacientes/${p.id}`)}>
-                        <td>
-                          <span className="badge badge-blue">{p.no_expediente}</span>
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                            <strong style={{ color: "var(--text)", fontSize: "0.92rem" }}>{p.nombres || "—"}</strong>
-                            <span style={{ color: "var(--text-muted)", fontSize: "0.84rem" }}>{p.apellidos || "—"}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
-                            <span className={`badge ${getEstadoBadge(estado)}`}>{titleCase(estado)}</span>
-                            {p.tiene_riesgo && <span className="badge badge-red">Riesgo obstétrico</span>}
-                          </div>
-                        </td>
-                        <td style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                          {formatDate(hasEmbarazo ? (p.embarazo_fur || p.fur) : null)}
-                        </td>
-                        <td>
-                          <span
-                            title={fppInfo.title}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "0.3rem",
-                              color: fppInfo.color,
-                              fontWeight: 700,
-                              fontSize: "0.82rem",
-                            }}>
-                            {fppInfo.urgent && <AlertTriangle size={13} />}
-                            {fppInfo.label}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: "right" }}>
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            title={abierta ? "Ocultar detalle" : "Mostrar detalle"}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setExpandida(abierta ? null : p.id);
-                            }}
-                            style={{ padding: "0.4rem", minWidth: 34 }}>
-                            {abierta ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                          </button>
-                        </td>
-                      </tr>
-                      {abierta && (
-                        <tr onClick={(e) => e.stopPropagation()}>
-                          <td
-                            colSpan={6}
-                            className="patients-expanded-cell">
-                            <div className="patients-detail-grid">
-                              <div>
-                                <span style={detailLabelStyle}>Municipio</span>
-                                <strong style={{ color: "var(--text)", fontSize: "0.88rem" }}>{p.municipio || "—"}</strong>
-                              </div>
-                              <div>
-                                <span style={detailLabelStyle}>Registrada</span>
-                                <strong style={{ color: "var(--text)", fontSize: "0.88rem" }}>{formatDate(p.created_at)}</strong>
-                              </div>
-                              <div>
-                                <span style={detailLabelStyle}>Comunidad</span>
-                                <strong style={{ color: "var(--text)", fontSize: "0.88rem" }}>{p.comunidad || "—"}</strong>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
+              return (
+                <article
+                  key={p.id}
+                  role="listitem"
+                  className={`patient-orbit-card ${p.tiene_riesgo ? "is-risk" : ""} ${fppInfo.urgent ? "is-urgent" : ""} ${abierta ? "is-open" : ""} ${openingPatient?.id === p.id ? "is-launching" : ""}`}
+                  style={{ animationDelay: `${Math.min(index, 6) * 45}ms` }}>
+                  <button
+                    type="button"
+                    className="patient-orbit-main"
+                    onClick={() => openPatientFile(p, nombreCompleto)}
+                    disabled={Boolean(openingPatient)}
+                    aria-label={`Abrir expediente de ${nombreCompleto}`}>
+                    <span className="patient-orbit-heading">
+                      <span className="patient-orbit-avatar" aria-hidden="true">{getPatientInitials(p)}</span>
+                      <span className="patient-orbit-identity">
+                        <small>Expediente {p.no_expediente || "sin número"}</small>
+                        <strong>{p.nombres || "—"}</strong>
+                        <span>{p.apellidos || "—"}</span>
+                      </span>
+                      <span className="patient-orbit-open">Abrir <ArrowUpRight size={15} /></span>
+                    </span>
+
+                    <span className="patient-orbit-badges">
+                      <span className={`badge ${getEstadoBadge(estado)}`}>{titleCase(estado)}</span>
+                      {p.tiene_riesgo && <span className="badge badge-red"><ShieldAlert size={12} /> Riesgo obstétrico</span>}
+                    </span>
+
+                    <span className="patient-orbit-path">
+                      <span className="patient-orbit-date">
+                        <CalendarDays size={16} aria-hidden="true" />
+                        <span><small>FUR</small><strong>{fur}</strong></span>
+                      </span>
+                      <span className="patient-orbit-line" aria-hidden="true"><span /></span>
+                      <span className={`patient-orbit-date is-fpp ${fppInfo.urgent ? "is-urgent" : ""}`} title={fppInfo.title}>
+                        {fppInfo.urgent ? <AlertTriangle size={16} aria-hidden="true" /> : <CalendarDays size={16} aria-hidden="true" />}
+                        <span><small>FPP estimada</small><strong style={{ color: fppInfo.color }}>{fppInfo.label}</strong></span>
+                      </span>
+                    </span>
+
+                    <span className="patient-orbit-location">
+                      <span><MapPin size={14} aria-hidden="true" /> {ubicacion}</span>
+                      <span>{fppInfo.title}</span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="patient-orbit-more"
+                    aria-expanded={abierta}
+                    aria-controls={detailsId}
+                    onClick={() => setExpandida(abierta ? null : p.id)}>
+                    <span>{abierta ? "Ocultar datos" : "Más datos"}</span>
+                    {abierta ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                  </button>
+
+                  {abierta && (
+                    <div id={detailsId} className="patient-orbit-details">
+                      <div>
+                        <span>Municipio</span>
+                        <strong>{p.municipio || "—"}</strong>
+                      </div>
+                      <div>
+                        <span>Comunidad</span>
+                        <strong>{p.comunidad || "—"}</strong>
+                      </div>
+                      <div>
+                        <span>Registrada</span>
+                        <strong>{formatDate(p.created_at)}</strong>
+                      </div>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
           </div>
         )}
 
         {total > 0 && (
           <div className="patients-footer">
-            <span style={{ fontSize: "0.83rem", color: "var(--text-muted)" }}>
+            <span className="patients-footer-count">
               Mostrando {inicio}-{fin} de {total} pacientes
             </span>
             <div className="patients-footer-actions">
-              <select
-                className="input-field"
-                value={limite}
-                onChange={(e) => {
-                  setLimite(Number(e.target.value));
-                  setPagina(1);
-                }}
-                style={{ margin: 0, width: 92, padding: "0.5rem 0.65rem" }}>
-                {PAGE_SIZE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
+              <label className="patients-page-size">
+                <span>Por página</span>
+                <select
+                  className="input-field"
+                  value={limite}
+                  onChange={(e) => {
+                    setLimite(Number(e.target.value));
+                    setPagina(1);
+                  }}>
+                  {PAGE_SIZE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </label>
               <button className="btn-secondary" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina === 1}>
                 <ChevronLeft size={15} /> Anterior
               </button>
-              <span style={{ padding: "0.5rem 0.75rem", fontSize: "0.83rem", color: "var(--text-muted)" }}>
+              <span className="patients-page-indicator">
                 {pagina} / {totalPaginas}
               </span>
               <button className="btn-secondary" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas}>
@@ -294,7 +362,36 @@ export default function Pacientes() {
             </div>
           </div>
         )}
-      </div>
+      </section>
+
+      {openingPatient && (
+        <div
+          className="patient-file-transition"
+          role="status"
+          aria-live="assertive"
+          aria-label={`Abriendo expediente de ${openingPatient.name}`}>
+          <div className="patient-file-transition__veil" aria-hidden="true" />
+          <div className="patient-file-transition__scene">
+            <div className="patient-file-transition__art" aria-hidden="true">
+              <div className="patient-file-transition__folder-back">
+                <div className="patient-file-transition__sheet">
+                  <span className="patient-file-transition__seal">CAP</span>
+                  <strong>{openingPatient.initials}</strong>
+                  <span className="patient-file-transition__sheet-line is-long" />
+                  <span className="patient-file-transition__sheet-line" />
+                  <span className="patient-file-transition__sheet-line is-short" />
+                </div>
+                <div className="patient-file-transition__folder-front">
+                  <span>EXPEDIENTE</span>
+                </div>
+              </div>
+            </div>
+            <span className="patient-file-transition__kicker">Expediente clínico</span>
+            <strong>{openingPatient.name}</strong>
+            <small>{openingPatient.fileNumber}</small>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

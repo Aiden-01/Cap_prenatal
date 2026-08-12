@@ -38,6 +38,7 @@ function getResumen(items = [], porcentaje) {
 function ProgressBar({ porcentaje, height = 6, width = "100%" }) {
   return (
     <div
+      className="completitud-progress"
       style={{
         width,
         height,
@@ -146,12 +147,13 @@ export default function SemaforoCompletitud({ pacienteId, initialData = null }) 
         }}
       >
         <ClipboardList size={18} style={{ color: "var(--primary)", flexShrink: 0 }} />
-        <span style={{ color: "var(--text)", fontSize: "0.92rem", fontWeight: 700, whiteSpace: "nowrap" }}>
+        <span className="completitud-title" style={{ color: "var(--text)", fontSize: "0.92rem", fontWeight: 700, whiteSpace: "nowrap" }}>
           Completitud del expediente
         </span>
         <ProgressBar porcentaje={porcentaje} width={120} />
-        <strong style={{ color: "var(--text)", fontSize: "0.9rem", flexShrink: 0 }}>{porcentaje}%</strong>
+        <strong className="completitud-percentage" style={{ color: "var(--text)", fontSize: "0.9rem", flexShrink: 0 }}>{porcentaje}%</strong>
         <span
+          className="completitud-summary"
           style={{
             color: error ? "var(--danger)" : "var(--text-muted)",
             fontSize: "0.82rem",

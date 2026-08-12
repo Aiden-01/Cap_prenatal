@@ -23,12 +23,36 @@ function useFormErrorUi() {
 
 // ─── STEPS ──────────────────────────────────────────────────
 const STEPS = [
-  { label: "Establecimiento", icon: Building2 },
-  { label: "Paciente",        icon: User       },
-  { label: "Gestación",       icon: Baby       },
-  { label: "Antecedentes",    icon: Heart      },
-  { label: "Riesgo social",   icon: ShieldAlert },
-  { label: "Confirmar",       icon: CheckCircle },
+  {
+    label: "Establecimiento",
+    icon: Building2,
+    description: "Identifica el expediente y confirma la unidad responsable del registro.",
+  },
+  {
+    label: "Paciente",
+    icon: User,
+    description: "Completa la identidad, ubicación, contacto y contexto personal de la paciente.",
+  },
+  {
+    label: "Gestación",
+    icon: Baby,
+    description: "Documenta la gestación actual y los antecedentes obstétricos relevantes.",
+  },
+  {
+    label: "Antecedentes",
+    icon: Heart,
+    description: "Registra condiciones personales y familiares para una valoración integral.",
+  },
+  {
+    label: "Riesgo social",
+    icon: ShieldAlert,
+    description: "Consigna factores sociales sensibles con una lectura clara por trimestre.",
+  },
+  {
+    label: "Confirmar",
+    icon: CheckCircle,
+    description: "Revisa la información principal antes de guardar el expediente clínico.",
+  },
 ];
 
 const FIELD_LABELS = {
@@ -882,19 +906,23 @@ export default function NuevaPaciente() {
   const p = { form, set };
   const comunidadCatalogoSeleccionada = esMunicipioElChal(form.municipio) && Boolean(form.comunidad_id);
   const nombrePaciente = `${form.nombres || ""} ${form.apellidos || ""}`.trim();
+  const CurrentStepIcon = STEPS[step].icon;
 
   return (
-    <div>
+    <div className="clinical-form-page">
       {/* HEADER */}
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.5rem" }}>
+      <div className="clinical-form-header">
         <button className="btn-secondary" onClick={() => navigate("/pacientes")}>
           <ChevronLeft size={15} /> Volver
         </button>
-        <div>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--text)" }}>
+        <div className="clinical-form-title">
+          <span className="clinical-form-kicker">
+            {editando ? "Actualización de expediente" : "Nuevo ingreso clínico"}
+          </span>
+          <h1>
             {editando ? "Editando datos de la paciente" : "Nueva paciente"}
           </h1>
-          <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 2 }}>
+          <p>
             {editando
               ? nombrePaciente || "Cargando datos de la paciente..."
               : "Ficha Clínica Prenatal y Puerperio — MSPAS"}
@@ -903,7 +931,7 @@ export default function NuevaPaciente() {
       </div>
 
       {/* STEPPER */}
-      <div style={{ display: "flex", gap: "0.35rem", marginBottom: "1.75rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
+      <div className="clinical-stepper" role="tablist" aria-label="Etapas del registro de paciente">
         {STEPS.map((s, i) => {
           const Icon = s.icon;
           const done    = i < step;
@@ -912,17 +940,11 @@ export default function NuevaPaciente() {
             <button
               key={i}
               onClick={() => setStep(i)}
-              style={{
-                flex: "1 1 auto", minWidth: 90,
-                padding: "0.55rem 0.75rem",
-                borderRadius: 10,
-                border: current ? "2px solid var(--primary)" : "2px solid var(--border)",
-                background: done ? "var(--primary)" : current ? "var(--primary-lt)" : "var(--surface)",
-                color: done ? "#fff" : current ? "var(--primary)" : "var(--text-muted)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                gap: "0.4rem", fontSize: "0.78rem", fontWeight: current ? 700 : 500,
-                cursor: "pointer", transition: "all 0.2s",
-              }}
+              type="button"
+              role="tab"
+              aria-selected={current}
+              aria-current={current ? "step" : undefined}
+              className={`clinical-step ${done ? "is-done" : ""} ${current ? "is-current" : ""}`}
             >
               <Icon size={14} />
               {done ? "✓ " : ""}{s.label}
@@ -932,8 +954,21 @@ export default function NuevaPaciente() {
       </div>
 
       {/* FORM CARD */}
-      <div className="card" style={{ padding: "1.75rem" }}>
+      <div className="card clinical-form-card">
         <FormErrorContext.Provider value={fieldErrors}>
+        <div key={step} className="clinical-stage-intro">
+          <div className="clinical-stage-icon" aria-hidden="true">
+            <CurrentStepIcon size={22} />
+          </div>
+          <div className="clinical-stage-copy">
+            <span>Etapa {step + 1} de {STEPS.length}</span>
+            <h2>{STEPS[step].label}</h2>
+            <p>{STEPS[step].description}</p>
+          </div>
+          <div className="clinical-stage-count" aria-hidden="true">
+            {String(step + 1).padStart(2, "0")}
+          </div>
+        </div>
         {fieldErrors.summary.length > 0 && (
           <div className="error-box" style={{ marginBottom: "1rem" }}>
             <strong>Revisa estos datos:</strong>{" "}
@@ -1365,11 +1400,7 @@ export default function NuevaPaciente() {
         )}
 
         {/* NAVEGACIÓN */}
-        <div style={{
-          display: "flex", justifyContent: "space-between",
-          marginTop: "2rem", paddingTop: "1.25rem",
-          borderTop: "1px solid var(--border)",
-        }}>
+        <div className="clinical-form-actions">
           <button
             className="btn-secondary"
             onClick={back}
@@ -1378,6 +1409,11 @@ export default function NuevaPaciente() {
           >
             <ChevronLeft size={15} /> Atrás
           </button>
+
+          <div className="clinical-form-actions-copy" aria-live="polite">
+            <span>Paso {step + 1} de {STEPS.length}</span>
+            <strong>{STEPS[step].label}</strong>
+          </div>
 
           {step < STEPS.length - 1 ? (
             <button

@@ -1235,7 +1235,7 @@ export default function ExpedientePaciente() {
       {hasEmbarazo && tab === "general" && (
         <div className="clinical-card-list">
 
-          <div className="card">
+          <div className="card patient-history-card">
             <SecTitle>Historial de embarazos</SecTitle>
             <Grid cols={4}>
               {exp.embarazos?.map((emb) => (

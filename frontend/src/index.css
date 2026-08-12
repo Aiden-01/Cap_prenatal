@@ -7188,3 +7188,2531 @@ html.dark .chatbot-suggestions button {
   font-variant-numeric: tabular-nums;
   color: var(--primary);
 }
+
+/* ==========================================================================
+   EXPERIMENTO VISUAL UX-01 · "Clínico limpio"
+
+   Esta capa sólo modifica presentación. No cambia rutas, estado, contratos,
+   validaciones ni flujos funcionales. Al estar agrupada al final de la hoja,
+   puede compararse o retirarse como una unidad.
+   ========================================================================== */
+
+:root {
+  --bg: #f5f7f8;
+  --surface: #ffffff;
+  --surface2: #eef3f4;
+  --border: #d9e2e5;
+  --text: #17242b;
+  --text-muted: #60717a;
+  --primary: #176f78;
+  --primary-dk: #105861;
+  --primary-lt: #e5f2f3;
+  --accent: #397a5c;
+  --accent-lt: #e8f3ec;
+  --danger: #b4233a;
+  --danger-lt: #fbe9ed;
+  --warn: #8c5b05;
+  --warn-lt: #fff3d8;
+  --info: #3c6f9f;
+  --info-lt: #eaf1f8;
+  --radius-sm: 8px;
+  --radius-md: 11px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(22, 36, 43, 0.04), 0 6px 18px rgba(22, 36, 43, 0.035);
+  --shadow-md: 0 18px 42px rgba(22, 36, 43, 0.12);
+}
+
+html.dark {
+  --bg: #10181d;
+  --surface: #172229;
+  --surface2: #202d34;
+  --border: #314149;
+  --text: #edf3f4;
+  --text-muted: #a5b5bc;
+  --primary: #76c8ce;
+  --primary-dk: #4ca4ac;
+  --primary-lt: #19373a;
+  --accent: #81c49e;
+  --accent-lt: #1c3b2a;
+  --danger: #ff8699;
+  --danger-lt: #421b24;
+  --warn: #efbd62;
+  --warn-lt: #3b2d16;
+  --info: #9bbfe1;
+  --info-lt: #1d3346;
+}
+
+body {
+  font-family: "Inter", "Aptos", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  line-height: 1.5;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+.app-shell {
+  background:
+    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--primary-lt) 64%, transparent) 0, transparent 27rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 44%, transparent), transparent 14rem),
+    var(--bg);
+}
+
+.app-main {
+  padding: clamp(1.25rem, 2.35vw, 2.4rem) !important;
+}
+
+.app-main > * {
+  width: min(100%, 1560px);
+  margin-inline: auto;
+}
+
+.card,
+.form-section,
+.patient-hero,
+.prenatal-controls-card,
+.mini-record-card {
+  border-color: color-mix(in srgb, var(--border) 88%, transparent);
+  box-shadow: var(--shadow-sm);
+}
+
+.card {
+  padding: 1.35rem;
+}
+
+.card:hover {
+  border-color: color-mix(in srgb, var(--primary) 16%, var(--border));
+}
+
+.page-header,
+.patients-header,
+.form-page-header,
+.dashboard-heading {
+  align-items: center;
+  margin-bottom: 0.15rem;
+}
+
+.page-header h1,
+.patients-header h1,
+.form-page-header h1,
+.dashboard-heading h1 {
+  font-size: clamp(1.55rem, 2vw, 1.85rem);
+  font-weight: 760;
+  letter-spacing: -0.025em;
+  line-height: 1.12;
+}
+
+.page-header p,
+.patients-header p,
+.form-page-header p,
+.dashboard-heading p {
+  margin-top: 0.35rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.dashboard-page,
+.patients-page,
+.record-page {
+  gap: 1.4rem;
+}
+
+.dashboard-date-chip {
+  min-height: 38px;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 88%, var(--primary-lt));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.stat-grid {
+  gap: 1rem;
+}
+
+.stat-card {
+  position: relative;
+  min-height: 124px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.stat-card::after {
+  content: "";
+  position: absolute;
+  inset: auto -2rem -3rem auto;
+  z-index: -1;
+  width: 8rem;
+  height: 8rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primary-lt) 54%, transparent);
+  pointer-events: none;
+}
+
+.stat-card:hover {
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-create,
+.btn-critical,
+.btn-danger {
+  min-height: 42px;
+  border-radius: var(--radius-md);
+  padding: 0.62rem 1rem;
+  font-size: 0.88rem;
+  font-weight: 680;
+  letter-spacing: -0.005em;
+}
+
+.btn-primary {
+  box-shadow: 0 1px 2px rgba(16, 88, 97, 0.2), 0 7px 16px rgba(16, 88, 97, 0.1);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 2px 3px rgba(16, 88, 97, 0.18), 0 10px 22px rgba(16, 88, 97, 0.14);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--surface);
+}
+
+.input-field {
+  min-height: 44px;
+  padding: 0.62rem 0.78rem;
+  border-color: color-mix(in srgb, var(--border) 92%, var(--text));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 96%, var(--surface2));
+  font-size: 0.9rem;
+}
+
+.input-field:hover:not(:disabled):not([readonly]) {
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+}
+
+.input-field:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 13%, transparent);
+}
+
+.input-label {
+  margin-bottom: 0.38rem;
+  color: color-mix(in srgb, var(--text) 76%, var(--text-muted));
+  font-size: 0.78rem;
+  font-weight: 680;
+}
+
+.form-section {
+  margin-bottom: 1.15rem;
+}
+
+.form-section-header {
+  padding: 0.88rem 1.05rem;
+  border-left: 0;
+  background: color-mix(in srgb, var(--surface2) 42%, var(--surface));
+  font-size: 0.88rem;
+  font-weight: 760;
+}
+
+.form-section-header::before {
+  content: "";
+  width: 0.28rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.form-section-body {
+  padding: 1.2rem;
+  gap: 1.05rem;
+}
+
+.content-tabs {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.3rem;
+  gap: 0.25rem;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--surface2) 68%, var(--surface));
+}
+
+.content-tab {
+  min-height: 38px;
+  margin: 0;
+  padding: 0.5rem 0.78rem;
+  border: 0;
+  border-radius: 9px;
+  font-weight: 620;
+}
+
+.content-tab.is-active {
+  border: 0;
+  background: var(--surface);
+  color: var(--primary-dk);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.table-card-header,
+.patients-footer {
+  background: color-mix(in srgb, var(--surface2) 38%, var(--surface));
+}
+
+.table-card-header {
+  min-height: 58px;
+  padding: 0.9rem 1.1rem;
+}
+
+.table-card-header h2 {
+  font-size: 0.96rem;
+  font-weight: 760;
+}
+
+.tabla th {
+  padding: 0.78rem 1rem;
+  background: color-mix(in srgb, var(--surface2) 58%, var(--surface));
+  color: color-mix(in srgb, var(--text-muted) 88%, var(--text));
+  font-size: 0.71rem;
+  font-weight: 720;
+  letter-spacing: 0.035em;
+}
+
+.tabla td {
+  padding: 0.82rem 1rem;
+  border-bottom-color: color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.tabla tr:hover td {
+  background: color-mix(in srgb, var(--primary-lt) 46%, var(--surface));
+}
+
+.badge {
+  min-height: 25px;
+  padding: 0.22rem 0.62rem;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  font-size: 0.73rem;
+  font-weight: 680;
+}
+
+.patients-search-card {
+  padding: 0.85rem;
+  border-radius: 14px;
+}
+
+.patients-search-card .input-field {
+  max-width: 620px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.patients-search-card:focus-within {
+  border-color: color-mix(in srgb, var(--primary) 52%, var(--border));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.patients-footer {
+  min-height: 62px;
+  padding: 0.85rem 1rem;
+}
+
+aside[data-app-sidebar] {
+  background:
+    radial-gradient(circle at 25% 0%, rgba(118, 200, 206, 0.11), transparent 17rem),
+    #10252e !important;
+  border-right-color: rgba(255, 255, 255, 0.075) !important;
+  box-shadow: 16px 0 40px rgba(16, 37, 46, 0.08);
+}
+
+.sidebar-item {
+  min-height: 43px;
+  border: 1px solid transparent !important;
+  border-radius: 10px !important;
+}
+
+.sidebar-item:hover {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+
+.sidebar-footer-action {
+  min-height: 42px;
+  border-radius: 10px !important;
+}
+
+.login-page,
+.login-panel-right {
+  background: #f6f8f9;
+}
+
+.login-panel-left {
+  background:
+    radial-gradient(circle at 72% 20%, rgba(118, 200, 206, 0.16), transparent 25%),
+    linear-gradient(145deg, #123642 0%, #102934 52%, #0d2029 100%);
+}
+
+.login-panel-left::before {
+  opacity: 0.54;
+}
+
+.login-brand {
+  width: min(700px, 100%);
+}
+
+.login-brand h1 {
+  font-size: clamp(2.15rem, 3.8vw, 2.85rem);
+  font-weight: 760;
+  letter-spacing: -0.035em;
+}
+
+.login-brand-mark {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.065);
+  box-shadow: none;
+}
+
+.login-brand-rule {
+  width: 3.25rem;
+  background: #76c8ce;
+}
+
+.login-dashboard-mock {
+  opacity: 0.28;
+  filter: saturate(0.72);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
+}
+
+.login-feature-list {
+  gap: 0.92rem;
+}
+
+.login-feature span {
+  border-radius: 11px;
+  color: #92d6db;
+  background: rgba(118, 200, 206, 0.08);
+}
+
+.login-security-note {
+  border-left: 0;
+  border: 1px solid rgba(118, 200, 206, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.login-panel-right {
+  box-shadow: -12px 0 40px rgba(15, 35, 42, 0.035);
+}
+
+.login-card {
+  padding: clamp(1.65rem, 3vw, 2.15rem);
+  border-color: #dde5e8;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 18px 50px rgba(23, 36, 43, 0.09);
+}
+
+.login-lock-badge {
+  width: 3.75rem;
+  height: 3.75rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 15%, var(--border));
+}
+
+.login-form-title h2 {
+  font-weight: 760;
+  letter-spacing: -0.025em;
+}
+
+.login-panel-right .input-label {
+  font-weight: 680;
+}
+
+.login-panel-right .input-field {
+  min-height: 46px;
+  border-color: #dbe3e7;
+  border-radius: 11px;
+}
+
+.chatbot-toggle,
+.chatbot-panel {
+  border-radius: 18px;
+}
+
+.chatbot-toggle {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dk));
+  box-shadow: 0 14px 32px rgba(16, 88, 97, 0.22), 0 0 0 4px rgba(23, 111, 120, 0.07);
+}
+
+@media (max-width: 767px) {
+  .app-main {
+    padding: 4.5rem 1rem 1.5rem !important;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  .page-header h1,
+  .patients-header h1,
+  .form-page-header h1,
+  .dashboard-heading h1 {
+    font-size: 1.5rem;
+  }
+
+  .content-tabs {
+    width: 100%;
+    flex-wrap: nowrap;
+  }
+
+  .content-tab {
+    flex: 0 0 auto;
+  }
+
+  .login-panel-right {
+    padding: 2rem 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==========================================================================
+   EXPERIMENTO VISUAL UX-01B · Pulido de pantallas internas
+
+   Complemento reversible del prototipo. Corrige el ancho móvil del dashboard,
+   da una presentación consistente al registro por etapas y afina superficies
+   de consulta sin modificar navegación, estado, validaciones ni solicitudes.
+   ========================================================================== */
+
+.dashboard-page,
+.dashboard-page > *,
+.stat-grid,
+.stat-card {
+  min-width: 0;
+}
+
+.dashboard-page {
+  width: 100%;
+  max-width: 100%;
+}
+
+.dashboard-page > * {
+  width: 100%;
+  max-width: 100%;
+}
+
+.stat-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+}
+
+.tabla-wrapper,
+.patients-table-card > div:has(> .tabla),
+.comunidades-table-wrap,
+.reportes-tabla-wrapper {
+  scrollbar-color: color-mix(in srgb, var(--primary) 36%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.tabla tbody tr {
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.tabla tbody tr:hover {
+  background: color-mix(in srgb, var(--primary-lt) 30%, transparent);
+}
+
+.tabla thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: color-mix(in srgb, var(--surface2) 94%, var(--surface));
+}
+
+.clinical-form-page {
+  display: grid;
+  min-width: 0;
+}
+
+.clinical-form-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.35rem;
+}
+
+.clinical-form-header > div {
+  min-width: 0;
+}
+
+.clinical-form-header h1 {
+  color: var(--text);
+  font-size: clamp(1.55rem, 2vw, 1.85rem);
+  font-weight: 760;
+  letter-spacing: -0.025em;
+  line-height: 1.12;
+}
+
+.clinical-form-header p {
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.clinical-stepper {
+  display: flex;
+  gap: 0.55rem;
+  min-width: 0;
+  margin-bottom: 1.5rem;
+  padding: 0.15rem 0.05rem 0.45rem;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline proximity;
+  scrollbar-color: color-mix(in srgb, var(--primary) 28%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.clinical-step {
+  display: inline-flex;
+  flex: 1 0 8.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.62rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 96%, var(--primary-lt));
+  color: var(--text-muted);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text) 4%, transparent);
+  font: inherit;
+  font-size: 0.79rem;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.clinical-step:hover {
+  border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.clinical-step.is-current {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary-lt) 82%, var(--surface));
+  color: var(--primary-dk);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
+  font-weight: 760;
+}
+
+.clinical-step.is-done {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.clinical-step:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 26%, transparent);
+  outline-offset: 2px;
+}
+
+.clinical-form-card {
+  padding: 1.5rem;
+}
+
+@media (max-width: 767px) {
+  .dashboard-heading {
+    align-items: flex-start;
+  }
+
+  .dashboard-date-chip {
+    max-width: 100%;
+  }
+
+  .stat-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .clinical-form-header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 0.9rem;
+    margin-bottom: 1.15rem;
+  }
+
+  .clinical-form-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .clinical-stepper {
+    margin-inline: -0.15rem;
+    padding-inline: 0.15rem;
+  }
+
+  .clinical-step {
+    flex-basis: 9rem;
+  }
+
+  .clinical-form-card {
+    padding: 0.9rem;
+  }
+}
+
+/* ==========================================================================
+   EXPERIMENTO VISUAL UX-01C · Expediente clínico adaptable
+
+   Capa reversible enfocada en jerarquía y lectura del expediente. Mantiene
+   intactos los datos, eventos, navegación y solicitudes de la aplicación.
+   ========================================================================== */
+
+.record-page,
+.record-page > *,
+.clinical-card-list,
+.clinical-card-list > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.record-page > .content-tabs {
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline proximity;
+  scrollbar-color: color-mix(in srgb, var(--primary) 32%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.record-page > .content-tabs .content-tab {
+  scroll-snap-align: start;
+}
+
+.patient-history-card {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--primary-lt) 24%, transparent), transparent 14rem),
+    var(--surface);
+}
+
+.patient-history-card .readonly-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 18rem));
+  justify-content: start;
+}
+
+.patient-history-card .mini-record-card {
+  min-height: 10.25rem;
+  background: color-mix(in srgb, var(--surface) 96%, var(--primary-lt));
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.patient-history-card .mini-record-card:hover {
+  border-color: color-mix(in srgb, var(--primary) 62%, var(--border));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--text) 8%, transparent);
+  transform: translateY(-2px);
+}
+
+.patient-history-card .mini-record-card:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .record-page > .content-tabs {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .record-page .completitud-trigger {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "icon title percentage detail"
+      "progress progress progress progress"
+      "summary summary summary summary";
+    align-items: center !important;
+    gap: 0.5rem 0.55rem !important;
+    box-sizing: border-box;
+    max-width: 100%;
+    padding: 0.85rem !important;
+    overflow: hidden;
+  }
+
+  .record-page .completitud-trigger > svg {
+    grid-area: icon;
+  }
+
+  .record-page .completitud-title {
+    grid-area: title;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.84rem !important;
+  }
+
+  .record-page .completitud-progress {
+    grid-area: progress;
+    width: 100% !important;
+    min-width: 0;
+  }
+
+  .record-page .completitud-percentage {
+    grid-area: percentage;
+  }
+
+  .record-page .completitud-summary {
+    grid-area: summary;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .record-page .completitud-detail-trigger {
+    grid-area: detail;
+  }
+
+  .patient-history-card .readonly-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .patient-history-card .mini-record-card {
+    min-height: 0;
+  }
+}
+
+/* ==========================================================================
+   EXPERIMENTO VISUAL UX-01D · Modo oscuro grafito
+
+   Neutraliza fondos y superficies para evitar el tinte verdoso. El teal se
+   conserva únicamente como acento de interacción y estado. Capa reversible.
+   ========================================================================== */
+
+html.dark {
+  --bg: #111318;
+  --surface: #191c22;
+  --surface2: #232730;
+  --border: #353c46;
+  --text: #f2f4f7;
+  --text-muted: #aab2bd;
+  --primary: #7bcbd2;
+  --primary-dk: #55aeb7;
+  --primary-lt: #232e34;
+  --primary-strong: #2f7f88;
+  --accent: #83c49e;
+  --accent-lt: #20352a;
+  --danger: #ff91a4;
+  --danger-lt: #3d2028;
+  --warn: #efbf69;
+  --warn-lt: #3a2e1b;
+  --info: #a4c5e3;
+  --info-lt: #223241;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.22), 0 7px 20px rgba(0, 0, 0, 0.14);
+  --shadow-md: 0 20px 48px rgba(0, 0, 0, 0.34);
+}
+
+html.dark .app-shell {
+  background:
+    radial-gradient(circle at 92% -4%, rgba(112, 132, 150, 0.12) 0, transparent 28rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.012), transparent 15rem),
+    var(--bg);
+}
+
+html.dark aside[data-app-sidebar] {
+  background:
+    radial-gradient(circle at 24% 0%, rgba(123, 203, 210, 0.055), transparent 17rem),
+    #151a21 !important;
+  border-right-color: rgba(255, 255, 255, 0.07) !important;
+  box-shadow: 16px 0 40px rgba(0, 0, 0, 0.16);
+}
+
+html.dark .btn-primary,
+html.dark .btn-create,
+html.dark aside[data-app-sidebar] .sidebar-item[style*="background: var(--primary)"] {
+  border-color: var(--primary-strong) !important;
+  background: var(--primary-strong) !important;
+  color: #fff !important;
+}
+
+html.dark .btn-primary:hover,
+html.dark .btn-create:hover {
+  border-color: #347983 !important;
+  background: #347983 !important;
+}
+
+html.dark .reportes-titlebar {
+  background: var(--surface);
+}
+
+html.dark .reportes-tabla tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--surface2) 58%, transparent);
+}
+
+/* ==========================================================================
+   EXPERIMENTO VISUAL UX-01E · Grafito cálido y movimiento profesional
+
+   Añade calidez ambiental, profundidad y microanimaciones accesibles. No
+   modifica estructura, navegación, estado, validaciones ni solicitudes.
+   ========================================================================== */
+
+html.dark {
+  --bg: #151317;
+  --surface: #1d1b20;
+  --surface2: #29262d;
+  --border: #433c47;
+  --text: #f7f2ee;
+  --text-muted: #bcb2ae;
+  --warm-accent: #e3a16f;
+  --warm-lt: #33271f;
+  --warm-glow: rgba(227, 161, 111, 0.1);
+}
+
+html.dark .app-shell {
+  background:
+    radial-gradient(circle at 94% -8%, rgba(123, 203, 210, 0.075) 0, transparent 29rem),
+    radial-gradient(circle at 8% 104%, rgba(227, 161, 111, 0.085) 0, transparent 34rem),
+    radial-gradient(circle at 62% 112%, rgba(210, 120, 140, 0.035) 0, transparent 26rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.014), transparent 15rem),
+    var(--bg);
+  background-size: 122% 122%, 128% 128%, 116% 116%, auto, auto;
+  animation: uxWarmAmbient 20s ease-in-out infinite alternate;
+}
+
+html.dark aside[data-app-sidebar] {
+  background:
+    radial-gradient(circle at 24% -2%, rgba(123, 203, 210, 0.06), transparent 17rem),
+    radial-gradient(circle at 30% 104%, rgba(227, 161, 111, 0.07), transparent 18rem),
+    #19171c !important;
+}
+
+html.dark .card,
+html.dark .patient-hero,
+html.dark .prenatal-controls-card,
+html.dark .form-section {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.018), transparent 42%),
+    var(--surface);
+}
+
+html.dark .patient-hero,
+html.dark .reportes-titlebar {
+  background:
+    radial-gradient(circle at 4% 10%, rgba(227, 161, 111, 0.07), transparent 19rem),
+    radial-gradient(circle at 96% 0%, rgba(123, 203, 210, 0.045), transparent 22rem),
+    var(--surface);
+}
+
+html.dark .dashboard-date-chip {
+  border: 1px solid color-mix(in srgb, var(--warm-accent) 18%, var(--border));
+  background: color-mix(in srgb, var(--surface) 92%, var(--warm-lt));
+}
+
+html.dark .stat-card::after {
+  background: radial-gradient(circle, rgba(227, 161, 111, 0.09), transparent 68%);
+}
+
+html.dark .stat-card:nth-child(even)::after {
+  background: radial-gradient(circle, rgba(123, 203, 210, 0.075), transparent 68%);
+}
+
+html.dark .stat-card:hover,
+html.dark .reportes-option:hover,
+html.dark .mini-record-card:hover {
+  border-color: color-mix(in srgb, var(--warm-accent) 26%, var(--primary));
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(227, 161, 111, 0.035);
+}
+
+html.dark aside[data-app-sidebar] .sidebar-item[style*="background: var(--primary)"] {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.075), 0 10px 24px rgba(47, 127, 136, 0.18);
+}
+
+.app-main > * {
+  animation: uxStageIn 0.46s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dashboard-page > *,
+.record-page > *,
+.reportes-page > *,
+.patients-page > *,
+.clinical-form-page > * {
+  animation: uxElementRise 0.48s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.stat-grid > .stat-card,
+.reportes-option-grid > .reportes-option,
+.clinical-card-list > .card {
+  animation: uxElementRise 0.46s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.stat-grid > *:nth-child(2),
+.reportes-option-grid > *:nth-child(2),
+.clinical-card-list > *:nth-child(2) {
+  animation-delay: 45ms;
+}
+
+.stat-grid > *:nth-child(3),
+.reportes-option-grid > *:nth-child(3),
+.clinical-card-list > *:nth-child(3) {
+  animation-delay: 90ms;
+}
+
+.stat-grid > *:nth-child(n + 4),
+.reportes-option-grid > *:nth-child(n + 4),
+.clinical-card-list > *:nth-child(n + 4) {
+  animation-delay: 135ms;
+}
+
+.dashboard-page > *:nth-child(2),
+.record-page > *:nth-child(2),
+.reportes-page > *:nth-child(2),
+.patients-page > *:nth-child(2),
+.clinical-form-page > *:nth-child(2) {
+  animation-delay: 55ms;
+}
+
+.dashboard-page > *:nth-child(3),
+.record-page > *:nth-child(3),
+.reportes-page > *:nth-child(3),
+.patients-page > *:nth-child(3),
+.clinical-form-page > *:nth-child(3) {
+  animation-delay: 105ms;
+}
+
+.dashboard-page > *:nth-child(n + 4),
+.record-page > *:nth-child(n + 4),
+.reportes-page > *:nth-child(n + 4),
+.patients-page > *:nth-child(n + 4),
+.clinical-form-page > *:nth-child(n + 4) {
+  animation-delay: 145ms;
+}
+
+.stat-card > div:first-child {
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms ease, background-color 180ms ease;
+}
+
+.stat-card:hover > div:first-child {
+  transform: translateY(-3px) rotate(-2deg);
+}
+
+.btn-primary,
+.btn-create {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.btn-primary::after,
+.btn-create::after {
+  content: "";
+  position: absolute;
+  inset: -35% auto -35% -32%;
+  z-index: 1;
+  width: 22%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  pointer-events: none;
+  transform: translateX(-180%) skewX(-18deg);
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.btn-primary:hover::after,
+.btn-create:hover::after {
+  transform: translateX(720%) skewX(-18deg);
+}
+
+.content-tab,
+.reportes-option,
+.mini-record-card {
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.content-tab.is-active {
+  animation: uxActiveSettle 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.completitud-progress > div {
+  background-image: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.24) 46%, transparent 76%);
+  background-size: 210% 100%;
+  animation: uxProgressFlow 3.2s linear infinite;
+}
+
+@keyframes uxWarmAmbient {
+  0% {
+    background-position: 100% 0%, 0% 100%, 58% 100%, 0 0, 0 0;
+  }
+  100% {
+    background-position: 92% 5%, 7% 94%, 66% 96%, 0 0, 0 0;
+  }
+}
+
+@keyframes uxStageIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes uxElementRise {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes uxActiveSettle {
+  from {
+    opacity: 0.72;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes uxProgressFlow {
+  from { background-position: 180% 0; }
+  to { background-position: -80% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.dark .app-shell,
+  .app-main > *,
+  .dashboard-page > *,
+  .record-page > *,
+  .reportes-page > *,
+  .patients-page > *,
+  .clinical-form-page > *,
+  .stat-grid > .stat-card,
+  .reportes-option-grid > .reportes-option,
+  .clinical-card-list > .card,
+  .content-tab.is-active,
+  .completitud-progress > div {
+    animation: none !important;
+  }
+}
+
+/* ==========================================================================
+   EXPERIMENTO VISUAL UX-01F · Dark clásico y paneles fijos
+
+   Sustituye la recoloración cálida por grafito neutral. El color de marca se
+   conserva como acento, mientras paneles y modales permanecen ligados al
+   viewport incluso cuando sus páginas tienen animaciones de entrada.
+   ========================================================================== */
+
+html.dark {
+  color-scheme: dark;
+  --bg: #0f1014;
+  --surface: #191b21;
+  --surface2: #23262e;
+  --border: #343943;
+  --text: #f4f4f5;
+  --text-muted: #a7acb5;
+  --primary: #69c3ca;
+  --primary-dk: #479da6;
+  --primary-lt: #1b2c31;
+  --primary-strong: #287b84;
+  --accent: #7fc99b;
+  --accent-lt: #1d3225;
+  --danger: #ff7f8d;
+  --danger-lt: #3b2025;
+  --warn: #f2ba63;
+  --warn-lt: #3b2e1d;
+  --info: #7aafe5;
+  --info-lt: #1c2d40;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 22px 54px rgba(0, 0, 0, 0.42);
+}
+
+html.dark .app-shell {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.016), transparent 13rem),
+    var(--bg);
+  background-size: auto;
+  animation: none;
+}
+
+html.dark aside[data-app-sidebar] {
+  background: #13151a !important;
+  box-shadow: 1px 0 0 rgba(255, 255, 255, 0.025), 16px 0 42px rgba(0, 0, 0, 0.12);
+}
+
+html.dark .card,
+html.dark .patient-hero,
+html.dark .prenatal-controls-card,
+html.dark .form-section,
+html.dark .reportes-titlebar {
+  background: var(--surface);
+}
+
+html.dark .dashboard-date-chip {
+  border-color: var(--border);
+  background: var(--surface2);
+}
+
+html.dark .stat-card::after,
+html.dark .stat-card:nth-child(even)::after {
+  background: radial-gradient(circle, rgba(105, 195, 202, 0.055), transparent 68%);
+}
+
+html.dark .stat-card:hover,
+html.dark .reportes-option:hover,
+html.dark .mini-record-card:hover {
+  border-color: color-mix(in srgb, var(--primary) 36%, var(--border));
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(105, 195, 202, 0.035);
+}
+
+html.dark .user-create-drawer-backdrop {
+  background: rgba(3, 5, 8, 0.66);
+}
+
+html.dark .user-create-drawer {
+  background: #1b1d23;
+  box-shadow: -20px 0 58px rgba(0, 0, 0, 0.48);
+}
+
+.user-create-drawer-shell {
+  z-index: 9000;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  animation: none !important;
+  transform: none !important;
+}
+
+.user-create-drawer {
+  height: 100dvh;
+  max-height: 100dvh;
+  overscroll-behavior: contain;
+}
+
+@supports not (height: 100dvh) {
+  .user-create-drawer-shell,
+  .user-create-drawer {
+    height: 100vh;
+    max-height: 100vh;
+  }
+}
+
+/* ==========================================================================
+   EXPERIMENTO VISUAL UX-01G · Registro clínico guiado
+
+   Refuerza orientación, jerarquía y foco dentro de Nueva paciente. La capa
+   solo presenta información ya disponible en el paso activo y no altera el
+   formulario, las validaciones, la navegación ni el envío de datos.
+   ========================================================================== */
+
+.clinical-form-page {
+  --clinical-panel: color-mix(in srgb, var(--surface) 96%, var(--primary-lt));
+  --clinical-line: color-mix(in srgb, var(--primary) 22%, var(--border));
+  gap: 0;
+}
+
+.clinical-form-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 88% -120%, color-mix(in srgb, var(--primary-lt) 76%, transparent), transparent 17rem),
+    var(--clinical-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.clinical-form-title {
+  min-width: 0;
+}
+
+.clinical-form-kicker {
+  display: block;
+  margin-bottom: 0.36rem;
+  color: var(--primary-dk);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.095em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.clinical-form-header h1 {
+  font-size: clamp(1.5rem, 2vw, 1.82rem);
+}
+
+.clinical-form-header p {
+  margin-top: 0.3rem;
+}
+
+.clinical-stepper {
+  gap: 0.22rem;
+  margin-bottom: 1rem;
+  padding: 0.36rem;
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 94%, var(--surface2));
+  box-shadow: var(--shadow-sm);
+}
+
+.clinical-step {
+  min-height: 2.85rem;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.clinical-step:hover {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--surface2) 78%, transparent);
+}
+
+.clinical-step.is-current {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  background: color-mix(in srgb, var(--primary-lt) 84%, var(--surface));
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--primary) 10%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.clinical-step.is-done {
+  border-color: transparent;
+  background: transparent;
+  color: var(--primary-dk);
+}
+
+.clinical-form-card {
+  padding: 1.25rem;
+  border-color: color-mix(in srgb, var(--border) 88%, transparent);
+  background: color-mix(in srgb, var(--surface) 97%, var(--surface2));
+  box-shadow: 0 20px 52px color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.clinical-stage-intro {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.9rem;
+  align-items: center;
+  min-width: 0;
+  margin-bottom: 1.15rem;
+  padding: 1rem 1.1rem;
+  overflow: hidden;
+  border: 1px solid var(--clinical-line);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 96% 4%, color-mix(in srgb, var(--primary-lt) 78%, transparent), transparent 16rem),
+    color-mix(in srgb, var(--surface2) 52%, var(--surface));
+  animation: clinicalStageReveal 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.clinical-stage-icon {
+  display: grid;
+  width: 2.85rem;
+  height: 2.85rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--primary-lt) 86%, var(--surface));
+  color: var(--primary-dk);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 4%, transparent);
+}
+
+.clinical-stage-copy {
+  min-width: 0;
+}
+
+.clinical-stage-copy > span {
+  display: block;
+  margin-bottom: 0.18rem;
+  color: var(--primary-dk);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.clinical-stage-copy h2 {
+  color: var(--text);
+  font-size: 1.02rem;
+  font-weight: 780;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+.clinical-stage-copy p {
+  max-width: 68ch;
+  margin-top: 0.28rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.clinical-stage-count {
+  color: color-mix(in srgb, var(--primary) 19%, transparent);
+  font-size: clamp(2rem, 4vw, 3.35rem);
+  font-weight: 850;
+  letter-spacing: -0.075em;
+  line-height: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
+.clinical-form-card .form-section {
+  border-color: color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 7px 22px color-mix(in srgb, var(--text) 3.5%, transparent);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.clinical-form-card .form-section:focus-within {
+  border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--primary) 8%, transparent), 0 0 0 3px color-mix(in srgb, var(--primary) 7%, transparent);
+}
+
+.clinical-form-card .form-section-header {
+  min-height: 3.05rem;
+  background: color-mix(in srgb, var(--surface2) 62%, var(--surface));
+}
+
+.clinical-form-card .form-section-header::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  margin-left: 0.35rem;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--border) 84%, transparent), transparent);
+}
+
+.clinical-form-card .form-group {
+  min-width: 0;
+}
+
+.clinical-form-card .input-label {
+  transition: color 160ms ease;
+}
+
+.clinical-form-card .form-group:focus-within .input-label {
+  color: var(--primary-dk);
+}
+
+.clinical-form-card .input-field,
+.clinical-form-card input:not([type="checkbox"]):not([type="radio"]),
+.clinical-form-card select,
+.clinical-form-card textarea {
+  min-height: 2.75rem;
+  border-radius: 10px;
+}
+
+.clinical-form-actions {
+  position: sticky;
+  z-index: 12;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  margin: 1.5rem -1.25rem -1.25rem;
+  padding: 0.9rem 5.25rem max(0.9rem, env(safe-area-inset-bottom)) 1.25rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  border-radius: 0 0 16px 16px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  box-shadow: 0 -14px 32px color-mix(in srgb, var(--bg) 34%, transparent);
+  backdrop-filter: blur(14px) saturate(135%);
+}
+
+.clinical-form-actions .btn-primary,
+.clinical-form-actions .btn-secondary {
+  min-width: 8.5rem;
+  justify-content: center;
+}
+
+.clinical-form-actions-copy {
+  display: grid;
+  min-width: 0;
+  place-items: center;
+  text-align: center;
+}
+
+.clinical-form-actions-copy span {
+  color: var(--text-muted);
+  font-size: 0.64rem;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.clinical-form-actions-copy strong {
+  margin-top: 0.1rem;
+  color: var(--text);
+  font-size: 0.79rem;
+  font-weight: 760;
+}
+
+html.dark .clinical-form-page {
+  --clinical-panel: #15171c;
+  --clinical-line: color-mix(in srgb, var(--primary) 20%, var(--border));
+}
+
+html.dark .clinical-form-kicker,
+html.dark .clinical-stage-copy > span,
+html.dark .clinical-form-card .form-group:focus-within .input-label {
+  color: var(--primary);
+}
+
+html.dark .clinical-stage-icon {
+  color: var(--primary);
+}
+
+html.dark .clinical-step.is-current,
+html.dark .clinical-step.is-done {
+  color: var(--primary);
+}
+
+html.dark .clinical-form-actions {
+  background: color-mix(in srgb, #191b21 92%, transparent);
+}
+
+@keyframes clinicalStageReveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 900px) {
+  .clinical-form-header {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+}
+
+@media (max-width: 767px) {
+  .clinical-form-header {
+    gap: 0.8rem;
+    padding: 0.85rem;
+  }
+
+  .clinical-form-header h1 {
+    font-size: 1.35rem;
+  }
+
+  .clinical-form-kicker {
+    font-size: 0.62rem;
+  }
+
+  .clinical-stepper {
+    margin-inline: 0;
+    padding: 0.3rem;
+  }
+
+  .clinical-step {
+    flex-basis: 8.8rem;
+  }
+
+  .clinical-form-card {
+    padding: 0.8rem;
+  }
+
+  .clinical-stage-intro {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 0.9rem;
+  }
+
+  .clinical-stage-count {
+    display: none;
+  }
+
+  .clinical-stage-copy p {
+    font-size: 0.76rem;
+  }
+
+  .clinical-form-actions {
+    bottom: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.65rem;
+    margin: 1.25rem -0.8rem -0.8rem;
+    padding: 0.75rem 4.6rem max(0.75rem, env(safe-area-inset-bottom)) 0.8rem;
+  }
+
+  .clinical-form-actions-copy {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .clinical-form-actions .btn-primary,
+  .clinical-form-actions .btn-secondary {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .clinical-stepper {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+
+  .clinical-step {
+    width: 100%;
+    min-width: 0;
+    min-height: 3.2rem;
+    padding: 0.48rem 0.35rem;
+    white-space: normal;
+    font-size: 0.68rem;
+    line-height: 1.15;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clinical-stage-intro {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ==========================================================================
+   EXPERIMENTO VISUAL UX-01H · Censo clínico dinámico
+
+   Sustituye la tabla de pacientes por tarjetas clínicas explorables. Usa los
+   mismos datos, búsqueda, paginación, expansión y navegación ya existentes.
+   ========================================================================== */
+
+.patients-census-tools {
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.85fr) minmax(20rem, 1.25fr);
+  gap: 1rem 1.25rem;
+  align-items: center;
+  padding: 1.15rem;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 96% -36%, color-mix(in srgb, var(--primary-lt) 78%, transparent), transparent 25rem),
+    var(--surface);
+}
+
+.patients-census-intro {
+  min-width: 0;
+}
+
+.patients-census-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  color: var(--primary-dk);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.085em;
+  text-transform: uppercase;
+}
+
+.patients-census-intro > strong {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--text);
+  font-size: 1.02rem;
+  font-weight: 780;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+.patients-census-intro > p {
+  max-width: 50ch;
+  margin-top: 0.28rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.patients-search-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+  min-width: 0;
+  padding: 0.28rem 0.48rem 0.28rem 0.78rem;
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--surface2) 58%, var(--surface));
+  color: var(--text-muted);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.patients-search-field:focus-within {
+  border-color: color-mix(in srgb, var(--primary) 56%, var(--border));
+  background: var(--surface);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 9%, transparent);
+}
+
+.patients-search-field .input-field {
+  width: 100%;
+  max-width: none;
+  min-height: 2.5rem;
+  margin: 0;
+  padding-inline: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.patients-search-field .input-field:focus {
+  border: 0;
+  box-shadow: none;
+}
+
+.patients-search-field > span {
+  padding: 0.32rem 0.55rem;
+  border-radius: 999px;
+  background: var(--primary-lt);
+  color: var(--primary-dk);
+  font-size: 0.68rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.patients-live-summary {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.patients-live-summary > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  min-width: 0;
+  padding: 0.6rem 0.72rem;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--surface2) 50%, var(--surface));
+}
+
+.patients-live-summary span {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.patients-live-summary strong {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 820;
+  font-variant-numeric: tabular-nums;
+}
+
+.patients-live-summary .is-risk strong {
+  color: var(--danger);
+}
+
+.patients-live-summary .is-near strong {
+  color: var(--warn);
+}
+
+.patients-board {
+  padding: 1rem 1rem 0;
+  overflow: clip;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface2) 28%, transparent), transparent 18rem),
+    var(--surface);
+}
+
+.patient-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(21rem, 100%), 1fr));
+  gap: 0.9rem;
+  align-items: start;
+}
+
+.patient-orbit-card {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  border-radius: 17px;
+  background:
+    radial-gradient(circle at 102% -8%, color-mix(in srgb, var(--primary-lt) 55%, transparent), transparent 12rem),
+    color-mix(in srgb, var(--surface) 97%, var(--surface2));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 4%, transparent);
+  animation: patientCardArrive 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  transition: transform 190ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.patient-orbit-card::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--primary);
+  opacity: 0.62;
+}
+
+.patient-orbit-card.is-risk::before {
+  background: var(--danger);
+  opacity: 0.9;
+}
+
+.patient-orbit-card.is-urgent {
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--border));
+}
+
+.patient-orbit-card:hover,
+.patient-orbit-card:focus-within,
+.patient-orbit-card.is-open {
+  z-index: 3;
+  border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--text) 8%, transparent), 0 0 0 3px color-mix(in srgb, var(--primary) 5%, transparent);
+  transform: translateY(-3px);
+}
+
+.patient-orbit-card.is-risk:hover,
+.patient-orbit-card.is-risk:focus-within,
+.patient-orbit-card.is-risk.is-open {
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--border));
+}
+
+.patient-orbit-card.is-launching {
+  z-index: 5;
+  border-color: color-mix(in srgb, var(--primary) 62%, var(--border));
+  box-shadow: 0 18px 42px color-mix(in srgb, var(--primary) 16%, transparent), 0 0 0 4px color-mix(in srgb, var(--primary) 10%, transparent);
+  transform: translateY(-3px) scale(0.985);
+}
+
+.patient-orbit-main {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  padding: 1rem 1rem 0.75rem 1.1rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.patient-orbit-main:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 34%, transparent);
+  outline-offset: -3px;
+}
+
+.patient-orbit-main:disabled {
+  color: inherit;
+  cursor: wait;
+}
+
+.patient-orbit-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.72rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.patient-orbit-avatar {
+  display: grid;
+  width: 2.8rem;
+  height: 2.8rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--primary-lt) 84%, var(--surface));
+  color: var(--primary-dk);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 5%, transparent);
+}
+
+.patient-orbit-card.is-risk .patient-orbit-avatar {
+  border-color: color-mix(in srgb, var(--danger) 26%, var(--border));
+  background: color-mix(in srgb, var(--danger-lt) 70%, var(--surface));
+  color: var(--danger);
+}
+
+.patient-orbit-identity {
+  display: grid;
+  min-width: 0;
+}
+
+.patient-orbit-identity small {
+  overflow: hidden;
+  margin-bottom: 0.14rem;
+  color: var(--primary-dk);
+  font-size: 0.63rem;
+  font-weight: 780;
+  letter-spacing: 0.055em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.patient-orbit-identity strong,
+.patient-orbit-identity > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.patient-orbit-identity strong {
+  color: var(--text);
+  font-size: 0.98rem;
+  font-weight: 790;
+  line-height: 1.2;
+}
+
+.patient-orbit-identity > span {
+  margin-top: 0.1rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.patient-orbit-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 720;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.patient-orbit-main:hover .patient-orbit-open {
+  color: var(--primary-dk);
+  transform: translate(2px, -2px);
+}
+
+.patient-orbit-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+  margin-top: 0.8rem;
+}
+
+.patient-orbit-badges .badge {
+  gap: 0.3rem;
+}
+
+.patient-orbit-path {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(2.2rem, 0.5fr) minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: center;
+  min-width: 0;
+  margin-top: 0.85rem;
+  padding: 0.72rem 0.78rem;
+  border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface2) 58%, var(--surface));
+}
+
+.patient-orbit-date {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.48rem;
+  align-items: center;
+  min-width: 0;
+  color: var(--text-muted);
+}
+
+.patient-orbit-date.is-fpp {
+  justify-self: end;
+}
+
+.patient-orbit-date.is-urgent {
+  color: var(--danger);
+}
+
+.patient-orbit-date > span {
+  display: grid;
+  min-width: 0;
+}
+
+.patient-orbit-date small {
+  color: var(--text-muted);
+  font-size: 0.59rem;
+  font-weight: 760;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.patient-orbit-date strong {
+  overflow: hidden;
+  margin-top: 0.08rem;
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.patient-orbit-line {
+  position: relative;
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, var(--primary), color-mix(in srgb, var(--primary) 22%, var(--border)));
+}
+
+.patient-orbit-line::before,
+.patient-orbit-line::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 0.38rem;
+  height: 0.38rem;
+  border: 2px solid var(--surface2);
+  border-radius: 50%;
+  background: var(--primary);
+  transform: translateY(-50%);
+}
+
+.patient-orbit-line::before { left: -0.12rem; }
+.patient-orbit-line::after { right: -0.12rem; }
+
+.patient-orbit-location {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+  margin-top: 0.72rem;
+  color: var(--text-muted);
+  font-size: 0.67rem;
+}
+
+.patient-orbit-location > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.patient-orbit-location > span:first-child {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.patient-orbit-more {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-height: 2.55rem;
+  padding: 0.62rem 1rem 0.62rem 1.1rem;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+  background: color-mix(in srgb, var(--surface2) 34%, transparent);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 720;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.patient-orbit-more:hover,
+.patient-orbit-more:focus-visible {
+  background: color-mix(in srgb, var(--primary-lt) 52%, var(--surface));
+  color: var(--primary-dk);
+  outline: none;
+}
+
+.patient-orbit-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  padding: 0.75rem 1rem 0.9rem 1.1rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+  background: color-mix(in srgb, var(--surface2) 48%, var(--surface));
+  animation: patientDetailsReveal 220ms ease-out;
+}
+
+.patient-orbit-details > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.12rem;
+}
+
+.patient-orbit-details span {
+  color: var(--text-muted);
+  font-size: 0.58rem;
+  font-weight: 760;
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+}
+
+.patient-orbit-details strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.73rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.patients-empty-state {
+  display: grid;
+  min-height: 18rem;
+  place-items: center;
+  align-content: center;
+  padding: 2rem;
+  text-align: center;
+}
+
+.patients-empty-state > span {
+  display: grid;
+  width: 3.1rem;
+  height: 3.1rem;
+  place-items: center;
+  border-radius: 15px;
+  background: var(--primary-lt);
+  color: var(--primary-dk);
+}
+
+.patients-empty-state strong {
+  margin-top: 0.7rem;
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.patients-empty-state p {
+  margin-top: 0.3rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.patient-card-skeleton {
+  min-height: 18.75rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 17px;
+  background:
+    linear-gradient(100deg, transparent 25%, color-mix(in srgb, var(--surface2) 82%, transparent) 42%, transparent 59%) 0 0 / 220% 100%,
+    color-mix(in srgb, var(--surface2) 50%, var(--surface));
+  animation: patientSkeleton 1.35s linear infinite;
+}
+
+.patients-board .patients-footer {
+  margin: 1rem -1rem 0;
+  border-radius: 0 0 18px 18px;
+}
+
+.patients-footer-count {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.patients-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.patients-page-size .input-field {
+  width: 4.5rem;
+  min-height: 2.35rem;
+  margin: 0;
+  padding: 0.4rem 0.55rem;
+}
+
+.patients-page-indicator {
+  padding: 0.45rem 0.65rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+html.dark .patients-census-tools,
+html.dark .patients-board {
+  background-color: var(--surface);
+}
+
+html.dark .patients-census-kicker,
+html.dark .patients-search-field > span,
+html.dark .patient-orbit-identity small,
+html.dark .patient-orbit-main:hover .patient-orbit-open,
+html.dark .patient-orbit-more:hover,
+html.dark .patient-orbit-more:focus-visible {
+  color: var(--primary);
+}
+
+html.dark .patient-orbit-avatar {
+  color: var(--primary);
+}
+
+/* UX-01I · Microtransición de apertura de expediente */
+.patient-file-transition {
+  position: fixed;
+  z-index: 1400;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.patient-file-transition__veil {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: blur(7px) saturate(0.82);
+  animation: patientFileVeil 180ms ease-out both;
+}
+
+.patient-file-transition__scene {
+  display: grid;
+  width: min(22rem, 100%);
+  justify-items: center;
+  padding: 1.4rem 1.5rem 1.2rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 50% -18%, color-mix(in srgb, var(--primary-lt) 80%, transparent), transparent 10rem),
+    color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: 0 28px 80px color-mix(in srgb, #061217 28%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+  text-align: center;
+  animation: patientFileScene 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.patient-file-transition__art {
+  position: relative;
+  width: 9.6rem;
+  height: 8.7rem;
+  margin-bottom: 0.35rem;
+  perspective: 32rem;
+  filter: drop-shadow(0 15px 15px color-mix(in srgb, #10252e 20%, transparent));
+}
+
+.patient-file-transition__folder-back {
+  position: absolute;
+  inset: auto 0.3rem 0.42rem;
+  height: 5.7rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 34%, transparent);
+  border-radius: 0.65rem 0.8rem 0.82rem 0.82rem;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 82%, #fff), var(--primary-dk));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 25%, transparent);
+}
+
+.patient-file-transition__folder-back::before {
+  content: "";
+  position: absolute;
+  inset: -1.05rem auto auto -1px;
+  width: 5.3rem;
+  height: 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 32%, transparent);
+  border-bottom: 0;
+  border-radius: 0.65rem 0.8rem 0 0;
+  background: color-mix(in srgb, var(--primary) 84%, #fff);
+}
+
+.patient-file-transition__sheet {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: 0.7rem;
+  display: grid;
+  width: 6.15rem;
+  height: 7.3rem;
+  justify-items: start;
+  align-content: start;
+  padding: 0.68rem;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, var(--primary));
+  border-radius: 0.5rem;
+  background: #f9fbfb;
+  box-shadow: 0 10px 24px rgba(13, 38, 46, 0.2);
+  color: #17343c;
+  transform: translateX(-50%);
+  animation: patientSheetRise 930ms cubic-bezier(0.2, 0.82, 0.24, 1) 80ms both;
+}
+
+.patient-file-transition__sheet::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto auto;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 0 0.45rem 0 0.4rem;
+  background: linear-gradient(225deg, var(--surface2) 48%, #dfe8ea 50%);
+}
+
+.patient-file-transition__seal {
+  padding: 0.16rem 0.28rem;
+  border-radius: 0.28rem;
+  background: #dff1f2;
+  color: #176f78;
+  font-size: 0.44rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.patient-file-transition__sheet strong {
+  display: grid;
+  width: 2.15rem;
+  height: 2.15rem;
+  place-items: center;
+  margin: 0.55rem auto 0.7rem;
+  border: 1px solid #c4dcdf;
+  border-radius: 50%;
+  color: #176f78;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+}
+
+.patient-file-transition__sheet-line {
+  width: 72%;
+  height: 0.24rem;
+  margin-top: 0.32rem;
+  border-radius: 999px;
+  background: #d9e5e7;
+}
+
+.patient-file-transition__sheet-line.is-long { width: 100%; }
+.patient-file-transition__sheet-line.is-short { width: 52%; }
+
+.patient-file-transition__folder-front {
+  position: absolute;
+  z-index: 3;
+  inset: 1.25rem -0.22rem -0.22rem;
+  display: grid;
+  place-items: end start;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--primary-dk) 55%, transparent);
+  border-radius: 0.75rem 0.75rem 0.95rem 0.95rem;
+  background:
+    linear-gradient(155deg, color-mix(in srgb, #fff 13%, transparent), transparent 42%),
+    linear-gradient(135deg, color-mix(in srgb, var(--primary) 92%, #fff), var(--primary-dk));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent);
+  transform-origin: center bottom;
+  animation: patientFolderOpen 930ms cubic-bezier(0.2, 0.82, 0.24, 1) 80ms both;
+}
+
+.patient-file-transition__folder-front span {
+  color: color-mix(in srgb, #fff 80%, var(--primary-lt));
+  font-size: 0.48rem;
+  font-weight: 850;
+  letter-spacing: 0.14em;
+}
+
+.patient-file-transition__kicker {
+  color: var(--primary-dk);
+  font-size: 0.64rem;
+  font-weight: 820;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.patient-file-transition__scene > strong {
+  max-width: 100%;
+  overflow: hidden;
+  margin-top: 0.28rem;
+  color: var(--text);
+  font-size: 1.02rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.patient-file-transition__scene > small {
+  margin-top: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+html.dark .patient-file-transition__veil {
+  background: rgba(9, 12, 16, 0.78);
+}
+
+html.dark .patient-file-transition__kicker {
+  color: var(--primary);
+}
+
+@keyframes patientCardArrive {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes patientDetailsReveal {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes patientSkeleton {
+  to { background-position: -220% 0, 0 0; }
+}
+
+@keyframes patientFileVeil {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes patientFileScene {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes patientSheetRise {
+  0% { opacity: 0; transform: translate(-50%, 2.5rem) scale(0.88); }
+  18% { opacity: 1; }
+  66% { transform: translate(-50%, -2.35rem) rotate(-2deg) scale(1); }
+  82% { transform: translate(-50%, -1.82rem) rotate(1deg) scale(1); }
+  100% { opacity: 1; transform: translate(-50%, -2rem) rotate(0); }
+}
+
+@keyframes patientFolderOpen {
+  0%, 18% { transform: rotateX(0) translateY(0); }
+  58% { transform: rotateX(-34deg) translateY(0.3rem); }
+  100% { transform: rotateX(-25deg) translateY(0.22rem); }
+}
+
+@media (max-width: 820px) {
+  .patients-census-tools {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .patients-live-summary {
+    grid-column: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .patients-census-tools {
+    padding: 0.9rem;
+  }
+
+  .patients-search-field {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .patients-search-field > span {
+    display: none;
+  }
+
+  .patients-live-summary > div {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .patients-board {
+    padding: 0.7rem 0.7rem 0;
+  }
+
+  .patient-card-grid {
+    gap: 0.7rem;
+  }
+
+  .patient-orbit-main {
+    padding: 0.9rem 0.85rem 0.68rem 0.95rem;
+  }
+
+  .patient-orbit-heading {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .patient-orbit-open {
+    display: none;
+  }
+
+  .patient-orbit-path {
+    grid-template-columns: minmax(0, 1fr) 2rem minmax(0, 1fr);
+    padding-inline: 0.62rem;
+  }
+
+  .patient-orbit-date {
+    gap: 0.34rem;
+  }
+
+  .patient-orbit-date svg {
+    display: none;
+  }
+
+  .patient-orbit-location > span:last-child {
+    display: none;
+  }
+
+  .patient-orbit-more {
+    padding-inline: 0.95rem;
+  }
+
+  .patient-orbit-details {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    padding-inline: 0.95rem;
+  }
+
+  .patients-board .patients-footer {
+    margin-inline: -0.7rem;
+  }
+
+  .patients-footer,
+  .patients-footer-actions {
+    width: 100%;
+  }
+
+  .patients-footer-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .patients-page-size {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+  }
+
+  .patients-footer-actions > button {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .patient-orbit-card,
+  .patient-orbit-details,
+  .patient-card-skeleton,
+  .patient-file-transition,
+  .patient-file-transition * {
+    animation: none !important;
+  }
+
+  .patient-orbit-card {
+    transition: none !important;
+  }
+}
