@@ -35,7 +35,7 @@ function createHarness({ query = null, closeError = null } = {}) {
   };
 }
 
-test('descubre migraciones versionadas en orden e incluye 007 a 012', () => {
+test('descubre migraciones versionadas en orden e incluye 007 a 013', () => {
   const files = discoverMigrationFiles({
     migrationsDir: 'migrations-test',
     readDirectory: () => [
@@ -85,6 +85,12 @@ test('descubre migraciones versionadas en orden e incluye 007 a 012', () => {
   assert.equal(
     discoverMigrationFiles().some(
       ({ filename }) => filename === '012_vax5_correccion_final.sql'
+    ),
+    true
+  );
+  assert.equal(
+    discoverMigrationFiles().some(
+      ({ filename }) => filename === '013_plan_parto_horas_decimales.sql'
     ),
     true
   );

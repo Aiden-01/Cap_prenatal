@@ -13,6 +13,7 @@ function validate(schema, source) {
       }));
     }
 
+    req[source] = result.data;
     return next();
   };
 }

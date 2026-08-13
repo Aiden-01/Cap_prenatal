@@ -178,7 +178,7 @@ test('usuarios conserva proteccion historica sin consultar la tabla eliminada', 
   );
 });
 
-test('el backend exige el registro exitoso de 008 a 012 antes de escuchar', async () => {
+test('el backend exige el registro exitoso de 008 a 013 antes de escuchar', async () => {
   const requiredState = loadRequiredMigrations();
   const missingRegistryCalls = [];
   await assert.rejects(

@@ -607,7 +607,7 @@ CREATE TABLE IF NOT EXISTS planes_parto (
 
   posicion_parto                  VARCHAR(50),
   lugar_atencion_parto            VARCHAR(50),
-  horas_distancia                 INTEGER,
+  horas_distancia                 NUMERIC(4,1),
   kms_servicio                    DECIMAL(6,2),
   casa_materna_cercana            BOOLEAN DEFAULT FALSE,
   usara_casa_materna              BOOLEAN DEFAULT FALSE,

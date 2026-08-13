@@ -566,7 +566,17 @@ export default function PlanPartoForm() {
               {form.lugar_atencion_parto === "otro" && (
                 <Input label="Especifique otro lugar" name="lugar_atencion_parto_otro" form={form} set={set} />
               )}
-              <Input label="Horas de distancia" name="horas_distancia" type="number" form={form} set={set} />
+              <Input
+                label="Horas de distancia"
+                name="horas_distancia"
+                type="number"
+                min="0"
+                max="72"
+                step="0.1"
+                inputMode="decimal"
+                form={form}
+                set={set}
+              />
               <Input label="Kilometros al servicio" name="kms_servicio" type="number" form={form} set={set} />
               <Select label="Como se trasladara" name="como_trasladara" form={form} set={set} options={trasladoOptions} />
               <Select label="Quien acompanara el traslado" name="acompana_traslado" form={form} set={set} options={acompanaTrasladoOptions} />

@@ -59,7 +59,7 @@ test('Docker termina como usuario node y los launchers no contienen flags insegu
   const pdfController = fs.readFileSync(path.join(__dirname, '../src/controllers/pdfController.js'), 'utf8');
   const reportesPdf = fs.readFileSync(path.join(__dirname, '../src/services/reportesPdfService.js'), 'utf8');
 
-  assert.match(dockerfile, /\nUSER node\n/);
+  assert.match(dockerfile, /\r?\nUSER node\r?\n/);
   assert.doesNotMatch(dockerfile, /USER root/);
   assert.doesNotMatch(`${pdfController}\n${reportesPdf}`, /--no-sandbox|--disable-setuid-sandbox/);
   assert.match(pdfController, /buildPuppeteerLaunchOptions\(\)/);

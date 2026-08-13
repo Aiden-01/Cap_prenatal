@@ -3,7 +3,9 @@ const fs = require('node:fs');
 const test = require('node:test');
 
 const privateAuditService = require('../src/services/auditService');
+const { validateBody } = require('../src/middleware/validate');
 const { HttpError } = require('../src/utils/httpError');
+const { planPartoSchema } = require('../src/validations/controles.schemas');
 
 const MORBIDITY_SERVICE_PATH = require.resolve('../src/services/morbilidadService');
 const MORBIDITY_REPOSITORY_PATH = require.resolve('../src/repositories/morbilidadRepository');
@@ -91,6 +93,12 @@ function strictMock(overrides, label) {
         throw new Error(`Llamada inesperada a ${label}.${String(property)}`);
       };
     },
+  });
+}
+
+function invokeMiddleware(middleware, req) {
+  return new Promise((resolve, reject) => {
+    middleware(req, {}, (error) => (error ? reject(error) : resolve()));
   });
 }
 
@@ -574,6 +582,33 @@ test('plan de parto crea evento privado sin valores prellenados o identificadore
     'Bearer secreto-sintetico',
     'sesion=sintetica',
   ]) assert.equal(serialized.includes(forbidden), false);
+});
+
+test('validacion normaliza horas decimales antes de guardar el plan de parto', async () => {
+  const req = {
+    body: {
+      fecha: '2026-06-15',
+      horas_distancia: '1.0',
+      kms_servicio: '4.50',
+    },
+  };
+
+  await invokeMiddleware(validateBody(planPartoSchema), req);
+
+  assert.equal(req.body.horas_distancia, 1);
+  assert.equal(req.body.kms_servicio, 4.5);
+});
+
+test('schema y migracion conservan decimas en horas_distancia', () => {
+  const schema = fs.readFileSync(require.resolve('../src/db/schema.sql'), 'utf8');
+  const migration = fs.readFileSync(
+    require.resolve('../src/db/migrations/013_plan_parto_horas_decimales.sql'),
+    'utf8'
+  );
+
+  assert.match(schema, /horas_distancia\s+NUMERIC\(4,1\)/);
+  assert.match(migration, /ALTER COLUMN horas_distancia TYPE NUMERIC\(4,1\)/);
+  assert.match(migration, /USING horas_distancia::NUMERIC\(4,1\)/);
 });
 
 test('upsert del plan registra solo nombres realmente modificados y un unico evento', async () => {

@@ -269,10 +269,14 @@ reconocimiento de eventos historicos de entidad `referencia`.
 El esquema final contiene 16 tablas operativas mas `schema_migrations`. La
 migracion `008_retirar_referencias_efectuadas.sql` bloquea y cuenta antes de
 retirar la tabla vacia, aborta si hay filas y no usa `CASCADE`. El codigo actual
-exige que las migraciones `008` a `012` esten registradas con el checksum de sus
+exige que las migraciones `008` a `013` esten registradas con el checksum de sus
 archivos versionados antes de abrir el puerto HTTP. Esta compuerta solo consulta
 el registro y nunca ejecuta migraciones; cada entorno actualiza su propia base
 con `npm run db:migrate`, sin copiar bases entre PCs.
+
+La migracion `013_plan_parto_horas_decimales.sql` alinea
+`planes_parto.horas_distancia` con el origen decimal `tiempo_horas` de la ficha
+de riesgo y evita errores `22P02` al prellenar fracciones de hora.
 
 Comunidades era el ultimo consumidor productivo del adaptador legacy detectado
 por el barrido. Sus escrituras usan ahora contexto administrativo privado,
