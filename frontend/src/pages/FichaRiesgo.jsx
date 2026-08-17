@@ -1,10 +1,27 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ChevronLeft, Save } from "lucide-react";
+import {
+  CalendarDays,
+  ClipboardList,
+  HeartPulse,
+  MapPinned,
+  Save,
+  ShieldCheck,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
 import api from "../api/axios";
+import {
+  ClinicalActionBar,
+  ClinicalLoadingSkeleton,
+  ClinicalNotice,
+  ClinicalSection,
+  ClinicalWorkflowShell,
+} from "../components/clinical/ClinicalWorkflow";
 import { useGlobalToast } from "../context/ToastContext";
 import { useFieldErrors } from "../hooks/useFieldErrors";
 import { useAuth } from "../hooks/useAuth";
+import "./clinical-secondary-workflows.css";
 
 const FormErrorContext = createContext({
   fieldError: () => "",
@@ -15,27 +32,37 @@ function useFormErrorUi() {
   return useContext(FormErrorContext);
 }
 
-function Field({ label, children, name }) {
+function Field({ label, children, name, inputId }) {
   const { fieldError } = useFormErrorUi();
   const error = name ? fieldError(name) : "";
   return (
     <div className="form-group">
-      <label className="input-label">{label}</label>
+      <label className="input-label" htmlFor={inputId}>{label}</label>
       {children}
-      {error && <div className="field-error-text">{error}</div>}
+      {error && <div id={`${inputId}-error`} className="field-error-text" role="alert">{error}</div>}
     </div>
   );
 }
 
+function blurNumberInputOnWheel(event) {
+  event.currentTarget.blur();
+}
+
 function Input({ label, name, form, set, type = "text", ...rest }) {
-  const { inputClass } = useFormErrorUi();
+  const { fieldError, inputClass } = useFormErrorUi();
+  const inputId = `risk-${name}`;
+  const error = fieldError(name);
   return (
-    <Field label={label} name={name}>
+    <Field label={label} name={name} inputId={inputId}>
       <input
+        id={inputId}
         className={inputClass(name)}
         name={name}
         type={type}
         value={form[name] ?? ""}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `${inputId}-error` : undefined}
+        onWheel={type === "number" ? blurNumberInputOnWheel : undefined}
         onChange={(e) => set(name, type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
         {...rest}
       />
@@ -44,10 +71,20 @@ function Input({ label, name, form, set, type = "text", ...rest }) {
 }
 
 function Select({ label, name, options, form, set }) {
-  const { inputClass } = useFormErrorUi();
+  const { fieldError, inputClass } = useFormErrorUi();
+  const inputId = `risk-${name}`;
+  const error = fieldError(name);
   return (
-    <Field label={label} name={name}>
-      <select className={inputClass(name)} name={name} value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)}>
+    <Field label={label} name={name} inputId={inputId}>
+      <select
+        id={inputId}
+        className={inputClass(name)}
+        name={name}
+        value={form[name] ?? ""}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `${inputId}-error` : undefined}
+        onChange={(e) => set(name, e.target.value)}
+      >
         <option value="">— Seleccionar —</option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
@@ -60,28 +97,15 @@ function Select({ label, name, options, form, set }) {
 function Toggle({ label, name, form, set }) {
   const val = form[name] ?? false;
   return (
-    <div
+    <button
+      type="button"
+      aria-pressed={val}
       onClick={() => set(name, !val)}
       className={`toggle-control ${val ? "is-on" : ""}`}
     >
-      <div className="toggle-mark">
-        {val && "✓"}
-      </div>
-      <span className="toggle-label">
-        {label}
-      </span>
-    </div>
-  );
-}
-
-function Section({ title, children }) {
-  return (
-    <div className="form-section">
-      <div className="form-section-header">{title}</div>
-      <div className="section-grid">
-        {children}
-      </div>
-    </div>
+      <span className="toggle-mark" aria-hidden="true">{val && "✓"}</span>
+      <span className="toggle-label">{label}</span>
+    </button>
   );
 }
 
@@ -254,6 +278,7 @@ export default function FichaRiesgo() {
   const edadPaciente = paciente ? calcularEdadAnios(paciente.fecha_nacimiento) : null;
   const hasRiskFeatures = RISK_FIELDS.some((field) => Boolean(form[field]));
   const referralMissing = !String(form.referida_a || "").trim();
+  const nombrePaciente = paciente ? `${paciente.nombres || ""} ${paciente.apellidos || ""}`.trim() : "";
 
   useEffect(() => {
     if (!embarazoId) {
@@ -344,202 +369,208 @@ export default function FichaRiesgo() {
   };
 
   return (
-    <div>
+    <>
       {showReferralAlert && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1000,
-            background: "rgba(15, 23, 42, 0.42)",
-            display: "grid",
-            placeItems: "center",
-            padding: "1rem",
-          }}
-        >
+        <div className="secondary-dialog-backdrop">
           <div
-            className="card"
-            style={{
-              width: "min(460px, 100%)",
-              padding: "1.25rem",
-              boxShadow: "0 24px 80px rgba(15, 23, 42, 0.22)",
-            }}
+            className="secondary-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="risk-referral-dialog-title"
+            aria-describedby="risk-referral-dialog-copy"
           >
-            <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text)", marginBottom: "0.45rem" }}>
-              Referencia pendiente
+            <div className="secondary-dialog-icon" aria-hidden="true"><MapPinned size={20} /></div>
+            <div>
+              <h2 id="risk-referral-dialog-title">Referencia pendiente</h2>
+              <p id="risk-referral-dialog-copy">
+                Se marcó una o más características de riesgo. Debe añadir el campo &quot;Referida a&quot; antes de guardar, o confirmar que no desea añadirlo.
+              </p>
             </div>
-            <p style={{ fontSize: "0.86rem", color: "var(--text-muted)", lineHeight: 1.45, margin: 0 }}>
-              Se marcó una o más características de riesgo. Debe añadir el campo "Referida a" antes de guardar, o confirmar que no desea añadirlo.
-            </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.65rem", marginTop: "1rem", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={handleSkipReferral}
-                disabled={loading}
-                style={{
-                  border: "1px solid #eab308",
-                  background: "#fef3c7",
-                  color: "#854d0e",
-                  borderRadius: 8,
-                  padding: "0.55rem 0.85rem",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
+            <div className="secondary-dialog-actions">
+              <button type="button" className="btn-secondary is-warning" onClick={handleSkipReferral} disabled={loading}>
                 No añadir
               </button>
-              <button
-                type="button"
-                onClick={handleAddReferral}
-                style={{
-                  border: "1px solid #16a34a",
-                  background: "#16a34a",
-                  color: "#fff",
-                  borderRadius: 8,
-                  padding: "0.55rem 0.85rem",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                Añadir
+              <button type="button" className="btn-primary" onClick={handleAddReferral}>
+                Añadir referencia
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.5rem" }}>
-        <button className="btn-secondary" onClick={() => navigate(expedientePath)}>
-          <ChevronLeft size={15} /> Volver
-        </button>
-        <div>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>Ficha de Riesgo Obstétrico</h1>
-          <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 2 }}>
-            Criterios de clasificación de riesgo
-          </p>
-        </div>
-      </div>
+      <ClinicalWorkflowShell
+        className="secondary-workflow risk-workflow"
+        onBack={() => navigate(expedientePath)}
+        eyebrow="Evaluación obstétrica"
+        title="Ficha de riesgo obstétrico"
+        description="Registro de antecedentes, condiciones actuales y referencia clínica."
+        patientName={nombrePaciente}
+        recordNumber={paciente?.no_expediente}
+        mode={existingRisk ? "edit" : "new"}
+        icon={ShieldCheck}
+      >
+        {loadingData ? (
+          <ClinicalLoadingSkeleton label="Cargando ficha de riesgo obstétrico" />
+        ) : (
+          <form className="secondary-workflow-form" onSubmit={handleSubmit}>
+            <FormErrorContext.Provider value={fieldErrors}>
+              {fieldErrors.summary.length > 0 && (
+                <ClinicalNotice variant="error" title="Revisa estos datos" className="secondary-workflow-notice">
+                  {fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" · ")}
+                </ClinicalNotice>
+              )}
 
-      {paciente && (
-        <div className="card" style={{ marginBottom: "1rem", padding: "0.9rem 1rem" }}>
-          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>
-            {existingRisk ? "Editando ficha de" : "Agregando ficha a"}
-          </span>
-          <div style={{ marginTop: 3, fontSize: "1rem", fontWeight: 800, color: "var(--text)" }}>
-            {paciente.nombres} {paciente.apellidos}
-          </div>
-          {edadPaciente !== null && (
-            <div style={{ marginTop: 4, fontSize: "0.82rem", color: "var(--text-muted)" }}>
-              Edad: <strong style={{ color: "var(--text)" }}>{formatEdad(edadPaciente)}</strong>
-            </div>
-          )}
-        </div>
-      )}
+              <div className="secondary-context-summary" aria-label="Resumen de la ficha de riesgo">
+                <div className="secondary-context-item">
+                  <span className="secondary-context-icon" aria-hidden="true"><CalendarDays size={16} /></span>
+                  <div><span>Fecha de evaluación</span><strong>{form.fecha || "Por definir"}</strong></div>
+                </div>
+                <div className="secondary-context-item">
+                  <span className="secondary-context-icon" aria-hidden="true"><UserRound size={16} /></span>
+                  <div><span>Edad</span><strong>{formatEdad(edadPaciente) || "Sin dato"}</strong></div>
+                </div>
+                <div className="secondary-context-item">
+                  <span className="secondary-context-icon" aria-hidden="true"><MapPinned size={16} /></span>
+                  <div><span>Distancia al servicio</span><strong>{form.distancia_servicio_km === "" ? "Sin dato" : `${form.distancia_servicio_km} km`}</strong></div>
+                </div>
+                <div className={`secondary-context-item ${hasRiskFeatures ? "is-attention" : ""}`}>
+                  <span className="secondary-context-icon" aria-hidden="true"><HeartPulse size={16} /></span>
+                  <div><span>Evaluación registrada</span><strong>{hasRiskFeatures ? "Con características marcadas" : "Sin características marcadas"}</strong></div>
+                </div>
+              </div>
 
-      {loadingData ? (
-        <div className="card" style={{ padding: "2rem", textAlign: "center", color: "var(--text-muted)" }}>
-          Cargando datos de la paciente...
-        </div>
-      ) : (
-      <form onSubmit={handleSubmit} className="card">
-        <FormErrorContext.Provider value={fieldErrors}>
-        {fieldErrors.summary.length > 0 && (
-          <div className="error-box" style={{ marginBottom: "1rem" }}>
-            <strong>Revisa estos datos:</strong>{" "}
-            {fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" | ")}
-          </div>
+              <ClinicalSection title="Información general" description="Datos de contacto, contexto social y fechas del embarazo." icon={ClipboardList}>
+                <div className="form-section-body col-4">
+                  <Input label="Fecha" name="fecha" type="date" form={form} set={set} />
+                  <Field label="Edad" inputId="risk-patient-age">
+                    <input id="risk-patient-age" className="input-field" value={formatEdad(edadPaciente)} readOnly />
+                  </Field>
+                  <Input label="Teléfono" name="telefono" form={form} set={set} />
+                  <Input label="Pueblo" name="pueblo" form={form} set={set} />
+                  <Input label="Estado civil" name="estado_civil" form={form} set={set} />
+                  <Input label="Escolaridad" name="escolaridad" form={form} set={set} />
+                  <Input label="Ocupación" name="ocupacion" form={form} set={set} />
+                  <Input label="Distancia al servicio (km)" name="distancia_servicio_km" type="number" form={form} set={set} min="0" />
+                  <Input label="Tiempo al servicio (horas)" name="tiempo_horas" type="number" form={form} set={set} min="0" />
+                  <Input label="FUR" name="fecha_ultima_regla" type="date" form={form} set={set} />
+                  <Input label="FPP" name="fecha_probable_parto" type="date" form={form} set={set} />
+                </div>
+              </ClinicalSection>
+
+              <ClinicalSection title="Esposo o conviviente" description="Información disponible de la pareja o persona conviviente." icon={UsersRound}>
+                <div className="form-section-body col-4">
+                  <Input label="Nombre del esposo o conviviente" name="nombre_esposo_conviviente" form={form} set={set} />
+                  <Input label="Edad" name="edad_esposo" type="number" form={form} set={set} min="0" />
+                  <Select label="Pueblo" name="pueblo_esposo" options={PUEBLO_CONVIVIENTE_OPTIONS} form={form} set={set} />
+                  <Select label="Escolaridad" name="escolaridad_esposo" options={ESCOLARIDAD_CONVIVIENTE_OPTIONS} form={form} set={set} />
+                  <Input label="Ocupación" name="ocupacion_esposo" form={form} set={set} />
+                </div>
+              </ClinicalSection>
+
+              <ClinicalSection
+                title="Condiciones de riesgo evaluadas"
+                description="Revisa los antecedentes y marca únicamente las características presentes."
+                icon={HeartPulse}
+                tone={hasRiskFeatures ? "danger" : "default"}
+                className="risk-evaluation-section"
+                aside={<span className={`secondary-state-pill ${hasRiskFeatures ? "is-attention" : ""}`}>{hasRiskFeatures ? "Revisar referencia" : "Sin marcas"}</span>}
+              >
+                <div className="risk-factor-group">
+                  <div className="risk-factor-heading">
+                    <span>01</span>
+                    <div><h3>Antecedentes obstétricos</h3><p>Historia reproductiva y resultados obstétricos previos.</p></div>
+                  </div>
+                  <div className="form-section-body col-4 secondary-compact-grid">
+                    <Input label="No. de embarazos" name="no_embarazos" type="number" form={form} set={set} min="0" />
+                    <Input label="No. de partos" name="no_partos" type="number" form={form} set={set} min="0" />
+                    <Input label="No. de cesáreas" name="no_cesareas" type="number" form={form} set={set} min="0" />
+                    <Input label="No. de abortos" name="no_abortos" type="number" form={form} set={set} min="0" />
+                    <Input label="No. de hijos vivos" name="no_hijos_vivos" type="number" form={form} set={set} min="0" />
+                    <Input label="No. de hijos muertos" name="no_hijos_muertos" type="number" form={form} set={set} min="0" />
+                    <Input label="Edad de embarazo (semanas)" name="edad_embarazo_semanas" type="number" form={form} set={set} min="0" />
+                  </div>
+                  <div className="risk-toggle-grid">
+                    <Toggle label="Muerte fetal/neonatal previa" name="muerte_fetal_neonatal_previa" {...p} />
+                    <Toggle label="3+ abortos espontáneos consecutivos" name="abortos_espontaneos_3mas" {...p} />
+                    <Toggle label="3+ gestas" name="gestas_3mas" {...p} />
+                    <Toggle label="RN anterior < 2500g" name="peso_ultimo_bebe_menor_2500g" {...p} />
+                    <Toggle label="RN anterior > 4500g" name="peso_ultimo_bebe_mayor_4500g" {...p} />
+                    <Toggle label="Antecedente HTA / preeclampsia" name="antec_hipertension_preeclampsia" {...p} />
+                    <Toggle label="Cirugías tracto reproductivo" name="cirugias_tracto_reproductivo" {...p} />
+                  </div>
+                </div>
+
+                <div className="risk-factor-group">
+                  <div className="risk-factor-heading">
+                    <span>02</span>
+                    <div><h3>Embarazo actual</h3><p>Características observadas en el embarazo en curso.</p></div>
+                  </div>
+                  <div className="risk-toggle-grid">
+                    <Toggle label="Embarazo múltiple" name="embarazo_multiple" {...p} />
+                    <Toggle label="Menor de 20 años" name="menor_20_anos" {...p} />
+                    <Toggle label="Mayor de 35 años" name="mayor_35_anos" {...p} />
+                    <Toggle label="Paciente Rh negativo" name="paciente_rh_negativo" {...p} />
+                    <Toggle label="Hemorragia vaginal" name="hemorragia_vaginal" {...p} />
+                    {puedeCapturarVih && <Toggle label="VIH+ / Sífilis" name="vih_positivo_sifilis" {...p} />}
+                    <Toggle label="P/A diastólica ≥ 90" name="presion_diastolica_90mas" {...p} />
+                    <Toggle label="Anemia" name="anemia" {...p} />
+                    <Toggle label="Desnutrición / obesidad" name="desnutricion_obesidad" {...p} />
+                    <Toggle label="Dolor abdominal" name="dolor_abdominal" {...p} />
+                    <Toggle label="Sintomatología urinaria" name="sintomatologia_urinaria" {...p} />
+                    <Toggle label="Ictericia" name="ictericia" {...p} />
+                  </div>
+                </div>
+
+                <div className="risk-factor-group">
+                  <div className="risk-factor-heading">
+                    <span>03</span>
+                    <div><h3>Historia clínica general</h3><p>Enfermedades y exposiciones relevantes registradas.</p></div>
+                  </div>
+                  <div className="risk-toggle-grid">
+                    <Toggle label="Diabetes" name="diabetes" {...p} />
+                    <Toggle label="Enfermedad renal" name="enfermedad_renal" {...p} />
+                    <Toggle label="Enfermedad del corazón" name="enfermedad_corazon" {...p} />
+                    <Toggle label="Hipertensión arterial" name="hipertension_arterial" {...p} />
+                    <Toggle label="Drogas / alcohol / tabaco" name="consumo_drogas_alcohol_tabaco" {...p} />
+                    <Toggle label="Otra enfermedad severa" name="otra_enfermedad_severa" {...p} />
+                  </div>
+                </div>
+              </ClinicalSection>
+
+              <ClinicalSection
+                title="Referencia y seguimiento"
+                description="Registra el destino de referencia y el personal que atendió."
+                icon={MapPinned}
+                tone={hasRiskFeatures ? "danger" : "default"}
+                className="risk-referral-section"
+                aside={hasRiskFeatures ? <span className="secondary-state-pill is-attention">Riesgo presente</span> : null}
+              >
+                {hasRiskFeatures && (
+                  <ClinicalNotice variant="warning" title="Confirma la referencia" className="risk-referral-notice">
+                    Existen características de riesgo marcadas. La ficha conserva la validación de referencia ya definida.
+                  </ClinicalNotice>
+                )}
+                <div className="form-section-body col-2">
+                  <Input label="Otra enfermedad / descripción" name="otra_enfermedad_descripcion" form={form} set={set} />
+                  <Input label="Referida a" name="referida_a" form={form} set={set} />
+                  <Input label="Nombre del personal que atendió" name="nombre_personal_atendio" form={form} set={set} />
+                </div>
+              </ClinicalSection>
+
+              <ClinicalActionBar
+                status={loading ? "Guardando ficha" : existingRisk ? "Edición de ficha" : "Nueva ficha de riesgo"}
+                detail={loading ? "Espera mientras se registra la información" : "La evaluación se guardará con los mismos criterios clínicos vigentes."}
+              >
+                <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>Cancelar</button>
+                <button type="submit" className="btn-primary" disabled={loading}>
+                  <Save size={15} aria-hidden="true" />
+                  {loading ? "Guardando..." : existingRisk ? "Guardar cambios" : "Guardar ficha"}
+                </button>
+              </ClinicalActionBar>
+            </FormErrorContext.Provider>
+          </form>
         )}
-        <div className="form-section">
-          <div className="form-section-header">Datos generales</div>
-          <div className="form-section-body col-4">
-            <Input label="Fecha" name="fecha" type="date" form={form} set={set} />
-            <Field label="Edad">
-              <input className="input-field" value={formatEdad(edadPaciente)} readOnly />
-            </Field>
-            <Input label="Teléfono" name="telefono" form={form} set={set} />
-            <Input label="Pueblo" name="pueblo" form={form} set={set} />
-            <Input label="Estado civil" name="estado_civil" form={form} set={set} />
-            <Input label="Escolaridad" name="escolaridad" form={form} set={set} />
-            <Input label="Ocupación" name="ocupacion" form={form} set={set} />
-            <Input label="Distancia al servicio (km)" name="distancia_servicio_km" type="number" form={form} set={set} min="0" />
-            <Input label="Tiempo al servicio (horas)" name="tiempo_horas" type="number" form={form} set={set} min="0" />
-            <Input label="FUR" name="fecha_ultima_regla" type="date" form={form} set={set} />
-            <Input label="FPP" name="fecha_probable_parto" type="date" form={form} set={set} />
-          </div>
-        </div>
-
-        <div className="form-section">
-          <div className="form-section-header">Esposo o conviviente</div>
-          <div className="form-section-body col-4">
-            <Input label="Nombre del esposo o conviviente" name="nombre_esposo_conviviente" form={form} set={set} />
-            <Input label="Edad" name="edad_esposo" type="number" form={form} set={set} min="0" />
-            <Select label="Pueblo" name="pueblo_esposo" options={PUEBLO_CONVIVIENTE_OPTIONS} form={form} set={set} />
-            <Select label="Escolaridad" name="escolaridad_esposo" options={ESCOLARIDAD_CONVIVIENTE_OPTIONS} form={form} set={set} />
-            <Input label="Ocupación" name="ocupacion_esposo" form={form} set={set} />
-          </div>
-        </div>
-
-        <Section title="Antecedentes obstétricos">
-          <Input label="No. de embarazos" name="no_embarazos" type="number" form={form} set={set} min="0" />
-          <Input label="No. de partos" name="no_partos" type="number" form={form} set={set} min="0" />
-          <Input label="No. de cesáreas" name="no_cesareas" type="number" form={form} set={set} min="0" />
-          <Input label="No. de abortos" name="no_abortos" type="number" form={form} set={set} min="0" />
-          <Input label="No. de hijos vivos" name="no_hijos_vivos" type="number" form={form} set={set} min="0" />
-          <Input label="No. de hijos muertos" name="no_hijos_muertos" type="number" form={form} set={set} min="0" />
-          <Input label="Edad de embarazo (semanas)" name="edad_embarazo_semanas" type="number" form={form} set={set} min="0" />
-          <Toggle label="Muerte fetal/neonatal previa" name="muerte_fetal_neonatal_previa" {...p} />
-          <Toggle label="3+ abortos espontáneos consecutivos" name="abortos_espontaneos_3mas" {...p} />
-          <Toggle label="3+ gestas" name="gestas_3mas" {...p} />
-          <Toggle label="RN anterior < 2500g" name="peso_ultimo_bebe_menor_2500g" {...p} />
-          <Toggle label="RN anterior > 4500g" name="peso_ultimo_bebe_mayor_4500g" {...p} />
-          <Toggle label="Antecedente HTA / preeclampsia" name="antec_hipertension_preeclampsia" {...p} />
-          <Toggle label="Cirugías tracto reproductivo" name="cirugias_tracto_reproductivo" {...p} />
-        </Section>
-
-        <Section title="Embarazo actual">
-          <Toggle label="Embarazo múltiple" name="embarazo_multiple" {...p} />
-          <Toggle label="Menor de 20 años" name="menor_20_anos" {...p} />
-          <Toggle label="Mayor de 35 años" name="mayor_35_anos" {...p} />
-          <Toggle label="Paciente Rh negativo" name="paciente_rh_negativo" {...p} />
-          <Toggle label="Hemorragia vaginal" name="hemorragia_vaginal" {...p} />
-          {puedeCapturarVih && <Toggle label="VIH+ / Sífilis" name="vih_positivo_sifilis" {...p} />}
-          <Toggle label="P/A diastólica ≥ 90" name="presion_diastolica_90mas" {...p} />
-          <Toggle label="Anemia" name="anemia" {...p} />
-          <Toggle label="Desnutrición / obesidad" name="desnutricion_obesidad" {...p} />
-          <Toggle label="Dolor abdominal" name="dolor_abdominal" {...p} />
-          <Toggle label="Sintomatología urinaria" name="sintomatologia_urinaria" {...p} />
-          <Toggle label="Ictericia" name="ictericia" {...p} />
-        </Section>
-
-        <Section title="Historia clínica general">
-          <Toggle label="Diabetes" name="diabetes" {...p} />
-          <Toggle label="Enfermedad renal" name="enfermedad_renal" {...p} />
-          <Toggle label="Enfermedad del corazón" name="enfermedad_corazon" {...p} />
-          <Toggle label="Hipertensión arterial" name="hipertension_arterial" {...p} />
-          <Toggle label="Drogas / alcohol / tabaco" name="consumo_drogas_alcohol_tabaco" {...p} />
-          <Toggle label="Otra enfermedad severa" name="otra_enfermedad_severa" {...p} />
-        </Section>
-
-        <div className="form-section">
-          <div className="form-section-header">Referencia</div>
-          <div className="form-section-body col-2">
-            <Input label="Otra enfermedad / descripción" name="otra_enfermedad_descripcion" form={form} set={set} />
-            <Input label="Referida a" name="referida_a" form={form} set={set} />
-            <Input label="Nombre del personal que atendió" name="nombre_personal_atendio" form={form} set={set} />
-          </div>
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.8rem", marginTop: "1.25rem" }}>
-          <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>
-            Cancelar
-          </button>
-          <button className="btn-primary" disabled={loading}>
-            <Save size={15} /> {loading ? "Guardando..." : existingRisk ? "Guardar cambios" : "Guardar ficha"}
-          </button>
-        </div>
-        </FormErrorContext.Provider>
-      </form>
-      )}
-    </div>
+      </ClinicalWorkflowShell>
+    </>
   );
 }

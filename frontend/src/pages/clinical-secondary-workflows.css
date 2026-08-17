@@ -1,0 +1,537 @@
+.secondary-workflow {
+  --secondary-panel: color-mix(in srgb, var(--surface) 97%, var(--primary-lt));
+  --secondary-soft: color-mix(in srgb, var(--surface2) 72%, var(--surface));
+  --secondary-line: color-mix(in srgb, var(--primary) 18%, var(--border));
+}
+
+.secondary-workflow-form {
+  min-width: 0;
+  margin-top: 1rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  border-radius: 18px;
+  background: var(--secondary-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.secondary-workflow-notice {
+  margin: 1rem 1rem 0;
+}
+
+.secondary-workflow .form-group,
+.secondary-workflow .clinical-section,
+.secondary-workflow .clinical-section-body,
+.secondary-workflow .secondary-context-item,
+.secondary-workflow .secondary-chapter {
+  min-width: 0;
+}
+
+.secondary-workflow .form-section-body {
+  padding: 0.2rem 0 0;
+  gap: 0.9rem;
+}
+
+.secondary-workflow .input-label {
+  transition: color 180ms ease;
+}
+
+.secondary-workflow .form-group:focus-within .input-label {
+  color: var(--primary-dk);
+}
+
+.secondary-workflow .input-field[readonly] {
+  cursor: default;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface2) 82%, var(--surface));
+}
+
+.secondary-workflow .btn-primary,
+.secondary-workflow .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+}
+
+.secondary-context-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+  background:
+    linear-gradient(115deg, color-mix(in srgb, var(--primary-lt) 52%, transparent), transparent 54%),
+    var(--secondary-soft);
+}
+
+.secondary-context-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.9rem 1rem;
+  border-right: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.secondary-context-item:last-child {
+  border-right: 0;
+}
+
+.secondary-context-item.is-attention {
+  background: color-mix(in srgb, var(--danger-lt) 58%, var(--surface));
+}
+
+.secondary-context-icon {
+  width: 2.15rem;
+  height: 2.15rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary-lt) 72%, var(--surface));
+  color: var(--primary-dk);
+}
+
+.secondary-context-item.is-attention .secondary-context-icon {
+  border-color: color-mix(in srgb, var(--danger) 36%, var(--border));
+  background: color-mix(in srgb, var(--danger-lt) 76%, var(--surface));
+  color: var(--danger);
+}
+
+.secondary-context-item > div {
+  min-width: 0;
+}
+
+.secondary-context-item span:not(.secondary-context-icon) {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 720;
+  letter-spacing: 0.045em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.secondary-context-item strong {
+  display: block;
+  margin-top: 0.16rem;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 760;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+
+.secondary-state-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.65rem;
+  padding: 0.22rem 0.56rem;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 999px;
+  background: var(--surface2);
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.secondary-state-pill.is-attention {
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--border));
+  background: color-mix(in srgb, var(--danger-lt) 74%, var(--surface));
+  color: var(--danger);
+}
+
+.secondary-field-hint {
+  margin-top: 0.05rem;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.secondary-workflow .toggle-control {
+  width: 100%;
+  appearance: none;
+  font: inherit;
+  text-align: left;
+}
+
+.secondary-workflow .toggle-control:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 24%, transparent);
+  outline-offset: 2px;
+}
+
+.risk-evaluation-section,
+.risk-referral-section {
+  margin: 0.8rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 98%, var(--primary-lt));
+}
+
+.risk-factor-group + .risk-factor-group {
+  margin-top: 1.1rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+}
+
+.risk-factor-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.72rem;
+  align-items: center;
+  margin-bottom: 0.85rem;
+}
+
+.risk-factor-heading > span {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--border));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--primary-lt) 66%, var(--surface));
+  color: var(--primary-dk);
+  font-size: 0.65rem;
+  font-weight: 820;
+}
+
+.risk-evaluation-section.is-danger .risk-factor-heading > span {
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--border));
+  background: color-mix(in srgb, var(--danger-lt) 62%, var(--surface));
+  color: var(--danger);
+}
+
+.risk-factor-heading h3 {
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 780;
+}
+
+.risk-factor-heading p {
+  margin-top: 0.12rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.risk-toggle-grid,
+.plan-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.risk-toggle-grid .toggle-control.is-on,
+.plan-danger-toggle-grid .toggle-control.is-on {
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--border));
+  background: color-mix(in srgb, var(--danger-lt) 72%, var(--surface));
+  color: var(--danger);
+}
+
+.risk-toggle-grid .toggle-control.is-on .toggle-mark,
+.plan-danger-toggle-grid .toggle-control.is-on .toggle-mark {
+  background: var(--danger);
+}
+
+.risk-referral-notice {
+  margin-bottom: 0.9rem;
+}
+
+.secondary-chapter {
+  margin: 1rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 98%, var(--primary-lt));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 4%, transparent);
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+
+.secondary-chapter:focus-within {
+  border-color: color-mix(in srgb, var(--primary) 34%, var(--border));
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.secondary-chapter-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: center;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  background:
+    radial-gradient(circle at 88% -110%, color-mix(in srgb, var(--primary-lt) 82%, transparent), transparent 17rem),
+    var(--secondary-soft);
+}
+
+.secondary-chapter-number {
+  width: 2.7rem;
+  height: 2.7rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--primary-lt) 76%, var(--surface));
+  color: var(--primary-dk);
+  font-size: 0.76rem;
+  font-weight: 840;
+  letter-spacing: 0.04em;
+}
+
+.secondary-chapter-kicker {
+  display: block;
+  margin-bottom: 0.15rem;
+  color: var(--primary-dk);
+  font-size: 0.62rem;
+  font-weight: 820;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.secondary-chapter-header h2 {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 810;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+.secondary-chapter-header p {
+  margin-top: 0.2rem;
+  color: var(--text-muted);
+  font-size: 0.73rem;
+  line-height: 1.4;
+}
+
+.secondary-chapter > .clinical-section:last-child {
+  border-bottom: 0;
+}
+
+.plan-toggle-row {
+  max-width: 24rem;
+  margin-bottom: 0.85rem;
+}
+
+.plan-section-followup {
+  max-width: 28rem;
+  margin-top: 0.9rem;
+}
+
+.plan-preparation-fields {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem !important;
+  border-top: 1px dashed color-mix(in srgb, var(--border) 88%, transparent);
+}
+
+.secondary-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: color-mix(in srgb, #0f172a 52%, transparent);
+  backdrop-filter: blur(3px);
+  animation: secondary-dialog-fade 180ms ease both;
+}
+
+.secondary-dialog {
+  width: min(30rem, 100%);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.85rem;
+  padding: 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--warn) 34%, var(--border));
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 26px 90px rgba(15, 23, 42, 0.28);
+  animation: secondary-dialog-enter 200ms ease both;
+}
+
+.secondary-dialog-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--warn) 36%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--warn-lt) 76%, var(--surface));
+  color: var(--warn);
+}
+
+.secondary-dialog h2 {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 820;
+}
+
+.secondary-dialog p {
+  margin-top: 0.38rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.secondary-dialog-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 0.2rem;
+  flex-wrap: wrap;
+}
+
+.secondary-dialog-actions .is-warning {
+  border-color: color-mix(in srgb, var(--warn) 42%, var(--border));
+  color: var(--warn);
+}
+
+@keyframes secondary-dialog-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes secondary-dialog-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+html.dark .secondary-workflow {
+  --secondary-panel: color-mix(in srgb, var(--surface) 98%, #111827);
+  --secondary-soft: color-mix(in srgb, var(--surface2) 88%, #111318);
+}
+
+html.dark .secondary-workflow .form-group:focus-within .input-label,
+html.dark .secondary-chapter-kicker {
+  color: var(--primary);
+}
+
+html.dark .secondary-context-item.is-attention,
+html.dark .risk-toggle-grid .toggle-control.is-on,
+html.dark .plan-danger-toggle-grid .toggle-control.is-on {
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface));
+}
+
+html.dark .secondary-dialog {
+  background: color-mix(in srgb, var(--surface) 96%, #111318);
+}
+
+@media (max-width: 1020px) {
+  .secondary-context-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .secondary-context-item:nth-child(2) {
+    border-right: 0;
+  }
+
+  .secondary-context-item:nth-child(-n + 2) {
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  }
+
+  .risk-toggle-grid,
+  .plan-toggle-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .secondary-workflow-form {
+    border-radius: 15px;
+  }
+
+  .secondary-workflow-notice {
+    margin: 0.8rem 0.8rem 0;
+  }
+
+  .secondary-context-item {
+    padding: 0.78rem 0.82rem;
+  }
+
+  .secondary-chapter,
+  .risk-evaluation-section,
+  .risk-referral-section {
+    margin: 0.75rem;
+  }
+
+  .secondary-chapter-header {
+    padding: 0.9rem;
+  }
+
+  .secondary-workflow .clinical-action-bar {
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 600px) {
+  .secondary-context-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .secondary-context-item,
+  .secondary-context-item:nth-child(2) {
+    border-right: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  }
+
+  .secondary-context-item:last-child {
+    border-bottom: 0;
+  }
+
+  .risk-toggle-grid,
+  .plan-toggle-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .secondary-chapter-header,
+  .risk-factor-heading {
+    align-items: start;
+  }
+
+  .secondary-dialog-actions,
+  .secondary-dialog-actions > button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 390px) {
+  .secondary-workflow-notice,
+  .secondary-chapter,
+  .risk-evaluation-section,
+  .risk-referral-section {
+    margin-inline: 0.55rem;
+  }
+
+  .secondary-context-item {
+    padding-inline: 0.7rem;
+  }
+
+  .secondary-chapter-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .secondary-chapter-number {
+    width: 2.35rem;
+    height: 2.35rem;
+  }
+
+  .secondary-state-pill {
+    white-space: normal;
+  }
+
+  .secondary-dialog {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .secondary-workflow *,
+  .secondary-dialog-backdrop,
+  .secondary-dialog {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

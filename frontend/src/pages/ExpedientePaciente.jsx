@@ -660,6 +660,19 @@ function buildCompletitudFromExp(exp, pacienteId) {
   };
 }
 
+const EXPEDIENTE_LOAD_ERROR = "El embarazo solicitado no existe o no pertenece a la paciente";
+
+function getPatientFilePrefetch(locationState, patientId, selectedEmbarazoId) {
+  const prefetch = locationState?.patientFilePrefetch;
+  const belongsToCurrentPatient = String(prefetch?.patientId || "") === String(patientId);
+  const hasValidResult = prefetch?.status === "fulfilled"
+    ? Boolean(prefetch.data)
+    : prefetch?.status === "rejected";
+
+  if (selectedEmbarazoId || !belongsToCurrentPatient || !hasValidResult) return null;
+  return prefetch;
+}
+
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────
 export default function ExpedientePaciente() {
   const { id }     = useParams();
@@ -669,9 +682,12 @@ export default function ExpedientePaciente() {
   const toast      = useGlobalToast();
   const { usuario } = useAuth();
   const { setPregnancyStatus } = useChatbotScreenContext();
-  const [exp, setExp]       = useState(null);
-  const [loadedRequestKey, setLoadedRequestKey] = useState("");
-  const [loadError, setLoadError] = useState("");
+  const selectedEmbarazoId = searchParams.get("embarazo_id") || "";
+  const requestKey = `${id}:${selectedEmbarazoId || "actual"}`;
+  const initialFilePrefetch = getPatientFilePrefetch(location.state, id, selectedEmbarazoId);
+  const [exp, setExp] = useState(() => initialFilePrefetch?.data || null);
+  const [loadedRequestKey, setLoadedRequestKey] = useState(() => initialFilePrefetch ? requestKey : "");
+  const [loadError, setLoadError] = useState(() => initialFilePrefetch?.status === "rejected" ? EXPEDIENTE_LOAD_ERROR : "");
   const [vaccineNotice] = useState(() => location.state?.vaccineNotice || null);
   const [printing, setPrinting] = useState(false);
   const [creatingPregnancy, setCreatingPregnancy] = useState(false);
@@ -690,8 +706,6 @@ export default function ExpedientePaciente() {
     embarazo: false,
     historia: false,
   });
-  const selectedEmbarazoId = searchParams.get("embarazo_id") || "";
-  const requestKey = `${id}:${selectedEmbarazoId || "actual"}`;
   const loading = loadedRequestKey !== requestKey;
 
   useEffect(() => {
@@ -708,6 +722,8 @@ export default function ExpedientePaciente() {
   };
 
   useEffect(() => {
+    if (loadedRequestKey === requestKey) return undefined;
+
     const controller = new AbortController();
     let active = true;
     api.get(`/pacientes/${id}/expediente`, {
@@ -723,9 +739,8 @@ export default function ExpedientePaciente() {
       .catch((err) => {
         if (!active || err?.code === "ERR_CANCELED") return;
         setExp(null);
-        const message = "El embarazo solicitado no existe o no pertenece a la paciente";
-        setLoadError(message);
-        toast(message, "error");
+        setLoadError(EXPEDIENTE_LOAD_ERROR);
+        toast(EXPEDIENTE_LOAD_ERROR, "error");
       })
       .finally(() => {
         if (active) setLoadedRequestKey(requestKey);
@@ -734,7 +749,7 @@ export default function ExpedientePaciente() {
       active = false;
       controller.abort();
     };
-  }, [id, requestKey, selectedEmbarazoId, toast]);
+  }, [id, loadedRequestKey, requestKey, selectedEmbarazoId, toast]);
 
   const tab = searchParams.get("tab") || "general";
 

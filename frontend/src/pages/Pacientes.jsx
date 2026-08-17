@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
@@ -15,10 +15,13 @@ import {
   UsersRound,
 } from "lucide-react";
 import api from "../api/axios";
+import { useGlobalToast } from "../context/ToastContext";
 import { isValidPregnancyId } from "../utils/pregnancyState";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
 const MS_DAY = 86400000;
+const PATIENT_FILE_TRANSITION_MS = 1050;
+const EXPEDIENTE_LOAD_ERROR = "El embarazo solicitado no existe o no pertenece a la paciente";
 
 function formatDate(value) {
   return value ? new Date(value).toLocaleDateString("es-GT") : "—";
@@ -111,7 +114,9 @@ export default function Pacientes() {
   const [expandida, setExpandida] = useState(null);
   const [openingPatient, setOpeningPatient] = useState(null);
   const [loadedQueryKey, setLoadedQueryKey] = useState("");
+  const openingPatientRequestRef = useRef(null);
   const navigate = useNavigate();
+  const toast = useGlobalToast();
   const queryKey = JSON.stringify([buscar, pagina, limite]);
   const loading = loadedQueryKey !== queryKey;
 
@@ -134,29 +139,42 @@ export default function Pacientes() {
     return () => { cancelado = true; };
   }, [buscar, pagina, limite]);
 
-  useEffect(() => {
-    if (!openingPatient) return undefined;
+  const openPatientFile = async (patient, patientName) => {
+    if (openingPatient || openingPatientRequestRef.current !== null) return;
+    openingPatientRequestRef.current = patient.id;
 
-    const navigationTimer = window.setTimeout(() => {
-      navigate(`/pacientes/${openingPatient.id}`);
-    }, 1050);
-
-    return () => window.clearTimeout(navigationTimer);
-  }, [navigate, openingPatient]);
-
-  const openPatientFile = (patient, patientName) => {
-    if (openingPatient) return;
-
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      navigate(`/pacientes/${patient.id}`);
-      return;
-    }
+    const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const transitionDuration = prefersReducedMotion ? 0 : PATIENT_FILE_TRANSITION_MS;
 
     setOpeningPatient({
       id: patient.id,
       name: patientName,
       initials: getPatientInitials(patient),
       fileNumber: patient.no_expediente || "Sin número",
+    });
+
+    const [expedienteResult] = await Promise.allSettled([
+      api.get(`/pacientes/${patient.id}/expediente`),
+      new Promise((resolve) => window.setTimeout(resolve, transitionDuration)),
+    ]);
+
+    if (expedienteResult.status === "rejected") {
+      toast(EXPEDIENTE_LOAD_ERROR, "error");
+    }
+
+    navigate(`/pacientes/${patient.id}`, {
+      state: {
+        patientFilePrefetch: expedienteResult.status === "fulfilled"
+          ? {
+              status: "fulfilled",
+              patientId: String(patient.id),
+              data: expedienteResult.value.data,
+            }
+          : {
+              status: "rejected",
+              patientId: String(patient.id),
+            },
+      },
     });
   };
 
