@@ -1,11 +1,18 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ChevronLeft, Save } from "lucide-react";
+import { Baby, ClipboardCheck, HeartPulse, MessageSquareText, Save } from "lucide-react";
 import api from "../api/axios";
+import {
+  ClinicalActionBar,
+  ClinicalNotice,
+  ClinicalSection,
+  ClinicalWorkflowShell,
+} from "../components/clinical/ClinicalWorkflow";
 import { useGlobalToast } from "../context/ToastContext";
 import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
 import { getErrorMessage } from "../utils/errorMessage";
 import { useFieldErrors } from "../hooks/useFieldErrors";
+import "./clinical-tertiary-workflows.css";
 
 const INIT = {
   numero_atencion: 1,
@@ -102,14 +109,21 @@ function inferPuerperioFieldErrors(err) {
   return {};
 }
 
-function Field({ label, children, error }) {
-  return <div className="form-group"><label className="input-label">{label}</label>{children}{error && <div className="field-error-text">{error}</div>}</div>;
+function Field({ label, children, error, htmlFor, className = "" }) {
+  return (
+    <div className={`form-group ${className}`.trim()}>
+      <label className="input-label" htmlFor={htmlFor}>{label}</label>
+      {children}
+      {error && <div className="field-error-text">{error}</div>}
+    </div>
+  );
 }
 
 function Input({ label, name, form, set, type = "text", errors = {}, inputClass, ...rest }) {
+  const inputId = `puerperio-${name}`;
   return (
-    <Field label={label} error={errors[name]}>
-      <input className={inputClass ? inputClass(name) : "input-field"} type={type} value={form[name] ?? ""}
+    <Field label={label} error={errors[name]} htmlFor={inputId}>
+      <input id={inputId} className={inputClass ? inputClass(name) : "input-field"} type={type} value={form[name] ?? ""}
         onChange={(e) => set(name, type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
         onWheel={type === "number" ? preventNumberWheel : undefined}
         {...rest}
@@ -119,10 +133,11 @@ function Input({ label, name, form, set, type = "text", errors = {}, inputClass,
 }
 
 function Toggle({ label, name, form, set }) {
+  const inputId = `puerperio-${name}`;
   return (
-    <label style={{ display: "flex", gap: "0.45rem", alignItems: "center", fontSize: "0.85rem" }}>
-      <input type="checkbox" checked={Boolean(form[name])} onChange={(e) => set(name, e.target.checked)} />
-      {label}
+    <label className="tertiary-toggle" htmlFor={inputId}>
+      <input id={inputId} type="checkbox" checked={Boolean(form[name])} onChange={(e) => set(name, e.target.checked)} />
+      <span>{label}</span>
     </label>
   );
 }
@@ -136,6 +151,7 @@ export default function PuerperioForm() {
   const toast = useGlobalToast();
   const [form, setForm] = useState(initialPuerperioForm);
   const [firstPuerperio, setFirstPuerperio] = useState(null);
+  const [patientContext, setPatientContext] = useState(null);
   const [loading, setLoading] = useState(false);
   const fieldErrors = useFieldErrors(FIELD_LABELS, inferPuerperioFieldErrors);
   const editando = Boolean(puerperioId);
@@ -170,6 +186,7 @@ export default function PuerperioForm() {
         navigate(expedientePath, { replace: true });
         return;
       }
+      setPatientContext(expediente?.paciente || null);
       if (editando) {
         setForm({ ...initialPuerperioForm(), ...data, fecha: data.fecha ? data.fecha.split("T")[0] : INIT.fecha });
       } else {
@@ -206,59 +223,119 @@ export default function PuerperioForm() {
     }
   };
 
+  const patientName = `${patientContext?.nombres || ""} ${patientContext?.apellidos || ""}`.trim();
+
   return (
-    <div>
-      <div style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1.5rem" }}>
-        <button className="btn-secondary" onClick={() => navigate(expedientePath)}><ChevronLeft size={15} /> Volver</button>
-        <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>{editando ? "Editar Puerperio" : "Registrar Puerperio"}</h1>
-      </div>
-      <form className="card" onSubmit={submit}>
+    <ClinicalWorkflowShell
+      className="tertiary-workflow puerperium-workflow"
+      eyebrow="Seguimiento postparto"
+      title={editando ? "Editar puerperio" : "Registrar puerperio"}
+      description="Documenta el resultado del parto, la evaluación inmediata y el seguimiento clínico disponible."
+      patientName={patientName}
+      recordNumber={patientContext?.no_expediente}
+      mode={editando ? "edit" : "new"}
+      icon={Baby}
+      onBack={() => navigate(expedientePath)}
+    >
+      <form className="tertiary-workflow-form" onSubmit={submit}>
         {fieldErrors.summary.length > 0 && (
-          <div className="error-box" style={{ marginBottom: "1rem" }}>
-            <strong>Revisa estos datos:</strong>{" "}
+          <ClinicalNotice variant="error" title="Revisa estos datos" className="tertiary-workflow-notice">
             {fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" | ")}
-          </div>
+          </ClinicalNotice>
         )}
-        <div className="form-section-body col-4">
-          <Input label="No. atención" name="numero_atencion" type="number" min="1" max="2" step="1" inputMode="numeric" {...p} />
-          <Input label="Fecha" name="fecha" type="date" max={getGuatemalaDateInputValue()} {...p} />
-          <Input label="Hora" name="hora" type="time" {...p} />
-          <Input label="Días después del parto" name="dias_despues_parto" type="number" min="0" max="60" step="1" inputMode="numeric" {...p} />
-          <Input label="Lugar del parto" name="lugar_atencion_parto" {...p} />
-          <Input label="Quién atendió parto" name="quien_atendio_parto" {...p} />
-          <Field label="Tipo de parto" error={fieldErrors.fieldError("tipo_parto")}>
-            <select className={fieldErrors.inputClass("tipo_parto")} value={form.tipo_parto} onChange={(e) => set("tipo_parto", e.target.value)}>
-              <option value="">—</option><option value="vaginal">Vaginal</option><option value="cesarea">Cesárea</option>
-            </select>
-          </Field>
-          <Input label="P/A sistólica" name="pa_sistolica" type="number" min="50" max="250" step="1" inputMode="numeric" {...p} />
-          <Input label="P/A diastólica" name="pa_diastolica" type="number" min="30" max="160" step="1" inputMode="numeric" {...p} />
-          <Input label="FC" name="frecuencia_cardiaca" type="number" min="30" max="220" step="1" inputMode="numeric" placeholder="Frecuencia cardiaca (lpm)" {...p} />
-          <Input label="FR" name="frecuencia_respiratoria" type="number" min="5" max="80" step="1" inputMode="numeric" placeholder="Frecuencia respiratoria (rpm)" {...p} />
-          <Input label="Temperatura" name="temperatura" type="number" min="30" max="45" step="0.1" inputMode="decimal" {...p} />
-          <Input label="Nombre/cargo atiende" name="nombre_cargo_atiende" {...p} />
+        <div className="tertiary-flow-panel puerperium-sequence">
+          <ClinicalSection
+            title="Parto y resultado"
+            description="Datos documentados del parto y del primer contexto postparto."
+            icon={ClipboardCheck}
+            className="puerperium-section"
+            aside={<span className="tertiary-section-index">01</span>}
+          >
+            <div className="puerperium-field-grid is-partum">
+              <Input label="No. atención" name="numero_atencion" type="number" min="1" max="2" step="1" inputMode="numeric" {...p} />
+              <Input label="Fecha" name="fecha" type="date" max={getGuatemalaDateInputValue()} {...p} />
+              <Input label="Hora" name="hora" type="time" {...p} />
+              <Input label="Días después del parto" name="dias_despues_parto" type="number" min="0" max="60" step="1" inputMode="numeric" {...p} />
+              <Input label="Lugar del parto" name="lugar_atencion_parto" {...p} />
+              <Input label="Quién atendió parto" name="quien_atendio_parto" {...p} />
+              <Field label="Tipo de parto" htmlFor="puerperio-tipo_parto" error={fieldErrors.fieldError("tipo_parto")}>
+                <select id="puerperio-tipo_parto" className={fieldErrors.inputClass("tipo_parto")} value={form.tipo_parto} onChange={(e) => set("tipo_parto", e.target.value)}>
+                  <option value="">—</option><option value="vaginal">Vaginal</option><option value="cesarea">Cesárea</option>
+                </select>
+              </Field>
+            </div>
+            <div className="tertiary-toggle-grid is-partum">
+              <Toggle label="Recién nacido vivo" name="recien_nacido_vivo" form={form} set={set} />
+              {!isSecondPuerperio && <Toggle label="Apego inmediato" name="tuvo_apego_inmediato" form={form} set={set} />}
+            </div>
+            {isSecondPuerperio && firstPuerperio && !editando && (
+              <ClinicalNotice variant="info" title="Datos heredados de la primera atención" className="puerperium-inherited-notice">
+                Se conservaron los datos existentes del parto. Los días después del parto se calculan según la fecha del segundo control.
+              </ClinicalNotice>
+            )}
+          </ClinicalSection>
+
+          <ClinicalSection
+            title="Puerperio inmediato"
+            description="Signos vitales, controles y evaluación clínica postparto."
+            icon={HeartPulse}
+            className="puerperium-section"
+            aside={<span className="tertiary-section-index">02</span>}
+          >
+            <div className="puerperium-vitals" aria-label="Signos vitales">
+              <Input label="P/A sistólica" name="pa_sistolica" type="number" min="50" max="250" step="1" inputMode="numeric" {...p} />
+              <Input label="P/A diastólica" name="pa_diastolica" type="number" min="30" max="160" step="1" inputMode="numeric" {...p} />
+              <Input label="FC" name="frecuencia_cardiaca" type="number" min="30" max="220" step="1" inputMode="numeric" placeholder="Frecuencia cardiaca (lpm)" {...p} />
+              <Input label="FR" name="frecuencia_respiratoria" type="number" min="5" max="80" step="1" inputMode="numeric" placeholder="Frecuencia respiratoria (rpm)" {...p} />
+              <Input label="Temperatura" name="temperatura" type="number" min="30" max="45" step="0.1" inputMode="decimal" {...p} />
+            </div>
+            <div className="tertiary-toggle-grid is-immediate">
+              <Toggle label="Lactancia materna exclusiva" name="lactancia_materna_exclusiva" form={form} set={set} />
+            </div>
+            <div className="puerperium-notes-grid">
+              {[
+                ["signos_peligro", "Signos de peligro"],
+                ["herida_operatoria", "Herida operatoria"],
+                ["examen_mamas", "Examen de mamas"],
+                ["examen_ginecologico", "Examen ginecológico"],
+              ].map(([name, label]) => (
+                <Field key={name} label={label} htmlFor={`puerperio-${name}`} error={fieldErrors.fieldError(name)}>
+                  <textarea id={`puerperio-${name}`} className={fieldErrors.inputClass(name)} rows={3} value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)} />
+                </Field>
+              ))}
+            </div>
+          </ClinicalSection>
+
+          <ClinicalSection
+            title="Seguimiento y observaciones"
+            description="Orientación, impresión clínica, conducta registrada y responsable de la atención."
+            icon={MessageSquareText}
+            className="puerperium-section"
+            aside={<span className="tertiary-section-index">03</span>}
+          >
+            <div className="puerperium-followup-grid">
+              {[
+                ["orientacion_consejeria", "Orientación y consejería"],
+                ["impresion_clinica", "Impresión clínica"],
+                ["tratamiento", "Tratamiento"],
+              ].map(([name, label]) => (
+                <Field key={name} label={label} htmlFor={`puerperio-${name}`} error={fieldErrors.fieldError(name)}>
+                  <textarea id={`puerperio-${name}`} className={fieldErrors.inputClass(name)} rows={4} value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)} />
+                </Field>
+              ))}
+              <Input label="Nombre/cargo atiende" name="nombre_cargo_atiende" {...p} />
+            </div>
+          </ClinicalSection>
         </div>
-        <div style={{ display: "flex", gap: "1rem", padding: "1rem", flexWrap: "wrap" }}>
-          <Toggle label="RN vivo" name="recien_nacido_vivo" form={form} set={set} />
-          {!isSecondPuerperio && <Toggle label="Apego inmediato" name="tuvo_apego_inmediato" form={form} set={set} />}
-          <Toggle label="Lactancia materna exclusiva" name="lactancia_materna_exclusiva" form={form} set={set} />
-        </div>
-        {isSecondPuerperio && firstPuerperio && !editando && (
-          <div className="muted-text" style={{ padding: "0 1rem 1rem", fontSize: "0.8rem" }}>
-            Se heredaron los datos del parto desde la primera atencion. Los dias despues del parto se calculan segun la fecha del segundo control.
-          </div>
-        )}
-        <div className="form-section-body col-2">
-          {["signos_peligro","herida_operatoria","examen_mamas","examen_ginecologico","orientacion_consejeria","impresion_clinica","tratamiento"].map((name) => (
-            <Field key={name} label={name.replaceAll("_", " ")} error={fieldErrors.fieldError(name)}>
-              <textarea className={fieldErrors.inputClass(name)} rows={2} value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)} />
-            </Field>
-          ))}
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem" }}>
-          <button className="btn-primary" disabled={loading}><Save size={15} /> {loading ? "Guardando..." : "Guardar"}</button>
-        </div>
+
+        <ClinicalActionBar
+          status={editando ? "Edición de puerperio" : "Nuevo control de puerperio"}
+          detail={editando ? "Se actualizará el registro seleccionado" : `Se registrará como atención ${form.numero_atencion || "—"}`}
+        >
+          <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>Volver al expediente</button>
+          <button type="submit" className="btn-primary" disabled={loading}><Save size={15} /> {loading ? "Guardando..." : "Guardar"}</button>
+        </ClinicalActionBar>
       </form>
-    </div>
+    </ClinicalWorkflowShell>
   );
 }

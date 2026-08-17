@@ -1,0 +1,323 @@
+.tertiary-workflow {
+  --tertiary-panel: color-mix(in srgb, var(--surface) 98%, var(--primary-lt));
+  --tertiary-soft: color-mix(in srgb, var(--surface2) 62%, var(--surface));
+  --tertiary-line: color-mix(in srgb, var(--border) 88%, transparent);
+}
+
+.tertiary-workflow-form {
+  display: grid;
+  min-width: 0;
+  gap: 0;
+  margin-top: 1rem;
+}
+
+.tertiary-workflow .form-group,
+.tertiary-workflow .clinical-section,
+.tertiary-workflow .clinical-section-body,
+.tertiary-workflow .clinical-notice,
+.tertiary-workflow input,
+.tertiary-workflow select,
+.tertiary-workflow textarea {
+  min-width: 0;
+}
+
+.tertiary-workflow .input-label {
+  transition: color 180ms ease;
+}
+
+.tertiary-workflow .form-group:focus-within .input-label {
+  color: var(--primary-dk);
+}
+
+.tertiary-workflow input,
+.tertiary-workflow select,
+.tertiary-workflow textarea {
+  width: 100%;
+}
+
+.tertiary-workflow textarea {
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.tertiary-workflow-notice {
+  margin-bottom: 0.85rem;
+}
+
+.tertiary-flow-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--tertiary-line);
+  border-radius: 18px;
+  background: var(--tertiary-panel);
+  box-shadow: var(--shadow-sm);
+  animation: tertiaryPanelIn 200ms ease both;
+}
+
+.tertiary-flow-panel > .clinical-section {
+  border-bottom-color: var(--tertiary-line);
+}
+
+.tertiary-flow-panel > .clinical-section:last-child {
+  border-bottom: 0;
+}
+
+.tertiary-section-index {
+  display: inline-flex;
+  min-height: 1.65rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.22rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary-lt) 58%, var(--surface));
+  color: var(--primary-dk);
+  font-size: 0.64rem;
+  font-weight: 820;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+/* Puerperio: una lectura cronológica continua, sin comportamiento de asistente. */
+.puerperium-field-grid,
+.puerperium-vitals,
+.puerperium-notes-grid,
+.puerperium-followup-grid,
+.tertiary-toggle-grid,
+.morbidity-identity-grid,
+.morbidity-evaluation-grid {
+  display: grid;
+  min-width: 0;
+  gap: 0.82rem;
+}
+
+.puerperium-field-grid.is-partum {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.puerperium-vitals {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.puerperium-notes-grid,
+.puerperium-followup-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0.95rem;
+}
+
+.tertiary-toggle-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0.9rem;
+}
+
+.tertiary-toggle-grid.is-immediate {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tertiary-toggle {
+  display: flex;
+  min-width: 0;
+  min-height: 2.65rem;
+  align-items: center;
+  gap: 0.62rem;
+  padding: 0.62rem 0.75rem;
+  border: 1px solid var(--tertiary-line);
+  border-radius: 11px;
+  background: var(--tertiary-soft);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.77rem;
+  font-weight: 680;
+  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+}
+
+.tertiary-toggle:hover,
+.tertiary-toggle:focus-within {
+  border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+  background: color-mix(in srgb, var(--primary-lt) 42%, var(--surface));
+  color: var(--text);
+}
+
+.tertiary-toggle input {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  accent-color: var(--primary);
+}
+
+.puerperium-inherited-notice {
+  margin-top: 0.9rem;
+}
+
+/* Morbilidad: nota clínica rápida con el mínimo de contenedores. */
+.morbidity-note .clinical-section-header {
+  padding-block: 0.88rem 0.65rem;
+}
+
+.morbidity-note .clinical-section-body {
+  padding-bottom: 0.95rem;
+}
+
+.morbidity-identity-grid {
+  grid-template-columns: minmax(8rem, 0.72fr) minmax(8rem, 0.65fr) repeat(2, minmax(0, 1.35fr));
+}
+
+.morbidity-evaluation-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.morbidity-workflow textarea {
+  min-height: 5.4rem;
+}
+
+/* Vacunas conserva sus tres etapas y componentes clínicos especializados. */
+.vaccine-workflow-form {
+  gap: 1rem;
+}
+
+.vaccine-workflow .vaccine-flow-section {
+  padding: 0;
+  border-radius: 16px;
+}
+
+.vaccine-workflow .vaccine-stage-section,
+.vaccine-workflow .vaccine-status-card,
+.vaccine-workflow .vaccine-selected-history {
+  border-color: var(--tertiary-line);
+  background: var(--tertiary-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.vaccine-workflow .vaccine-stage-section {
+  overflow: hidden;
+  animation: tertiaryPanelIn 200ms ease both;
+}
+
+.vaccine-workflow .vaccine-stage-section > .clinical-section-header {
+  padding: 1rem 1.1rem 0.78rem;
+  border-bottom: 1px solid var(--tertiary-line);
+  background:
+    linear-gradient(110deg, color-mix(in srgb, var(--primary-lt) 38%, transparent), transparent 58%),
+    var(--tertiary-soft);
+}
+
+.vaccine-workflow .vaccine-stage-section > .clinical-section-body {
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.vaccine-workflow .vaccine-stage-section:focus-within {
+  border-color: color-mix(in srgb, var(--primary) 34%, var(--border));
+  background: var(--tertiary-panel);
+}
+
+.vaccine-workflow .vaccine-status-card,
+.vaccine-workflow .vaccine-selected-history {
+  border-radius: 16px;
+}
+
+.vaccine-workflow .vaccine-status-card {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--primary-lt) 30%, transparent), transparent 55%),
+    var(--tertiary-panel);
+}
+
+.vaccine-workflow .vaccine-choice,
+.vaccine-workflow .vaccine-dose-choice,
+.vaccine-workflow .vaccine-moment-choice,
+.vaccine-workflow .vaccine-status-facts > div,
+.vaccine-workflow .vaccine-readonly-field {
+  background: var(--tertiary-soft);
+}
+
+.vaccine-workflow .clinical-action-bar {
+  margin-top: 0;
+}
+
+html.dark .tertiary-workflow {
+  --tertiary-panel: #17191f;
+  --tertiary-soft: #1d2027;
+  --tertiary-line: color-mix(in srgb, var(--border) 92%, transparent);
+}
+
+html.dark .tertiary-workflow .form-group:focus-within .input-label,
+html.dark .tertiary-section-index {
+  color: var(--primary);
+}
+
+html.dark .tertiary-toggle:hover,
+html.dark .tertiary-toggle:focus-within {
+  background: #20242b;
+}
+
+@keyframes tertiaryPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 1020px) {
+  .puerperium-field-grid.is-partum,
+  .morbidity-identity-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .puerperium-vitals {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .puerperium-vitals,
+  .tertiary-toggle-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .puerperium-notes-grid,
+  .puerperium-followup-grid,
+  .morbidity-evaluation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vaccine-workflow .vaccine-stage-section > .clinical-section-header,
+  .vaccine-workflow .vaccine-stage-section > .clinical-section-body {
+    padding-inline: 0.9rem;
+  }
+}
+
+@media (max-width: 390px) {
+  .puerperium-field-grid.is-partum,
+  .puerperium-vitals,
+  .tertiary-toggle-grid,
+  .morbidity-identity-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tertiary-flow-panel,
+  .vaccine-workflow .vaccine-stage-section,
+  .vaccine-workflow .vaccine-status-card,
+  .vaccine-workflow .vaccine-selected-history {
+    border-radius: 13px;
+  }
+
+  .tertiary-section-index {
+    padding-inline: 0.45rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tertiary-flow-panel,
+  .vaccine-workflow .vaccine-stage-section {
+    animation: none !important;
+  }
+
+  .tertiary-toggle,
+  .tertiary-workflow .input-label {
+    transition: none !important;
+  }
+}

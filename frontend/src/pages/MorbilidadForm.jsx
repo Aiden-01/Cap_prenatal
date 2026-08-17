@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ChevronLeft, Save } from "lucide-react";
+import { CalendarClock, ClipboardCheck, FileText, Save, Stethoscope } from "lucide-react";
 import api from "../api/axios";
+import {
+  ClinicalActionBar,
+  ClinicalNotice,
+  ClinicalSection,
+  ClinicalWorkflowShell,
+} from "../components/clinical/ClinicalWorkflow";
 import { useGlobalToast } from "../context/ToastContext";
 import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
 import { useFieldErrors } from "../hooks/useFieldErrors";
+import "./clinical-tertiary-workflows.css";
 
 const INIT = {
   fecha: getGuatemalaDateInputValue(),
@@ -36,8 +43,14 @@ const FIELD_LABELS = {
   nombre_cargo_atiende: "Nombre / cargo atiende",
 };
 
-function Field({ label, children, error }) {
-  return <div className="form-group"><label className="input-label">{label}</label>{children}{error && <div className="field-error-text">{error}</div>}</div>;
+function Field({ label, children, error, htmlFor, className = "" }) {
+  return (
+    <div className={`form-group ${className}`.trim()}>
+      <label className="input-label" htmlFor={htmlFor}>{label}</label>
+      {children}
+      {error && <div className="field-error-text">{error}</div>}
+    </div>
+  );
 }
 
 export default function MorbilidadForm() {
@@ -48,6 +61,7 @@ export default function MorbilidadForm() {
   const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=morbilidad`;
   const toast = useGlobalToast();
   const [form, setForm] = useState(initialMorbilidadForm);
+  const [patientContext, setPatientContext] = useState(null);
   const [loading, setLoading] = useState(false);
   const fieldErrors = useFieldErrors(FIELD_LABELS);
   const editando = Boolean(morbilidadId);
@@ -72,6 +86,7 @@ export default function MorbilidadForm() {
           navigate(expedientePath, { replace: true });
           return;
         }
+        setPatientContext(expediente?.paciente || null);
         if (editando) setForm({ ...initialMorbilidadForm(), ...data, fecha: data.fecha ? data.fecha.split("T")[0] : INIT.fecha });
       })
       .catch(() => toast("Error al cargar morbilidad", "error"));
@@ -93,42 +108,92 @@ export default function MorbilidadForm() {
     }
   };
 
+  const patientName = `${patientContext?.nombres || ""} ${patientContext?.apellidos || ""}`.trim();
+
   return (
-    <div>
-      <div style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1.5rem" }}>
-        <button className="btn-secondary" onClick={() => navigate(expedientePath)}><ChevronLeft size={15} /> Volver</button>
-        <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>{editando ? "Editar Morbilidad" : "Registrar Morbilidad"}</h1>
-      </div>
-      <form className="card" onSubmit={submit}>
+    <ClinicalWorkflowShell
+      className="tertiary-workflow morbidity-workflow"
+      eyebrow="Nota clínica compacta"
+      title={editando ? "Editar morbilidad" : "Registrar morbilidad"}
+      description="Captura el evento, la evaluación y la conducta clínica sin perder velocidad de registro."
+      patientName={patientName}
+      recordNumber={patientContext?.no_expediente}
+      mode={editando ? "edit" : "new"}
+      icon={FileText}
+      onBack={() => navigate(expedientePath)}
+    >
+      <form className="tertiary-workflow-form morbidity-workflow-form" onSubmit={submit}>
         {fieldErrors.summary.length > 0 && (
-          <div className="error-box" style={{ marginBottom: "1rem" }}>
-            <strong>Revisa estos datos:</strong>{" "}
+          <ClinicalNotice variant="error" title="Revisa estos datos" className="tertiary-workflow-notice">
             {fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" | ")}
-          </div>
+          </ClinicalNotice>
         )}
-        <div className="form-section-body col-3">
-          <Field label="Fecha" error={fieldErrors.fieldError("fecha")}><input className={fieldErrors.inputClass("fecha")} type="date" value={form.fecha} onChange={(e) => set("fecha", e.target.value)} /></Field>
-          <Field label="Hora" error={fieldErrors.fieldError("hora")}><input className={fieldErrors.inputClass("hora")} type="time" value={form.hora ?? ""} onChange={(e) => set("hora", e.target.value)} /></Field>
-          <Field label="Motivo de consulta" error={fieldErrors.fieldError("motivo_consulta")}><input className={fieldErrors.inputClass("motivo_consulta")} value={form.motivo_consulta ?? ""} onChange={(e) => set("motivo_consulta", e.target.value)} /></Field>
-        </div>
-        <div className="form-section-body col-2">
-          {[
-            ["historia_enfermedad_actual", "Historia enfermedad actual"],
-            ["revision_por_sistemas", "Revisión por sistemas"],
-            ["examen_fisico", "Examen físico"],
-            ["impresion_clinica", "Impresión clínica"],
-            ["tratamiento_referencia", "Tratamiento / Referencia"],
-            ["nombre_cargo_atiende", "Nombre / cargo atiende"],
-          ].map(([name, label]) => (
-            <Field key={name} label={label} error={fieldErrors.fieldError(name)}>
-              <textarea className={fieldErrors.inputClass(name)} rows={2} value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)} />
+        <div className="tertiary-flow-panel morbidity-note">
+          <ClinicalSection
+            title="Identidad del evento"
+            description="Fecha, hora, motivo y responsable de la atención."
+            icon={CalendarClock}
+            className="morbidity-section"
+            aside={<span className="tertiary-section-index">01</span>}
+          >
+            <div className="morbidity-identity-grid">
+              <Field label="Fecha" htmlFor="morbilidad-fecha" error={fieldErrors.fieldError("fecha")}>
+                <input id="morbilidad-fecha" className={fieldErrors.inputClass("fecha")} type="date" value={form.fecha} onChange={(e) => set("fecha", e.target.value)} />
+              </Field>
+              <Field label="Hora" htmlFor="morbilidad-hora" error={fieldErrors.fieldError("hora")}>
+                <input id="morbilidad-hora" className={fieldErrors.inputClass("hora")} type="time" value={form.hora ?? ""} onChange={(e) => set("hora", e.target.value)} />
+              </Field>
+              <Field label="Motivo de consulta" htmlFor="morbilidad-motivo_consulta" error={fieldErrors.fieldError("motivo_consulta")} className="is-wide">
+                <input id="morbilidad-motivo_consulta" className={fieldErrors.inputClass("motivo_consulta")} value={form.motivo_consulta ?? ""} onChange={(e) => set("motivo_consulta", e.target.value)} />
+              </Field>
+              <Field label="Nombre / cargo atiende" htmlFor="morbilidad-nombre_cargo_atiende" error={fieldErrors.fieldError("nombre_cargo_atiende")} className="is-wide">
+                <input id="morbilidad-nombre_cargo_atiende" className={fieldErrors.inputClass("nombre_cargo_atiende")} value={form.nombre_cargo_atiende ?? ""} onChange={(e) => set("nombre_cargo_atiende", e.target.value)} />
+              </Field>
+            </div>
+          </ClinicalSection>
+
+          <ClinicalSection
+            title="Evaluación"
+            description="Hallazgos y valoración clínica documentada del evento."
+            icon={Stethoscope}
+            className="morbidity-section"
+            aside={<span className="tertiary-section-index">02</span>}
+          >
+            <div className="morbidity-evaluation-grid">
+              {[
+                ["historia_enfermedad_actual", "Historia enfermedad actual"],
+                ["revision_por_sistemas", "Revisión por sistemas"],
+                ["examen_fisico", "Examen físico"],
+                ["impresion_clinica", "Impresión clínica"],
+              ].map(([name, label]) => (
+                <Field key={name} label={label} htmlFor={`morbilidad-${name}`} error={fieldErrors.fieldError(name)}>
+                  <textarea id={`morbilidad-${name}`} className={fieldErrors.inputClass(name)} rows={3} value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)} />
+                </Field>
+              ))}
+            </div>
+          </ClinicalSection>
+
+          <ClinicalSection
+            title="Conducta"
+            description="Tratamiento, referencia o conducta consignada para el seguimiento."
+            icon={ClipboardCheck}
+            className="morbidity-section"
+            aside={<span className="tertiary-section-index">03</span>}
+          >
+            <Field label="Tratamiento / Referencia" htmlFor="morbilidad-tratamiento_referencia" error={fieldErrors.fieldError("tratamiento_referencia")}>
+              <textarea id="morbilidad-tratamiento_referencia" className={fieldErrors.inputClass("tratamiento_referencia")} rows={4} value={form.tratamiento_referencia ?? ""} onChange={(e) => set("tratamiento_referencia", e.target.value)} />
             </Field>
-          ))}
+          </ClinicalSection>
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem" }}>
-          <button className="btn-primary" disabled={loading}><Save size={15} /> {loading ? "Guardando..." : "Guardar"}</button>
-        </div>
+
+        <ClinicalActionBar
+          status={editando ? "Edición de morbilidad" : "Nueva nota de morbilidad"}
+          detail={editando ? "Se actualizará el registro seleccionado" : "Se agregará una nota al embarazo seleccionado"}
+        >
+          <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>Volver al expediente</button>
+          <button type="submit" className="btn-primary" disabled={loading}><Save size={15} /> {loading ? "Guardando..." : "Guardar"}</button>
+        </ClinicalActionBar>
       </form>
-    </div>
+    </ClinicalWorkflowShell>
   );
 }

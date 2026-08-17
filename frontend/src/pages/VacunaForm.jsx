@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { AlertTriangle, ChevronLeft, Save } from "lucide-react";
+import { AlertTriangle, Save, Syringe } from "lucide-react";
 import api from "../api/axios";
 import {
   AppointmentCard,
@@ -12,6 +12,13 @@ import {
   VaccineSelector,
 } from "../components/VaccineFlow";
 import VaccineClinicalDialog from "../components/VaccineClinicalDialog";
+import {
+  ClinicalActionBar,
+  ClinicalLoadingSkeleton,
+  ClinicalNotice,
+  ClinicalSection,
+  ClinicalWorkflowShell,
+} from "../components/clinical/ClinicalWorkflow";
 import { useGlobalToast } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
 import { useFieldErrors } from "../hooks/useFieldErrors";
@@ -42,6 +49,7 @@ import {
   firstMissingVaccineField,
   normalizeVaccineDate,
 } from "../utils/vaccineFormState";
+import "./clinical-tertiary-workflows.css";
 
 const INIT = Object.freeze({
   tipo_vacuna: "",
@@ -342,32 +350,48 @@ export default function VacunaForm() {
     }
   };
 
-  if (initialLoading) return <div className="vaccine-page-loading">Cargando contexto de vacunación...</div>;
+  if (initialLoading) return <ClinicalLoadingSkeleton label="Cargando contexto de vacunación" />;
+
+  const patientContext = expediente?.paciente || null;
+  const patientName = `${patientContext?.nombres || ""} ${patientContext?.apellidos || ""}`.trim();
 
   return (
-    <div className="vaccine-form-page">
-      <header className="vaccine-form-header">
-        <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}><ChevronLeft size={15} /> Volver</button>
-        <div><span className="vaccine-step-label">Vacunación segura</span><h1>{editando ? "Editar vacuna" : "Registrar vacuna"}</h1><p>Registra la información que consta en el carné o antecedente presentado.</p></div>
-      </header>
+    <ClinicalWorkflowShell
+      className="tertiary-workflow vaccine-workflow"
+      backLabel="Volver al historial"
+      onBack={() => navigate(expedientePath)}
+      eyebrow="Vacunación segura"
+      title={editando ? "Editar vacuna" : "Registrar vacuna"}
+      description="Registra la información que consta en el carné o antecedente presentado."
+      patientName={patientName}
+      recordNumber={patientContext?.no_expediente}
+      mode={readOnly ? "readonly" : editando ? "edit" : "new"}
+      icon={Syringe}
+    >
+      {loadError ? <ClinicalNotice variant="error">{loadError}</ClinicalNotice> : null}
+      {!canWrite ? <ClinicalNotice variant="restriction">No tienes permiso para {editando ? "editar" : "registrar"} vacunas.</ClinicalNotice> : null}
 
-      {loadError ? <div className="error-box">{loadError}</div> : null}
-      {!canWrite ? <div className="error-box">No tienes permiso para {editando ? "editar" : "registrar"} vacunas.</div> : null}
-
-      <form className="vaccine-flow" onSubmit={submit} noValidate>
-        <section className="vaccine-flow-section">
-          <div className="vaccine-section-heading"><div><span className="vaccine-step-label">Paso 1</span><h2>Selecciona la vacuna</h2></div><p>TD y Tdap se registran como vacunas diferentes.</p></div>
+      <form className="vaccine-flow tertiary-workflow-form vaccine-workflow-form" onSubmit={submit} noValidate>
+        <ClinicalSection
+          className="vaccine-flow-section vaccine-stage-section"
+          title="Selecciona la vacuna"
+          description="TD y Tdap se registran como vacunas diferentes."
+          aside={<span className="tertiary-section-index">Paso 1</span>}
+        >
           <VaccineSelector selected={form.tipo_vacuna} onSelect={selectVaccine} disabled={loading || readOnly} />
           {fieldErrors.fieldError("tipo_vacuna") ? <div className="field-error-text">{fieldErrors.fieldError("tipo_vacuna")}</div> : null}
-        </section>
+        </ClinicalSection>
 
         {form.tipo_vacuna && status ? (
           <>
             <ClinicalStatus type={form.tipo_vacuna} status={status} pregnancy={pregnancy} currentGestationalAge={currentGestationalAge} applicationGestationalAge={applicationGestationalAge} readOnly={readOnly} />
 
-            <section className="vaccine-flow-section vaccine-application-section">
-              <div className="vaccine-section-heading"><div><span className="vaccine-step-label">Paso 3</span><h2>Documenta la aplicación</h2></div><p>La información será verificada al guardar.</p></div>
-
+            <ClinicalSection
+              className="vaccine-flow-section vaccine-application-section vaccine-stage-section"
+              title="Documenta la aplicación"
+              description="La información será verificada al guardar."
+              aside={<span className="tertiary-section-index">Paso 3</span>}
+            >
               {!isInfluenza ? (
                 <>
                   <DoseSelector
@@ -397,16 +421,20 @@ export default function VacunaForm() {
               {momentAssessment.state === "unverifiable" ? <div className="vaccine-clinical-message is-warning"><AlertTriangle size={18} /><span>{momentAssessment.message}</span></div> : null}
               {editando ? <p className="vaccine-context-note"><strong>Importante:</strong> modificar la fecha, posición o momento puede alterar la cronología conocida. La información será verificada al guardar.</p> : null}
               {preflightClinicalAlert && preflightClinicalAlert.kind !== "interval" ? <div className="vaccine-blocking-message" role="alert"><AlertTriangle size={19} /><span>{preflightClinicalAlert.reason}</span></div> : null}
-              {fieldErrors.summary.length > 0 ? <div className="error-box" role="alert"><strong>Revisa estos datos:</strong> {fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" | ")}</div> : null}
+              {fieldErrors.summary.length > 0 ? <ClinicalNotice variant="error" title="Revisa estos datos:">{fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" | ")}</ClinicalNotice> : null}
               {intervalAlert ? <IntervalWarningCard alert={intervalAlert} /> : <AppointmentCard recommendation={previewRecommendation} preview />}
-            </section>
+            </ClinicalSection>
 
             <VaccineHistory type={form.tipo_vacuna} status={status} pregnancy={pregnancy} />
 
-            <footer className="vaccine-form-actions">
+            <ClinicalActionBar
+              status={readOnly ? "Consulta de vacunación" : editando ? "Edición de aplicación" : "Nueva aplicación"}
+              detail={readOnly ? "Solo lectura" : "La información clínica se verificará al guardar"}
+              readOnly={readOnly}
+            >
               <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>Volver al historial</button>
               {canWrite ? <button ref={submitButtonRef} type="submit" className="btn-primary" disabled={loading || initialLoading || readOnly}><Save size={15} /> {loading ? "Guardando..." : editando ? "Guardar cambios" : "Registrar aplicación"}</button> : null}
-            </footer>
+            </ClinicalActionBar>
           </>
         ) : null}
       </form>
@@ -417,6 +445,6 @@ export default function VacunaForm() {
           returnFocusRef={submitButtonRef}
         />
       ) : null}
-    </div>
+    </ClinicalWorkflowShell>
   );
 }
