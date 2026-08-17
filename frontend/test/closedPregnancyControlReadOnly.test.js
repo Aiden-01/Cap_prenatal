@@ -59,13 +59,15 @@ test("Abrir navega por permiso de consulta sin depender del acordeon ni de edici
 
 test("el detalle cerrado carga el GET y muestra el formulario en solo lectura", async () => {
   const detail = await source("src/pages/NuevoControl.jsx");
+  const workflow = await source("src/components/clinical/ClinicalWorkflow.jsx");
 
   assert.match(detail, /api\.get\(`\/pacientes\/\$\{id\}\/controles\/\$\{controlId\}`/);
   assert.match(detail, /const readOnly = Boolean\(expediente\?\.is_read_only\)/);
   assert.match(detail, /if \(readOnly && !editando\)/);
   assert.match(detail, /setForm\(parseControl\(data\)\)/);
   assert.match(detail, /disabled=\{soloLectura\}/);
-  assert.match(detail, /Solo lectura/);
+  assert.match(detail, /workflowMode = soloLectura \? "readonly"/);
+  assert.match(workflow, /readonly: "Solo lectura"/);
   assert.match(detail, /\{puedeEditar && \(/);
   assert.match(detail, /\{soloLectura \? "Volver" : "Cancelar"\}/);
   assert.doesNotMatch(detail, />\s*Eliminar\s*</);

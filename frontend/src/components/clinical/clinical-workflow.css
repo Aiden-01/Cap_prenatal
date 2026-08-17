@@ -1,0 +1,543 @@
+.clinical-workflow {
+  --clinical-workflow-panel: color-mix(in srgb, var(--surface) 97%, var(--primary-lt));
+  --clinical-workflow-line: color-mix(in srgb, var(--primary) 20%, var(--border));
+  width: min(100%, 1280px);
+  margin-inline: auto;
+  padding-bottom: 1rem;
+}
+
+.clinical-workflow-header {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) minmax(13rem, auto);
+  gap: 0.9rem;
+  align-items: center;
+  padding: 1rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 78% -140%, color-mix(in srgb, var(--primary-lt) 78%, transparent), transparent 19rem),
+    var(--clinical-workflow-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.clinical-workflow-back {
+  min-width: 0;
+  padding-inline: 0.85rem;
+  justify-content: center;
+}
+
+.clinical-workflow-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--primary-lt) 82%, var(--surface));
+  color: var(--primary-dk);
+}
+
+.clinical-workflow-heading {
+  min-width: 0;
+}
+
+.clinical-workflow-eyebrow {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--primary-dk);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.clinical-workflow-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.clinical-workflow-title-row h1 {
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  font-weight: 820;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+
+.clinical-workflow-heading p {
+  max-width: 62ch;
+  margin-top: 0.32rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.clinical-workflow-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 1.7rem;
+  padding: 0.25rem 0.58rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary-lt) 76%, var(--surface));
+  color: var(--primary-dk);
+  font-size: 0.7rem;
+  font-weight: 780;
+}
+
+.clinical-workflow-mode.is-readonly {
+  border-color: color-mix(in srgb, var(--warn) 40%, var(--border));
+  background: color-mix(in srgb, var(--warn-lt) 72%, var(--surface));
+  color: var(--warn);
+}
+
+.clinical-workflow-patient {
+  display: grid;
+  gap: 0.52rem;
+  min-width: 0;
+  padding-left: 1rem;
+  border-left: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+}
+
+.clinical-workflow-patient div {
+  min-width: 0;
+}
+
+.clinical-workflow-patient dt {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 760;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.clinical-workflow-patient dd {
+  margin-top: 0.08rem;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 720;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+}
+
+.clinical-section {
+  min-width: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  background: transparent;
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+
+.clinical-section:last-child {
+  border-bottom: 0;
+}
+
+.clinical-section:focus-within {
+  background: color-mix(in srgb, var(--primary-lt) 17%, transparent);
+}
+
+.clinical-section-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 1rem 1.1rem 0.75rem;
+}
+
+.clinical-section-icon {
+  width: 2.2rem;
+  height: 2.2rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 26%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary-lt) 72%, var(--surface));
+  color: var(--primary-dk);
+}
+
+.clinical-section-heading {
+  min-width: 0;
+}
+
+.clinical-section-heading h2 {
+  color: var(--text);
+  font-size: 0.93rem;
+  font-weight: 790;
+  letter-spacing: -0.012em;
+}
+
+.clinical-section-heading p {
+  max-width: 72ch;
+  margin-top: 0.18rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.clinical-section-aside {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.clinical-section-body {
+  padding: 0.25rem 1.1rem 1.15rem;
+}
+
+.clinical-section.is-danger {
+  --clinical-section-tone: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--danger-lt) 34%, var(--surface));
+}
+
+.clinical-section.is-danger .clinical-section-icon {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  background: color-mix(in srgb, var(--danger-lt) 74%, var(--surface));
+  color: var(--danger);
+}
+
+.clinical-section.is-danger:focus-within {
+  background: color-mix(in srgb, var(--danger-lt) 52%, var(--surface));
+}
+
+.clinical-notice {
+  --clinical-notice-color: var(--info);
+  --clinical-notice-bg: var(--info-lt);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.72rem;
+  align-items: start;
+  padding: 0.82rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--clinical-notice-color) 38%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--clinical-notice-bg) 72%, var(--surface));
+  color: var(--text);
+}
+
+.clinical-notice.is-warning {
+  --clinical-notice-color: var(--warn);
+  --clinical-notice-bg: var(--warn-lt);
+}
+
+.clinical-notice.is-error,
+.clinical-notice.is-restriction {
+  --clinical-notice-color: var(--danger);
+  --clinical-notice-bg: var(--danger-lt);
+}
+
+.clinical-notice.is-readonly {
+  --clinical-notice-color: var(--warn);
+  --clinical-notice-bg: var(--warn-lt);
+}
+
+.clinical-notice-icon {
+  display: grid;
+  width: 1.85rem;
+  height: 1.85rem;
+  place-items: center;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--clinical-notice-color) 12%, transparent);
+  color: var(--clinical-notice-color);
+}
+
+.clinical-notice strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.79rem;
+  font-weight: 780;
+}
+
+.clinical-notice-copy {
+  margin-top: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.77rem;
+  line-height: 1.45;
+}
+
+.clinical-action-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 1.15rem;
+  padding: 0.82rem max(1rem, env(safe-area-inset-right)) max(0.82rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.clinical-action-status {
+  display: grid;
+  min-width: 0;
+  gap: 0.08rem;
+}
+
+.clinical-action-status span {
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 760;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.clinical-action-status strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clinical-action-bar.is-readonly .clinical-action-status span {
+  color: var(--warn);
+}
+
+.clinical-action-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.clinical-action-buttons .btn-primary,
+.clinical-action-buttons .btn-secondary {
+  min-width: 9rem;
+  justify-content: center;
+}
+
+.clinical-loading {
+  width: min(100%, 1280px);
+  margin-inline: auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.clinical-loading-header,
+.clinical-loading-summary,
+.clinical-loading-panel {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.clinical-loading-header {
+  display: grid;
+  grid-template-columns: 8rem 2.75rem minmax(0, 1fr) minmax(12rem, 0.3fr);
+  gap: 0.9rem;
+  align-items: center;
+  padding: 1rem;
+}
+
+.clinical-loading-header > div,
+.clinical-loading-patient,
+.clinical-loading-summary > div {
+  display: grid;
+  gap: 0.48rem;
+}
+
+.clinical-loading-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  padding: 0.8rem;
+}
+
+.clinical-loading-summary > div {
+  padding: 0.55rem 0.75rem;
+  border-right: 1px solid var(--border);
+}
+
+.clinical-loading-summary > div:last-child {
+  border-right: 0;
+}
+
+.clinical-loading-panel {
+  padding: 1.1rem;
+}
+
+.clinical-loading-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.clinical-skeleton-block {
+  display: block;
+  overflow: hidden;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface2) 78%, var(--border));
+  position: relative;
+}
+
+.clinical-skeleton-block::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface) 68%, transparent), transparent);
+  animation: clinicalSkeletonSweep 1.4s ease-in-out infinite;
+}
+
+.clinical-skeleton-block.is-button { height: 2.5rem; }
+.clinical-skeleton-block.is-icon { width: 2.75rem; height: 2.75rem; }
+.clinical-skeleton-block.is-kicker { width: 5rem; height: 0.55rem; }
+.clinical-skeleton-block.is-title { width: min(20rem, 78%); height: 1.35rem; }
+.clinical-skeleton-block.is-copy { width: min(16rem, 88%); height: 0.72rem; }
+.clinical-skeleton-block.is-copy-short { width: 7rem; height: 0.72rem; }
+.clinical-skeleton-block.is-value { width: 6rem; height: 1rem; }
+.clinical-skeleton-block.is-section-title { width: 12rem; height: 1rem; }
+.clinical-skeleton-block.is-field { height: 3.75rem; }
+
+.clinical-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+html.dark .clinical-workflow {
+  --clinical-workflow-panel: #15171c;
+  --clinical-workflow-line: color-mix(in srgb, var(--primary) 20%, var(--border));
+}
+
+html.dark .clinical-workflow-eyebrow,
+html.dark .clinical-workflow-icon,
+html.dark .clinical-section-icon {
+  color: var(--primary);
+}
+
+html.dark .clinical-workflow-mode:not(.is-readonly) {
+  color: var(--primary);
+}
+
+html.dark .clinical-action-bar {
+  background: #191b21;
+}
+
+@keyframes clinicalSkeletonSweep {
+  to { transform: translateX(100%); }
+}
+
+@media (max-width: 1020px) {
+  .clinical-workflow-header {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+
+  .clinical-workflow-patient {
+    grid-column: 2 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0.72rem 0 0;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .clinical-workflow-header {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 0.85rem;
+  }
+
+  .clinical-workflow-back {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .clinical-workflow-icon {
+    width: 2.45rem;
+    height: 2.45rem;
+  }
+
+  .clinical-workflow-patient {
+    grid-column: 1 / -1;
+  }
+
+  .clinical-section-header {
+    padding-inline: 0.9rem;
+  }
+
+  .clinical-section-body {
+    padding-inline: 0.9rem;
+  }
+
+  .clinical-action-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .clinical-action-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .clinical-action-buttons .btn-primary,
+  .clinical-action-buttons .btn-secondary {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .clinical-loading-header {
+    grid-template-columns: 6.5rem 2.75rem minmax(0, 1fr);
+  }
+
+  .clinical-loading-patient {
+    grid-column: 2 / -1;
+  }
+
+  .clinical-loading-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .clinical-loading-summary > div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .clinical-loading-summary > div:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .clinical-loading-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 390px) {
+  .clinical-workflow-title-row h1 {
+    font-size: 1.2rem;
+  }
+
+  .clinical-workflow-patient {
+    grid-template-columns: 1fr;
+  }
+
+  .clinical-action-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .clinical-loading-header {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .clinical-loading-header .is-button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clinical-section,
+  .clinical-skeleton-block::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

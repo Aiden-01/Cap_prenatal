@@ -1,0 +1,436 @@
+.control-workflow-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.control-workflow-notice {
+  animation: controlNoticeReveal 200ms ease both;
+}
+
+.control-context-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 96%, var(--surface2));
+  box-shadow: var(--shadow-sm);
+}
+
+.control-context-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.7rem;
+  align-items: center;
+  min-width: 0;
+  padding: 0.85rem 0.95rem;
+  border-right: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+}
+
+.control-context-item:last-child {
+  border-right: 0;
+}
+
+.control-context-icon {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary-lt) 76%, var(--surface));
+  color: var(--primary-dk);
+}
+
+.control-context-item div {
+  min-width: 0;
+}
+
+.control-context-item div > span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 760;
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+}
+
+.control-context-item strong {
+  display: block;
+  margin-top: 0.14rem;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 760;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control-foundation-panel,
+.control-tab-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 97%, var(--surface2));
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.control-foundation-panel {
+  display: grid;
+  gap: 0.9rem;
+  padding-bottom: 0.9rem;
+}
+
+.control-foundation-panel .control-danger-section {
+  margin-inline: 0.9rem;
+}
+
+.control-workflow .clinical-section-body > .form-section-body {
+  padding: 0;
+}
+
+.control-workflow .form-group,
+.control-workflow .input-field,
+.control-workflow select,
+.control-workflow textarea {
+  min-width: 0;
+}
+
+.control-workflow .input-field,
+.control-workflow input:not([type="checkbox"]):not([type="radio"]),
+.control-workflow select,
+.control-workflow textarea {
+  min-height: 2.7rem;
+  border-radius: 10px;
+}
+
+.control-workflow button.toggle-control {
+  width: 100%;
+  appearance: none;
+  font: inherit;
+  text-align: left;
+}
+
+.control-workflow button.toggle-control:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  outline-offset: 2px;
+}
+
+.control-toggle-grid,
+.control-orientation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.55rem;
+}
+
+.control-orientation-grid {
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+}
+
+.control-danger-other,
+.control-section-followup {
+  margin-top: 0.85rem;
+}
+
+.control-inline-toggles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.85rem;
+}
+
+.control-workflow-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+  padding: 0.38rem;
+  overflow-x: auto;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 94%, var(--surface2));
+  box-shadow: var(--shadow-sm);
+  scrollbar-width: thin;
+}
+
+.control-workflow-tab {
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.72rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.77rem;
+  font-weight: 690;
+  white-space: nowrap;
+  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.control-workflow-tab:hover {
+  background: color-mix(in srgb, var(--surface2) 76%, transparent);
+  color: var(--text);
+}
+
+.control-workflow-tab.is-active {
+  border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+  background: color-mix(in srgb, var(--primary-lt) 80%, var(--surface));
+  color: var(--primary-dk);
+  box-shadow: 0 5px 15px color-mix(in srgb, var(--primary) 9%, transparent);
+}
+
+.control-workflow-tab:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 24%, transparent);
+  outline-offset: 1px;
+}
+
+.control-tab-panel {
+  animation: controlPanelReveal 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  outline: none;
+}
+
+.control-tab-panel:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.control-lab-list {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+  border-radius: 12px;
+}
+
+.control-lab-head,
+.control-lab-entry {
+  display: grid;
+  grid-template-columns: minmax(13rem, 0.78fr) minmax(14rem, 1.22fr);
+  gap: 0.85rem;
+}
+
+.control-lab-head {
+  padding: 0.62rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface2) 72%, var(--surface));
+  color: var(--text-muted);
+  font-size: 0.64rem;
+  font-weight: 780;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.control-lab-entry {
+  align-items: center;
+  padding: 0.72rem 0.8rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+}
+
+.control-lab-entry:last-child {
+  border-bottom: 0;
+}
+
+.control-lab-entry:hover {
+  background: color-mix(in srgb, var(--primary-lt) 18%, transparent);
+}
+
+.control-lab-check {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.control-lab-state {
+  padding: 0.24rem 0.48rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface2) 82%, var(--surface));
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
+.control-lab-state.is-complete {
+  background: color-mix(in srgb, var(--accent-lt) 84%, var(--surface));
+  color: var(--accent);
+}
+
+.control-lab-result {
+  min-width: 0;
+}
+
+.control-lab-result-fields {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.55rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.control-lab-result-fields > .form-group,
+.control-lab-result-fields > .input-field,
+.control-lab-result-fields > textarea {
+  flex: 1 1 12rem;
+}
+
+.control-lab-empty {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.control-lab-other {
+  margin-top: 0.9rem;
+}
+
+.control-supplement-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.control-supplement-item {
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface2) 40%, transparent);
+}
+
+html.dark .control-context-icon,
+html.dark .control-workflow-tab.is-active {
+  color: var(--primary);
+}
+
+html.dark .control-context-summary,
+html.dark .control-foundation-panel,
+html.dark .control-tab-panel {
+  background: #191b21;
+}
+
+html.dark .control-lab-state.is-complete {
+  color: var(--accent);
+}
+
+@keyframes controlPanelReveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes controlNoticeReveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 980px) {
+  .control-context-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .control-context-item:nth-child(2) {
+    border-right: 0;
+  }
+
+  .control-context-item:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 767px) {
+  .control-workflow-tabs {
+    display: flex;
+    scroll-snap-type: x proximity;
+  }
+
+  .control-workflow-tab {
+    flex: 0 0 auto;
+    min-width: 9.25rem;
+    scroll-snap-align: start;
+  }
+
+  .control-lab-head {
+    display: none;
+  }
+
+  .control-lab-entry {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .control-lab-result {
+    padding-left: 0.25rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .control-context-summary,
+  .control-supplement-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .control-context-item,
+  .control-context-item:nth-child(2) {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .control-context-item:last-child {
+    border-bottom: 0;
+  }
+
+  .control-toggle-grid,
+  .control-orientation-grid,
+  .control-inline-toggles {
+    grid-template-columns: 1fr;
+  }
+
+  .control-lab-check {
+    grid-template-columns: 1fr;
+  }
+
+  .control-lab-state {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 390px) {
+  .control-foundation-panel .control-danger-section {
+    margin-inline: 0.65rem;
+  }
+
+  .control-workflow-tab {
+    min-width: 8.5rem;
+  }
+
+  .control-lab-entry {
+    padding-inline: 0.65rem;
+  }
+
+  .control-lab-result-fields > .form-group,
+  .control-lab-result-fields > .input-field,
+  .control-lab-result-fields > textarea {
+    flex-basis: 100%;
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control-workflow-notice,
+  .control-tab-panel,
+  .control-workflow-tab,
+  .control-lab-entry {
+    animation: none !important;
+    transition: none !important;
+  }
+}

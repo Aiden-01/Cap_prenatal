@@ -3,35 +3,64 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
-import { ChevronLeft, Save, Stethoscope, FlaskConical, Pill, BookOpen, LockKeyhole } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  Baby,
+  BookOpen,
+  CalendarDays,
+  ClipboardList,
+  FileText,
+  FlaskConical,
+  HeartPulse,
+  Pill,
+  Save,
+  Stethoscope,
+} from "lucide-react";
 import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
 import { calculateGestationalWeeks } from "../utils/gestationalAge";
 import { getErrorMessage, getFieldErrors } from "../utils/errorMessage";
 import { isValidPregnancyId } from "../utils/pregnancyState";
 import {
+  ClinicalActionBar,
+  ClinicalLoadingSkeleton,
+  ClinicalNotice,
+  ClinicalSection,
+  ClinicalWorkflowShell,
+} from "../components/clinical/ClinicalWorkflow";
+import {
   canConsultPrenatalControl,
   canEditPrenatalControl,
 } from "../utils/prenatalControlAccess";
+import "./nuevo-control.css";
 
 // ─── HELPERS ────────────────────────────────────────────────
-function Field({ label, children, col, error }) {
+function Field({ label, children, col, error, htmlFor }) {
   return (
     <div className="form-group" style={col ? { gridColumn: `span ${col}` } : {}}>
-      <label className="input-label">{label}</label>
+      <label className="input-label" htmlFor={htmlFor}>{label}</label>
       {children}
       {error && <div className="field-error-text">{error}</div>}
     </div>
   );
 }
 
+function blurNumberInputOnWheel(event) {
+  event.currentTarget.blur();
+}
+
 function Inp({ label, name, type = "text", form, set, col, errors = {}, ...rest }) {
   const error = errors[name];
+  const inputId = `control-${name}`;
   return (
-    <Field label={label} col={col} error={error}>
+    <Field label={label} col={col} error={error} htmlFor={inputId}>
       <input
+        id={inputId}
+        name={name}
         className={`input-field ${error ? "input-error" : ""}`}
         type={type}
         value={form[name] ?? ""}
+        onWheel={type === "number" ? blurNumberInputOnWheel : undefined}
         onChange={(e) =>
           set(name, type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)
         }
@@ -44,10 +73,13 @@ function Inp({ label, name, type = "text", form, set, col, errors = {}, ...rest 
 function Toggle({ label, name, form, set, disabled = false }) {
   const val = form[name] ?? false;
   return (
-    <div
-      onClick={() => { if (!disabled) set(name, !val); }}
+    <button
+      type="button"
+      onClick={() => set(name, !val)}
       className={`toggle-control ${val ? "is-on" : ""} ${disabled ? "is-disabled" : ""}`}
+      aria-pressed={Boolean(val)}
       aria-disabled={disabled}
+      disabled={disabled}
     >
       <div className="toggle-mark">
         {val && "✓"}
@@ -55,6 +87,23 @@ function Toggle({ label, name, form, set, disabled = false }) {
       <span className="toggle-label">
         {label}
       </span>
+    </button>
+  );
+}
+
+function LabEntry({ label, realizadoKey, form, set, disabled = false, children }) {
+  const realizado = Boolean(form[realizadoKey]);
+  return (
+    <div className="lab-row control-lab-entry">
+      <div className="control-lab-check">
+        <Toggle label={label} name={realizadoKey} form={form} set={set} disabled={disabled} />
+        <span className={`control-lab-state ${realizado ? "is-complete" : ""}`}>
+          {realizado ? "Realizado" : "No realizado"}
+        </span>
+      </div>
+      <div className="control-lab-result">
+        {realizado ? children : <span className="control-lab-empty">Sin resultado registrado</span>}
+      </div>
     </div>
   );
 }
@@ -62,13 +111,10 @@ function Toggle({ label, name, form, set, disabled = false }) {
 function LabRow({ label, realizadoKey, resultadoKey, form, set, errors = {}, extra, disabled = false }) {
   const error = errors[resultadoKey];
   return (
-    <div className="lab-row">
-      <Toggle label={label} name={realizadoKey} form={form} set={set} disabled={disabled} />
-      {form[realizadoKey] && (
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+    <LabEntry label={label} realizadoKey={realizadoKey} form={form} set={set} disabled={disabled}>
+      <div className="control-lab-result-fields">
           <input
             className={`input-field ${error ? "input-error" : ""}`}
-            style={{ flex: 1, minWidth: 120 }}
             placeholder="Resultado"
             value={form[resultadoKey] ?? ""}
             onChange={(e) => set(resultadoKey, e.target.value)}
@@ -76,9 +122,8 @@ function LabRow({ label, realizadoKey, resultadoKey, form, set, errors = {}, ext
           />
           {extra}
           {error && <div className="field-error-text" style={{ flexBasis: "100%" }}>{error}</div>}
-        </div>
-      )}
-    </div>
+      </div>
+    </LabEntry>
   );
 }
 
@@ -316,6 +361,7 @@ export default function NuevoControl() {
   const [tab, setTab]         = useState("general");
   const [form, setForm]       = useState(initialControlForm);
   const [fur, setFur]         = useState("");
+  const [paciente, setPaciente] = useState(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const todayInputValue = getGuatemalaDateInputValue();
@@ -387,6 +433,7 @@ export default function NuevoControl() {
           return;
         }
         setFur(expediente?.embarazo_seleccionado?.fur || "");
+        setPaciente(expediente?.paciente || null);
         if (editando) {
           setForm(parseControl(data));
           return;
@@ -403,6 +450,18 @@ export default function NuevoControl() {
     ...form,
     edad_gestacional_semanas: edadGestacionalSemanas,
   };
+  const nombrePaciente = [paciente?.nombres, paciente?.apellidos].filter(Boolean).join(" ");
+  const workflowMode = soloLectura ? "readonly" : editando ? "edit" : "new";
+  const workflowTitle = soloLectura
+    ? "Detalle del Control Prenatal"
+    : editando
+      ? "Editar Control Prenatal"
+      : "Registrar Control Prenatal";
+  const workflowDescription = soloLectura
+    ? `Control ${form.numero_control} · Consulta histórica`
+    : editando
+      ? `Control ${form.numero_control}`
+      : `Se registrará como control ${form.numero_control}`;
 
   // IMC automático
   const handlePeso = (v) => {
@@ -472,49 +531,59 @@ export default function NuevoControl() {
   };
 
   return (
-    <div>
-      {/* HEADER */}
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.75rem" }}>
-        <button className="btn-secondary" onClick={() => navigate(expedientePath)}>
-          <ChevronLeft size={15} /> Volver
-        </button>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", flexWrap: "wrap" }}>
-            <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>
-              {soloLectura ? "Detalle del Control Prenatal" : editando ? "Editar Control Prenatal" : "Registrar Control Prenatal"}
-            </h1>
-            {soloLectura && (
-              <span className="badge control-read-only-badge">
-                <LockKeyhole size={13} /> Solo lectura
-              </span>
-            )}
-          </div>
-          <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 2 }}>
-            {soloLectura
-              ? `Control ${form.numero_control} · Consulta histórica`
-              : editando
-                ? `Control ${form.numero_control}`
-                : `Se registrara como control ${form.numero_control}`}
-          </p>
-        </div>
-      </div>
-
+    <ClinicalWorkflowShell
+      className="control-workflow"
+      onBack={() => navigate(expedientePath)}
+      eyebrow="Atención prenatal"
+      title={workflowTitle}
+      description={workflowDescription}
+      patientName={nombrePaciente}
+      recordNumber={paciente?.no_expediente}
+      mode={workflowMode}
+      icon={Stethoscope}
+    >
       {loadingData ? (
-        <div className="card" style={{ padding: "2rem", textAlign: "center", color: "var(--text-muted)" }}>
-          Cargando control...
-        </div>
+        <ClinicalLoadingSkeleton label="Cargando control prenatal" />
       ) : (
-      <form onSubmit={handleSubmit}>
+      <form className="control-workflow-form" onSubmit={handleSubmit}>
+        {soloLectura && (
+          <ClinicalNotice variant="readonly" title="Consulta histórica" className="control-workflow-notice">
+            Este embarazo está cerrado. Puedes revisar toda la información del control, pero no modificarla.
+          </ClinicalNotice>
+        )}
+
         {visibleFieldErrors.length > 0 && (
-          <div className="error-box" style={{ marginBottom: "1rem" }}>
-            <strong>Revisa estos datos:</strong>{" "}
-            {visibleFieldErrors.map((error) => `${error.label}: ${error.message}`).join(" | ")}
-          </div>
+          <ClinicalNotice variant="error" title="Revisa estos datos" className="control-workflow-notice">
+            {visibleFieldErrors.map((error) => `${error.label}: ${error.message}`).join(" · ")}
+          </ClinicalNotice>
         )}
 
         <fieldset disabled={soloLectura} className="control-form-fieldset">
-        {/* DATOS BÁSICOS DEL CONTROL — siempre visibles */}
-        <div className="card" style={{ marginBottom: "1.25rem" }}>
+        <div className="control-context-summary" aria-label="Resumen del control">
+          <div className="control-context-item">
+            <span className="control-context-icon" aria-hidden="true"><ClipboardList size={16} /></span>
+            <div><span>No. de control</span><strong>{form.numero_control || "—"}</strong></div>
+          </div>
+          <div className="control-context-item">
+            <span className="control-context-icon" aria-hidden="true"><CalendarDays size={16} /></span>
+            <div><span>Fecha</span><strong>{form.fecha || "Por definir"}</strong></div>
+          </div>
+          <div className="control-context-item">
+            <span className="control-context-icon" aria-hidden="true"><Baby size={16} /></span>
+            <div><span>Edad gestacional</span><strong>{edadGestacionalSemanas === "" ? "Sin dato" : `${edadGestacionalSemanas} semanas`}</strong></div>
+          </div>
+          <div className="control-context-item">
+            <span className="control-context-icon" aria-hidden="true"><CalendarDays size={16} /></span>
+            <div><span>Próxima cita</span><strong>{form.cita_siguiente || "Por definir"}</strong></div>
+          </div>
+        </div>
+
+        <div className="control-foundation-panel">
+        <ClinicalSection
+          title="Datos del control"
+          description="Identificación y contexto de esta atención prenatal."
+          icon={ClipboardList}
+        >
           <div className="form-section-body col-4">
             <Field label="No. Control" error={fieldError("numero_control")}>
               <select className={inputClass("numero_control")} value={form.numero_control}
@@ -532,14 +601,16 @@ export default function NuevoControl() {
             <Inp label="Nombre del acompañante" name="nombre_acompanante" {...p} />
             <Inp label="Nombre y cargo de quien atiende" name="nombre_cargo_atiende" {...p} col={2} />
           </div>
-        </div>
+        </ClinicalSection>
 
-        {/* SIGNOS DE PELIGRO */}
-        <div className="card" style={{ marginBottom: "1.25rem", borderLeft: "3px solid var(--danger)" }}>
-          <div style={{ fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--danger)", marginBottom: "0.85rem" }}>
-            ⚠ Signos de Peligro
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: "0.5rem" }}>
+        <ClinicalSection
+          title="Signos de peligro"
+          description="Marca únicamente los signos identificados durante esta atención."
+          icon={AlertTriangle}
+          tone="danger"
+          className="control-danger-section"
+        >
+          <div className="control-toggle-grid">
             <Toggle label="Hemorragia vía vaginal" name="peligro_hemorragia_vaginal" {...p} />
             <Toggle label="Palidez" name="peligro_palidez" {...p} />
             <Toggle label="Dolor de cabeza" name="peligro_dolor_cabeza" {...p} />
@@ -548,18 +619,28 @@ export default function NuevoControl() {
             <Toggle label="Trastornos visuales" name="peligro_trastornos_visuales" {...p} />
             <Toggle label="Fiebre" name="peligro_fiebre" {...p} />
           </div>
-          <div style={{ marginTop: "0.75rem" }}>
+          <div className="control-danger-other">
             <Inp label="Otro signo de peligro" name="peligro_otro" {...p} placeholder="Especifique..." />
           </div>
+        </ClinicalSection>
         </div>
         </fieldset>
 
         {/* TABS */}
-        <div className="content-tabs">
+        <div className="control-workflow-tabs" role="tablist" aria-label="Áreas del control prenatal">
           {TABS.map((t) => {
             const Icon = t.icon;
             return (
-              <button key={t.id} type="button" onClick={() => setTab(t.id)} className={`content-tab ${tab === t.id ? "is-active" : ""}`}>
+              <button
+                key={t.id}
+                id={`control-tab-${t.id}`}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.id}
+                aria-controls={`control-panel-${t.id}`}
+                onClick={() => setTab(t.id)}
+                className={`control-workflow-tab ${tab === t.id ? "is-active" : ""}`}
+              >
                 <Icon size={14} />{t.label}
               </button>
             );
@@ -569,9 +650,19 @@ export default function NuevoControl() {
         <fieldset disabled={soloLectura} className="control-form-fieldset">
         {/* ── TAB: GENERAL ── */}
         {tab === "general" && (
-          <div className="card">
-            <div className="form-section">
-              <div className="form-section-header">Examen Físico</div>
+          <div
+            key="general"
+            id="control-panel-general"
+            className="control-tab-panel"
+            role="tabpanel"
+            aria-labelledby="control-tab-general"
+            tabIndex={0}
+          >
+            <ClinicalSection
+              title="Examen físico"
+              description="Signos vitales, antropometría y evaluaciones físicas."
+              icon={Activity}
+            >
               <div className="form-section-body col-4">
                 <Inp label="P/A Sistólica" name="pa_sistolica" type="number" {...p} />
                 <Inp label="P/A Diastólica" name="pa_diastolica" type="number" {...p} />
@@ -581,47 +672,58 @@ export default function NuevoControl() {
                 <Inp label="Perímetro braquial (cm)" name="perimetro_braquial_cm" type="number" {...p} />
                 <Field label="Peso (kg)" error={fieldError("peso_kg")}>
                   <input className={inputClass("peso_kg")} type="number" value={form.peso_kg ?? ""}
+                    onWheel={blurNumberInputOnWheel}
                     onChange={(e) => handlePeso(e.target.value === "" ? "" : Number(e.target.value))} />
                 </Field>
                 <Field label="Talla (cm)" error={fieldError("talla_cm")}>
                   <input className={inputClass("talla_cm")} type="number" value={form.talla_cm ?? ""}
+                    onWheel={blurNumberInputOnWheel}
                     onChange={(e) => handleTalla(e.target.value === "" ? "" : Number(e.target.value))} />
                 </Field>
                 <Inp label="IMC" name="imc" type="number" {...p} />
               </div>
-              <div style={{ display: "flex", gap: "0.6rem", padding: "0 1rem 1rem", flexWrap: "wrap" }}>
+              <div className="control-inline-toggles">
                 <Toggle label="Examen bucodental (Si)" name="examen_bucodental" {...p} />
                 <Toggle label="Examen de mamas (Si)" name="examen_mamas" {...p} />
               </div>
-            </div>
+            </ClinicalSection>
 
-            <div className="form-section">
-              <div className="form-section-header">Examen Obstétrico</div>
+            <ClinicalSection
+              title="Examen obstétrico"
+              description="Evaluación del crecimiento y bienestar fetal."
+              icon={Baby}
+            >
               <div className="form-section-body col-4">
                 <Inp label="Altura uterina (cm)" name="altura_uterina_cm" type="number" {...p} />
                 <Inp label="FCF (lpm)" name="fcf" type="number" {...p} />
                 <Inp label="Situación fetal" name="situacion_fetal" {...p} />
                 <Inp label="Presentación fetal" name="presentacion_fetal" {...p} />
               </div>
-              <div style={{ padding: "0 1rem 1rem" }}>
+              <div className="control-inline-toggles">
                 <Toggle label="Movimientos fetales" name="movimientos_fetales" {...p} />
               </div>
-            </div>
+            </ClinicalSection>
 
-            <div className="form-section">
-              <div className="form-section-header">Examen Ginecológico</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: "0.5rem", padding: "0.75rem 1rem" }}>
+            <ClinicalSection
+              title="Examen ginecológico"
+              description="Hallazgos observados durante la evaluación."
+              icon={HeartPulse}
+            >
+              <div className="control-toggle-grid">
                 <Toggle label="Sangre o manchado" name="sangre_manchado" {...p} />
                 <Toggle label="Verrugas/Herpes/Papilomas/Úlceras" name="verrugas_herpes_papilomas" {...p} />
                 <Toggle label="Flujo vaginal" name="flujo_vaginal" {...p} />
               </div>
-              <div style={{ padding: "0 1rem 1rem" }}>
+              <div className="control-section-followup">
                 <Inp label="Otros hallazgos ginecológicos" name="otros_ginecologico" {...p} />
               </div>
-            </div>
+            </ClinicalSection>
 
-            <div className="form-section">
-              <div className="form-section-header">Impresión Clínica / Tratamiento</div>
+            <ClinicalSection
+              title="Impresión clínica y tratamiento"
+              description="Conclusión de la atención, conducta indicada y seguimiento."
+              icon={FileText}
+            >
               <div className="form-section-body col-2">
                 <Field label="Impresión clínica" col={2} error={fieldError("impresion_clinica")}>
                   <textarea className={inputClass("impresion_clinica")} rows={2} value={form.impresion_clinica}
@@ -633,42 +735,50 @@ export default function NuevoControl() {
                 </Field>
                 <Inp label="Cita siguiente" name="cita_siguiente" type="date" {...p} />
               </div>
-            </div>
+            </ClinicalSection>
           </div>
         )}
 
         {/* ── TAB: LABORATORIOS ── */}
         {tab === "laboratorio" && (
-          <div className="card">
-            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
-              Marque los exámenes realizados en este control e ingrese el resultado.
-            </p>
+          <div
+            key="laboratorio"
+            id="control-panel-laboratorio"
+            className="control-tab-panel"
+            role="tabpanel"
+            aria-labelledby="control-tab-laboratorio"
+            tabIndex={0}
+          >
+            <ClinicalSection
+              title="Laboratorios y estudios"
+              description="Marca los exámenes realizados en este control y registra el resultado disponible."
+              icon={FlaskConical}
+            >
+            <div className="control-lab-list">
+              <div className="control-lab-head" aria-hidden="true">
+                <span>Examen y estado</span>
+                <span>Resultado</span>
+              </div>
 
             <LabRow label="Hematología" realizadoKey="hematologia_realizada" resultadoKey="hematologia_resultado" {...p} />
             <LabRow label="Glicemia en ayunas" realizadoKey="glicemia_realizada" resultadoKey="glicemia_resultado" {...p} />
-            <div className="lab-row">
-              <Toggle label="Grupo y RH" name="grupo_rh_realizado" {...p} />
-              {form.grupo_rh_realizado && <BloodGroupRh {...p} />}
-            </div>
+            <LabEntry label="Grupo y RH" realizadoKey="grupo_rh_realizado" {...p}>
+              <BloodGroupRh {...p} />
+            </LabEntry>
 
             {/* Orina — con bacteriuria y proteinuria */}
-            <div style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
-              <Toggle label="Orina" name="orina_realizada" {...p} />
-              {form.orina_realizada && (
-                <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
-                  <Toggle label="Bacteriuria +" name="orina_bacteriuria" {...p} />
-                  <Toggle label="Proteinuria +" name="orina_proteinuria" {...p} />
-                </div>
-              )}
-            </div>
+            <LabEntry label="Orina" realizadoKey="orina_realizada" {...p}>
+              <div className="control-lab-result-fields">
+                <Toggle label="Bacteriuria +" name="orina_bacteriuria" {...p} />
+                <Toggle label="Proteinuria +" name="orina_proteinuria" {...p} />
+              </div>
+            </LabEntry>
 
             <LabRow label="Heces" realizadoKey="heces_realizada" resultadoKey="heces_resultado" {...p} />
 
             {puedeCapturarVih && (
-              <div style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
-                <Toggle label="VIH" name="vih_realizado" {...p} />
-                {form.vih_realizado && (
-                  <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
+              <LabEntry label="VIH" realizadoKey="vih_realizado" {...p}>
+                  <div className="control-lab-result-fields">
                     <Field label="Resultado" error={fieldError("vih_resultado")}>
                       <select className={inputClass("vih_resultado")} style={{ minWidth: 130 }} value={form.vih_resultado}
                         onChange={(e) => set("vih_resultado", e.target.value)}>
@@ -678,15 +788,12 @@ export default function NuevoControl() {
                       </select>
                     </Field>
                   </div>
-                )}
-              </div>
+              </LabEntry>
             )}
 
             {/* VDRL/RPR */}
-            <div style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
-              <Toggle label="VDRL / RPR" name="vdrl_realizado" {...p} />
-              {form.vdrl_realizado && (
-                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap", alignItems: "flex-end" }}>
+            <LabEntry label="VDRL / RPR" realizadoKey="vdrl_realizado" {...p}>
+                <div className="control-lab-result-fields">
                   <Field label="Resultado" error={fieldError("vdrl_resultado")}>
                     <select className={inputClass("vdrl_resultado")} style={{ minWidth: 130 }} value={form.vdrl_resultado}
                       onChange={(e) => set("vdrl_resultado", e.target.value)}>
@@ -696,14 +803,11 @@ export default function NuevoControl() {
                     </select>
                   </Field>
                 </div>
-              )}
-            </div>
+            </LabEntry>
 
             {/* TORCH */}
-            <div style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
-              <Toggle label="TORCH" name="torch_realizado" {...p} />
-              {form.torch_realizado && (
-                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
+            <LabEntry label="TORCH" realizadoKey="torch_realizado" {...p}>
+                <div className="control-lab-result-fields">
                   <Field label="Resultado" error={fieldError("torch_resultado_positivo")}>
                     <select
                       className={inputClass("torch_resultado_positivo")}
@@ -722,14 +826,11 @@ export default function NuevoControl() {
                     </select>
                   </Field>
                 </div>
-              )}
-            </div>
+            </LabEntry>
 
             {/* Papanicolau / IVAA */}
-            <div style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
-              <Toggle label="Papanicolau / IVAA" name="papanicolau_ivaa_realizado" {...p} />
-              {form.papanicolau_ivaa_realizado && (
-                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
+            <LabEntry label="Papanicolau / IVAA" realizadoKey="papanicolau_ivaa_realizado" {...p}>
+                <div className="control-lab-result-fields">
                   <Field label="Resultado" error={fieldError("papanicolau_ivaa_resultado")}>
                     <ResultadoSelect
                       value={form.papanicolau_ivaa_resultado}
@@ -738,14 +839,11 @@ export default function NuevoControl() {
                     />
                   </Field>
                 </div>
-              )}
-            </div>
+            </LabEntry>
 
             {/* Hepatitis B */}
-            <div style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
-              <Toggle label="Hepatitis B" name="hepatitis_b_realizado" {...p} />
-              {form.hepatitis_b_realizado && (
-                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
+            <LabEntry label="Hepatitis B" realizadoKey="hepatitis_b_realizado" {...p}>
+                <div className="control-lab-result-fields">
                   <Field label="Resultado" error={fieldError("hepatitis_b_resultado")}>
                     <ResultadoSelect
                       value={form.hepatitis_b_resultado}
@@ -754,59 +852,70 @@ export default function NuevoControl() {
                     />
                   </Field>
                 </div>
-              )}
-            </div>
+            </LabEntry>
 
             {/* USG */}
-            <div style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--border)" }}>
-              <Toggle label="USG (Ultrasonido)" name="usg_realizado" {...p} />
-              {form.usg_realizado && (
-                <div style={{ marginTop: "0.5rem" }}>
+            <LabEntry label="USG (Ultrasonido)" realizadoKey="usg_realizado" {...p}>
+                <div className="control-lab-result-fields">
                   <Field label="Hallazgos de USG" error={fieldError("usg_hallazgos")}>
                     <textarea className={inputClass("usg_hallazgos")} rows={2} value={form.usg_hallazgos}
                       onChange={(e) => set("usg_hallazgos", e.target.value)} />
                   </Field>
                 </div>
-              )}
+            </LabEntry>
             </div>
 
-            <div style={{ marginTop: "1rem" }}>
+            <div className="control-lab-other">
               <Field label="Otros laboratorios" error={fieldError("otros_lab")}>
                 <textarea className={inputClass("otros_lab")} rows={2} value={form.otros_lab}
                   onChange={(e) => set("otros_lab", e.target.value)}
                   placeholder="Gota gruesa (malaria), Tamizaje Chagas, etc." />
               </Field>
             </div>
+            </ClinicalSection>
           </div>
         )}
 
         {/* ── TAB: SUPLEMENTACIÓN ── */}
         {tab === "suplementacion" && (
-          <div className="card">
-            <div className="form-section">
-              <div className="form-section-header">Micronutrientes</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", padding: "1rem" }}>
-                <div>
+          <div
+            key="suplementacion"
+            id="control-panel-suplementacion"
+            className="control-tab-panel"
+            role="tabpanel"
+            aria-labelledby="control-tab-suplementacion"
+            tabIndex={0}
+          >
+            <ClinicalSection
+              title="Micronutrientes"
+              description="Suplementos entregados o indicados durante esta atención."
+              icon={Pill}
+            >
+              <div className="control-supplement-grid">
+                <div className="control-supplement-item">
                   <Toggle label="Sulfato Ferroso" name="sulfato_ferroso" {...p} />
                   {form.sulfato_ferroso && (
-                    <div style={{ marginTop: "0.6rem" }}>
+                    <div className="control-section-followup">
                       <Inp label="No. de tabletas" name="sulfato_ferroso_tabletas" type="number" {...p} />
                     </div>
                   )}
                 </div>
-                <div>
+                <div className="control-supplement-item">
                   <Toggle label="Ácido Fólico" name="acido_folico" {...p} />
                   {form.acido_folico && (
-                    <div style={{ marginTop: "0.6rem" }}>
+                    <div className="control-section-followup">
                       <Inp label="No. de tabletas" name="acido_folico_tabletas" type="number" {...p} />
                     </div>
                   )}
                 </div>
               </div>
-            </div>
+            </ClinicalSection>
 
-            <div className="form-section">
-              <div className="form-section-header">Hallazgos y Tratamiento</div>
+            <ClinicalSection
+              title="Hallazgos y tratamiento"
+              description="Observaciones e indicaciones relacionadas con la suplementación."
+              icon={FileText}
+            >
               <div className="form-section-body col-2">
                 <Field label="Hallazgos" col={2} error={fieldError("suplementacion_hallazgos")}>
                   <textarea className={inputClass("suplementacion_hallazgos")} rows={2} value={form.suplementacion_hallazgos}
@@ -817,17 +926,26 @@ export default function NuevoControl() {
                     onChange={(e) => set("suplementacion_tratamiento", e.target.value)} />
                 </Field>
               </div>
-            </div>
+            </ClinicalSection>
           </div>
         )}
 
         {/* ── TAB: ORIENTACIONES ── */}
         {tab === "orientaciones" && (
-          <div className="card">
-            <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: "1.25rem" }}>
-              Marque los temas de orientación brindados en esta atención.
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(250px,1fr))", gap: "0.6rem" }}>
+          <div
+            key="orientaciones"
+            id="control-panel-orientaciones"
+            className="control-tab-panel"
+            role="tabpanel"
+            aria-labelledby="control-tab-orientaciones"
+            tabIndex={0}
+          >
+            <ClinicalSection
+              title="Orientación brindada"
+              description="Marca los temas abordados con la paciente durante esta atención."
+              icon={BookOpen}
+            >
+            <div className="control-orientation-grid">
               <Toggle label="Plan de emergencia del parto, familiar y comunitario" name="orient_plan_emergencia_parto" {...p} />
               <Toggle label="Alimentación durante el embarazo" name="orient_alimentacion_embarazo" {...p} />
               <Toggle label="Señales de peligro" name="orient_senales_peligro" {...p} />
@@ -839,18 +957,23 @@ export default function NuevoControl() {
               <Toggle label="Importancia del No. de atenciones prenatales" name="orient_importancia_atenciones" {...p} />
               <Toggle label="Importancia de tratamiento de ITS a cónyuge/pareja" name="orient_tratamiento_its_pareja" {...p} />
             </div>
-            <div style={{ marginTop: "1rem" }}>
+            <div className="control-section-followup">
               <Field label="Otras orientaciones" error={fieldError("orient_otros")}>
                 <input className={inputClass("orient_otros")} value={form.orient_otros}
                   onChange={(e) => set("orient_otros", e.target.value)} />
               </Field>
             </div>
+            </ClinicalSection>
           </div>
         )}
         </fieldset>
 
         {/* BOTONES */}
-        <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+        <ClinicalActionBar
+          readOnly={soloLectura}
+          status={loading ? "Guardando control" : soloLectura ? "Modo de consulta" : editando ? "Edición del control" : "Nuevo control"}
+          detail={loading ? "Espera mientras se registra la información" : workflowDescription}
+        >
           <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>
             {soloLectura ? "Volver" : "Cancelar"}
           </button>
@@ -861,10 +984,10 @@ export default function NuevoControl() {
               {loading ? "Guardando..." : editando ? "Guardar cambios" : "Guardar control"}
             </button>
           )}
-        </div>
+        </ClinicalActionBar>
 
       </form>
       )}
-    </div>
+    </ClinicalWorkflowShell>
   );
 }
