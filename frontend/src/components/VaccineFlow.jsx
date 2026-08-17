@@ -17,20 +17,41 @@ import {
   vaccineMomentLabel,
 } from "../utils/vaccineSchedule";
 
-export function VaccineSelector({ selected, onSelect, disabled }) {
+function handleRadioNavigation(event) {
+  if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"].includes(event.key)) return;
+
+  const group = event.currentTarget.closest('[role="radiogroup"]');
+  const radios = [...(group?.querySelectorAll('[role="radio"]:not(:disabled)') || [])];
+  const currentIndex = radios.indexOf(event.currentTarget);
+  if (currentIndex < 0 || !radios.length) return;
+
+  event.preventDefault();
+  let nextIndex;
+  if (event.key === "Home") nextIndex = 0;
+  else if (event.key === "End") nextIndex = radios.length - 1;
+  else if (event.key === "ArrowRight" || event.key === "ArrowDown") nextIndex = (currentIndex + 1) % radios.length;
+  else nextIndex = (currentIndex - 1 + radios.length) % radios.length;
+
+  radios[nextIndex].focus();
+  radios[nextIndex].click();
+}
+
+export function VaccineSelector({ selected, onSelect, disabled, invalid = false, describedBy }) {
   return (
-    <div className="vaccine-choice-grid" role="radiogroup" aria-label="Tipo de vacuna">
-      {VACCINE_CATALOG.map((vaccine) => {
+    <div className="vaccine-choice-grid" role="radiogroup" aria-label="Tipo de vacuna" aria-invalid={invalid} aria-describedby={describedBy}>
+      {VACCINE_CATALOG.map((vaccine, index) => {
         const active = selected === vaccine.value;
         return (
           <button
             type="button"
             role="radio"
             aria-checked={active}
+            tabIndex={active || (!selected && index === 0) ? 0 : -1}
             className={`vaccine-choice ${active ? "is-selected" : ""}`}
             key={vaccine.value}
             disabled={disabled}
             onClick={() => onSelect(vaccine.value)}
+            onKeyDown={handleRadioNavigation}
           >
             <span className="vaccine-choice-icon"><Syringe size={20} /></span>
             <span>
@@ -45,13 +66,14 @@ export function VaccineSelector({ selected, onSelect, disabled }) {
   );
 }
 
-export function DoseSelector({ definition, selected, suggestedDose, unavailablePositions, onSelect, disabled }) {
+export function DoseSelector({ definition, selected, suggestedDose, unavailablePositions, onSelect, disabled, invalid = false, describedBy }) {
   if (!definition) return null;
+  const firstAvailablePosition = definition.sequence.findIndex((_, index) => !unavailablePositions.has(index + 1)) + 1;
   return (
     <div>
       <p className="vaccine-selector-instruction">Selecciona la dosis según el carné o antecedente disponible de la paciente.</p>
       {suggestedDose ? <p className="vaccine-suggestion">Sugerida según el historial: <strong>{vaccineDoseLabel(definition.value, suggestedDose)}</strong></p> : null}
-      <div className="vaccine-dose-grid" role="radiogroup" aria-label="Posición de dosis">
+      <div className="vaccine-dose-grid" role="radiogroup" aria-label="Posición de dosis" aria-invalid={invalid} aria-describedby={describedBy}>
         {definition.sequence.map((label, index) => {
           const position = index + 1;
           const active = Number(selected) === position;
@@ -61,10 +83,12 @@ export function DoseSelector({ definition, selected, suggestedDose, unavailableP
               type="button"
               role="radio"
               aria-checked={active}
+              tabIndex={active || (!selected && position === firstAvailablePosition) ? 0 : -1}
               className={`vaccine-dose-choice ${active ? "is-selected" : ""}`}
               disabled={disabled || unavailable}
               key={label}
               onClick={() => onSelect(position)}
+              onKeyDown={handleRadioNavigation}
             >
               <span>{position}</span>
               <strong>{label}</strong>
@@ -77,22 +101,24 @@ export function DoseSelector({ definition, selected, suggestedDose, unavailableP
   );
 }
 
-export function MomentSelector({ selected, onSelect, disabled }) {
+export function MomentSelector({ selected, onSelect, disabled, invalid = false, describedBy }) {
   return (
     <div>
       <p className="vaccine-selector-instruction">Selecciona el momento oficial que consta en el antecedente.</p>
-      <div className="vaccine-moment-grid" role="radiogroup" aria-label="Momento de aplicación">
-        {VACCINE_MOMENT_OPTIONS.map((option) => {
+      <div className="vaccine-moment-grid" role="radiogroup" aria-label="Momento de aplicación" aria-invalid={invalid} aria-describedby={describedBy}>
+        {VACCINE_MOMENT_OPTIONS.map((option, index) => {
           const active = selected === option.value;
           return (
             <button
               type="button"
               role="radio"
               aria-checked={active}
+              tabIndex={active || (!selected && index === 0) ? 0 : -1}
               className={`vaccine-moment-choice ${active ? "is-selected" : ""}`}
               disabled={disabled}
               key={option.value}
               onClick={() => onSelect(option.value)}
+              onKeyDown={handleRadioNavigation}
             >
               <strong>{option.label}</strong>
               <small>{option.description}</small>

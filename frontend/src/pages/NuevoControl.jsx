@@ -36,11 +36,12 @@ import "./nuevo-control.css";
 
 // ─── HELPERS ────────────────────────────────────────────────
 function Field({ label, children, col, error, htmlFor }) {
+  const errorId = error && htmlFor ? `${htmlFor}-error` : undefined;
   return (
     <div className="form-group" style={col ? { gridColumn: `span ${col}` } : {}}>
       <label className="input-label" htmlFor={htmlFor}>{label}</label>
       {children}
-      {error && <div className="field-error-text">{error}</div>}
+      {error && <div id={errorId} className="field-error-text" role="alert">{error}</div>}
     </div>
   );
 }
@@ -60,6 +61,8 @@ function Inp({ label, name, type = "text", form, set, col, errors = {}, ...rest 
         className={`input-field ${error ? "input-error" : ""}`}
         type={type}
         value={form[name] ?? ""}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `${inputId}-error` : undefined}
         onWheel={type === "number" ? blurNumberInputOnWheel : undefined}
         onChange={(e) =>
           set(name, type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)
@@ -110,26 +113,42 @@ function LabEntry({ label, realizadoKey, form, set, disabled = false, children }
 
 function LabRow({ label, realizadoKey, resultadoKey, form, set, errors = {}, extra, disabled = false }) {
   const error = errors[resultadoKey];
+  const inputId = `control-${resultadoKey}`;
   return (
     <LabEntry label={label} realizadoKey={realizadoKey} form={form} set={set} disabled={disabled}>
       <div className="control-lab-result-fields">
           <input
+            id={inputId}
+            name={resultadoKey}
             className={`input-field ${error ? "input-error" : ""}`}
             placeholder="Resultado"
+            aria-label={`${label}: resultado`}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? `${inputId}-error` : undefined}
             value={form[resultadoKey] ?? ""}
             onChange={(e) => set(resultadoKey, e.target.value)}
             disabled={disabled}
           />
           {extra}
-          {error && <div className="field-error-text" style={{ flexBasis: "100%" }}>{error}</div>}
+          {error && <div id={`${inputId}-error`} className="field-error-text" role="alert" style={{ flexBasis: "100%" }}>{error}</div>}
       </div>
     </LabEntry>
   );
 }
 
-function ResultadoSelect({ value, onChange, error }) {
+function ResultadoSelect({ value, onChange, error, inputId, name, label }) {
   return (
-    <select className={`input-field ${error ? "input-error" : ""}`} style={{ minWidth: 130 }} value={value ?? ""} onChange={(e) => onChange(e.target.value)}>
+    <select
+      id={inputId}
+      name={name}
+      aria-label={label}
+      aria-invalid={Boolean(error)}
+      aria-describedby={error ? `${inputId}-error` : undefined}
+      className={`input-field ${error ? "input-error" : ""}`}
+      style={{ minWidth: 130 }}
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value)}
+    >
       <option value="">-</option>
       <option value="positivo">Positivo (+)</option>
       <option value="negativo">Negativo (-)</option>
@@ -152,6 +171,7 @@ function parseBloodGroupRh(value = "") {
 
 function BloodGroupRh({ form, set, errors = {} }) {
   const error = errors.grupo_rh_resultado;
+  const inputId = "control-grupo_rh_resultado";
   const { group, rh } = parseBloodGroupRh(form.grupo_rh_resultado);
 
   const updateValue = (nextGroup, nextRh) => {
@@ -159,12 +179,16 @@ function BloodGroupRh({ form, set, errors = {} }) {
   };
 
   return (
-    <Field label="Resultado" error={error}>
+    <Field label="Resultado" error={error} htmlFor={inputId}>
       <div style={{ display: "flex", gap: "0.55rem", flexWrap: "wrap", alignItems: "center" }}>
         <select
+          id={inputId}
+          name="grupo_rh_resultado"
           className={`input-field ${error ? "input-error" : ""}`}
           style={{ width: 120, minWidth: 120 }}
           value={group}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${inputId}-error` : undefined}
           onChange={(e) => updateValue(e.target.value, rh)}
         >
           <option value="">Grupo</option>
@@ -192,6 +216,7 @@ function BloodGroupRh({ form, set, errors = {} }) {
                 fontWeight: 800,
               }}
               aria-pressed={rh === option}
+              aria-label={`Factor RH ${option === "+" ? "positivo" : "negativo"}`}
             >
               {option}
             </button>
@@ -393,6 +418,21 @@ export default function NuevoControl() {
   const inputClass = (name) => `input-field ${fieldErrors[name] ? "input-error" : ""}`;
   const fieldError = (name) => fieldErrors[name];
   const p = { form, set, errors: fieldErrors, disabled: soloLectura };
+  const handleTabKeyDown = (event, currentTabId) => {
+    const currentIndex = TABS.findIndex((item) => item.id === currentTabId);
+    let nextIndex;
+
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") nextIndex = (currentIndex + 1) % TABS.length;
+    else if (event.key === "ArrowLeft" || event.key === "ArrowUp") nextIndex = (currentIndex - 1 + TABS.length) % TABS.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = TABS.length - 1;
+    else return;
+
+    event.preventDefault();
+    const nextTabId = TABS[nextIndex].id;
+    setTab(nextTabId);
+    requestAnimationFrame(() => document.getElementById(`control-tab-${nextTabId}`)?.focus());
+  };
   const visibleFieldErrors = Object.entries(fieldErrors).map(([field, message]) => ({
     field,
     label: CONTROL_FIELD_LABELS[field] || field,
@@ -585,8 +625,10 @@ export default function NuevoControl() {
           icon={ClipboardList}
         >
           <div className="form-section-body col-4">
-            <Field label="No. Control" error={fieldError("numero_control")}>
-              <select className={inputClass("numero_control")} value={form.numero_control}
+            <Field label="No. Control" htmlFor="control-numero_control" error={fieldError("numero_control")}>
+              <select id="control-numero_control" name="numero_control" className={inputClass("numero_control")} value={form.numero_control}
+                aria-invalid={Boolean(fieldError("numero_control"))}
+                aria-describedby={fieldError("numero_control") ? "control-numero_control-error" : undefined}
                 onChange={(e) => set("numero_control", Number(e.target.value))}>
                 {[1,2,3,4].map(n => <option key={n} value={n}>{n}° Control</option>)}
                 {[5,6,7,8,9,10].map(n => <option key={n} value={n}>Otro ({n})</option>)}
@@ -627,7 +669,7 @@ export default function NuevoControl() {
         </fieldset>
 
         {/* TABS */}
-        <div className="control-workflow-tabs" role="tablist" aria-label="Áreas del control prenatal">
+        <div className="control-workflow-tabs" role="tablist" aria-label="Áreas del control prenatal" aria-orientation="horizontal">
           {TABS.map((t) => {
             const Icon = t.icon;
             return (
@@ -638,10 +680,12 @@ export default function NuevoControl() {
                 role="tab"
                 aria-selected={tab === t.id}
                 aria-controls={`control-panel-${t.id}`}
+                tabIndex={tab === t.id ? 0 : -1}
                 onClick={() => setTab(t.id)}
+                onKeyDown={(event) => handleTabKeyDown(event, t.id)}
                 className={`control-workflow-tab ${tab === t.id ? "is-active" : ""}`}
               >
-                <Icon size={14} />{t.label}
+                <Icon size={14} aria-hidden="true" />{t.label}
               </button>
             );
           })}
@@ -670,13 +714,17 @@ export default function NuevoControl() {
                 <Inp label="FR (x min)" name="frecuencia_respiratoria" type="number" {...p} />
                 <Inp label="Temperatura (°C)" name="temperatura" type="number" {...p} />
                 <Inp label="Perímetro braquial (cm)" name="perimetro_braquial_cm" type="number" {...p} />
-                <Field label="Peso (kg)" error={fieldError("peso_kg")}>
-                  <input className={inputClass("peso_kg")} type="number" value={form.peso_kg ?? ""}
+                <Field label="Peso (kg)" htmlFor="control-peso_kg" error={fieldError("peso_kg")}>
+                  <input id="control-peso_kg" name="peso_kg" className={inputClass("peso_kg")} type="number" value={form.peso_kg ?? ""}
+                    aria-invalid={Boolean(fieldError("peso_kg"))}
+                    aria-describedby={fieldError("peso_kg") ? "control-peso_kg-error" : undefined}
                     onWheel={blurNumberInputOnWheel}
                     onChange={(e) => handlePeso(e.target.value === "" ? "" : Number(e.target.value))} />
                 </Field>
-                <Field label="Talla (cm)" error={fieldError("talla_cm")}>
-                  <input className={inputClass("talla_cm")} type="number" value={form.talla_cm ?? ""}
+                <Field label="Talla (cm)" htmlFor="control-talla_cm" error={fieldError("talla_cm")}>
+                  <input id="control-talla_cm" name="talla_cm" className={inputClass("talla_cm")} type="number" value={form.talla_cm ?? ""}
+                    aria-invalid={Boolean(fieldError("talla_cm"))}
+                    aria-describedby={fieldError("talla_cm") ? "control-talla_cm-error" : undefined}
                     onWheel={blurNumberInputOnWheel}
                     onChange={(e) => handleTalla(e.target.value === "" ? "" : Number(e.target.value))} />
                 </Field>
@@ -725,12 +773,16 @@ export default function NuevoControl() {
               icon={FileText}
             >
               <div className="form-section-body col-2">
-                <Field label="Impresión clínica" col={2} error={fieldError("impresion_clinica")}>
-                  <textarea className={inputClass("impresion_clinica")} rows={2} value={form.impresion_clinica}
+                <Field label="Impresión clínica" htmlFor="control-impresion_clinica" col={2} error={fieldError("impresion_clinica")}>
+                  <textarea id="control-impresion_clinica" name="impresion_clinica" className={inputClass("impresion_clinica")} rows={2} value={form.impresion_clinica}
+                    aria-invalid={Boolean(fieldError("impresion_clinica"))}
+                    aria-describedby={fieldError("impresion_clinica") ? "control-impresion_clinica-error" : undefined}
                     onChange={(e) => set("impresion_clinica", e.target.value)} />
                 </Field>
-                <Field label="Tratamiento" col={2} error={fieldError("tratamiento")}>
-                  <textarea className={inputClass("tratamiento")} rows={2} value={form.tratamiento}
+                <Field label="Tratamiento" htmlFor="control-tratamiento" col={2} error={fieldError("tratamiento")}>
+                  <textarea id="control-tratamiento" name="tratamiento" className={inputClass("tratamiento")} rows={2} value={form.tratamiento}
+                    aria-invalid={Boolean(fieldError("tratamiento"))}
+                    aria-describedby={fieldError("tratamiento") ? "control-tratamiento-error" : undefined}
                     onChange={(e) => set("tratamiento", e.target.value)} />
                 </Field>
                 <Inp label="Cita siguiente" name="cita_siguiente" type="date" {...p} />
@@ -779,8 +831,10 @@ export default function NuevoControl() {
             {puedeCapturarVih && (
               <LabEntry label="VIH" realizadoKey="vih_realizado" {...p}>
                   <div className="control-lab-result-fields">
-                    <Field label="Resultado" error={fieldError("vih_resultado")}>
-                      <select className={inputClass("vih_resultado")} style={{ minWidth: 130 }} value={form.vih_resultado}
+                    <Field label="Resultado" htmlFor="control-vih_resultado" error={fieldError("vih_resultado")}>
+                      <select id="control-vih_resultado" name="vih_resultado" className={inputClass("vih_resultado")} style={{ minWidth: 130 }} value={form.vih_resultado}
+                        aria-invalid={Boolean(fieldError("vih_resultado"))}
+                        aria-describedby={fieldError("vih_resultado") ? "control-vih_resultado-error" : undefined}
                         onChange={(e) => set("vih_resultado", e.target.value)}>
                         <option value="">-</option>
                         <option value="positivo">Positivo (+)</option>
@@ -794,8 +848,10 @@ export default function NuevoControl() {
             {/* VDRL/RPR */}
             <LabEntry label="VDRL / RPR" realizadoKey="vdrl_realizado" {...p}>
                 <div className="control-lab-result-fields">
-                  <Field label="Resultado" error={fieldError("vdrl_resultado")}>
-                    <select className={inputClass("vdrl_resultado")} style={{ minWidth: 130 }} value={form.vdrl_resultado}
+                  <Field label="Resultado" htmlFor="control-vdrl_resultado" error={fieldError("vdrl_resultado")}>
+                    <select id="control-vdrl_resultado" name="vdrl_resultado" className={inputClass("vdrl_resultado")} style={{ minWidth: 130 }} value={form.vdrl_resultado}
+                      aria-invalid={Boolean(fieldError("vdrl_resultado"))}
+                      aria-describedby={fieldError("vdrl_resultado") ? "control-vdrl_resultado-error" : undefined}
                       onChange={(e) => set("vdrl_resultado", e.target.value)}>
                       <option value="">-</option>
                       <option value="positivo">Positivo (+)</option>
@@ -808,11 +864,15 @@ export default function NuevoControl() {
             {/* TORCH */}
             <LabEntry label="TORCH" realizadoKey="torch_realizado" {...p}>
                 <div className="control-lab-result-fields">
-                  <Field label="Resultado" error={fieldError("torch_resultado_positivo")}>
+                  <Field label="Resultado" htmlFor="control-torch_resultado_positivo" error={fieldError("torch_resultado_positivo")}>
                     <select
+                      id="control-torch_resultado_positivo"
+                      name="torch_resultado_positivo"
                       className={inputClass("torch_resultado_positivo")}
                       style={{ minWidth: 130 }}
                       value={form.torch_resultado_positivo === true ? "positivo" : form.torch_resultado_positivo === false ? "negativo" : ""}
+                      aria-invalid={Boolean(fieldError("torch_resultado_positivo"))}
+                      aria-describedby={fieldError("torch_resultado_positivo") ? "control-torch_resultado_positivo-error" : undefined}
                       onChange={(e) =>
                         set(
                           "torch_resultado_positivo",
@@ -831,8 +891,11 @@ export default function NuevoControl() {
             {/* Papanicolau / IVAA */}
             <LabEntry label="Papanicolau / IVAA" realizadoKey="papanicolau_ivaa_realizado" {...p}>
                 <div className="control-lab-result-fields">
-                  <Field label="Resultado" error={fieldError("papanicolau_ivaa_resultado")}>
+                  <Field label="Resultado" htmlFor="control-papanicolau_ivaa_resultado" error={fieldError("papanicolau_ivaa_resultado")}>
                     <ResultadoSelect
+                      inputId="control-papanicolau_ivaa_resultado"
+                      name="papanicolau_ivaa_resultado"
+                      label="Papanicolau / IVAA: resultado"
                       value={form.papanicolau_ivaa_resultado}
                       onChange={(value) => set("papanicolau_ivaa_resultado", value)}
                       error={fieldError("papanicolau_ivaa_resultado")}
@@ -844,8 +907,11 @@ export default function NuevoControl() {
             {/* Hepatitis B */}
             <LabEntry label="Hepatitis B" realizadoKey="hepatitis_b_realizado" {...p}>
                 <div className="control-lab-result-fields">
-                  <Field label="Resultado" error={fieldError("hepatitis_b_resultado")}>
+                  <Field label="Resultado" htmlFor="control-hepatitis_b_resultado" error={fieldError("hepatitis_b_resultado")}>
                     <ResultadoSelect
+                      inputId="control-hepatitis_b_resultado"
+                      name="hepatitis_b_resultado"
+                      label="Hepatitis B: resultado"
                       value={form.hepatitis_b_resultado}
                       onChange={(value) => set("hepatitis_b_resultado", value)}
                       error={fieldError("hepatitis_b_resultado")}
@@ -857,8 +923,10 @@ export default function NuevoControl() {
             {/* USG */}
             <LabEntry label="USG (Ultrasonido)" realizadoKey="usg_realizado" {...p}>
                 <div className="control-lab-result-fields">
-                  <Field label="Hallazgos de USG" error={fieldError("usg_hallazgos")}>
-                    <textarea className={inputClass("usg_hallazgos")} rows={2} value={form.usg_hallazgos}
+                  <Field label="Hallazgos de USG" htmlFor="control-usg_hallazgos" error={fieldError("usg_hallazgos")}>
+                    <textarea id="control-usg_hallazgos" name="usg_hallazgos" className={inputClass("usg_hallazgos")} rows={2} value={form.usg_hallazgos}
+                      aria-invalid={Boolean(fieldError("usg_hallazgos"))}
+                      aria-describedby={fieldError("usg_hallazgos") ? "control-usg_hallazgos-error" : undefined}
                       onChange={(e) => set("usg_hallazgos", e.target.value)} />
                   </Field>
                 </div>
@@ -866,8 +934,10 @@ export default function NuevoControl() {
             </div>
 
             <div className="control-lab-other">
-              <Field label="Otros laboratorios" error={fieldError("otros_lab")}>
-                <textarea className={inputClass("otros_lab")} rows={2} value={form.otros_lab}
+              <Field label="Otros laboratorios" htmlFor="control-otros_lab" error={fieldError("otros_lab")}>
+                <textarea id="control-otros_lab" name="otros_lab" className={inputClass("otros_lab")} rows={2} value={form.otros_lab}
+                  aria-invalid={Boolean(fieldError("otros_lab"))}
+                  aria-describedby={fieldError("otros_lab") ? "control-otros_lab-error" : undefined}
                   onChange={(e) => set("otros_lab", e.target.value)}
                   placeholder="Gota gruesa (malaria), Tamizaje Chagas, etc." />
               </Field>
@@ -917,12 +987,16 @@ export default function NuevoControl() {
               icon={FileText}
             >
               <div className="form-section-body col-2">
-                <Field label="Hallazgos" col={2} error={fieldError("suplementacion_hallazgos")}>
-                  <textarea className={inputClass("suplementacion_hallazgos")} rows={2} value={form.suplementacion_hallazgos}
+                <Field label="Hallazgos" htmlFor="control-suplementacion_hallazgos" col={2} error={fieldError("suplementacion_hallazgos")}>
+                  <textarea id="control-suplementacion_hallazgos" name="suplementacion_hallazgos" className={inputClass("suplementacion_hallazgos")} rows={2} value={form.suplementacion_hallazgos}
+                    aria-invalid={Boolean(fieldError("suplementacion_hallazgos"))}
+                    aria-describedby={fieldError("suplementacion_hallazgos") ? "control-suplementacion_hallazgos-error" : undefined}
                     onChange={(e) => set("suplementacion_hallazgos", e.target.value)} />
                 </Field>
-                <Field label="Tratamiento" col={2} error={fieldError("suplementacion_tratamiento")}>
-                  <textarea className={inputClass("suplementacion_tratamiento")} rows={2} value={form.suplementacion_tratamiento}
+                <Field label="Tratamiento" htmlFor="control-suplementacion_tratamiento" col={2} error={fieldError("suplementacion_tratamiento")}>
+                  <textarea id="control-suplementacion_tratamiento" name="suplementacion_tratamiento" className={inputClass("suplementacion_tratamiento")} rows={2} value={form.suplementacion_tratamiento}
+                    aria-invalid={Boolean(fieldError("suplementacion_tratamiento"))}
+                    aria-describedby={fieldError("suplementacion_tratamiento") ? "control-suplementacion_tratamiento-error" : undefined}
                     onChange={(e) => set("suplementacion_tratamiento", e.target.value)} />
                 </Field>
               </div>
@@ -958,8 +1032,10 @@ export default function NuevoControl() {
               <Toggle label="Importancia de tratamiento de ITS a cónyuge/pareja" name="orient_tratamiento_its_pareja" {...p} />
             </div>
             <div className="control-section-followup">
-              <Field label="Otras orientaciones" error={fieldError("orient_otros")}>
-                <input className={inputClass("orient_otros")} value={form.orient_otros}
+              <Field label="Otras orientaciones" htmlFor="control-orient_otros" error={fieldError("orient_otros")}>
+                <input id="control-orient_otros" name="orient_otros" className={inputClass("orient_otros")} value={form.orient_otros}
+                  aria-invalid={Boolean(fieldError("orient_otros"))}
+                  aria-describedby={fieldError("orient_otros") ? "control-orient_otros-error" : undefined}
                   onChange={(e) => set("orient_otros", e.target.value)} />
               </Field>
             </div>

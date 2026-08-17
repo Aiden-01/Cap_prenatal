@@ -110,20 +110,24 @@ function inferPuerperioFieldErrors(err) {
 }
 
 function Field({ label, children, error, htmlFor, className = "" }) {
+  const errorId = error && htmlFor ? `${htmlFor}-error` : undefined;
   return (
     <div className={`form-group ${className}`.trim()}>
       <label className="input-label" htmlFor={htmlFor}>{label}</label>
       {children}
-      {error && <div className="field-error-text">{error}</div>}
+      {error && <div id={errorId} className="field-error-text" role="alert">{error}</div>}
     </div>
   );
 }
 
 function Input({ label, name, form, set, type = "text", errors = {}, inputClass, ...rest }) {
   const inputId = `puerperio-${name}`;
+  const error = errors[name];
   return (
-    <Field label={label} error={errors[name]} htmlFor={inputId}>
-      <input id={inputId} className={inputClass ? inputClass(name) : "input-field"} type={type} value={form[name] ?? ""}
+    <Field label={label} error={error} htmlFor={inputId}>
+      <input id={inputId} name={name} className={inputClass ? inputClass(name) : "input-field"} type={type} value={form[name] ?? ""}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `${inputId}-error` : undefined}
         onChange={(e) => set(name, type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
         onWheel={type === "number" ? preventNumberWheel : undefined}
         {...rest}
@@ -259,7 +263,10 @@ export default function PuerperioForm() {
               <Input label="Lugar del parto" name="lugar_atencion_parto" {...p} />
               <Input label="Quién atendió parto" name="quien_atendio_parto" {...p} />
               <Field label="Tipo de parto" htmlFor="puerperio-tipo_parto" error={fieldErrors.fieldError("tipo_parto")}>
-                <select id="puerperio-tipo_parto" className={fieldErrors.inputClass("tipo_parto")} value={form.tipo_parto} onChange={(e) => set("tipo_parto", e.target.value)}>
+                <select id="puerperio-tipo_parto" name="tipo_parto" className={fieldErrors.inputClass("tipo_parto")} value={form.tipo_parto}
+                  aria-invalid={Boolean(fieldErrors.fieldError("tipo_parto"))}
+                  aria-describedby={fieldErrors.fieldError("tipo_parto") ? "puerperio-tipo_parto-error" : undefined}
+                  onChange={(e) => set("tipo_parto", e.target.value)}>
                   <option value="">—</option><option value="vaginal">Vaginal</option><option value="cesarea">Cesárea</option>
                 </select>
               </Field>
@@ -300,7 +307,10 @@ export default function PuerperioForm() {
                 ["examen_ginecologico", "Examen ginecológico"],
               ].map(([name, label]) => (
                 <Field key={name} label={label} htmlFor={`puerperio-${name}`} error={fieldErrors.fieldError(name)}>
-                  <textarea id={`puerperio-${name}`} className={fieldErrors.inputClass(name)} rows={3} value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)} />
+                  <textarea id={`puerperio-${name}`} name={name} className={fieldErrors.inputClass(name)} rows={3} value={form[name] ?? ""}
+                    aria-invalid={Boolean(fieldErrors.fieldError(name))}
+                    aria-describedby={fieldErrors.fieldError(name) ? `puerperio-${name}-error` : undefined}
+                    onChange={(e) => set(name, e.target.value)} />
                 </Field>
               ))}
             </div>
@@ -320,7 +330,10 @@ export default function PuerperioForm() {
                 ["tratamiento", "Tratamiento"],
               ].map(([name, label]) => (
                 <Field key={name} label={label} htmlFor={`puerperio-${name}`} error={fieldErrors.fieldError(name)}>
-                  <textarea id={`puerperio-${name}`} className={fieldErrors.inputClass(name)} rows={4} value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)} />
+                  <textarea id={`puerperio-${name}`} name={name} className={fieldErrors.inputClass(name)} rows={4} value={form[name] ?? ""}
+                    aria-invalid={Boolean(fieldErrors.fieldError(name))}
+                    aria-describedby={fieldErrors.fieldError(name) ? `puerperio-${name}-error` : undefined}
+                    onChange={(e) => set(name, e.target.value)} />
                 </Field>
               ))}
               <Input label="Nombre/cargo atiende" name="nombre_cargo_atiende" {...p} />

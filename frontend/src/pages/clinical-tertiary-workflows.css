@@ -312,12 +312,16 @@ html.dark .tertiary-toggle:focus-within {
 
 @media (prefers-reduced-motion: reduce) {
   .tertiary-flow-panel,
-  .vaccine-workflow .vaccine-stage-section {
+  .vaccine-workflow .vaccine-stage-section,
+  .vaccine-workflow .vaccine-clinical-dialog {
     animation: none !important;
   }
 
   .tertiary-toggle,
-  .tertiary-workflow .input-label {
+  .tertiary-workflow .input-label,
+  .vaccine-workflow .vaccine-choice,
+  .vaccine-workflow .vaccine-dose-choice,
+  .vaccine-workflow .vaccine-moment-choice {
     transition: none !important;
   }
 }

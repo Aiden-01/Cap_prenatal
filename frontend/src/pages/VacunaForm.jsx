@@ -72,12 +72,14 @@ function inferVacunaFieldErrors(error) {
 }
 
 function Field({ id, label, children, error, hint }) {
+  const hintId = hint ? `${id}-hint` : undefined;
+  const errorId = error ? `${id}-error` : undefined;
   return (
     <div className="form-group">
       <label className="input-label" htmlFor={id}>{label}</label>
       {children}
-      {hint ? <div className="vaccine-field-hint">{hint}</div> : null}
-      {error ? <div className="field-error-text">{error}</div> : null}
+      {hint ? <div id={hintId} className="vaccine-field-hint">{hint}</div> : null}
+      {error ? <div id={errorId} className="field-error-text" role="alert">{error}</div> : null}
     </div>
   );
 }
@@ -354,6 +356,10 @@ export default function VacunaForm() {
 
   const patientContext = expediente?.paciente || null;
   const patientName = `${patientContext?.nombres || ""} ${patientContext?.apellidos || ""}`.trim();
+  const vaccineTypeError = fieldErrors.fieldError("tipo_vacuna");
+  const doseError = fieldErrors.fieldError("numero_dosis");
+  const momentError = fieldErrors.fieldError("momento");
+  const dateError = fieldErrors.fieldError("fecha_dosis");
 
   return (
     <ClinicalWorkflowShell
@@ -378,8 +384,14 @@ export default function VacunaForm() {
           description="TD y Tdap se registran como vacunas diferentes."
           aside={<span className="tertiary-section-index">Paso 1</span>}
         >
-          <VaccineSelector selected={form.tipo_vacuna} onSelect={selectVaccine} disabled={loading || readOnly} />
-          {fieldErrors.fieldError("tipo_vacuna") ? <div className="field-error-text">{fieldErrors.fieldError("tipo_vacuna")}</div> : null}
+          <VaccineSelector
+            selected={form.tipo_vacuna}
+            onSelect={selectVaccine}
+            disabled={loading || readOnly}
+            invalid={Boolean(vaccineTypeError)}
+            describedBy={vaccineTypeError ? "vaccine-type-error" : undefined}
+          />
+          {vaccineTypeError ? <div id="vaccine-type-error" className="field-error-text" role="alert">{vaccineTypeError}</div> : null}
         </ClinicalSection>
 
         {form.tipo_vacuna && status ? (
@@ -401,19 +413,30 @@ export default function VacunaForm() {
                     unavailablePositions={unavailablePositions}
                     onSelect={selectDose}
                     disabled={loading || readOnly}
+                    invalid={Boolean(doseError)}
+                    describedBy={doseError ? "vaccine-dose-error" : undefined}
                   />
-                  {fieldErrors.fieldError("numero_dosis") ? <div className="field-error-text">{fieldErrors.fieldError("numero_dosis")}</div> : null}
+                  {doseError ? <div id="vaccine-dose-error" className="field-error-text" role="alert">{doseError}</div> : null}
                   {missingPreviousPositions ? <div className="vaccine-clinical-message is-warning"><AlertTriangle size={18} /><span>Las dosis anteriores no constan en el sistema. Verifica el carné o antecedente presentado por la paciente.</span></div> : null}
                 </>
               ) : null}
 
               <div className="vaccine-form-divider" />
-              <MomentSelector selected={form.momento} onSelect={selectMoment} disabled={loading || readOnly} />
-              {fieldErrors.fieldError("momento") ? <div className="field-error-text">{fieldErrors.fieldError("momento")}</div> : null}
+              <MomentSelector
+                selected={form.momento}
+                onSelect={selectMoment}
+                disabled={loading || readOnly}
+                invalid={Boolean(momentError)}
+                describedBy={momentError ? "vaccine-moment-error" : undefined}
+              />
+              {momentError ? <div id="vaccine-moment-error" className="field-error-text" role="alert">{momentError}</div> : null}
 
               <div className="vaccine-date-row">
-                <Field id="vaccine-application-date" label="Fecha de aplicación" error={fieldErrors.fieldError("fecha_dosis")} hint="Fecha clínica sin hora. No puede ser futura.">
-                  <input id="vaccine-application-date" name="fecha_dosis" className={fieldErrors.inputClass("fecha_dosis")} type="date" max={today} required value={form.fecha_dosis} disabled={loading || readOnly} onChange={(event) => setApplicationDate(event.target.value)} />
+                <Field id="vaccine-application-date" label="Fecha de aplicación" error={dateError} hint="Fecha clínica sin hora. No puede ser futura.">
+                  <input id="vaccine-application-date" name="fecha_dosis" className={fieldErrors.inputClass("fecha_dosis")} type="date" max={today} required value={form.fecha_dosis}
+                    aria-invalid={Boolean(dateError)}
+                    aria-describedby={["vaccine-application-date-hint", dateError ? "vaccine-application-date-error" : ""].filter(Boolean).join(" ")}
+                    disabled={loading || readOnly} onChange={(event) => setApplicationDate(event.target.value)} />
                 </Field>
               </div>
 

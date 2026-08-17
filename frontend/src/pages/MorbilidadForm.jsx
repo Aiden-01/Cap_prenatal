@@ -44,11 +44,12 @@ const FIELD_LABELS = {
 };
 
 function Field({ label, children, error, htmlFor, className = "" }) {
+  const errorId = error && htmlFor ? `${htmlFor}-error` : undefined;
   return (
     <div className={`form-group ${className}`.trim()}>
       <label className="input-label" htmlFor={htmlFor}>{label}</label>
       {children}
-      {error && <div className="field-error-text">{error}</div>}
+      {error && <div id={errorId} className="field-error-text" role="alert">{error}</div>}
     </div>
   );
 }
@@ -138,16 +139,28 @@ export default function MorbilidadForm() {
           >
             <div className="morbidity-identity-grid">
               <Field label="Fecha" htmlFor="morbilidad-fecha" error={fieldErrors.fieldError("fecha")}>
-                <input id="morbilidad-fecha" className={fieldErrors.inputClass("fecha")} type="date" value={form.fecha} onChange={(e) => set("fecha", e.target.value)} />
+                <input id="morbilidad-fecha" name="fecha" className={fieldErrors.inputClass("fecha")} type="date" value={form.fecha}
+                  aria-invalid={Boolean(fieldErrors.fieldError("fecha"))}
+                  aria-describedby={fieldErrors.fieldError("fecha") ? "morbilidad-fecha-error" : undefined}
+                  onChange={(e) => set("fecha", e.target.value)} />
               </Field>
               <Field label="Hora" htmlFor="morbilidad-hora" error={fieldErrors.fieldError("hora")}>
-                <input id="morbilidad-hora" className={fieldErrors.inputClass("hora")} type="time" value={form.hora ?? ""} onChange={(e) => set("hora", e.target.value)} />
+                <input id="morbilidad-hora" name="hora" className={fieldErrors.inputClass("hora")} type="time" value={form.hora ?? ""}
+                  aria-invalid={Boolean(fieldErrors.fieldError("hora"))}
+                  aria-describedby={fieldErrors.fieldError("hora") ? "morbilidad-hora-error" : undefined}
+                  onChange={(e) => set("hora", e.target.value)} />
               </Field>
               <Field label="Motivo de consulta" htmlFor="morbilidad-motivo_consulta" error={fieldErrors.fieldError("motivo_consulta")} className="is-wide">
-                <input id="morbilidad-motivo_consulta" className={fieldErrors.inputClass("motivo_consulta")} value={form.motivo_consulta ?? ""} onChange={(e) => set("motivo_consulta", e.target.value)} />
+                <input id="morbilidad-motivo_consulta" name="motivo_consulta" className={fieldErrors.inputClass("motivo_consulta")} value={form.motivo_consulta ?? ""}
+                  aria-invalid={Boolean(fieldErrors.fieldError("motivo_consulta"))}
+                  aria-describedby={fieldErrors.fieldError("motivo_consulta") ? "morbilidad-motivo_consulta-error" : undefined}
+                  onChange={(e) => set("motivo_consulta", e.target.value)} />
               </Field>
               <Field label="Nombre / cargo atiende" htmlFor="morbilidad-nombre_cargo_atiende" error={fieldErrors.fieldError("nombre_cargo_atiende")} className="is-wide">
-                <input id="morbilidad-nombre_cargo_atiende" className={fieldErrors.inputClass("nombre_cargo_atiende")} value={form.nombre_cargo_atiende ?? ""} onChange={(e) => set("nombre_cargo_atiende", e.target.value)} />
+                <input id="morbilidad-nombre_cargo_atiende" name="nombre_cargo_atiende" className={fieldErrors.inputClass("nombre_cargo_atiende")} value={form.nombre_cargo_atiende ?? ""}
+                  aria-invalid={Boolean(fieldErrors.fieldError("nombre_cargo_atiende"))}
+                  aria-describedby={fieldErrors.fieldError("nombre_cargo_atiende") ? "morbilidad-nombre_cargo_atiende-error" : undefined}
+                  onChange={(e) => set("nombre_cargo_atiende", e.target.value)} />
               </Field>
             </div>
           </ClinicalSection>
@@ -167,7 +180,10 @@ export default function MorbilidadForm() {
                 ["impresion_clinica", "Impresión clínica"],
               ].map(([name, label]) => (
                 <Field key={name} label={label} htmlFor={`morbilidad-${name}`} error={fieldErrors.fieldError(name)}>
-                  <textarea id={`morbilidad-${name}`} className={fieldErrors.inputClass(name)} rows={3} value={form[name] ?? ""} onChange={(e) => set(name, e.target.value)} />
+                  <textarea id={`morbilidad-${name}`} name={name} className={fieldErrors.inputClass(name)} rows={3} value={form[name] ?? ""}
+                    aria-invalid={Boolean(fieldErrors.fieldError(name))}
+                    aria-describedby={fieldErrors.fieldError(name) ? `morbilidad-${name}-error` : undefined}
+                    onChange={(e) => set(name, e.target.value)} />
                 </Field>
               ))}
             </div>
@@ -181,7 +197,10 @@ export default function MorbilidadForm() {
             aside={<span className="tertiary-section-index">03</span>}
           >
             <Field label="Tratamiento / Referencia" htmlFor="morbilidad-tratamiento_referencia" error={fieldErrors.fieldError("tratamiento_referencia")}>
-              <textarea id="morbilidad-tratamiento_referencia" className={fieldErrors.inputClass("tratamiento_referencia")} rows={4} value={form.tratamiento_referencia ?? ""} onChange={(e) => set("tratamiento_referencia", e.target.value)} />
+              <textarea id="morbilidad-tratamiento_referencia" name="tratamiento_referencia" className={fieldErrors.inputClass("tratamiento_referencia")} rows={4} value={form.tratamiento_referencia ?? ""}
+                aria-invalid={Boolean(fieldErrors.fieldError("tratamiento_referencia"))}
+                aria-describedby={fieldErrors.fieldError("tratamiento_referencia") ? "morbilidad-tratamiento_referencia-error" : undefined}
+                onChange={(e) => set("tratamiento_referencia", e.target.value)} />
             </Field>
           </ClinicalSection>
         </div>

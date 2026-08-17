@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   CalendarDays,
@@ -27,6 +27,8 @@ const FormErrorContext = createContext({
   fieldError: () => "",
   inputClass: () => "input-field",
 });
+
+const FOCUSABLE_SELECTOR = "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
 
 function useFormErrorUi() {
   return useContext(FormErrorContext);
@@ -270,6 +272,8 @@ export default function FichaRiesgo() {
   const [loadingData, setLoadingData] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showReferralAlert, setShowReferralAlert] = useState(false);
+  const referralDialogRef = useRef(null);
+  const referralPrimaryActionRef = useRef(null);
   const fieldErrors = useFieldErrors(FIELD_LABELS);
 
   const set = (k, v) => fieldErrors.setFormValue(setForm, k, v);
@@ -318,6 +322,46 @@ export default function FichaRiesgo() {
       .catch(() => toast("Error al cargar datos de la paciente", "error"))
       .finally(() => setLoadingData(false));
   }, [id, embarazoId, expedientePath, navigate, toast]);
+
+  useEffect(() => {
+    if (!showReferralAlert) return undefined;
+
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    referralPrimaryActionRef.current?.focus();
+
+    const handleDialogKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setShowReferralAlert(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = [...(referralDialogRef.current?.querySelectorAll(FOCUSABLE_SELECTOR) || [])];
+      if (!focusable.length) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleDialogKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleDialogKeyDown);
+      document.body.style.overflow = previousOverflow;
+      requestAnimationFrame(() => previousFocus?.focus());
+    };
+  }, [showReferralAlert]);
 
   const saveFicha = async () => {
     setLoading(true);
@@ -373,6 +417,7 @@ export default function FichaRiesgo() {
       {showReferralAlert && (
         <div className="secondary-dialog-backdrop">
           <div
+            ref={referralDialogRef}
             className="secondary-dialog"
             role="dialog"
             aria-modal="true"
@@ -390,7 +435,7 @@ export default function FichaRiesgo() {
               <button type="button" className="btn-secondary is-warning" onClick={handleSkipReferral} disabled={loading}>
                 No añadir
               </button>
-              <button type="button" className="btn-primary" onClick={handleAddReferral}>
+              <button ref={referralPrimaryActionRef} type="button" className="btn-primary" onClick={handleAddReferral}>
                 Añadir referencia
               </button>
             </div>
