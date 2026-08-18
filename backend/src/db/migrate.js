@@ -1,7 +1,10 @@
-const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const pool = require('./pool');
+const {
+  calculateMigrationChecksum,
+  isMigrationChecksumCompatible,
+} = require('./migrationChecksum');
 
 const DEFAULT_SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 const DEFAULT_MIGRATIONS_DIR = path.join(__dirname, 'migrations');
@@ -22,7 +25,7 @@ function discoverMigrationFiles({
 }
 
 function checksum(sql) {
-  return crypto.createHash('sha256').update(sql, 'utf8').digest('hex');
+  return calculateMigrationChecksum(sql);
 }
 
 async function inTransaction(db, callback) {
@@ -55,7 +58,7 @@ async function ensureMigrationRegistry(db) {
   );
 }
 
-async function applyMigration({ db, filename, sql, sqlChecksum }) {
+async function applyMigration({ db, filename, sql }) {
   return inTransaction(db, async () => {
     await db.query('SELECT pg_advisory_xact_lock(hashtext($1))', [MIGRATIONS_LOCK_NAME]);
     const { rows = [] } = await db.query(
@@ -63,7 +66,7 @@ async function applyMigration({ db, filename, sql, sqlChecksum }) {
       [filename]
     );
     if (rows[0]) {
-      if (rows[0].checksum !== sqlChecksum) {
+      if (!isMigrationChecksumCompatible(rows[0].checksum, sql)) {
         throw new Error(`La migracion aplicada fue modificada: ${filename}`);
       }
       return false;
@@ -72,7 +75,7 @@ async function applyMigration({ db, filename, sql, sqlChecksum }) {
     await db.query(sql);
     await db.query(
       'INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2)',
-      [filename, sqlChecksum]
+      [filename, calculateMigrationChecksum(sql)]
     );
     return true;
   });
@@ -109,7 +112,6 @@ async function migrate({
         db: client,
         filename: migration.filename,
         sql,
-        sqlChecksum: checksum(sql),
       });
       if (wasApplied) applied += 1;
       else skipped += 1;

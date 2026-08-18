@@ -2,9 +2,12 @@ const fs = require('fs');
 const pool = require('./pool');
 const {
   DEFAULT_MIGRATIONS_DIR,
-  checksum,
   discoverMigrationFiles,
 } = require('./migrate');
+const {
+  calculateMigrationChecksum,
+  isMigrationChecksumCompatible,
+} = require('./migrationChecksum');
 
 const REQUIRED_MIGRATIONS = Object.freeze([
   '008_retirar_referencias_efectuadas.sql',
@@ -44,9 +47,11 @@ function loadRequiredMigrations({
 
   return REQUIRED_MIGRATIONS.map((filename) => {
     const migration = discovered.get(filename);
+    const sql = readMigration(migration.path, 'utf8');
     return {
       filename,
-      checksum: checksum(readMigration(migration.path, 'utf8')),
+      checksum: calculateMigrationChecksum(sql),
+      sql,
     };
   });
 }
@@ -103,9 +108,12 @@ async function assertSchemaCompatible(
   }
 
   const pendingOrModified = requiredMigrations
-    .filter(({ filename, checksum: expectedChecksum }) => (
-      appliedMigrations.get(filename) !== expectedChecksum
-    ))
+    .filter(({ filename, checksum: expectedChecksum, sql }) => {
+      const storedChecksum = appliedMigrations.get(filename);
+      return typeof sql === 'string'
+        ? !isMigrationChecksumCompatible(storedChecksum, sql)
+        : storedChecksum !== expectedChecksum;
+    })
     .map(({ filename }) => filename);
 
   if (!registryIsCompatible || pendingOrModified.length > 0) {

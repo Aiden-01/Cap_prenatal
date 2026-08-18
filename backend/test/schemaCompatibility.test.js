@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
@@ -10,8 +11,15 @@ const {
   assertSchemaCompatible,
   loadRequiredMigrations,
 } = require('../src/db/schemaCompatibility');
+const {
+  calculateMigrationChecksum,
+} = require('../src/db/migrationChecksum');
 
 const REQUIRED_STATE = loadRequiredMigrations();
+
+function legacyChecksum(sql) {
+  return crypto.createHash('sha256').update(sql, 'utf8').digest('hex');
+}
 
 function createRegistry({ rows = REQUIRED_STATE, registry = 'schema_migrations', queryError } = {}) {
   const calls = [];
@@ -78,6 +86,71 @@ test('un checksum incorrecto impide el arranque', async () => {
   await rejectsAsPending(
     assertSchemaCompatible(createRegistry({ rows }).db),
     /010_vax31_historias_parciales\.sql/i
+  );
+});
+
+test('schemaCompatibility acepta checksum historico CRLF con archivo actual LF', async () => {
+  const filename = REQUIRED_MIGRATIONS[0];
+  const currentSql = 'CREATE TABLE ejemplo (id INTEGER);\nSELECT 1;\n';
+  const historicalSql = currentSql.replace(/\n/g, '\r\n');
+  const requiredMigrations = [{
+    filename,
+    checksum: calculateMigrationChecksum(currentSql),
+    sql: currentSql,
+  }];
+  const registry = createRegistry({
+    rows: [{ filename, checksum: legacyChecksum(historicalSql) }],
+  });
+
+  await assertSchemaCompatible(registry.db, { requiredMigrations });
+});
+
+test('schemaCompatibility acepta checksum historico LF con archivo actual CRLF', async () => {
+  const filename = REQUIRED_MIGRATIONS[0];
+  const historicalSql = 'CREATE TABLE ejemplo (id INTEGER);\nSELECT 1;\n';
+  const currentSql = historicalSql.replace(/\n/g, '\r\n');
+  const requiredMigrations = [{
+    filename,
+    checksum: calculateMigrationChecksum(currentSql),
+    sql: currentSql,
+  }];
+  const registry = createRegistry({
+    rows: [{ filename, checksum: legacyChecksum(historicalSql) }],
+  });
+
+  await assertSchemaCompatible(registry.db, { requiredMigrations });
+});
+
+test('schemaCompatibility rechaza una modificacion SQL real aunque cambien los finales de linea', async () => {
+  const filename = REQUIRED_MIGRATIONS[0];
+  const historicalSql = 'CREATE TABLE ejemplo (id TEXT);\r\n';
+  const currentSql = 'CREATE TABLE ejemplo (id INTEGER);\n';
+  const requiredMigrations = [{
+    filename,
+    checksum: calculateMigrationChecksum(currentSql),
+    sql: currentSql,
+  }];
+  const registry = createRegistry({
+    rows: [{ filename, checksum: legacyChecksum(historicalSql) }],
+  });
+
+  await rejectsAsPending(
+    assertSchemaCompatible(registry.db, { requiredMigrations }),
+    /008_retirar_referencias_efectuadas\.sql/i
+  );
+});
+
+test('loadRequiredMigrations calcula checksums canonicos LF', () => {
+  const sql = 'SELECT 1;\r\nSELECT 2;\r';
+  const migrations = loadRequiredMigrations({
+    migrationsDir: 'migrations-test',
+    readDirectory: () => [...REQUIRED_MIGRATIONS],
+    readMigration: () => sql,
+  });
+
+  assert.equal(
+    migrations.every(({ checksum }) => checksum === calculateMigrationChecksum(sql)),
+    true
   );
 });
 

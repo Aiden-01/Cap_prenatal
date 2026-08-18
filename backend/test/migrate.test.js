@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const path = require('node:path');
 const test = require('node:test');
 
@@ -7,6 +8,14 @@ const {
   discoverMigrationFiles,
   migrate,
 } = require('../src/db/migrate');
+const {
+  calculateMigrationChecksum,
+  normalizeLineEndings,
+} = require('../src/db/migrationChecksum');
+
+function legacyChecksum(sql) {
+  return crypto.createHash('sha256').update(sql, 'utf8').digest('hex');
+}
 
 function createHarness({ query = null, closeError = null } = {}) {
   const calls = { query: [], end: 0 };
@@ -145,10 +154,79 @@ test('omite una migracion ya registrada con el mismo checksum', async () => {
   assert.match(harness.entries.log[0].join(' '), /0 aplicada\(s\), 1 omitida\(s\)/);
 });
 
-test('rechaza una migracion aplicada cuyo archivo fue modificado y revierte', async () => {
+test('acepta un checksum historico CRLF cuando el archivo actual usa LF', async () => {
+  const currentSql = 'CREATE TABLE ejemplo (id INTEGER);\nSELECT 1;\n';
+  const historicalSql = currentSql.replace(/\n/g, '\r\n');
   const harness = createHarness({
     query: async (sql) => sql.startsWith('SELECT checksum FROM schema_migrations')
-      ? { rows: [{ checksum: '0'.repeat(64) }] }
+      ? { rows: [{ checksum: legacyChecksum(historicalSql) }] }
+      : { rows: [] },
+  });
+
+  const result = await migrate({
+    ...harness,
+    readSchema: () => 'SELECT schema_base;',
+    readDirectory: () => ['007_auth_sessions.sql'],
+    readMigration: () => currentSql,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(harness.calls.query.some(({ sql }) => sql === currentSql), false);
+  assert.equal(harness.calls.query.some(({ sql }) => sql.startsWith('INSERT INTO schema_migrations')), false);
+});
+
+test('acepta un checksum historico LF cuando el archivo actual usa CRLF', async () => {
+  const historicalSql = 'CREATE TABLE ejemplo (id INTEGER);\nSELECT 1;\n';
+  const currentSql = historicalSql.replace(/\n/g, '\r\n');
+  const harness = createHarness({
+    query: async (sql) => sql.startsWith('SELECT checksum FROM schema_migrations')
+      ? { rows: [{ checksum: legacyChecksum(historicalSql) }] }
+      : { rows: [] },
+  });
+
+  const result = await migrate({
+    ...harness,
+    readSchema: () => 'SELECT schema_base;',
+    readDirectory: () => ['007_auth_sessions.sql'],
+    readMigration: () => currentSql,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(harness.calls.query.some(({ sql }) => sql === currentSql), false);
+  assert.equal(harness.calls.query.some(({ sql }) => sql.startsWith('INSERT INTO schema_migrations')), false);
+});
+
+test('registra migraciones nuevas con checksum canonico LF', async () => {
+  const migrationSql = 'CREATE TABLE ejemplo (id INTEGER);\r\nSELECT 1;\r';
+  const harness = createHarness();
+
+  const result = await migrate({
+    ...harness,
+    readSchema: () => 'SELECT schema_base;',
+    readDirectory: () => ['007_auth_sessions.sql'],
+    readMigration: () => migrationSql,
+  });
+
+  assert.equal(result.ok, true);
+  const insert = harness.calls.query.find(({ sql }) => sql.startsWith('INSERT INTO schema_migrations'));
+  assert.equal(insert.params[1], calculateMigrationChecksum(migrationSql));
+  assert.equal(insert.params[1], legacyChecksum('CREATE TABLE ejemplo (id INTEGER);\nSELECT 1;\n'));
+  assert.notEqual(insert.params[1], legacyChecksum(migrationSql));
+});
+
+test('normaliza solo CRLF y CR aislado sin alterar el resto del SQL', () => {
+  const sql = 'SELECT  1;\r\n\t-- comentario con espacios  \rSELECT 2;\n';
+  assert.equal(
+    normalizeLineEndings(sql),
+    'SELECT  1;\n\t-- comentario con espacios  \nSELECT 2;\n'
+  );
+});
+
+test('rechaza una migracion aplicada cuyo archivo fue modificado y revierte', async () => {
+  const previousSql = 'SELECT version_anterior;\r\n';
+  const harness = createHarness({
+    query: async (sql) => sql.startsWith('SELECT checksum FROM schema_migrations')
+      ? { rows: [{ checksum: legacyChecksum(previousSql) }] }
       : { rows: [] },
   });
   const result = await migrate({
