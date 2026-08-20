@@ -40,9 +40,12 @@
   justify-content: center;
   min-height: 30px;
   padding: 0.42rem 0.62rem;
+  border: 0;
   border-radius: 6px;
+  background: transparent;
   color: var(--text-muted, #64748b);
   cursor: pointer;
+  font: inherit;
   transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
 }
 
@@ -57,17 +60,7 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary, #1d4ed8) 24%, transparent);
 }
 
-.map-base-layer-control__option input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-}
-
-.map-base-layer-control__option:focus-within {
+.map-base-layer-control__option:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--primary, #1d4ed8) 30%, transparent);
   outline-offset: 1px;
 }

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import L from "leaflet";
 import { MapContainer, Marker, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -42,6 +42,23 @@ function MiniMapView({ position }) {
   return null;
 }
 
+function MiniMapResize({ expanded }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const refreshSize = () => map.invalidateSize({ animate: false, pan: true });
+    const frame = requestAnimationFrame(refreshSize);
+    const timeout = window.setTimeout(refreshSize, 180);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+    };
+  }, [expanded, map]);
+
+  return null;
+}
+
 function OverviewMapView({ comunidades, visible }) {
   const map = useMap();
 
@@ -68,10 +85,13 @@ function overviewMarkerIcon(hasRisk, selected) {
   });
 }
 
-export function ComunidadMiniMap({ lat, lng, onPickCoords }) {
+export function ComunidadMiniMap({ lat, lng, onPickCoords, expanded = false }) {
   const parsedLat = parseCoordinate(lat);
   const parsedLng = parseCoordinate(lng);
-  const position = parsedLat !== null && parsedLng !== null ? [parsedLat, parsedLng] : null;
+  const position = useMemo(
+    () => (parsedLat !== null && parsedLng !== null ? [parsedLat, parsedLng] : null),
+    [parsedLat, parsedLng],
+  );
 
   return (
     <MapContainer
@@ -87,6 +107,7 @@ export function ComunidadMiniMap({ lat, lng, onPickCoords }) {
       <MapBaseLayerControl />
       <MiniMapEvents onPick={onPickCoords} />
       <MiniMapView position={position} />
+      <MiniMapResize expanded={expanded} />
       {position && <Marker position={position} icon={markerIcon} />}
     </MapContainer>
   );
