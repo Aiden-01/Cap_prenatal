@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import L from "leaflet";
-import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import MapBaseLayerControl from "./MapBaseLayerControl";
 
 const EL_CHAL_CENTER = [16.4870, -89.6820];
 const EL_CHAL_BOUNDS = [
@@ -83,10 +84,7 @@ export function ComunidadMiniMap({ lat, lng, onPickCoords }) {
       scrollWheelZoom
       className="comunidades-mini-map"
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <MapBaseLayerControl />
       <MiniMapEvents onPick={onPickCoords} />
       <MiniMapView position={position} />
       {position && <Marker position={position} icon={markerIcon} />}
@@ -106,10 +104,7 @@ export function ComunidadesOverviewMap({ comunidades, selectedCommunity, onSelec
       scrollWheelZoom
       className="comunidades-overview-map"
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <MapBaseLayerControl />
       <OverviewMapView comunidades={comunidades} visible={visible} />
       {comunidades.map((comunidad) => (
         <Marker

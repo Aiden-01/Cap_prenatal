@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapContainer, Marker, TileLayer } from "react-leaflet";
+import { MapContainer, Marker } from "react-leaflet";
 import L from "leaflet";
 import { AlertTriangle, Loader2, MapPin, X } from "lucide-react";
 import "leaflet/dist/leaflet.css";
@@ -8,6 +8,7 @@ import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
 import iconUrl from "leaflet/dist/images/marker-icon.png";
 import shadowUrl from "leaflet/dist/images/marker-shadow.png";
 import api from "../api/axios";
+import MapBaseLayerControl from "../components/MapBaseLayerControl";
 import { getErrorMessage } from "../utils/errorMessage";
 
 delete L.Icon.Default.prototype._getIconUrl;
@@ -490,10 +491,7 @@ export default function MapaRiesgo() {
           scrollWheelZoom
           className="mapa-riesgo-map"
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          <MapBaseLayerControl />
 
           {comunidades.map((comunidad) => (
             <Marker
