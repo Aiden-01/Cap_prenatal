@@ -11,6 +11,8 @@ import {
   Loader2,
   MapPin,
   MapPinned,
+  Maximize2,
+  Minimize2,
   PlusCircle,
   RotateCcw,
   Search,
@@ -62,6 +64,18 @@ function ComunidadModal({
   onSubmit,
   onPickCoords,
 }) {
+  const [mapExpanded, setMapExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!mapExpanded) return undefined;
+
+    const restoreMap = (event) => {
+      if (event.key === "Escape") setMapExpanded(false);
+    };
+    window.addEventListener("keydown", restoreMap);
+    return () => window.removeEventListener("keydown", restoreMap);
+  }, [mapExpanded]);
+
   if (!open) return null;
 
   return (
@@ -154,10 +168,26 @@ function ComunidadModal({
             </div>
           </div>
 
-          <div className="comunidades-map-box">
+          <div className={`comunidades-map-box ${mapExpanded ? "is-expanded" : ""}`}>
             <Suspense fallback={<div className="comunidades-map-loading"><Loader2 className="spin" size={18} /> Cargando mapa...</div>}>
-              <ComunidadMiniMap lat={form.lat} lng={form.lng} onPickCoords={onPickCoords} />
+              <ComunidadMiniMap
+                lat={form.lat}
+                lng={form.lng}
+                onPickCoords={onPickCoords}
+                expanded={mapExpanded}
+              />
             </Suspense>
+            <button
+              type="button"
+              className="btn-secondary comunidades-map-expand"
+              onClick={() => setMapExpanded((current) => !current)}
+              aria-label={mapExpanded ? "Restaurar tamaño del mapa" : "Expandir mapa"}
+              aria-pressed={mapExpanded}
+              title={mapExpanded ? "Restaurar mapa" : "Expandir mapa"}
+            >
+              {mapExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              <span>{mapExpanded ? "Restaurar" : "Expandir"}</span>
+            </button>
           </div>
         </div>
 
@@ -741,6 +771,7 @@ export default function Comunidades() {
         }
 
         .comunidades-map-box {
+          position: relative;
           min-height: 320px;
           border: 1px solid var(--border);
           border-radius: 8px;
@@ -748,10 +779,37 @@ export default function Comunidades() {
           background: var(--surface2);
         }
 
+        .comunidades-map-box.is-expanded {
+          position: fixed;
+          inset: 1rem;
+          z-index: 12000;
+          min-height: 0;
+          border-radius: 12px;
+          box-shadow: 0 0 0 100vmax rgba(7, 12, 22, 0.68), var(--shadow-lg);
+        }
+
         .comunidades-mini-map {
           height: 100%;
           min-height: 320px;
           width: 100%;
+        }
+
+        .comunidades-map-box.is-expanded .comunidades-mini-map {
+          height: 100%;
+          min-height: 0;
+        }
+
+        .comunidades-map-expand {
+          position: absolute;
+          z-index: 1001;
+          left: 0.75rem;
+          bottom: 0.75rem;
+          min-height: 36px;
+          padding: 0.48rem 0.68rem;
+          border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+          background: color-mix(in srgb, var(--surface) 94%, transparent);
+          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.2);
+          backdrop-filter: blur(8px);
         }
 
         .comunidades-map-marker div {
@@ -946,6 +1004,8 @@ export default function Comunidades() {
         @media (max-width: 560px) {
           .comunidades-stats { grid-template-columns: 1fr; }
           .comunidades-stat { min-height: 78px; }
+          .comunidades-map-box.is-expanded { inset: 0.5rem; }
+          .comunidades-map-expand span { display: none; }
         }
       `}</style>
 
@@ -1264,6 +1324,7 @@ export default function Comunidades() {
       </div>
 
       <ComunidadModal
+        key={modalOpen ? (editing ? `edit-${editing.id}` : "new") : "closed"}
         open={modalOpen}
         form={form}
         errors={formErrors}
