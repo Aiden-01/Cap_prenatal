@@ -6,6 +6,7 @@ const {
   parseAllowedCidrs,
 } = require('../utils/ipAllowlist');
 const {
+  automationCensusPeriodQuerySchema,
   automationRangeQuerySchema,
 } = require('../validations/automatizaciones.schemas');
 
@@ -97,11 +98,28 @@ function createAutomationRangeMiddleware({ startOffsetDays, windowDays }) {
   };
 }
 
+function createAutomationCensusPeriodMiddleware() {
+  return (req, _res, next) => {
+    const result = automationCensusPeriodQuerySchema.safeParse(req.query);
+    if (!result.success) {
+      return next(new AppError(
+        400,
+        'Periodo de censo invalido',
+        { code: 'AUTOMATION_INVALID_PERIOD' }
+      ));
+    }
+
+    req.automationPeriod = result.data;
+    return next();
+  };
+}
+
 module.exports = {
   AUTOMATION_KEY_PATTERN,
   automationUnauthorized,
   candidateHash,
   createAutomationAuthentication,
+  createAutomationCensusPeriodMiddleware,
   createAutomationOriginMiddleware,
   createAutomationRangeMiddleware,
   hashBuffer,

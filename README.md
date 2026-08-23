@@ -18,7 +18,9 @@ La solucion esta pensada para el flujo operativo del CAP El Chal. No es una plat
 - `backend/src/ARCHITECTURE.md`: patron interno del backend por capas.
 - `backend/src/AUDITORIA.md`: politica de auditoria y trazabilidad.
 - `DOCKER.md`: ejecucion con Docker y notas de despliegue.
-- `docs/N8N.md`: integracion con n8n para automatizaciones.
+- `docs/N8N.md`: arquitectura, contratos y workflows de automatizacion.
+- `docs/N8N_OPERACION.md`: instalacion, backups, acceso, pruebas y troubleshooting de n8n.
+- `docs/RESEND.md`: dominio, credencial, nodo y pruebas de correo con Resend.
 - `docs/ROTACION_SECRETOS.md`: procedimiento manual de rotacion y riesgo historico.
 
 ## Tecnologias principales

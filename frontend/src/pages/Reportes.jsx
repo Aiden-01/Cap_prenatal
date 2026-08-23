@@ -18,6 +18,7 @@ import { useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessage";
 import {
   getDefaultReportPeriod,
+  getReportPeriodFromSearch,
   getReportRiskLevel,
   REPORTES,
   safeDownloadFilename,
@@ -211,7 +212,9 @@ function ComunidadesTable({ resultado }) {
 }
 
 export default function Reportes() {
-  const initialPeriod = getDefaultReportPeriod();
+  const initialPeriod = typeof window === "undefined"
+    ? getDefaultReportPeriod()
+    : getReportPeriodFromSearch(window.location.search);
   const [desde, setDesde] = useState(initialPeriod.desde);
   const [hasta, setHasta] = useState(initialPeriod.hasta);
   const [reporteActivo, setReporteActivo] = useState(REPORTES.PRIMER_CONTROL);

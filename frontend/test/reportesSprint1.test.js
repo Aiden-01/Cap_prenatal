@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 import {
   getDefaultReportPeriod,
+  getReportPeriodFromSearch,
   getReportRiskLevel,
   REPORTES,
   safeDownloadFilename,
@@ -15,6 +16,18 @@ test("periodo predeterminado usa el mes actual de Guatemala", () => {
   assert.deepEqual(
     getDefaultReportPeriod(new Date("2026-07-16T18:30:00Z")),
     { desde: "2026-07-01", hasta: "2026-07-16" }
+  );
+});
+
+test("enlace mensual precarga solo un periodo ISO valido", () => {
+  const now = new Date("2026-08-22T18:30:00Z");
+  assert.deepEqual(
+    getReportPeriodFromSearch("?desde=2026-07-26&hasta=2026-08-25", now),
+    { desde: "2026-07-26", hasta: "2026-08-25" }
+  );
+  assert.deepEqual(
+    getReportPeriodFromSearch("?desde=2026-08-31&hasta=2026-08-01", now),
+    { desde: "2026-08-01", hasta: "2026-08-22" }
   );
 });
 

@@ -3,6 +3,7 @@ const defaultControllers = require('../controllers/automatizacionesController');
 const { createAutomationRateLimiter } = require('../middleware/automationRateLimit');
 const {
   createAutomationAuthentication,
+  createAutomationCensusPeriodMiddleware,
   createAutomationOriginMiddleware,
   createAutomationRangeMiddleware,
 } = require('../middleware/automationSecurity');
@@ -25,9 +26,13 @@ function createAutomatizacionesRouter({
   const router = express.Router();
 
   router.get('/proximas-citas', automationNotFound);
+  router.get('/censo-primer-control', automationNotFound);
+  router.get('/censo-primer-control/excel', automationNotFound);
 
   if (!config.active) {
     router.get('/v1/proximas-citas', automationNotFound);
+    router.get('/v1/censo-primer-control', automationNotFound);
+    router.get('/v1/censo-primer-control/excel', automationNotFound);
     return router;
   }
 
@@ -44,6 +49,7 @@ function createAutomatizacionesRouter({
     nextHash: config.nextHash,
   });
   const validateRange = createAutomationRangeMiddleware(config);
+  const validateCensusPeriod = createAutomationCensusPeriodMiddleware();
 
   router.get(
     '/v1/proximas-citas',
@@ -52,6 +58,24 @@ function createAutomatizacionesRouter({
     authenticate,
     validateRange,
     controllers.proximasCitas
+  );
+
+  router.get(
+    '/v1/censo-primer-control',
+    originMiddleware,
+    limiter,
+    authenticate,
+    validateCensusPeriod,
+    controllers.censoPrimerControl
+  );
+
+  router.get(
+    '/v1/censo-primer-control/excel',
+    originMiddleware,
+    limiter,
+    authenticate,
+    validateCensusPeriod,
+    controllers.censoPrimerControlExcel
   );
 
   return router;

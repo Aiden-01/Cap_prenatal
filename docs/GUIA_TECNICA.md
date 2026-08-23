@@ -1043,14 +1043,23 @@ PDF_EXCEL_ENGINE=excel
 
 ## Automatizaciones y n8n
 
-El endpoint interno versionado es:
+La arquitectura es `CAP/PostgreSQL -> API Express privada -> n8n -> Resend ->
+correo autorizado`. n8n nunca consulta PostgreSQL directamente ni recibe
+credenciales clínicas, JWT o secretos de sesión.
+
+Endpoints internos versionados:
 
 ```text
 GET /api/automatizaciones/v1/proximas-citas?offset_days=1&window_days=1
+GET /api/automatizaciones/v1/censo-primer-control?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
+GET /api/automatizaciones/v1/censo-primer-control/excel?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
 ```
 
-Requiere `NODE_ENV=production`, `N8N_INTEGRATION_ENABLED=true`, origen en la
-allowlist, rate limit disponible y el header:
+Requiere `N8N_INTEGRATION_ENABLED=true` y `NODE_ENV=production`. Para una
+prueba local controlada tambien admite `NODE_ENV=development` junto con
+`N8N_INTEGRATION_LOCAL_ENABLED=true`, pero en ese modo la allowlist solo puede
+contener `127.0.0.1/32` y/o `::1/128`. Ademas requiere origen en la allowlist,
+rate limit disponible y el header:
 
 ```text
 X-CAP-Automation-Key: <API_KEY_ALEATORIA>
@@ -1060,9 +1069,12 @@ El backend conserva solamente hashes SHA-256 CURRENT/NEXT. JWT, cookies, CSRF,
 `Authorization`, parametros desconocidos y credenciales en query string no
 autentican la ruta. En desarrollo o deshabilitada responde `404`.
 
-La consulta usa el ultimo control determinista por embarazo activo y responde
-solo conteos por fecha, sin IDs, datos personales, clinicos, HTML o Markdown.
-El endpoint legacy `/api/automatizaciones/proximas-citas` responde `404`.
+La consulta de citas usa el ultimo control determinista por embarazo activo y
+expone solo fecha, primer nombre, primer apellido, telefono y comunidad. No
+incluye IDs, CUI, expediente, direccion, riesgo, diagnostico u otros datos
+clinicos. El resumen del censo solo expone rango y total; el XLSX nominal se
+genera en memoria únicamente para adjuntarlo cuando hay registros. El endpoint
+legacy `/api/automatizaciones/proximas-citas` responde `404`.
 
 Sprint 5B.2A incorpora una topologia de ejemplo con cuatro redes Docker:
 `proxy_public`, `app_internal`, `data_internal` y `automation_internal`.
@@ -1074,29 +1086,28 @@ nombre interno `backend:3001` y no comparte red con PostgreSQL.
 `TRUSTED_PROXY_CIDRS`; no se configura como `true`. El endpoint M2M sigue
 validando `req.socket.remoteAddress` y no confia en `X-Forwarded-For`.
 
-n8n queda fijado exactamente en `2.34.4`, usa volumen persistente, exige
-`N8N_ENCRYPTION_KEY`, bloquea `$env` y aplica poda de ejecuciones. En produccion
-no publica su UI; el acceso administrativo requiere VPN, red privada o tunel y
-HTTPS. El script local lee solo `n8n/.env` y liga el proceso a loopback.
+n8n queda fijado en `2.34.4` y el paquete verificado de Resend en `2.8.0`.
+Ambos se declaran en configuración reproducible. El perfil persistente exige
+una `N8N_ENCRYPTION_KEY` estable; el script local lee solo `n8n/.env` y liga el
+editor a loopback. Produccion requiere acceso administrativo privado/HTTPS,
+backups restaurables, egress limitado y gestor de secretos.
 
-Sprint 5B.2B agrega `n8n/workflows/proximas-citas-v1.json`. Permanece inactivo,
-sin credenciales y sin correos reales. Se agenda a las 06:00
-`America/Guatemala`, consulta manana, valida la respuesta con lista cerrada de
-campos y termina sin SMTP si `total=0`. Tres requests como maximo cubren
-conectividad/5xx con esperas de 1 y 5 minutos; 400/401/404/429 no se reintentan.
+Los tres workflows Resend versionados permanecen inactivos y sin credenciales:
 
-La deduplicacion usa SHA-256 de `v1|from|to|recipient_alias` en static data,
-marca solo despues de envio confirmado y poda a 90 hashes/45 dias. Es de mejor
-esfuerzo, no transaccional. La concurrencia operativa del workflow debe quedar
-en 1; la instancia productiva de ejemplo fija
-`N8N_CONCURRENCY_PRODUCTION_LIMIT=1`.
+- recordatorio diario a las 08:00: sin citas termina sin correo; con citas
+  envía un único HTML con el detalle operativo mínimo;
+- censo de mes logístico cada 26 a las 06:00: procesa del 26 al 25;
+- censo de mes calendario cada 3 a las 06:00: procesa el mes anterior.
 
-El correo es texto agregado con total, fecha/rango y enlace HTTPS a
-`/dashboard`. Header Auth, SMTP, destinatario y remitente se configuran
-manualmente fuera del JSON. El workflow no tiene `pinData`, PostgreSQL, acceso
-a `data_internal`, comandos, pacientes o datos clinicos. El egress SMTP sigue
-pendiente y debe resolverse con relay institucional o firewall limitado.
-Contrato, importacion y operacion completa en `docs/N8N.md` y `n8n/README.md`.
+Los censos envían un aviso sin archivo cuando `total=0`; cuando hay datos
+descargan `binary.data` y adjuntan el XLSX mediante Resend. Todos validan el
+contrato antes de enviar y deshabilitan la persistencia de ejecuciones en el
+JSON. El antiguo `n8n/workflows/proximas-citas-v1.json` conserva SMTP como
+artefacto heredado y no representa la configuración local actual.
+
+Arquitectura y contratos: `docs/N8N.md`. Operacion, backup, recuperación y
+troubleshooting: `docs/N8N_OPERACION.md`. Dominio y credencial:
+`docs/RESEND.md`. Importacion: `n8n/README.md`.
 
 ## Laboratorios
 
@@ -1165,7 +1176,8 @@ Fuera de alcance actual:
 | `CHATBOT_RATE_LIMIT_WINDOW_MS` | Ventana de rate limit de Lia en ms. Default `60000`. |
 | `CHATBOT_MESSAGE_RATE_LIMIT` | Solicitudes de `/mensaje` por ventana y usuario/IP. Default `30`. |
 | `CHATBOT_FEEDBACK_RATE_LIMIT` | Solicitudes de `/feedback` por ventana y usuario/IP. Default `20`. |
-| `N8N_INTEGRATION_ENABLED` | Activa el endpoint v1 solo en produccion. Default `false`. |
+| `N8N_INTEGRATION_ENABLED` | Activa el endpoint v1 en produccion o con opt-in local controlado. Default `false`. |
+| `N8N_INTEGRATION_LOCAL_ENABLED` | Permite el endpoint en desarrollo solo con CIDR loopback. Default `false`. |
 | `N8N_API_KEY_HASH_CURRENT` | SHA-256 de la API key vigente; sensible. |
 | `N8N_API_KEY_HASH_NEXT` | SHA-256 opcional durante rotacion; sensible. |
 | `N8N_ALLOWED_CIDRS` | Origenes IPv4/IPv6 permitidos, separados por coma. |

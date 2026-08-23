@@ -56,13 +56,35 @@ function activeConfig(overrides = {}) {
 }
 
 function aggregateRows(overrides = {}) {
-  return [{
-    fecha_desde: '2026-07-24',
-    fecha_hasta: '2026-07-24',
-    fecha_proxima_cita: '2026-07-24',
-    total: 3,
-    ...overrides,
-  }];
+  return [
+    {
+      fecha_desde: '2026-07-24',
+      fecha_hasta: '2026-07-24',
+      fecha_proxima_cita: '2026-07-24',
+      primer_nombre: 'Ana',
+      primer_apellido: 'López',
+      telefono: '5555-0101',
+      comunidad: 'El Chal',
+    },
+    {
+      fecha_desde: '2026-07-24',
+      fecha_hasta: '2026-07-24',
+      fecha_proxima_cita: '2026-07-24',
+      primer_nombre: 'Beatriz',
+      primer_apellido: 'Méndez',
+      telefono: '5555-0102',
+      comunidad: 'Las Flores',
+    },
+    {
+      fecha_desde: '2026-07-24',
+      fecha_hasta: '2026-07-24',
+      fecha_proxima_cita: '2026-07-24',
+      primer_nombre: 'Clara',
+      primer_apellido: 'Pérez',
+      telefono: '5555-0103',
+      comunidad: 'Santa Rosita',
+    },
+  ].map((row) => ({ ...row, ...overrides }));
 }
 
 function serviceForRows(rows = aggregateRows()) {
@@ -70,6 +92,9 @@ function serviceForRows(rows = aggregateRows()) {
     repository: {
       async obtenerResumenProximasCitas() {
         return rows;
+      },
+      async obtenerResumenCensoPrimerControl({ desde, hasta }) {
+        return [{ fecha_desde: desde, fecha_hasta: hasta, total: 4 }];
       },
     },
     now: () => new Date('2026-07-23T12:00:00.000Z'),
@@ -125,6 +150,7 @@ test('configuracion queda deshabilitada por defecto y valida limites no secretos
   const development = validateAutomationConfig({ NODE_ENV: 'development' });
   assert.equal(development.active, false);
   assert.equal(development.enabled, false);
+  assert.equal(development.localEnabled, false);
   assert.equal(development.startOffsetDays, 1);
   assert.equal(development.windowDays, 1);
   assert.equal(development.timezone, 'America/Guatemala');
@@ -155,6 +181,45 @@ test('configuracion queda deshabilitada por defecto y valida limites no secretos
     (error) => error instanceof ConfigError
       && error.variable === 'APPOINTMENT_NOTIFICATION_TIMEZONE'
   );
+});
+
+test('desarrollo requiere opt-in local y restringe la allowlist a loopback', () => {
+  const base = {
+    NODE_ENV: 'development',
+    N8N_INTEGRATION_ENABLED: 'true',
+    N8N_INTEGRATION_LOCAL_ENABLED: 'true',
+    N8N_API_KEY_HASH_CURRENT: sha256(CURRENT_KEY),
+  };
+
+  const withoutOptIn = validateAutomationConfig({
+    ...base,
+    N8N_INTEGRATION_LOCAL_ENABLED: 'false',
+    N8N_ALLOWED_CIDRS: '127.0.0.1/32',
+  });
+  assert.equal(withoutOptIn.active, false);
+
+  const valid = validateAutomationConfig({
+    ...base,
+    N8N_ALLOWED_CIDRS: '127.0.0.1/32,::1/128',
+  });
+  assert.equal(valid.active, true);
+  assert.equal(valid.localEnabled, true);
+  assert.deepEqual(valid.allowedCidrs, ['127.0.0.1/32', '::1/128']);
+
+  assert.throws(
+    () => validateAutomationConfig({
+      ...base,
+      N8N_ALLOWED_CIDRS: '127.0.0.1/32,192.168.1.0/24',
+    }),
+    (error) => error instanceof ConfigError && error.variable === 'N8N_ALLOWED_CIDRS'
+  );
+
+  const testEnvironment = validateAutomationConfig({
+    ...base,
+    NODE_ENV: 'test',
+    N8N_ALLOWED_CIDRS: '127.0.0.1/32',
+  });
+  assert.equal(testEnvironment.active, false);
 });
 
 test('produccion habilitada exige hash CURRENT y allowlist validos; NEXT es opcional', () => {
@@ -373,7 +438,7 @@ test('query valida enteros, rangos, repetidos y desconocidos sin defaults silenc
   assert.equal(calls.length, 2);
 });
 
-test('repositorio usa consulta parametrizada, ultimo control determinista y solo embarazo activo', async () => {
+test('repositorio usa consulta parametrizada y devuelve solo el detalle operativo solicitado', async () => {
   let captured;
   const repository = createAutomatizacionesRepository({
     async query(sql, params) {
@@ -394,10 +459,33 @@ test('repositorio usa consulta parametrizada, ultimo control determinista y solo
   assert.match(captured.sql, /lc\.cita_siguiente IS NOT NULL/);
   assert.match(captured.sql, /lc\.cita_siguiente >= b\.fecha_desde/);
   assert.match(captured.sql, /lc\.cita_siguiente < b\.fecha_hasta_exclusiva/);
-  assert.match(captured.sql, /COUNT\(\*\)::integer/);
-  assert.match(captured.sql, /GROUP BY lc\.cita_siguiente/);
-  assert.doesNotMatch(captured.sql, /p\.nombres|p\.apellidos|p\.cui|p\.telefono|p\.no_expediente/);
+  assert.match(captured.sql, /SPLIT_PART\(TRIM\(p\.nombres\), ' ', 1\)/);
+  assert.match(captured.sql, /SPLIT_PART\(TRIM\(p\.apellidos\), ' ', 1\)/);
+  assert.match(captured.sql, /COALESCE\(p\.telefono, ''\)/);
+  assert.match(captured.sql, /COALESCE\(com\.nombre, p\.comunidad, ''\)/);
+  assert.doesNotMatch(captured.sql, /p\.cui|p\.no_expediente|diagnostico|observaciones/);
   assert.doesNotMatch(captured.sql, /\$\{|\+\s*offsetDays|\+\s*windowDays/);
+});
+
+test('repositorio de censo usa fechas parametrizadas y devuelve solo un conteo agregado', async () => {
+  let captured;
+  const repository = createAutomatizacionesRepository({
+    async query(sql, params) {
+      captured = { sql, params };
+      return { rows: [{ fecha_desde: '2026-07-26', fecha_hasta: '2026-08-25', total: 4 }] };
+    },
+  });
+
+  await repository.obtenerResumenCensoPrimerControl({
+    desde: '2026-07-26',
+    hasta: '2026-08-25',
+  });
+  assert.deepEqual(captured.params, ['2026-07-26', '2026-08-25']);
+  assert.match(captured.sql, /c\.numero_control = 1/);
+  assert.match(captured.sql, /COUNT\(\*\)::integer AS total/);
+  assert.match(captured.sql, /pc\.fecha BETWEEN \$1::date AND \$2::date/);
+  assert.doesNotMatch(captured.sql, /p\.nombres|p\.apellidos|p\.cui|p\.telefono|p\.no_expediente/);
+  assert.doesNotMatch(captured.sql, /\$\{|\+\s*desde|\+\s*hasta/);
 });
 
 test('servicio agrega por fecha, ordena, suma y acepta resultado vacio', async () => {
@@ -406,13 +494,28 @@ test('servicio agrega por fecha, ordena, suma y acepta resultado vacio', async (
       fecha_desde: '2026-07-24',
       fecha_hasta: '2026-07-25',
       fecha_proxima_cita: '2026-07-25',
-      total: '2',
+      primer_nombre: 'Beatriz',
+      primer_apellido: 'Méndez',
+      telefono: '5555-0102',
+      comunidad: 'Las Flores',
     },
     {
       fecha_desde: '2026-07-24',
       fecha_hasta: '2026-07-25',
       fecha_proxima_cita: '2026-07-24',
-      total: 1,
+      primer_nombre: 'Ana',
+      primer_apellido: 'López',
+      telefono: '5555-0101',
+      comunidad: 'El Chal',
+    },
+    {
+      fecha_desde: '2026-07-24',
+      fecha_hasta: '2026-07-25',
+      fecha_proxima_cita: '2026-07-25',
+      primer_nombre: 'Clara',
+      primer_apellido: 'Pérez',
+      telefono: '5555-0103',
+      comunidad: 'Santa Rosita',
     },
   ]);
   const result = await service.consultarProximasCitas({ offsetDays: 1, windowDays: 2 });
@@ -426,6 +529,29 @@ test('servicio agrega por fecha, ordena, suma y acepta resultado vacio', async (
       { date: '2026-07-24', total: 1 },
       { date: '2026-07-25', total: 2 },
     ],
+    appointments: [
+      {
+        date: '2026-07-24',
+        first_name: 'Ana',
+        last_name: 'López',
+        phone: '5555-0101',
+        community: 'El Chal',
+      },
+      {
+        date: '2026-07-25',
+        first_name: 'Beatriz',
+        last_name: 'Méndez',
+        phone: '5555-0102',
+        community: 'Las Flores',
+      },
+      {
+        date: '2026-07-25',
+        first_name: 'Clara',
+        last_name: 'Pérez',
+        phone: '5555-0103',
+        community: 'Santa Rosita',
+      },
+    ],
     secure_path: '/dashboard',
   });
 
@@ -433,14 +559,79 @@ test('servicio agrega por fecha, ordena, suma y acepta resultado vacio', async (
     fecha_desde: '2026-07-24',
     fecha_hasta: '2026-07-24',
     fecha_proxima_cita: null,
-    total: 0,
+    primer_nombre: null,
+    primer_apellido: null,
+    telefono: null,
+    comunidad: null,
   }]).consultarProximasCitas({ offsetDays: 1, windowDays: 1 });
   assert.equal(empty.total, 0);
   assert.deepEqual(empty.summary_by_date, []);
+  assert.deepEqual(empty.appointments, []);
   assert.deepEqual(empty.range, { from: '2026-07-24', to: '2026-07-24' });
 });
 
-test('contrato HTTP no contiene identificadores, datos personales, clinicos, HTML o Markdown', async () => {
+test('servicio de censo conserva solo periodo, total y ruta autenticada', async () => {
+  const result = await serviceForRows().consultarResumenCensoPrimerControl({
+    desde: '2026-07-26',
+    hasta: '2026-08-25',
+  });
+  assert.deepEqual(result, {
+    schema_version: 1,
+    generated_at: '2026-07-23T12:00:00.000Z',
+    timezone: 'America/Guatemala',
+    report_type: 'first_prenatal_control_census',
+    range: { from: '2026-07-26', to: '2026-08-25' },
+    total: 4,
+    secure_path: '/reportes',
+  });
+});
+
+test('endpoint de censo M2M valida un periodo mensual y nunca devuelve filas nominales', async () => {
+  await withServer(automationApp(), async (baseUrl) => {
+    const response = await fetch(
+      `${baseUrl}/api/automatizaciones/v1/censo-primer-control?desde=2026-07-26&hasta=2026-08-25`,
+      { headers: automationHeaders() }
+    );
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    const body = await response.json();
+    assert.deepEqual(Object.keys(body), [
+      'schema_version',
+      'generated_at',
+      'timezone',
+      'report_type',
+      'range',
+      'total',
+      'secure_path',
+    ]);
+    assert.equal(body.total, 4);
+    assert.equal(body.secure_path, '/reportes');
+    assert.doesNotMatch(
+      JSON.stringify(body).toLowerCase(),
+      /paciente|embarazo_id|nombre|cui|telefono|expediente|comunidad|riesgo|diagnostico/
+    );
+  });
+});
+
+test('endpoint de censo rechaza fechas irreales, rango inverso y mas de 31 dias', async () => {
+  await withServer(automationApp(), async (baseUrl) => {
+    for (const query of [
+      'desde=2026-02-30&hasta=2026-03-25',
+      'desde=2026-08-26&hasta=2026-08-25',
+      'desde=2026-07-01&hasta=2026-08-01',
+      'desde=2026-07-26',
+    ]) {
+      const response = await fetch(
+        `${baseUrl}/api/automatizaciones/v1/censo-primer-control?${query}`,
+        { headers: automationHeaders() }
+      );
+      assert.equal(response.status, 400);
+      assert.equal((await response.json()).code, 'AUTOMATION_INVALID_PERIOD');
+    }
+  });
+});
+
+test('contrato HTTP limita el detalle a nombre operativo, teléfono, comunidad y fecha', async () => {
   await withServer(automationApp(), async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/automatizaciones/v1/proximas-citas`, {
       headers: automationHeaders(),
@@ -455,17 +646,23 @@ test('contrato HTTP no contiene identificadores, datos personales, clinicos, HTM
       'range',
       'total',
       'summary_by_date',
+      'appointments',
       'secure_path',
+    ]);
+    assert.equal(body.appointments.length, 3);
+    assert.deepEqual(Object.keys(body.appointments[0]), [
+      'date',
+      'first_name',
+      'last_name',
+      'phone',
+      'community',
     ]);
     const serialized = JSON.stringify(body).toLowerCase();
     for (const forbidden of [
       'paciente_id',
       'embarazo_id',
-      'nombre',
       'cui',
-      'telefono',
       'expediente',
-      'comunidad',
       'territorio',
       'riesgo',
       'diagnostico',
@@ -479,6 +676,51 @@ test('contrato HTTP no contiene identificadores, datos personales, clinicos, HTM
       assert.doesNotMatch(serialized, new RegExp(forbidden));
     }
   });
+});
+
+test('endpoint M2M de Excel usa el mismo periodo, headers privados y no expone secretos', async () => {
+  const audits = [];
+  const service = serviceForRows();
+  service.generarCensoPrimerControlExcel = async ({ desde, hasta }) => ({
+    content: Buffer.from('xlsx-sintetico'),
+    filename: `censo_primer_control_${desde}_${hasta}.xlsx`,
+    range: { from: desde, to: hasta },
+    total: 4,
+  });
+
+  await withServer(automationApp({
+    service,
+    audit: async (_req, event) => audits.push(event),
+  }), async (baseUrl) => {
+    const response = await fetch(
+      `${baseUrl}/api/automatizaciones/v1/censo-primer-control/excel?desde=2026-07-26&hasta=2026-08-25`,
+      { headers: automationHeaders() }
+    );
+    assert.equal(response.status, 200);
+    assert.equal(
+      response.headers.get('content-type'),
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    assert.equal(response.headers.get('cache-control'), 'private, no-store, max-age=0');
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(response.headers.get('x-cap-report-count'), '4');
+    assert.equal(
+      response.headers.get('content-disposition'),
+      'attachment; filename="censo_primer_control_2026-07-26_2026-08-25.xlsx"'
+    );
+    assert.equal(Buffer.from(await response.arrayBuffer()).toString(), 'xlsx-sintetico');
+  });
+
+  assert.equal(audits.length, 1);
+  assert.deepEqual(audits[0].metadata, {
+    tipo_automatizacion: 'censo_primer_control',
+    resultado: 'exitoso',
+    motivo_codigo: 'excel_generado',
+    cantidad_registros: 4,
+    fecha_desde: '2026-07-26',
+    fecha_hasta: '2026-08-25',
+  });
+  assert.doesNotMatch(JSON.stringify(audits), /xlsx-sintetico|X-CAP-Automation-Key/);
 });
 
 test('auditoria privada conserva solo conteo, rango, codigos y politica version 1', async () => {

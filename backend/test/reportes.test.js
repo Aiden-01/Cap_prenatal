@@ -260,7 +260,10 @@ test('Excel principal usa oficio horizontal, una pagina de ancho y columnas requ
   const buffer = await workbook.xlsx.writeBuffer();
   const loaded = new ExcelJS.Workbook();
   await loaded.xlsx.load(buffer);
-  assert.equal(loaded.getWorksheet('Censo MSPAS').getCell('J9').value instanceof Date, true);
+  const loadedSheet = loaded.getWorksheet('Censo MSPAS');
+  assert.equal(loadedSheet.getCell('J9').value instanceof Date, true);
+  assert.equal(loadedSheet.getCell('C9').value, '1234567890101');
+  assert.equal(loadedSheet.getCell('C9').numFmt, '@');
 });
 
 test('HTML y renderer PDF fijan oficio 13 x 8.5, tabla completa y encabezado repetible', async () => {

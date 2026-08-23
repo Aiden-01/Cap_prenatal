@@ -12,6 +12,7 @@ const JWT_ALGORITHM = 'HS256';
 const JWT_ISSUER = 'cap-prenatal-api';
 const JWT_AUDIENCE = 'cap-prenatal-web';
 const AUTOMATION_TIMEZONE = 'America/Guatemala';
+const LOCAL_AUTOMATION_CIDRS = new Set(['127.0.0.1/32', '::1/128']);
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
 let environmentFileLoaded = false;
 const UNSAFE_SECRET_MARKERS = [
@@ -317,6 +318,9 @@ function validateTrustedProxyCidrs(env) {
 function validateAutomationConfig(env = process.env, options = {}) {
   const nodeEnv = options.nodeEnv || nodeEnvForValidation(env);
   const enabled = parseBoolean(env, 'N8N_INTEGRATION_ENABLED', { fallback: false });
+  const localEnabled = parseBoolean(env, 'N8N_INTEGRATION_LOCAL_ENABLED', {
+    fallback: false,
+  });
   const currentHash = validateAutomationHash(env, 'N8N_API_KEY_HASH_CURRENT');
   const nextHash = validateAutomationHash(env, 'N8N_API_KEY_HASH_NEXT');
   const allowedCidrs = validateAutomationCidrs(env);
@@ -346,16 +350,21 @@ function validateAutomationConfig(env = process.env, options = {}) {
     min: 1,
     max: 100,
   });
-  const active = nodeEnv === 'production' && enabled;
+  const localActive = nodeEnv === 'development' && enabled && localEnabled;
+  const active = (nodeEnv === 'production' && enabled) || localActive;
 
   if (active && !currentHash) invalid('N8N_API_KEY_HASH_CURRENT');
   if (active && allowedCidrs.length === 0) invalid('N8N_ALLOWED_CIDRS');
+  if (localActive && allowedCidrs.some((cidr) => !LOCAL_AUTOMATION_CIDRS.has(cidr))) {
+    invalid('N8N_ALLOWED_CIDRS');
+  }
 
   return Object.freeze({
     active,
     allowedCidrs,
     currentHash,
     enabled,
+    localEnabled,
     nextHash,
     rateLimitMax,
     rateLimitWindowMs,

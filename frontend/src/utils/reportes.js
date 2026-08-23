@@ -14,6 +14,21 @@ export function getDefaultReportPeriod(now = new Date()) {
   return { desde: `${hasta.slice(0, 8)}01`, hasta };
 }
 
+export function getReportPeriodFromSearch(search, now = new Date()) {
+  const fallback = getDefaultReportPeriod(now);
+  const params = new URLSearchParams(String(search || ""));
+  const desde = params.get("desde") || "";
+  const hasta = params.get("hasta") || "";
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  const isRealDate = (value) => {
+    if (!datePattern.test(value)) return false;
+    const parsed = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  };
+  if (!isRealDate(desde) || !isRealDate(hasta) || desde > hasta) return fallback;
+  return { desde, hasta };
+}
+
 export function getReportRiskLevel(paciente) {
   if (paciente?.nivel_riesgo) return String(paciente.nivel_riesgo).toLowerCase();
   if (paciente?.tiene_riesgo) return "alto";

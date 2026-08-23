@@ -1,0 +1,331 @@
+{
+  "id": "capCenso2625V1A1",
+  "name": "CAP Prenatal | Censo 26 a 25 | Resend | v1",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "monthsInterval": 1,
+              "triggerAtDayOfMonth": 26,
+              "triggerAtHour": 6,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "d9ce0711-3711-4a82-aa19-a13816bbafbd",
+      "name": "Cada 26 a las 06:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -760,
+        0
+      ],
+      "notes": "Calcula el ultimo periodo completo del dia 26 al dia 25 en America/Guatemala."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const timezone = 'America/Guatemala';\nconst inputDate = new Date($now.toISO());\nconst parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(inputDate).filter((part) => part.type !== 'literal').map((part) => [part.type, Number(part.value)]));\nconst shiftMonth = (year, month, delta) => { const shifted = new Date(Date.UTC(year, month - 1 + delta, 1)); return { year: shifted.getUTCFullYear(), month: shifted.getUTCMonth() + 1 }; };\nconst iso = (year, month, day) => [year, String(month).padStart(2, '0'), String(day).padStart(2, '0')].join('-');\nconst endMonth = parts.day >= 26 ? { year: parts.year, month: parts.month } : shiftMonth(parts.year, parts.month, -1);\nconst startMonth = shiftMonth(endMonth.year, endMonth.month, -1);\nreturn [{ json: { timezone, period_kind: 'day_26_to_25', desde: iso(startMonth.year, startMonth.month, 26), hasta: iso(endMonth.year, endMonth.month, 25) } }];"
+      },
+      "id": "93f8a3e0-d392-488c-ae4e-c9bd2581c304",
+      "name": "Calcular periodo 26 a 25",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -520,
+        0
+      ],
+      "notes": "Solo genera fechas ISO; no procesa pacientes ni secretos."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/censo-primer-control' : 'http://127.0.0.1:3001/api/automatizaciones/v1/censo-primer-control' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "desde",
+              "value": "={{ $json.desde }}"
+            },
+            {
+              "name": "hasta",
+              "value": "={{ $json.hasta }}"
+            }
+          ]
+        },
+        "sendHeaders": false,
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          },
+          "sendCredentialsOnCrossOriginRedirect": false,
+          "timeout": 10000
+        }
+      },
+      "id": "33eb12f1-3ac4-4b65-8781-f5479e18b015",
+      "name": "Consultar resumen agregado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -280,
+        0
+      ],
+      "notes": "Asignar Header Auth X-CAP-Automation-Key. La prueba manual usa loopback; una ejecucion publicada usa el servicio backend privado."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw = $json;\nconst expectedKeys = ['generated_at', 'range', 'report_type', 'schema_version', 'secure_path', 'timezone', 'total'];\nconst actualKeys = raw && typeof raw === 'object' && !Array.isArray(raw) ? Object.keys(raw).sort() : [];\nif (JSON.stringify(actualKeys) !== JSON.stringify(expectedKeys.slice().sort())) throw new Error('CONTRACT_INVALID');\nconst datePattern = /^\\d{4}-\\d{2}-\\d{2}$/;\nconst realDate = (value) => { if (typeof value !== 'string' || !datePattern.test(value)) return false; const date = new Date(value + 'T00:00:00Z'); return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value; };\nif (raw.schema_version !== 1 || raw.timezone !== 'America/Guatemala' || raw.report_type !== 'first_prenatal_control_census' || raw.secure_path !== '/reportes') throw new Error('CONTRACT_INVALID');\nif (!raw.range || Object.keys(raw.range).sort().join(',') !== 'from,to' || !realDate(raw.range.from) || !realDate(raw.range.to) || raw.range.from > raw.range.to) throw new Error('CONTRACT_INVALID');\nif (!Number.isSafeInteger(raw.total) || raw.total < 0 || raw.total > 100000) throw new Error('CONTRACT_INVALID');\nconst requested = $node['Calcular periodo 26 a 25'].json;\nif (raw.range.from !== requested.desde || raw.range.to !== requested.hasta) throw new Error('CONTRACT_INVALID');\nconst hasData = raw.total > 0;\nconst subject = 'CAP Prenatal | Censo mes logístico | ' + raw.range.from + ' al ' + raw.range.to;\nconst summary = hasData ? 'Se adjunta el censo de ' + raw.total + ' captadas en primer control.' : 'No se registraron captadas en primer control durante este mes logístico.';\nconst html = '<div style=\"font-family:Arial,sans-serif;color:#1f2937;line-height:1.6\"><h2 style=\"color:#7c3aed\">Censo de embarazadas: mes logístico</h2><p><strong>Periodo:</strong> ' + raw.range.from + ' al ' + raw.range.to + '</p><p>' + summary + '</p><p style=\"font-size:12px;color:#6b7280\">Documento confidencial para uso institucional. Proteja los datos de las pacientes.</p></div>';\nconst filename = 'censo_mes_logistico_' + raw.range.from + '_' + raw.range.to + '.xlsx';\nreturn [{ json: { subject, html, total: raw.total, has_data: hasData, filename, range_from: raw.range.from, range_to: raw.range.to } }];"
+      },
+      "id": "8e9f4b7b-1134-48d4-978f-586340edb84f",
+      "name": "Validar y preparar correo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        0
+      ],
+      "notes": "Conserva solo periodo, total y contenido del correo; no copia filas nominales al JSON del workflow."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "21b64bda-d5f4-48c7-a91f-0acc86f70d4e",
+              "leftValue": "={{ $json.has_data }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "51cd6dc1-5e3f-4ff3-873c-2a7314ee35db",
+      "name": "¿Hay datos para adjuntar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        180,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/censo-primer-control/excel' : 'http://127.0.0.1:3001/api/automatizaciones/v1/censo-primer-control/excel' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "desde",
+              "value": "={{ $json.range_from }}"
+            },
+            {
+              "name": "hasta",
+              "value": "={{ $json.range_to }}"
+            }
+          ]
+        },
+        "sendHeaders": false,
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false,
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          },
+          "sendCredentialsOnCrossOriginRedirect": false,
+          "timeout": 30000
+        }
+      },
+      "id": "de86bfb3-4ce7-4391-a0f9-9937dd00df50",
+      "name": "Descargar Excel del censo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        420,
+        -100
+      ],
+      "notes": "Solo se ejecuta cuando el resumen indica al menos un registro. Usa la misma credencial Header Auth."
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "from": "CAP Prenatal <censo@notificaciones.example.invalid>",
+        "to": "responsable@example.invalid",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.html }}",
+        "additionalOptions": {}
+      },
+      "id": "d7a5c060-d7d7-45ff-a9ca-dd64d5ca2bfd",
+      "name": "Enviar aviso sin datos",
+      "type": "n8n-nodes-resend.resend",
+      "typeVersion": 1,
+      "position": [
+        420,
+        120
+      ],
+      "notes": "Rama sin datos: envía el aviso y no configura ningún adjunto."
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "from": "CAP Prenatal <censo@notificaciones.example.invalid>",
+        "to": "responsable@example.invalid",
+        "subject": "={{ $node[\"Validar y preparar correo\"].json.subject }}",
+        "html": "={{ $node[\"Validar y preparar correo\"].json.html }}",
+        "additionalOptions": {
+          "attachments": {
+            "attachments": [
+              {
+                "attachmentType": "binaryData",
+                "binaryPropertyName": "data",
+                "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "filename": "={{ $node[\"Validar y preparar correo\"].json.filename }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "adbc2f9f-a1c5-49c4-bfd1-b221fb78bcf1",
+      "name": "Enviar correo con Excel",
+      "type": "n8n-nodes-resend.resend",
+      "typeVersion": 1,
+      "position": [
+        660,
+        -100
+      ],
+      "notes": "Adjunta únicamente la propiedad binaria data descargada desde el backend privado."
+    }
+  ],
+  "connections": {
+    "Cada 26 a las 06:00": {
+      "main": [
+        [
+          {
+            "node": "Calcular periodo 26 a 25",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular periodo 26 a 25": {
+      "main": [
+        [
+          {
+            "node": "Consultar resumen agregado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar resumen agregado": {
+      "main": [
+        [
+          {
+            "node": "Validar y preparar correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar y preparar correo": {
+      "main": [
+        [
+          {
+            "node": "¿Hay datos para adjuntar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay datos para adjuntar?": {
+      "main": [
+        [
+          {
+            "node": "Descargar Excel del censo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar aviso sin datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar Excel del censo": {
+      "main": [
+        [
+          {
+            "node": "Enviar correo con Excel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Guatemala",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false,
+    "callerPolicy": "none",
+    "availableInMCP": false
+  },
+  "versionId": "fcf56506-ae1f-4fb8-a52c-4bc459866f65",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

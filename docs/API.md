@@ -347,6 +347,15 @@ Excel y PDF usan papel oficio/folio de 8.5 x 13 pulgadas, orientacion horizontal
 una pagina de ancho y tantas paginas verticales como sean necesarias. El PDF
 responde con `private, no-store`, `nosniff` y nombre de descarga sanitizado.
 
+La automatizacion mensual no llama estas rutas humanas con un JWT fijo. Primero
+usa `GET /automatizaciones/v1/censo-primer-control?desde=...&hasta=...`,
+protegido por la frontera M2M de n8n, para decidir si hay registros. Cuando el
+total es mayor que cero descarga el mismo Excel mediante
+`GET /automatizaciones/v1/censo-primer-control/excel?desde=...&hasta=...` y lo
+adjunta al correo institucional. Si el total es cero envia solo un aviso, sin
+archivo. Ambas respuestas se sirven con `no-store`; el workflow no persiste
+ejecuciones ni binarios.
+
 ## Mapa de riesgo
 
 Base: `/mapa`
@@ -380,13 +389,17 @@ X-CAP-Automation-Key: <API_KEY_ALEATORIA>
 
 | Metodo | Ruta | Descripcion |
 | --- | --- | --- |
-| `GET` | `/v1/proximas-citas?offset_days=1&window_days=1` | Conteo agregado de citas por fecha. |
+| `GET` | `/v1/proximas-citas?offset_days=1&window_days=1` | Citas por fecha con un nombre, un apellido, telefono y comunidad. |
+| `GET` | `/v1/censo-primer-control?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` | Conteo de primeros controles del periodo. |
+| `GET` | `/v1/censo-primer-control/excel?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` | Excel nominal del mismo periodo para adjunto institucional. |
 | `GET` | `/proximas-citas` | Endpoint legacy retirado; siempre `404`. |
 
 La key original vive solo en n8n. El backend compara su SHA-256 contra
 `N8N_API_KEY_HASH_CURRENT` o el hash NEXT de rotacion. La ruta exige allowlist
-CIDR y tiene rate limit propio. La respuesta solo contiene version, fecha de
-generacion, zona horaria, rango, total, resumen por fecha y `/dashboard`.
+CIDR y tiene rate limit propio. La respuesta de citas contiene version, fecha
+de generacion, zona horaria, rango, total, resumen por fecha, `/dashboard` y el
+detalle minimo solicitado: `first_name`, `last_name`, `phone` y `community`.
+No incluye IDs, CUI, expediente, direccion ni informacion clinica.
 
 El proxy publico Nginx no reenvia este prefijo: responde `404` antes del bloque
 general `/api/`. Solo n8n puede usar la ruta directa

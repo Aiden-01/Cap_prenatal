@@ -13,6 +13,7 @@ function createAutomatizacionesRepository(db = pool) {
       latest_control AS (
         SELECT
           c.embarazo_id,
+          c.paciente_id,
           c.cita_siguiente,
           ROW_NUMBER() OVER (
             PARTITION BY c.embarazo_id
@@ -25,32 +26,64 @@ function createAutomatizacionesRepository(db = pool) {
          AND e.estado = 'activo'
         WHERE c.embarazo_id IS NOT NULL
       ),
-      summary AS (
+      appointments AS (
         SELECT
           lc.cita_siguiente AS fecha_proxima_cita,
-          COUNT(*)::integer AS total
+          SPLIT_PART(TRIM(p.nombres), ' ', 1) AS primer_nombre,
+          SPLIT_PART(TRIM(p.apellidos), ' ', 1) AS primer_apellido,
+          COALESCE(p.telefono, '') AS telefono,
+          COALESCE(com.nombre, p.comunidad, '') AS comunidad
         FROM latest_control lc
+        JOIN pacientes p ON p.id = lc.paciente_id
+        LEFT JOIN comunidades com ON com.id = p.comunidad_id
         CROSS JOIN bounds b
         WHERE lc.rn = 1
           AND lc.cita_siguiente IS NOT NULL
           AND lc.cita_siguiente >= b.fecha_desde
           AND lc.cita_siguiente < b.fecha_hasta_exclusiva
-        GROUP BY lc.cita_siguiente
       )
       SELECT
         b.fecha_desde,
         b.fecha_hasta_exclusiva - 1 AS fecha_hasta,
-        s.fecha_proxima_cita,
-        COALESCE(s.total, 0)::integer AS total
+        a.fecha_proxima_cita,
+        a.primer_nombre,
+        a.primer_apellido,
+        a.telefono,
+        a.comunidad
       FROM bounds b
-      LEFT JOIN summary s ON TRUE
-      ORDER BY s.fecha_proxima_cita ASC NULLS LAST`,
+      LEFT JOIN appointments a ON TRUE
+      ORDER BY
+        a.fecha_proxima_cita ASC NULLS LAST,
+        a.primer_apellido ASC NULLS LAST,
+        a.primer_nombre ASC NULLS LAST`,
       [offsetDays, windowDays]
     );
     return rows;
   }
 
+  async function obtenerResumenCensoPrimerControl({ desde, hasta }) {
+    const { rows } = await db.query(
+      `WITH primer_control AS (
+        SELECT DISTINCT ON (c.embarazo_id)
+          c.embarazo_id,
+          c.fecha
+        FROM controles_prenatales c
+        WHERE c.numero_control = 1
+        ORDER BY c.embarazo_id, c.fecha ASC, c.id ASC
+      )
+      SELECT
+        $1::date AS fecha_desde,
+        $2::date AS fecha_hasta,
+        COUNT(*)::integer AS total
+      FROM primer_control pc
+      WHERE pc.fecha BETWEEN $1::date AND $2::date`,
+      [desde, hasta]
+    );
+    return rows;
+  }
+
   return {
+    obtenerResumenCensoPrimerControl,
     obtenerResumenProximasCitas,
   };
 }

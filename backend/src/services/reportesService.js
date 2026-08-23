@@ -148,8 +148,8 @@ function crearWorkbookCenso(rows, {
   rows.forEach((row, index) => {
     const added = sheet.addRow({
       no: index + 1,
-      expediente: row.no_expediente || '',
-      cui: row.cui || '',
+      expediente: row.no_expediente ? String(row.no_expediente) : '',
+      cui: row.cui ? String(row.cui) : '',
       nombre: row.nombre_completo || '',
       edad: row.edad ?? '',
       etnia: row.etnia || '',
@@ -189,6 +189,9 @@ function crearWorkbookCenso(rows, {
   for (const key of ['fur', 'fpp', ...(incluirPrimerControl ? ['primer_control'] : [])]) {
     sheet.getColumn(key).numFmt = 'dd/mm/yyyy';
     sheet.getColumn(key).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  }
+  for (const key of ['expediente', 'cui']) {
+    sheet.getColumn(key).numFmt = '@';
   }
   for (const key of ['no', 'edad', 'semanas', 'gestas', 'partos', 'abortos', 'riesgo', 'estado']) {
     sheet.getColumn(key).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };

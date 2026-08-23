@@ -34,6 +34,29 @@ function validContract(overrides = {}) {
         total: 3,
       },
     ],
+    appointments: [
+      {
+        date: '2026-07-24',
+        first_name: 'Ana',
+        last_name: 'López',
+        phone: '5555-0101',
+        community: 'El Chal',
+      },
+      {
+        date: '2026-07-24',
+        first_name: 'Beatriz',
+        last_name: 'Méndez',
+        phone: '5555-0102',
+        community: 'Las Flores',
+      },
+      {
+        date: '2026-07-24',
+        first_name: 'Clara',
+        last_name: 'Pérez',
+        phone: '5555-0103',
+        community: 'Santa Rosita',
+      },
+    ],
     secure_path: '/dashboard',
     ...overrides,
   };
@@ -68,8 +91,12 @@ function runMailBuilder({
   execution = { mode: 'trigger' },
 } = {}) {
   const code = byName('Construir correo agregado').parameters.jsCode;
-  const execute = new Function('$json', '$vars', '$execution', code);
-  return execute(input, vars, execution)[0].json;
+  const execute = new Function('$json', '$vars', '$execution', '$node', code);
+  return execute(input, vars, execution, {
+    'Validar contrato estrictamente': {
+      json: { appointments: validContract().appointments },
+    },
+  })[0].json;
 }
 
 function runRequestClassifier(attempt, payload) {
@@ -93,7 +120,7 @@ function runInitialConfiguration({
 
 test('workflow JSON es válido, versionado, inactivo y sin datos fijados', () => {
   assert.equal(workflow.id, 'capProxCitasV1A1');
-  assert.equal(workflow.name, 'CAP Prenatal | Próximas citas agregadas | v1');
+  assert.equal(workflow.name, 'CAP Prenatal | Próximas citas operativas | v1');
   assert.equal(workflow.active, false);
   assert.match(workflow.versionId, /^[0-9a-f-]{36}$/);
   assert.equal(new Set(workflow.nodes.map((node) => node.id)).size, workflow.nodes.length);
@@ -303,7 +330,7 @@ test('no existen nodos peligrosos, PostgreSQL ni lectura global del entorno', ()
   }
 });
 
-test('contrato válido se reduce a rango, total, secure_path y alias', () => {
+test('contrato válido conserva solo rango, total, detalle operativo, ruta y alias', () => {
   const result = runContractValidator(validContract());
   assert.deepEqual(result, {
     workflow_version: 1,
@@ -311,6 +338,7 @@ test('contrato válido se reduce a rango, total, secure_path y alias', () => {
     range_from: '2026-07-24',
     range_to: '2026-07-24',
     total: 3,
+    appointments: validContract().appointments,
     secure_path: '/dashboard',
     recipient_alias: 'responsable_salud_reproductiva',
   });
@@ -368,6 +396,26 @@ test('validador rechaza campos adicionales, desorden y suma inconsistente', () =
   assert.equal(
     runContractValidator(badSum).validation_detail,
     'summary_sum_mismatch'
+  );
+
+  const badAppointment = validContract();
+  badAppointment.appointments[0].cui = 'dato no permitido';
+  assert.equal(
+    runContractValidator(badAppointment).validation_detail,
+    'forbidden_field:cui'
+  );
+
+  const missingAppointment = validContract({ appointments: [] });
+  assert.equal(
+    runContractValidator(missingAppointment).validation_detail,
+    'appointments_total_mismatch'
+  );
+
+  const controlCharacter = validContract();
+  controlCharacter.appointments[0].community = 'El Chal\nOtra línea';
+  assert.equal(
+    runContractValidator(controlCharacter).validation_detail,
+    'appointment_text_invalid'
   );
 });
 
@@ -450,7 +498,7 @@ test('deduplicación usa SHA-256 con alias y marca solo después del envío', ()
   ]);
 });
 
-test('correo es texto simple y contiene únicamente total, rango y enlace seguro', () => {
+test('correo es texto simple e incluye nombre operativo, teléfono y comunidad', () => {
   const built = runMailBuilder();
   assert.equal(built.mail_configuration_valid, true);
   assert.equal(
@@ -462,7 +510,12 @@ test('correo es texto simple y contiene únicamente total, rango y enlace seguro
     [
       'Se identificaron 3 citas prenatales programadas para 2026-07-24.',
       '',
-      'Ingrese al sistema CAP Prenatal para consultar el detalle:',
+      'Detalle operativo:',
+      '1. Ana López | Teléfono: 5555-0101 | Comunidad: El Chal',
+      '2. Beatriz Méndez | Teléfono: 5555-0102 | Comunidad: Las Flores',
+      '3. Clara Pérez | Teléfono: 5555-0103 | Comunidad: Santa Rosita',
+      '',
+      'Ingrese al sistema CAP Prenatal:',
       'https://cap-prenatal.example.test/dashboard',
       '',
       'Este es un mensaje automático. No responda a este correo.',

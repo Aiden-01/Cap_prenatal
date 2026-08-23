@@ -110,17 +110,22 @@ routes/automatizaciones
   -> repositories/automatizacionesRepository
 ```
 
-`GET /api/automatizaciones/v1/proximas-citas` solo esta activo en produccion
-habilitada. La ruta valida direccion de socket contra CIDR, aplica un rate limit
+`GET /api/automatizaciones/v1/proximas-citas` esta activo en produccion
+habilitada o mediante el opt-in explicito de desarrollo, que solo acepta CIDR
+loopback. La ruta valida direccion de socket contra CIDR, aplica un rate limit
 independiente, compara SHA-256 de `X-CAP-Automation-Key`, valida el rango y
-responde conteos por fecha. No usa JWT, cookies, CSRF, `Authorization`,
+responde conteos por fecha y el detalle operativo minimo de cada cita: primer
+nombre, primer apellido, telefono y comunidad. No usa JWT, cookies, CSRF, `Authorization`,
 `X-Forwarded-For` ni CORS de navegador.
 
 El repositorio selecciona el ultimo control por `embarazo_id` mediante
 `fecha DESC, numero_control DESC, id DESC`, filtra exclusivamente embarazos
-activos y nunca selecciona datos nominales. El endpoint legacy responde `404`.
-La auditoria de consulta es informativa y best effort. No se modifico la base de
-datos.
+activos y no selecciona IDs, CUI, expediente, direccion ni datos clinicos. Los
+endpoints M2M de censo exponen por separado el resumen agregado y un Excel
+nominal en memoria para el adjunto autorizado; ambos validan un periodo de hasta
+31 dias. La auditoria conserva solo conteo, rango y codigos controlados, nunca
+el archivo ni sus filas. El endpoint legacy responde `404`. No se modifico la
+base de datos.
 
 La topologia de Sprint 5B.2A separa `proxy_public`, `app_internal`,
 `data_internal` y `automation_internal`. El proxy y n8n solo comparten el

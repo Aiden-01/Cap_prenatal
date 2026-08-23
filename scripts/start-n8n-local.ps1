@@ -23,6 +23,8 @@ $allowedVariables = @(
   "N8N_BLOCK_ENV_ACCESS_IN_NODE",
   "N8N_COMMUNITY_PACKAGES_ENABLED",
   "N8N_UNVERIFIED_PACKAGES_ENABLED",
+  "N8N_COMMUNITY_PACKAGES_MANAGED_BY_ENV",
+  "N8N_COMMUNITY_PACKAGES",
   "N8N_DIAGNOSTICS_ENABLED",
   "N8N_VERSION_NOTIFICATIONS_ENABLED",
   "N8N_TEMPLATES_ENABLED",
@@ -112,6 +114,27 @@ if ($env:N8N_BLOCK_ENV_ACCESS_IN_NODE -ne "true") {
 }
 if ($env:N8N_RUNNERS_MODE -ne "internal") {
   throw "N8N_RUNNERS_MODE local debe ser internal."
+}
+if ($env:N8N_COMMUNITY_PACKAGES_ENABLED -ne "true") {
+  throw "N8N_COMMUNITY_PACKAGES_ENABLED debe permanecer en true para cargar Resend."
+}
+if ($env:N8N_UNVERIFIED_PACKAGES_ENABLED -ne "false") {
+  throw "N8N_UNVERIFIED_PACKAGES_ENABLED debe permanecer en false."
+}
+if ($env:N8N_COMMUNITY_PACKAGES_MANAGED_BY_ENV -ne "true") {
+  throw "N8N_COMMUNITY_PACKAGES_MANAGED_BY_ENV debe permanecer en true."
+}
+try {
+  $communityPackages = @($env:N8N_COMMUNITY_PACKAGES | ConvertFrom-Json)
+} catch {
+  throw "N8N_COMMUNITY_PACKAGES debe ser JSON valido."
+}
+if (
+  $communityPackages.Count -ne 1 -or
+  $communityPackages[0].name -ne "n8n-nodes-resend" -or
+  $communityPackages[0].version -ne "2.8.0"
+) {
+  throw "N8N_COMMUNITY_PACKAGES debe fijar solo n8n-nodes-resend 2.8.0."
 }
 
 $n8nUserFolder = Join-Path $repositoryRoot ".n8n-local"

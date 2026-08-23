@@ -1,445 +1,280 @@
-# Integracion segura con n8n
+# Automatizaciones seguras con n8n
 
-## Estado
+Esta guía define la arquitectura, los contratos y el comportamiento esperado de
+las automatizaciones de CAP Prenatal. La operación diaria está en
+[`N8N_OPERACION.md`](N8N_OPERACION.md), la configuración de correo en
+[`RESEND.md`](RESEND.md) y el inventario importable en
+[`../n8n/README.md`](../n8n/README.md).
 
-Sprint 5B.2B agrega el workflow versionado
-`n8n/workflows/proximas-citas-v1.json` sobre la infraestructura aislada de
-5B.2A. El artefacto esta inactivo, no contiene credenciales, no se importo, no
-se desplego, no inicio n8n o Docker y no envio correos. Tampoco hubo cambios de
-base de datos, migraciones, `schema.sql`, frontend funcional o archivos `.env`
-reales.
+## Estado observado el 22 de agosto de 2026
 
-El endpoint anterior:
+- Rama inspeccionada: `main`, HEAD `bc99a6cacaced5b635794d697bd4919c2f23d49e`.
+- n8n local: `2.34.4`, disponible en `http://127.0.0.1:5678` y ligado a
+  loopback.
+- Perfil persistente: `.n8n-local/`, ignorado por Git.
+- Nodo Resend: `n8n-nodes-resend@2.8.0` instalado en el perfil persistente.
+- Workflows locales: tres, con IDs estables, credenciales asignadas y
+  `active=false`.
+- Workflows versionados: inactivos, sin IDs de credenciales, sin claves y con
+  direcciones `.invalid`.
 
-```text
-GET /api/automatizaciones/proximas-citas
-```
+La inspección del repositorio y de los metadatos locales no implica que el
+dominio, una API key o la entrega productiva se hayan vuelto a validar en los
+paneles externos durante esta sesión.
 
-esta retirado y responde `404`. `AUTOMATION_SECRET` es obsoleto y el backend no
-lo usa. No debe restaurarse ni redirigirse al contrato nuevo.
+| ID local | Workflow | Programación | Resultado sin datos | Correo |
+| --- | --- | --- | --- | --- |
+| `NI4eHXsKQmcCB2Xg` | Recordatorio de citas | Diario 08:00 | Termina sin enviar | Resend, sin adjunto |
+| `capCenso2625V1A1` | Censo 26 a 25 | Día 26, 06:00 | Envía aviso sin archivo | Resend, XLSX si hay datos |
+| `capCensoMesV1A1` | Censo de mes cerrado | Día 3, 06:00 | Envía aviso sin archivo | Resend, XLSX si hay datos |
 
-## Topologia
+Todos usan `America/Guatemala`. Activar un workflow es una decisión operativa
+separada de importarlo o probar nodos individuales.
 
-```text
-Internet/navegador
-        |
-        v
-proxy Nginx :80/:443  -- app_internal -->  backend :3001
-                                                |
-                                                +-- data_internal --> PostgreSQL :5432
-                                                |
-n8n :5678 -- automation_internal ---------------+
-```
-
-La configuracion productiva de ejemplo define:
-
-- `proxy_public`: solo el proxy;
-- `app_internal`: proxy y backend;
-- `data_internal`: backend y PostgreSQL;
-- `automation_internal`: n8n y backend.
-
-Las tres redes internas usan `internal: true`. PostgreSQL, backend y n8n no
-publican puertos al host; solo `proxy` publica `80`. TLS debe terminar en este
-proxy o en un balanceador administrado antes de usar la configuracion.
-
-Inventario:
-
-| Servicio | Desarrollo local | Produccion de ejemplo | Redes productivas |
-| --- | --- | --- | --- |
-| Proxy/frontend | `127.0.0.1:8080` | publica `80`; `443` debe resolverse en proxy/balanceador | `proxy_public`, `app_internal` |
-| Backend | `127.0.0.1:3001` | sin `ports`, solo `expose: 3001` | `app_internal`, `data_internal`, `automation_internal` |
-| PostgreSQL | `127.0.0.1:5432` | sin `ports`, solo `expose: 5432` | `data_internal` |
-| n8n | `127.0.0.1:5678` | sin `ports`, solo `expose: 5678` | `automation_internal` |
-
-El backend recibe DB/JWT y hashes M2M; PostgreSQL recibe unicamente sus
-variables propias; n8n recibe cifrado, retencion y URLs dedicadas; el proxy no
-recibe secretos de backend o n8n.
-
-n8n consulta directamente:
+## Responsabilidades y límites de confianza
 
 ```text
-http://backend:3001/api/automatizaciones/v1/proximas-citas
+CAP Prenatal
+    |
+    | consulta privada autenticada
+    v
+API interna Express
+    |
+    | respuesta mínima / XLSX temporal
+    v
+n8n
+    |
+    | HTTPS saliente con credencial cifrada
+    v
+Resend
+    |
+    v
+correo institucional autorizado
 ```
 
-No usa el proxy publico. Nginx responde un `404` JSON uniforme para el prefijo
-normalizado `/api/automatizaciones/` antes del bloque general `/api/`. La regla
-es case-insensitive y se aplica con `merge_slashes on`, por lo que variantes
-simples de mayusculas, barras duplicadas o URI normalizada tampoco se reenvian.
-Las rutas humanas restantes conservan el proxy general.
+- **CAP Prenatal/PostgreSQL:** fuente clínica canónica.
+- **API Express:** único punto autorizado para consultar datos de
+  automatización y generar el XLSX. Aplica validación, allowlist, rate limit y
+  minimización.
+- **n8n:** agenda, valida contratos, decide ramas, forma el correo y adjunta el
+  binario. No consulta PostgreSQL.
+- **Resend:** entrega el correo usando un dominio verificado y una API key
+  guardada como credencial de n8n.
+- **Destinatario:** custodio del mensaje y de cualquier archivo clínico.
 
-En una llamada directa n8n -> backend, `req.socket.remoteAddress` es la IP del
-contenedor n8n dentro de `172.30.30.0/24`. En una llamada humana, el socket del
-backend observa al proxy dentro de `172.30.10.0/24` y Express solo acepta sus
-headers reenviados porque esa subred esta en `TRUSTED_PROXY_CIDRS`. Una llamada
-publica nunca llega al router de automatizaciones porque Nginx la corta.
+n8n no comparte la red `data_internal`, no recibe `DATABASE_URL`, contraseñas
+de PostgreSQL, JWT, secretos de sesión ni hashes M2M. En producción solo
+comparte `automation_internal` con el backend.
 
-## Endpoint v1
+## Autenticación de máquina a máquina
+
+Las rutas usan exclusivamente:
 
 ```text
-GET /api/automatizaciones/v1/proximas-citas
-X-CAP-Automation-Key: <API_KEY_ALEATORIA>
+X-CAP-Automation-Key: <valor aleatorio guardado en Header Auth>
 ```
 
-Parametros opcionales:
+La key original vive en una credencial `HTTP Header Auth` de n8n. El backend
+recibe solo su SHA-256 en `N8N_API_KEY_HASH_CURRENT` y, durante una rotación,
+en `N8N_API_KEY_HASH_NEXT`.
 
-- `offset_days`: entero de 0 a 30; default `1`.
-- `window_days`: entero de 1 a 7; default `1`.
+Además se exige:
 
-No se permiten parametros repetidos, desconocidos, negativos o decimales. La
-zona horaria unica de esta version es `America/Guatemala`.
-
-El endpoint existe funcionalmente solo cuando:
-
-- `NODE_ENV=production`;
 - `N8N_INTEGRATION_ENABLED=true`;
-- el hash CURRENT esta configurado;
-- el origen pertenece a `N8N_ALLOWED_CIDRS`;
-- la API key es valida;
-- el rate limit permite la solicitud.
+- producción, o desarrollo con `N8N_INTEGRATION_LOCAL_ENABLED=true`;
+- origen incluido en `N8N_ALLOWED_CIDRS`;
+- ausencia de `Origin` de navegador;
+- rate limit disponible.
 
-En desarrollo, test o con la integracion deshabilitada responde `404`. JWT,
-cookies, CSRF, `Authorization` y credenciales en query string no autentican esta
-ruta. Las solicitudes de navegador con header `Origin` se rechazan.
+El opt-in local admite únicamente `127.0.0.1/32` y/o `::1/128`. JWT, cookies,
+CSRF, `Authorization`, query strings y `X-Forwarded-For` no sustituyen estos
+controles. La ruta legacy `/api/automatizaciones/proximas-citas` permanece
+retirada y responde `404`.
 
-## Respuesta
+## API interna
+
+### Citas de mañana
+
+```text
+GET /api/automatizaciones/v1/proximas-citas?offset_days=1&window_days=1
+```
+
+La respuesta raíz contiene exactamente:
 
 ```json
 {
   "schema_version": 1,
   "generated_at": "2026-01-01T12:00:00.000Z",
   "timezone": "America/Guatemala",
-  "range": {
-    "from": "2026-01-02",
-    "to": "2026-01-02"
-  },
-  "total": 3,
-  "summary_by_date": [
+  "range": { "from": "2026-01-02", "to": "2026-01-02" },
+  "total": 1,
+  "summary_by_date": [{ "date": "2026-01-02", "total": 1 }],
+  "appointments": [
     {
       "date": "2026-01-02",
-      "total": 3
+      "first_name": "Nombre",
+      "last_name": "Apellido",
+      "phone": "0000-0000",
+      "community": "Comunidad"
     }
   ],
   "secure_path": "/dashboard"
 }
 ```
 
-`range.to` es la ultima fecha incluida. Una consulta sin citas responde
-`total: 0` y `summary_by_date: []`.
+El ejemplo es sintético. Cada cita expone solo fecha, primer nombre, primer
+apellido, teléfono y comunidad. No devuelve IDs, CUI, expediente, dirección,
+riesgo, diagnóstico, observaciones ni otros datos clínicos.
 
-La respuesta nunca contiene paciente, embarazo, nombre, CUI, telefono,
-expediente, direccion, comunidad, territorio, riesgo, diagnostico, controles,
-observaciones, HTML, Markdown ni SQL.
+La consulta considera embarazos activos y únicamente la `cita_siguiente` del
+control más reciente de cada embarazo. Una cita antigua no reaparece si el
+último control ya no tiene una fecha futura.
 
-## Seleccion de citas
+### Censo de primer control
 
-La consulta:
-
-- usa la fecha de PostgreSQL en `America/Guatemala`;
-- incluye solo embarazos `activo`;
-- exige que control y embarazo pertenezcan a la misma paciente;
-- particiona por `embarazo_id`;
-- elige `fecha DESC, numero_control DESC, id DESC`;
-- considera solo `cita_siguiente` del control mas reciente;
-- no revive una cita de un control anterior si el ultimo no tiene fecha;
-- excluye fechas fuera del rango;
-- agrega el resultado por fecha.
-
-No realiza escrituras ni requiere cambios de base de datos.
-
-## Configuracion del backend
-
-```env
-N8N_INTEGRATION_ENABLED=false
-N8N_API_KEY_HASH_CURRENT=
-N8N_API_KEY_HASH_NEXT=
-N8N_ALLOWED_CIDRS=
-APPOINTMENT_NOTIFICATION_START_OFFSET_DAYS=1
-APPOINTMENT_NOTIFICATION_WINDOW_DAYS=1
-APPOINTMENT_NOTIFICATION_TIMEZONE=America/Guatemala
-AUTOMATION_RATE_LIMIT_WINDOW_MS=900000
-AUTOMATION_RATE_LIMIT_MAX=6
-```
-
-CURRENT y NEXT son hashes SHA-256 hexadecimales de 64 caracteres. La API key
-original existe unicamente en la credencial Header Auth de n8n. Los hashes se
-tratan como configuracion sensible y no se escriben en Git, tickets o logs.
-
-En produccion habilitada la allowlist no puede estar vacia. Soporta IPv4, IPv6
-y direcciones IPv4 mapeadas como IPv6. El backend usa la direccion del socket;
-no confia en `X-Forwarded-For`.
-
-La validacion CIDR usa la dependencia explicita `ipaddr.js` porque implementa
-parseo y comparacion mantenidos para IPv4, IPv6 e IPv4 mapeada; evita un parser
-manual incompleto en un control de acceso de red.
-
-Para trafico humano, Express configura `trust proxy` con una funcion CIDR
-estricta basada en `TRUSTED_PROXY_CIDRS`. El ejemplo productivo confia solo en
-`172.30.10.0/24`, la subred de `app_internal`; nunca usa `true`. Esta
-configuracion permite interpretar los headers del proxy humano, pero no cambia
-el origen del endpoint M2M, que siempre usa `req.socket.remoteAddress`.
-
-## n8n, secretos y version
-
-La imagen y la dependencia local estan fijadas exactamente en `2.34.4`. Se
-eligio porque npm y GitHub la publican como `latest` oficial dentro de 2.x y la
-auditoria de npm la propone como correccion compatible para los avisos directos
-de `2.26.4`. No se usa una etiqueta Docker mutable, rango semver ni descarga
-implicita mediante `npx`.
-
-Para actualizar:
-
-1. revisar las notas de version y cambios incompatibles;
-2. respaldar y probar restauracion del volumen n8n;
-3. verificar compatibilidad de nodos y credenciales en un entorno aislado;
-4. actualizar a la vez Compose local, Compose productivo, `package.json` y lock;
-5. ejecutar las pruebas de infraestructura y no saltar automaticamente de major.
-
-n8n recibe solamente variables dedicadas. No recibe PostgreSQL clinico, JWT,
-sesiones, SMTP, seed ni hashes CURRENT/NEXT. La API key original debe crearse
-como credencial Header Auth dentro de n8n; el backend recibe unicamente los
-hashes SHA-256.
-
-En `2.34.4`, `WEBHOOK_URL` fue reemplazada por `N8N_WEBHOOK_URL` y
-`N8N_RUNNERS_ENABLED` ya no es necesaria. La configuracion fija runners
-internos con timeout de 60 segundos, cookies seguras en produccion, paquetes
-comunitarios deshabilitados, diagnosticos/plantillas deshabilitados y acceso
-global a `$env` bloqueado. Las URLs no secretas de CAP viven en variables de
-proyecto n8n para que el workflow no requiera abrir el entorno del proceso.
-
-### Compatibilidad de variables 2.26.4 a 2.34.4
-
-| Clasificacion | Variables/configuracion | Resultado |
-|---|---|---|
-| Sin cambio | `GENERIC_TIMEZONE`, `TZ`, `N8N_ENCRYPTION_KEY`, host, puerto, protocolo, listen address y editor base URL | Se conservan; Guatemala y cifrado estable siguen siendo obligatorios. |
-| Sin cambio | poda, retencion, guardado de ejecuciones y `N8N_CONCURRENCY_PRODUCTION_LIMIT` | Se conservan; produccion no guarda payloads y limita concurrencia a 1. |
-| Renombrada | `WEBHOOK_URL` | Sustituida por `N8N_WEBHOOK_URL`; la anterior queda prohibida por pruebas. |
-| Retirada | `N8N_RUNNERS_ENABLED` | Eliminada por deprecacion; runners quedan en `N8N_RUNNERS_MODE=internal`. |
-| Ajustada | task runners | Timeout explicito de 60 segundos; sin broker externo ni token compartido. |
-| Endurecida | cookies | `N8N_SECURE_COOKIE=true` y SameSite strict en produccion; solo local HTTP usa secure=false. |
-| Endurecida | nodos y paquetes | `$env` bloqueado; paquetes comunitarios/no verificados deshabilitados. |
-| Sin cambio | diagnosticos, notificaciones, plantillas y logging | Telemetria y salidas externas deshabilitadas; log a consola, JSON en produccion. |
-| Sin cambio | base de datos n8n | SQLite propia en volumen persistente; nunca PostgreSQL clinico. |
-| Manual | user management, SMTP y credenciales Header Auth | Se configuran dentro de n8n y quedan cifradas; no se exportan al JSON o Compose. |
-
-No aparecio una variable nueva obligatoria para este workflow. La migracion de
-las dos URLs CAP a `$vars` es intencional: no son secretos y permite mantener
-el entorno del proceso cerrado. `N8N_ENCRYPTION_KEY` no cambia durante una
-actualizacion de una instancia existente.
-
-`N8N_ENCRYPTION_KEY` es obligatoria, estable y secreta. Debe respaldarse en un
-gestor independiente del volumen. Regenerarla despues de crear credenciales
-puede impedir descifrarlas. El volumen `n8n_data` es persistente, se ejecuta con
-UID/GID `1000:1000` y `N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true`. El backup
-debe cifrarse, tener acceso restringido e incluir una prueba periodica de
-restauracion; la clave no debe guardarse dentro del mismo backup sin una
-proteccion separada.
-
-## Retencion
-
-Produccion parte de una politica conservadora:
-
-```env
-EXECUTIONS_DATA_PRUNE=true
-EXECUTIONS_DATA_MAX_AGE=168
-EXECUTIONS_DATA_PRUNE_MAX_COUNT=1000
-EXECUTIONS_DATA_SAVE_ON_SUCCESS=none
-EXECUTIONS_DATA_SAVE_ON_ERROR=none
-EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=false
-EXECUTIONS_DATA_SAVE_ON_PROGRESS=false
-```
-
-La retencion maxima inicial es siete dias y 1000 ejecuciones. Local conserva
-errores y ejecuciones manuales sinteticas por hasta 24 horas/100 ejecuciones.
-Adicionalmente, el workflow v1 fija `saveDataSuccessExecution=none`,
-`saveDataErrorExecution=none`, `saveManualExecutions=false` y
-`saveExecutionProgress=false`. Sus nodos HTTP no devuelven headers y las ramas
-de error reducen inmediatamente el error a codigos controlados.
-
-## Acceso administrativo
-
-En produccion n8n no publica `5678`. Su editor debe alcanzarse solo mediante
-VPN, red administrativa o tunel autenticado, con HTTPS si cruza una red. La
-cuenta propietaria y MFA, cuando la plataforma lo permita, se configuran fuera
-de Git. No habilitar el tunel administrativo hasta confirmar autenticacion y
-cuenta propietaria; una UI sin autenticacion no es aceptable. El Compose local
-publica exclusivamente `127.0.0.1:5678`.
-
-## Configuracion local
-
-`scripts/start-n8n-local.ps1` lee unicamente `n8n/.env`, valida una lista cerrada
-de variables, elimina del proceso variables clinicas heredadas y exige:
-
-- `N8N_ENCRYPTION_KEY` de al menos 32 caracteres;
-- `N8N_LISTEN_ADDRESS` en loopback;
-- `GENERIC_TIMEZONE=America/Guatemala`;
-- `N8N_BLOCK_ENV_ACCESS_IN_NODE=true` y runners internos;
-- n8n local exactamente en `2.34.4`.
-
-Copiar `n8n/.env.example` a `n8n/.env`; este ultimo esta ignorado por Git. La
-integracion del backend permanece deshabilitada por defecto y solo deben usarse
-datos sinteticos. El script no lee `backend/.env` y no inicia si falta la
-configuracion minima o la dependencia local.
-
-## Configuracion productiva de ejemplo
-
-`docker-compose.production.example.yml` es un artefacto revisable, no un
-despliegue. Exige secretos externos por interpolacion, usa redes y volumenes con
-nombres explicitos, reinicio `unless-stopped` y health checks sin credenciales.
-`deploy/.env.example` es solo inventario; los valores vacios deben inyectarse
-desde un gestor de secretos o el entorno protegido, no desde Git.
-
-## Generacion y rotacion
-
-En una terminal administrativa segura puede generarse una key base64url y su
-hash:
+Resumen agregado:
 
 ```text
-node -e "const c=require('crypto');const k=c.randomBytes(32).toString('base64url');console.log('KEY='+k);console.log('SHA256='+c.createHash('sha256').update(k).digest('hex'))"
+GET /api/automatizaciones/v1/censo-primer-control?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
 ```
 
-Procedimiento:
-
-1. Guardar `KEY` solamente como credencial `X-CAP-Automation-Key` en n8n.
-2. Guardar `SHA256` como `N8N_API_KEY_HASH_CURRENT` en el gestor de secretos del backend.
-3. Para rotar, colocar el hash nuevo en `N8N_API_KEY_HASH_NEXT`.
-4. Cambiar la credencial de n8n a la key nueva.
-5. Promover NEXT a CURRENT y vaciar NEXT al terminar la ventana.
-
-Nunca copiar la key original al entorno del backend.
-
-## Rate limit y errores
-
-El limite predeterminado es 6 solicitudes por 15 minutos y tiene un contador
-independiente por origen validado. No comparte estado con login, reportes ni
-rutas clinicas.
-
-Codigos controlados:
-
-- `400 AUTOMATION_INVALID_RANGE`;
-- `401 AUTOMATION_UNAUTHORIZED`;
-- `404 ROUTE_NOT_FOUND`;
-- `429 AUTOMATION_RATE_LIMITED`;
-- `500 AUTOMATION_INTERNAL_ERROR`.
-
-Las respuestas y logs no incluyen key, hash, IP permitida, headers, query
-completa, SQL o stack de automatizacion.
-
-## Auditoria
-
-Una consulta autorizada registra best effort:
+Archivo nominal, solo cuando el resumen indica `total > 0`:
 
 ```text
-categoria: automatizaciones
-entidad: proximas_citas
-evento: consultar
-accion: consultar
+GET /api/automatizaciones/v1/censo-primer-control/excel?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
 ```
 
-Solo conserva tipo, resultado, motivo controlado, cantidad, rango y
-`politica_version: 1`. IP y user-agent quedan `null`. Un fallo de esta auditoria
-informativa no convierte una consulta valida en error. Los intentos con key
-incorrecta no crean filas de auditoria.
+El período es inclusivo y no puede superar 31 días. El resumen solo contiene
+versión, generación, zona, tipo, rango, total y `/reportes`. La ruta binaria
+responde un XLSX con `Content-Disposition: attachment` y
+`Cache-Control: private, no-store`. n8n lo maneja temporalmente como propiedad
+binaria `data`.
 
-## Workflow de proximas citas v1
+## Workflow de recordatorio diario
 
-El Schedule Trigger se ejecuta diariamente a las `06:00` en
-`America/Guatemala`. Consulta exclusivamente manana con `offset_days=1` y
-`window_days=1`, y genera como maximo un resumen agregado. Si `total=0`
-finaliza como `no_results` sin alcanzar SMTP.
-
-Diagrama:
+Archivo: `n8n/workflows/recordatorio-citas-resend-v1.json`.
 
 ```text
-Schedule -> preparar parametros -> GET interno (hasta 3 intentos)
-         -> validar contrato -> SHA-256 -> comprobar static data
-         -> duplicado | sin citas | construir correo
-         -> SMTP (maximo 2 intentos restringidos) -> marcar enviado
+Schedule diario 08:00
+    -> GET próximas citas (offset_days=1, window_days=1)
+    -> ¿total > 0?
+       ├─ no: fin, ningún correo
+       └─ sí: validar contrato y escapar HTML
+              -> un correo Resend con tabla operativa
 ```
 
-Los requests esperan 10 segundos, no siguen redirects y no incluyen headers en
-el resultado. Solo conectividad y HTTP 5xx se reintentan, despues de 1 y 5
-minutos. `400`, `401`, `404` y `429` terminan inmediatamente con salida
-controlada. Un JSON invalido o una violacion del contrato produce
-`CONTRACT_INVALID`; nunca se marca idempotencia ni se envia correo.
+La tabla contiene un nombre, un apellido, teléfono y comunidad por cita. El
+nodo Code exige la lista cerrada de campos, longitudes máximas y ausencia de
+caracteres de control; todos los valores se escapan antes de interpolarse en
+HTML. Un contrato inesperado falla antes de Resend.
 
-## Validacion y privacidad del contrato
+Errores HTTP, `401`, `404`, `429`, contrato inválido o credencial ausente no se
+convierten en un correo aparentemente exitoso. La rama falsa del IF no tiene
+conexión al nodo Resend.
 
-Se exige exactamente `schema_version=1`, zona `America/Guatemala`, ISO valido,
-rango `YYYY-MM-DD` ascendente, total entero entre 0 y 10000, resumen por fecha
-ascendente cuya suma coincide con el total y `secure_path=/dashboard`. La raiz,
-el rango y cada elemento no admiten campos adicionales.
+## Workflows mensuales del censo
 
-Una busqueda recursiva rechaza campos de paciente, embarazo, nombre, apellidos,
-expediente, CUI, telefono, direccion, comunidad, territorio, riesgo,
-diagnostico, observaciones, HTML, Markdown, controles o laboratorios. Despues
-de validar se descartan `generated_at` y `summary_by_date`; solo siguen rango,
-total, ruta y hash. No hay `pinData`, fixtures sensibles, nodos PostgreSQL,
-Execute Command ni lectura de todo el entorno.
+### Mes logístico 26 a 25
 
-Las salidas conservan unicamente version, resultado, codigo, rango, cantidad y,
-cuando existe, hash. No contienen key, headers, URL, destinatario, texto,
-respuesta JSON, respuesta SMTP ni stack.
+Archivo: `n8n/workflows/censo-primer-control-26-25-resend-v1.json`.
 
-## Correo e idempotencia
+Cada día 26 a las 06:00 calcula el último período completo que inicia el 26 del
+mes anterior y termina el 25 del mes actual. Ejemplo: el 26 de febrero procesa
+del 26 de enero al 25 de febrero.
 
-El correo es texto simple:
+### Mes calendario cerrado
+
+Archivo: `n8n/workflows/censo-primer-control-mes-cerrado-resend-v1.json`.
+
+Cada día 3 a las 06:00 procesa desde el día 1 hasta el último día del mes
+calendario anterior.
+
+### Comportamiento común
 
 ```text
-Asunto: CAP Prenatal | Proximas citas — YYYY-MM-DD
-
-Se identificaron N citas prenatales programadas para YYYY-MM-DD.
-
-Ingrese al sistema CAP Prenatal para consultar el detalle:
-https://cap-prenatal.example.invalid/dashboard
-
-Este es un mensaje automatico. No responda a este correo.
+Schedule
+    -> calcular período
+    -> GET resumen agregado
+    -> validar contrato y período exacto
+    -> ¿total > 0?
+       ├─ no: Resend con aviso, sin archivo
+       └─ sí: GET XLSX como binary.data
+              -> Resend con adjunto .xlsx
 ```
 
-La URL real proviene de la variable de proyecto n8n `CAP_SYSTEM_BASE_URL`; una
-ejecucion programada exige HTTPS y rechaza `javascript:`, `data:` y `file:`.
-`CAP_BACKEND_AUTOMATION_URL`, destinatario, remitente y alias tambien son
-variables de proyecto n8n. Los placeholders `example.invalid` bloquean el
-envio.
+El archivo solo se descarga después de comprobar que hay registros. El
+workflow no serializa el XLSX dentro del JSON versionado ni lo guarda como
+archivo del repositorio.
 
-La clave es SHA-256 de
-`v1|range.from|range.to|recipient_alias`. Static data guarda solo hash y
-timestamp, hasta 90 claves/45 dias, y agrega la actual despues del envio
-confirmado. Static data es de mejor esfuerzo y no es una garantia transaccional.
-La concurrencia operativa del workflow debe quedar en 1; la configuracion de
-esta instancia fija `N8N_CONCURRENCY_PRODUCTION_LIMIT=1` porque el JSON
-versionado no serializa un limite por-workflow.
+## Persistencia, retención y privacidad
 
-SMTP solo admite un reintento adicional ante un codigo transitorio
-`421/450/451/452` asociado claramente a `MAIL FROM` o `RCPT`. Timeout, socket
-cerrado o aceptacion ambigua no se reintentan. El resultado SMTP bruto se
-descarta.
+Los tres JSON fijan:
 
-## Importacion, autorizacion y egress pendiente
+```text
+saveDataSuccessExecution=none
+saveDataErrorExecution=none
+saveManualExecutions=false
+saveExecutionProgress=false
+availableInMCP=false
+```
 
-La guia paso a paso esta en `n8n/README.md`. Antes de activar se debe:
+Producción aplica poda y no guarda payloads exitosos, fallidos, manuales o en
+progreso. Local puede conservar errores/manuales por hasta 24 horas para
+diagnóstico; por eso solo deben usarse datos sintéticos o el mínimo operativo
+autorizado y se debe limpiar la evidencia temporal después de probar.
 
-1. importar y confirmar `active=false`;
-2. crear Header Auth con `X-CAP-Automation-Key`;
-3. crear SMTP aprobado y asignarlo a ambos nodos;
-4. configurar destinatario/remitente/alias mediante variables n8n;
-5. verificar URL privada del backend y URL HTTPS del sistema;
-6. ejecutar primero las pruebas sinteticas sin n8n y despues un mock con
-   `total=0`;
-7. confirmar ausencia de `pinData`, politica de ejecuciones y concurrencia 1;
-8. obtener autorizacion institucional.
+No copiar a Git:
 
-No se habilito egress general. Las opciones son relay SMTP institucional en la
-red privada, egress dedicado con firewall limitado al proveedor aprobado o un
-servicio institucional accesible desde red privada. Se prefiere relay o egress
-limitado. n8n no debe conectarse a `data_internal` o PostgreSQL, publicar 5678
-ni recibir una red publica sin controles.
+- `n8n/.env`;
+- `.n8n-local/` ni su SQLite;
+- exports locales con IDs de credenciales o destinatarios;
+- API keys, valores DKIM/SPF/DMARC, claves de cifrado o backups;
+- capturas o payloads con pacientes.
 
-## Pendiente operativo
+## Resend y artefacto SMTP heredado
 
-- importar y revisar visualmente el workflow en un entorno aislado;
-- crear las credenciales y variables reales fuera de Git;
-- aprobar proveedor, remitente, destinatario y egress;
-- desplegar TLS, firewall, VPN/tunel y backups probados;
-- comprobar que las subredes no colisionen;
-- probar la topologia con Docker fuera de este sprint;
-- activar solo despues de autorizacion institucional.
+Los tres workflows cargados utilizan `n8n-nodes-resend.resend`. El archivo
+`n8n/workflows/proximas-citas-v1.json` conserva un diseño endurecido de 40
+nodos con `n8n-nodes-base.emailSend`; no está cargado en la instancia local y
+no es el camino operativo actual. Se mantiene como artefacto heredado cubierto
+por pruebas hasta que una decisión separada autorice retirarlo.
+
+No existen variables `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER` o
+`SMTP_PASS` en los `.env.example` del proyecto ni consumo SMTP en el backend.
+Las menciones SMTP restantes pertenecen al artefacto heredado, pruebas de
+privacidad o documentación histórica; no deben usarse para configurar los
+workflows Resend.
+
+## Preparación productiva
+
+Antes de publicar:
+
+1. respaldar el volumen/perfil de n8n y custodiar aparte la misma
+   `N8N_ENCRYPTION_KEY`;
+2. desplegar n8n `2.34.4` y reconciliar
+   `n8n-nodes-resend@2.8.0` desde configuración;
+3. verificar propietario, acceso administrativo HTTPS y MFA si está disponible;
+4. importar los JSON y confirmar `active=false`;
+5. asignar Header Auth y Resend sin pegar secretos en nodos o variables de
+   proyecto;
+6. sustituir `.invalid` por el remitente verificado y el destinatario
+   institucional aprobado;
+7. confirmar red privada hacia Express y egress HTTPS limitado a Resend;
+8. probar con payload sintético, rama vacía y un XLSX no clínico;
+9. revisar retención, concurrencia, monitoreo de fallos y política de adjuntos;
+10. publicar solo con autorización institucional.
+
+El ejemplo `docker-compose.production.example.yml` no es un despliegue listo:
+faltan TLS, firewall/egress, gestor de secretos, backups restaurables,
+observabilidad y autorización formal.
+
+## Validación del repositorio
+
+```powershell
+node --test backend/test/n8nInfrastructure.test.js
+node --test backend/test/n8nResendDailyWorkflow.test.js
+node --test backend/test/n8nCensusWorkflow.test.js
+node --test backend/test/automatizaciones.test.js
+```
+
+Estas pruebas no envían correo ni requieren una base clínica real.
