@@ -1,4 +1,5 @@
 const controlesRepository = require('../repositories/controlesPrenatalesRepository');
+const citasRepository = require('../repositories/citasPrenatalesRepository');
 const {
   requerirEmbarazoId,
   resolverEmbarazoParaLectura,
@@ -15,8 +16,14 @@ const AUDIT_CONTEXT = Object.freeze({
   crear: Object.freeze({ categoria: 'clinica', entidad: 'control_prenatal', evento: 'crear' }),
   actualizar: Object.freeze({ categoria: 'clinica', entidad: 'control_prenatal', evento: 'actualizar' }),
   eliminar: Object.freeze({ categoria: 'clinica', entidad: 'control_prenatal', evento: 'eliminar' }),
+  citaAtender: Object.freeze({ categoria: 'clinica', entidad: 'cita_prenatal', evento: 'atender' }),
 });
 const RESULTADO_EXITOSO = 'exitoso';
+const CITA_REPROGRAMACION_REQUERIDA = Object.freeze({
+  statusCode: 409,
+  message: 'La fecha de una cita existente debe cambiarse desde el flujo de reprogramacion',
+  code: 'CITA_REPROGRAMACION_REQUERIDA',
+});
 
 const CONTROL_FIELDS = [
   'numero_control', 'fecha', 'hora', 'motivo_consulta',
@@ -134,6 +141,27 @@ function camposRealmenteModificados(anterior, nuevo, campos) {
   );
 }
 
+function impedirCambioHistoricoDeCita(modifiedFields) {
+  if (!modifiedFields.includes('cita_siguiente')) return;
+  throw new HttpError(
+    CITA_REPROGRAMACION_REQUERIDA.statusCode,
+    CITA_REPROGRAMACION_REQUERIDA.message,
+    { code: CITA_REPROGRAMACION_REQUERIDA.code }
+  );
+}
+
+function resolverCitaProgramadaInequivoca(citas) {
+  if (citas.length <= 1) return citas[0] || null;
+  throw new HttpError(
+    409,
+    'Existen varias citas programadas para el mismo embarazo',
+    {
+      code: 'CITAS_VIGENTES_AMBIGUAS',
+      details: { cantidad: citas.length },
+    }
+  );
+}
+
 function buildUpdateData(body) {
   const data = withGuatemalaTimeFallback(body, { onlyWhenHoraIsPresent: true });
   const campos = CONTROL_FIELDS.filter((field) => Object.prototype.hasOwnProperty.call(data, field));
@@ -209,6 +237,17 @@ async function crearControl({ pacienteId, embarazoId, body, req }) {
       ? camposRealmenteModificados(before, data, updateFields)
       : updateFields;
     if (before && modifiedFields.length === 0) return before;
+    if (before) impedirCambioHistoricoDeCita(modifiedFields);
+
+    const citaVigente = before
+      ? null
+      : resolverCitaProgramadaInequivoca(
+        await citasRepository.listarProgramadasVigentesPorEmbarazo(
+          embarazoId,
+          client,
+          { bloquear: true }
+        )
+      );
 
     const control = await controlesRepository.upsert({
       data,
@@ -217,6 +256,48 @@ async function crearControl({ pacienteId, embarazoId, body, req }) {
     if (!control) {
       await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
       throw new HttpError(409, 'No fue posible guardar el control');
+    }
+
+    if (!before && citaVigente) {
+      const citaAtendida = await citasRepository.marcarAtendida({
+        citaId: citaVigente.id,
+        embarazoId,
+        controlCumplimientoId: control.id,
+        usuarioId: req.usuario.id,
+      }, client);
+      if (!citaAtendida) {
+        throw new HttpError(409, 'La cita vigente cambio durante el registro del control', {
+          code: 'CITA_CUMPLIMIENTO_CONFLICTO',
+        });
+      }
+
+      await registrarAuditoria(req, {
+        contexto: AUDIT_CONTEXT.citaAtender,
+        accion: 'actualizar',
+        entidadId: citaVigente.id,
+        pacienteId,
+        embarazoId,
+        cambios: {
+          anteriores: {
+            estado_cita: citaVigente.estado,
+            control_cumplimiento_id: null,
+          },
+          nuevos: {
+            estado_cita: citaAtendida.estado,
+            control_cumplimiento_id: Number(control.id),
+          },
+        },
+        metadata: { resultado: RESULTADO_EXITOSO, motivo_codigo: 'cita_atendida' },
+      }, { db: client, obligatorio: true });
+    }
+
+    if (!before && data.cita_siguiente) {
+      await citasRepository.crearProgramadaDesdeControl({
+        embarazoId,
+        controlOrigenId: control.id,
+        fechaProgramada: data.cita_siguiente,
+        usuarioId: req.usuario.id,
+      }, client);
     }
 
     await registrarAuditoria(req, {
@@ -253,6 +334,7 @@ async function actualizarControl({ pacienteId, embarazoId, id, body, req }) {
 
     const modifiedFields = camposRealmenteModificados(before, data, campos);
     if (modifiedFields.length === 0) return before;
+    impedirCambioHistoricoDeCita(modifiedFields);
     const modifiedData = seleccionarCamposAuditoria(data, modifiedFields);
     const control = await controlesRepository.actualizar({
       id,
@@ -294,6 +376,13 @@ async function eliminarControl({ pacienteId, embarazoId, id, req }) {
       throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
     }
     await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
+    if (await citasRepository.existeRelacionConControl({ controlId: id, embarazoId }, client)) {
+      throw new HttpError(
+        409,
+        'No se puede eliminar un control relacionado con una cita prenatal',
+        { code: 'CONTROL_RELACIONADO_CON_CITA' }
+      );
+    }
     const { control, rowCount } = await controlesRepository.eliminar(
       { id, embarazoId, pacienteId },
       client
@@ -322,6 +411,7 @@ async function eliminarControl({ pacienteId, embarazoId, id, req }) {
 
 module.exports = {
   CONTROL_FIELDS,
+  resolverCitaProgramadaInequivoca,
   valoresControlEquivalentes,
   listarControles,
   obtenerControl,

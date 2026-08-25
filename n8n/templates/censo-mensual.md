@@ -10,6 +10,10 @@ CAP Prenatal | Censo mes logístico | {{DESDE}} al {{HASTA}}
 CAP Prenatal | Censo mensual cerrado | {{DESDE}} al {{HASTA}}
 ```
 
+`{{DESDE}}` y `{{HASTA}}` se presentan como `DD-MM-YYYY` en asunto, cuerpo y
+nombre del adjunto. Las consultas y el contrato del backend conservan ISO
+`YYYY-MM-DD`.
+
 ## Mensaje con datos y archivo
 
 ```html

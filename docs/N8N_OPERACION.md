@@ -71,8 +71,12 @@ La plantilla y ambos Compose fijan:
 N8N_COMMUNITY_PACKAGES_ENABLED=true
 N8N_UNVERIFIED_PACKAGES_ENABLED=false
 N8N_COMMUNITY_PACKAGES_MANAGED_BY_ENV=true
-N8N_COMMUNITY_PACKAGES=[{"name":"n8n-nodes-resend","version":"2.8.0"}]
+N8N_COMMUNITY_PACKAGES=[{"name":"n8n-nodes-resend","version":"2.8.0","checksum":"sha512-t5d9NJTd0dA+Zo0+Hs9lQ0UN2Mx5LQxccm52+j1yvOlHnx/xxvkV8tRS8bJFN+rbxBliFWPUJ9QI+pmAY7hKuA=="}]
 ```
+
+El checksum coincide con el registro oficial de nodos verificados de n8n y con
+la integridad del paquete instalado. Declararlo evita que cada arranque recorra
+el catálogo remoto completo antes de reconciliar Resend.
 
 Al arrancar, n8n reconcilia el paquete aprobado en su perfil persistente. La
 lista declarativa evita depender de recordar una instalación manual y mantiene
@@ -170,7 +174,7 @@ destinatarios reales, remitentes internos y cualquier resultado de ejecución.
 Orden recomendado:
 
 1. `node --test backend/test/n8nInfrastructure.test.js`;
-2. pruebas estáticas de los tres JSON;
+2. pruebas estáticas de los cuatro JSON Resend;
 3. health checks de backend y n8n;
 4. HTTP Request con un período/cita sintéticos;
 5. rama `total=0` para confirmar el comportamiento esperado;
@@ -178,6 +182,19 @@ Orden recomendado:
 7. descarga XLSX sintética y revisión del nombre/MIME;
 8. un único correo de prueba a destinatario autorizado;
 9. confirmar entrega y ausencia de datos sensibles en logs.
+
+Para `Seguimiento semanal de inasistencias`, el orden manual obligatorio es:
+
+1. mantener el workflow sin publicar;
+2. ejecutar con una base o fixture sintético sin resultados y comprobar que
+   Resend no se ejecuta;
+3. usar una base temporal nueva para el caso positivo, porque un período ya
+   registrado como `sin_resultados` no se reabre;
+4. comprobar que `Preparar semana anterior` devuelve `ready`;
+5. ejecutar una sola vez el flujo hasta Resend y confirmación;
+6. repetir el workflow y comprobar que termina en `already_processed` antes de
+   construir el correo;
+7. revisar **Executions** sin copiar payloads nominales a tickets.
 
 No ejecutar el Schedule completo mientras se configuran credenciales. No usar
 una paciente real para probar formato, errores o adjuntos.
@@ -252,6 +269,36 @@ Con `total=0` se envía solo un aviso. Con datos, revisar que la ruta `/excel`
 responda archivo, que el HTTP Request use `responseFormat=file`, que la
 propiedad sea `data` y que el nodo Resend adjunte esa propiedad.
 
+### Inasistencias: `AUTOMATION_DISPATCH_UNCERTAIN`
+
+El backend ya reservó el período y no puede saber si un intento anterior llegó
+a Resend. No ejecutar otra vez el workflow ni borrar la fila técnica. Revisar
+la ejecución y el evento de Resend:
+
+- si el proveedor confirma la aceptación, resolver como `enviado` con
+  `entrega_confirmada_en_resend`;
+- si se confirma que no hubo entrega, autorizar `reintentar` con
+  `entrega_no_realizada_confirmada`;
+- si la evidencia sigue siendo ambigua, conservar la reserva y escalar.
+
+La llamada manual está documentada en
+[`N8N.md`](N8N.md#seguimiento-de-inasistencias-n8n-ops-01a). Requiere la misma
+credencial M2M y la confirmación literal. Nunca pegar la key en historial de
+terminal, tickets o Notion.
+
+### Inasistencias: API no disponible, timeout o contrato inválido
+
+La ejecución debe quedar fallida. No interpretar un error como `total=0`. En
+**Executions**, identificar el último nodo verde y el primero fallido:
+
+- `Preparar semana anterior`: salud, puerto, allowlist y Header Auth;
+- `Validar contrato y reserva`: cambio incompatible del backend;
+- `Enviar seguimiento por Resend`: credencial, dominio o egress;
+- `Confirmar despacho en CAP`: revisar primero si Resend aceptó el correo.
+
+Los nodos HTTP usan 10 segundos y no tienen reintentos automáticos. Un error de
+confirmación posterior a Resend exige el procedimiento de despacho ambiguo.
+
 ### Credenciales no descifrables
 
 Detener el proceso y confirmar que se usó la key histórica correcta. No
@@ -260,7 +307,7 @@ compatibles o recrear las credenciales si la clave se perdió.
 
 ## Checklist de cierre local
 
-- [ ] Los tres workflows siguen inactivos salvo autorización expresa.
+- [ ] Los cuatro workflows Resend siguen inactivos salvo autorización expresa.
 - [ ] No quedó n8n escuchando fuera de loopback.
 - [ ] No hay exports locales o `.env` rastreados por Git.
 - [ ] No se guardaron payloads clínicos o capturas de pacientes.

@@ -127,7 +127,7 @@ Backend:
 | --- | --- |
 | `npm run dev` | Servidor Express con nodemon. |
 | `npm start` | Servidor Express sin recarga automatica. |
-| `npm run db:migrate` | Aplica `schema.sql` y las migraciones versionadas pendientes, incluidas las migraciones estructurales `008` a `012`. |
+| `npm run db:migrate` | Aplica `schema.sql` y las migraciones versionadas pendientes, incluidas las migraciones estructurales `008` a `015`. |
 | `npm run db:seed` | Inicializa catalogos y, si no existe, una cuenta director configurada por entorno. |
 | `npm run db:seed-demo-patients` | Crea pacientes demo. |
 | `npm run test:embarazo-activo` | Validacion manual del flujo de embarazo activo. |
@@ -249,7 +249,7 @@ las migraciones versionadas pendientes. La migracion
 `008_retirar_referencias_efectuadas.sql` toma un bloqueo exclusivo, muestra solo
 el conteo agregado y aborta sin borrar datos si encuentra una o mas filas. El
 codigo actual no abre el puerto hasta confirmar por nombre y checksum las
-migraciones `008` a `012` en `schema_migrations`. La validacion de arranque es
+migraciones `008` a `015` en `schema_migrations`. La validacion de arranque es
 de solo lectura: nunca ejecuta migraciones automaticamente y, ante pendientes,
 indica usar `npm run db:migrate`. Cada entorno mantiene su propia base; no se
 copian bases entre PCs. Estado operativo registrado para este cierre: la
@@ -259,9 +259,25 @@ desarrollo de PC Trabajo/AIDEN29, una consulta de solo lectura confirmo que
 archivos versionados; una migracion ya registrada no debe volver a ejecutarse
 manualmente. Esta verificacion no se conecto a la base de PC Casa ni permite
 inferir un estado nuevo para ese entorno.
-El esquema final contiene 16 tablas operativas y una tabla tecnica
-`schema_migrations`. La limpieza futura/manual de sesiones se ejecuta con
+El esquema final contiene 17 tablas operativas y dos tablas tecnicas:
+`schema_migrations` y `automatizacion_despachos`. La limpieza futura/manual de sesiones se ejecuta con
 `npm run sessions:cleanup` desde `backend` y nunca elimina sesiones activas.
+
+La migracion `014_citas_prenatales.sql` agrega el modelo trazable de citas sin
+reconstruir historicos. Al registrar un control nuevo con `cita_siguiente`, el
+backend crea atomicamente una cita `programada`; `cita_siguiente` permanece
+como evidencia historica del control. La verdad operativa vive en
+`citas_prenatales`: el siguiente control valido cumple la unica cita vigente,
+y el dashboard permite reprogramarla o cancelarla sin alterar el control de
+origen. El recordatorio n8n conserva su contrato y ahora consulta internamente
+solo citas `programada` sin cumplimiento.
+
+La migracion `015_automatizacion_despachos.sql` agrega idempotencia persistente
+para el seguimiento semanal de inasistencias. No almacena datos de pacientes o
+correo: conserva únicamente tipo, semana, estado, hash de token, conteo e
+intentos. El workflow versionado se ejecuta conceptualmente cada lunes a las
+08:00 sobre la semana anterior, pero permanece desactivado hasta autorización
+operativa.
 
 ## Docker
 

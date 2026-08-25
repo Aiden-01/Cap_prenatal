@@ -72,7 +72,11 @@ function isAllowedOrigin(origin) {
 app.use(helmet({
   crossOriginResourcePolicy: false,
 }));
-app.use('/api/automatizaciones', automatizacionesRoutes);
+app.use(
+  '/api/automatizaciones',
+  express.json({ limit: config.jsonBodyLimit }),
+  automatizacionesRoutes
+);
 app.use(cors({
   origin(origin, callback) {
     if (isAllowedOrigin(origin)) return callback(null, true);

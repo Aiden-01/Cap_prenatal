@@ -20,6 +20,7 @@ const productionCompose = read('docker-compose.production.example.yml');
 const localCompose = read('docker-compose.yml');
 const nginx = read('frontend', 'nginx.conf');
 const localScript = read('scripts', 'start-n8n-local.ps1');
+const RESEND_CHECKSUM = 'sha512-t5d9NJTd0dA+Zo0+Hs9lQ0UN2Mx5LQxccm52+j1yvOlHnx/xxvkV8tRS8bJFN+rbxBliFWPUJ9QI+pmAY7hKuA==';
 
 function serviceBlock(source, serviceName) {
   const lines = source.split(/\r?\n/);
@@ -135,9 +136,11 @@ test('script local usa solo n8n/.env, lista cerrada y binario fijado', () => {
   assert.match(localScript, /\$permittedProcessVariables/);
   assert.match(localScript, /\$permittedProcessVariables -notcontains \$_.Name/);
   assert.match(localScript, /\$requiredN8nVersion = "2\.34\.4"/);
+  assert.match(localScript, /\$requiredResendVersion = "2\.8\.0"/);
+  assert.ok(localScript.includes(RESEND_CHECKSUM));
   assert.doesNotMatch(localScript, /backend\\\.env|npx\s+n8n/i);
   assert.match(localScript, /Variable no permitida en n8n\/\.env/);
-  assert.match(localScript, /N8N_COMMUNITY_PACKAGES debe fijar solo n8n-nodes-resend 2\.8\.0/);
+  assert.match(localScript, /N8N_COMMUNITY_PACKAGES debe fijar solo n8n-nodes-resend con version y checksum oficiales/);
 });
 
 test('configuracion n8n 2.34.4 evita variables deprecadas y acceso global al entorno', () => {
@@ -154,6 +157,7 @@ test('configuracion n8n 2.34.4 evita variables deprecadas y acceso global al ent
     assert.match(source, /N8N_UNVERIFIED_PACKAGES_ENABLED(?::|=)\s*"?false"?/);
     assert.match(source, /N8N_COMMUNITY_PACKAGES_MANAGED_BY_ENV(?::|=)\s*"?true"?/);
     assert.match(source, /N8N_COMMUNITY_PACKAGES(?::|=).*n8n-nodes-resend.*2\.8\.0/);
+    assert.ok(source.includes(RESEND_CHECKSUM));
     assert.doesNotMatch(source, /(^|\n)\s*WEBHOOK_URL(?::|=)/);
     assert.doesNotMatch(source, /N8N_RUNNERS_ENABLED/);
     assert.doesNotMatch(

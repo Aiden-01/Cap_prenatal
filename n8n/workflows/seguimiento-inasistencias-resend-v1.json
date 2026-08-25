@@ -1,0 +1,157 @@
+{
+  "id": "capInasistV1A1",
+  "name": "CAP Prenatal | Seguimiento semanal de inasistencias | Resend | v1",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [1],
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "ecaaec88-89dc-4bec-a0a3-e0ebc70b5444",
+      "name": "Cada lunes a las 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [-760, 0],
+      "notes": "Horario America/Guatemala. El workflow debe permanecer desactivado hasta aprobacion manual."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/inasistencias/preparar' : 'http://127.0.0.1:3001/api/automatizaciones/v1/inasistencias/preparar' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": false,
+        "options": {
+          "redirect": { "redirect": { "followRedirects": false } },
+          "response": { "response": { "fullResponse": false, "neverError": false, "responseFormat": "json" } },
+          "sendCredentialsOnCrossOriginRedirect": false,
+          "timeout": 10000
+        }
+      },
+      "id": "ca37e07e-4b4f-40b3-ac8f-0bcc94339341",
+      "name": "Preparar semana anterior",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-520, 0],
+      "notes": "El backend calcula lunes-domingo anterior, aplica el corte seguro y reserva el despacho. Asignar Header Auth con X-CAP-Automation-Key. Sin reintentos automaticos."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw = $json;\nconst fail = () => { throw new Error('CONTRACT_INVALID'); };\nconst expectedRoot = ['appointments', 'cutoff_at', 'dispatch', 'generated_at', 'range', 'report_type', 'schema_version', 'timezone', 'total'];\nconst keys = raw && typeof raw === 'object' && !Array.isArray(raw) ? Object.keys(raw).sort() : [];\nif (JSON.stringify(keys) !== JSON.stringify(expectedRoot.slice().sort())) fail();\nconst datePattern = /^\\d{4}-\\d{2}-\\d{2}$/;\nconst realDate = (value) => { if (typeof value !== 'string' || !datePattern.test(value)) return false; const parsed = new Date(value + 'T00:00:00Z'); return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value; };\nif (raw.schema_version !== 1 || raw.timezone !== 'America/Guatemala' || raw.report_type !== 'weekly_missed_appointments') fail();\nif (!raw.range || Object.keys(raw.range).sort().join(',') !== 'from,to' || !realDate(raw.range.from) || !realDate(raw.range.to)) fail();\nconst from = Date.parse(raw.range.from + 'T00:00:00Z');\nconst to = Date.parse(raw.range.to + 'T00:00:00Z');\nif (to - from !== 6 * 86400000 || new Date(from).getUTCDay() !== 1 || new Date(to).getUTCDay() !== 0) fail();\nif (typeof raw.generated_at !== 'string' || Number.isNaN(Date.parse(raw.generated_at)) || typeof raw.cutoff_at !== 'string' || Number.isNaN(Date.parse(raw.cutoff_at))) fail();\nif (!Number.isSafeInteger(raw.total) || raw.total < 0 || raw.total > 10000 || !Array.isArray(raw.appointments)) fail();\nif (!raw.dispatch || typeof raw.dispatch !== 'object' || Array.isArray(raw.dispatch)) fail();\nconst status = raw.dispatch.status;\nif (!['ready', 'no_results', 'already_processed'].includes(status)) fail();\nconst dispatchKeys = Object.keys(raw.dispatch).sort();\nif (status === 'ready') {\n  if (dispatchKeys.join(',') !== 'status,token' || typeof raw.dispatch.token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(raw.dispatch.token) || raw.total < 1 || raw.appointments.length !== raw.total) fail();\n} else if (dispatchKeys.join(',') !== 'status' || raw.total !== 0 || raw.appointments.length !== 0) fail();\nconst cleanAppointments = raw.appointments.map((appointment) => {\n  const appointmentKeys = appointment && typeof appointment === 'object' && !Array.isArray(appointment) ? Object.keys(appointment).sort() : [];\n  if (JSON.stringify(appointmentKeys) !== JSON.stringify(['community', 'date', 'first_name', 'last_name', 'phone'])) fail();\n  if (!realDate(appointment.date) || appointment.date < raw.range.from || appointment.date > raw.range.to) fail();\n  for (const [key, max] of [['first_name', 80], ['last_name', 80], ['phone', 32], ['community', 120]]) { if (typeof appointment[key] !== 'string' || appointment[key].length > max || /[\\u0000-\\u001f\\u007f]/.test(appointment[key])) fail(); }\n  return { date: appointment.date, first_name: appointment.first_name, last_name: appointment.last_name, phone: appointment.phone, community: appointment.community };\n});\nreturn [{ json: { range: { from: raw.range.from, to: raw.range.to }, total: raw.total, appointments: cleanAppointments, dispatch_token: status === 'ready' ? raw.dispatch.token : null, should_send: status === 'ready' } }];"
+      },
+      "id": "4ac2955e-28b2-480b-a649-22b9beee3b25",
+      "name": "Validar contrato y reserva",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-280, 0],
+      "notes": "Falla ante respuesta invalida. Conserva solo los campos operativos permitidos y el token efimero de confirmacion."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "d0fb4df7-31a5-4ac7-89f3-3be53880899d",
+              "leftValue": "={{ $json.should_send }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a00a135f-b8df-4868-b9eb-c11309509973",
+      "name": "¿Hay inasistencias nuevas?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-40, 0],
+      "notes": "La salida falsa termina normalmente sin ejecutar Resend."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw = $json;\nif (!raw.should_send || !Number.isSafeInteger(raw.total) || raw.total < 1 || !Array.isArray(raw.appointments) || raw.appointments.length !== raw.total || typeof raw.dispatch_token !== 'string') throw new Error('CONTRACT_INVALID');\nconst escapeHtml = (value) => String(value || 'No registrado').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\\\"/g, '&quot;').replace(/'/g, '&#39;');\nconst formatDate = (value) => value.split('-').reverse().join('-');\nconst rows = raw.appointments.map((appointment) => '<tr><td style=\"padding:7px;border-bottom:1px solid #e5e7eb;white-space:nowrap\">' + escapeHtml(formatDate(appointment.date)) + '</td><td style=\"padding:7px;border-bottom:1px solid #e5e7eb\">' + escapeHtml(appointment.first_name) + ' ' + escapeHtml(appointment.last_name) + '</td><td style=\"padding:7px;border-bottom:1px solid #e5e7eb\">' + escapeHtml(appointment.phone) + '</td><td style=\"padding:7px;border-bottom:1px solid #e5e7eb\">' + escapeHtml(appointment.community) + '</td></tr>').join('');\nconst fromLabel = formatDate(raw.range.from);\nconst toLabel = formatDate(raw.range.to);\nconst subject = 'CAP Prenatal | Seguimiento semanal de inasistencias | ' + fromLabel + ' al ' + toLabel;\nconst html = '<div style=\"font-family:Arial,sans-serif;color:#1f2937;line-height:1.5\"><h2 style=\"color:#7c3aed;margin-bottom:8px\">Seguimiento de inasistencias</h2><p>Buen día.</p><p>Se identificaron citas programadas que requieren seguimiento por no contar con un control prenatal registrado posteriormente.</p><p><strong>Periodo revisado:</strong> ' + escapeHtml(fromLabel) + ' al ' + escapeHtml(toLabel) + '<br><strong>Total de inasistencias detectadas:</strong> ' + raw.total + '</p><table style=\"border-collapse:collapse;width:100%;max-width:820px;font-size:14px\"><thead><tr style=\"background:#f3f4f6\"><th style=\"padding:7px;text-align:left\">Fecha de cita</th><th style=\"padding:7px;text-align:left\">Paciente</th><th style=\"padding:7px;text-align:left\">Teléfono</th><th style=\"padding:7px;text-align:left\">Comunidad</th></tr></thead><tbody>' + rows + '</tbody></table><p style=\"font-size:12px;color:#6b7280\">Se incluye únicamente la información mínima necesaria para facilitar el seguimiento por el personal autorizado. Este es un mensaje automático. No responda a este correo.</p></div>';\nreturn [{ json: { subject, html, dispatch_token: raw.dispatch_token } }];"
+      },
+      "id": "d392b228-d7d7-44e5-b32b-2dfbc424aeee",
+      "name": "Construir mensaje operativo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, -100],
+      "notes": "Escapa HTML. Incluye fecha operativa, primer nombre, primer apellido, telefono y comunidad; no incluye datos clinicos ni identificadores."
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "from": "CAP Prenatal <citas@notificaciones.example.invalid>",
+        "to": "responsable@example.invalid",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.html }}",
+        "additionalOptions": {}
+      },
+      "id": "4e1e11aa-28d6-4e04-a1e6-919de14c3134",
+      "name": "Enviar seguimiento por Resend",
+      "type": "n8n-nodes-resend.resend",
+      "typeVersion": 1,
+      "position": [440, -100],
+      "notes": "Asignar la credencial Resend existente y reemplazar los correos .invalid solo en la instancia autorizada. Sin reintentos automaticos."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/inasistencias/confirmar' : 'http://127.0.0.1:3001/api/automatizaciones/v1/inasistencias/confirmar' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": false,
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { dispatch_token: $node[\"Construir mensaje operativo\"].json.dispatch_token } }}",
+        "options": {
+          "redirect": { "redirect": { "followRedirects": false } },
+          "response": { "response": { "fullResponse": false, "neverError": false, "responseFormat": "json" } },
+          "sendCredentialsOnCrossOriginRedirect": false,
+          "timeout": 10000
+        }
+      },
+      "id": "0c92d62d-08e6-449b-9ab9-210968ddfd2c",
+      "name": "Confirmar despacho en CAP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [680, -100],
+      "notes": "Solo confirma despues de Resend. Si existe un timeout ambiguo, no reintentar: revisar Resend y resolver manualmente en backend."
+    }
+  ],
+  "connections": {
+    "Cada lunes a las 08:00": { "main": [[{ "node": "Preparar semana anterior", "type": "main", "index": 0 }]] },
+    "Preparar semana anterior": { "main": [[{ "node": "Validar contrato y reserva", "type": "main", "index": 0 }]] },
+    "Validar contrato y reserva": { "main": [[{ "node": "¿Hay inasistencias nuevas?", "type": "main", "index": 0 }]] },
+    "¿Hay inasistencias nuevas?": { "main": [[{ "node": "Construir mensaje operativo", "type": "main", "index": 0 }], []] },
+    "Construir mensaje operativo": { "main": [[{ "node": "Enviar seguimiento por Resend", "type": "main", "index": 0 }]] },
+    "Enviar seguimiento por Resend": { "main": [[{ "node": "Confirmar despacho en CAP", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Guatemala",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false,
+    "callerPolicy": "none",
+    "availableInMCP": false
+  },
+  "versionId": "289b47bd-6aaf-460d-a8d4-aae0e4b2cb60",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

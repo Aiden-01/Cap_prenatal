@@ -7,6 +7,10 @@ const {
 } = require('../utils/ipAllowlist');
 const {
   automationCensusPeriodQuerySchema,
+  automationDispatchConfirmationSchema,
+  automationDispatchResolutionSchema,
+  automationEmptyQuerySchema,
+  automationMissedAppointmentsPeriodSchema,
   automationRangeQuerySchema,
 } = require('../validations/automatizaciones.schemas');
 
@@ -114,13 +118,64 @@ function createAutomationCensusPeriodMiddleware() {
   };
 }
 
+function parseAutomationRequest(schema, source, {
+  code = 'AUTOMATION_INVALID_REQUEST',
+  message = 'Solicitud de automatizacion invalida',
+  target,
+} = {}) {
+  return (req, _res, next) => {
+    const result = schema.safeParse(req[source]);
+    if (!result.success) {
+      return next(new AppError(400, message, { code }));
+    }
+    req[target] = result.data;
+    return next();
+  };
+}
+
+function createAutomationMissedAppointmentsPeriodMiddleware() {
+  return parseAutomationRequest(automationMissedAppointmentsPeriodSchema, 'query', {
+    code: 'AUTOMATION_INVALID_PERIOD',
+    message: 'Periodo semanal invalido',
+    target: 'automationPeriod',
+  });
+}
+
+function createAutomationEmptyQueryMiddleware() {
+  return parseAutomationRequest(automationEmptyQuerySchema, 'query', {
+    code: 'AUTOMATION_INVALID_REQUEST',
+    target: 'automationQuery',
+  });
+}
+
+function createAutomationDispatchConfirmationMiddleware() {
+  return parseAutomationRequest(automationDispatchConfirmationSchema, 'body', {
+    code: 'AUTOMATION_INVALID_DISPATCH_CONFIRMATION',
+    message: 'Confirmacion de despacho invalida',
+    target: 'automationDispatchConfirmation',
+  });
+}
+
+function createAutomationDispatchResolutionMiddleware() {
+  return parseAutomationRequest(automationDispatchResolutionSchema, 'body', {
+    code: 'AUTOMATION_INVALID_DISPATCH_RESOLUTION',
+    message: 'Resolucion manual de despacho invalida',
+    target: 'automationDispatchResolution',
+  });
+}
+
 module.exports = {
   AUTOMATION_KEY_PATTERN,
   automationUnauthorized,
   candidateHash,
   createAutomationAuthentication,
   createAutomationCensusPeriodMiddleware,
+  createAutomationDispatchConfirmationMiddleware,
+  createAutomationDispatchResolutionMiddleware,
+  createAutomationEmptyQueryMiddleware,
+  createAutomationMissedAppointmentsPeriodMiddleware,
   createAutomationOriginMiddleware,
   createAutomationRangeMiddleware,
   hashBuffer,
+  parseAutomationRequest,
 };

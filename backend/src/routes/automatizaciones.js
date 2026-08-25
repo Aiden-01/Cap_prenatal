@@ -4,6 +4,10 @@ const { createAutomationRateLimiter } = require('../middleware/automationRateLim
 const {
   createAutomationAuthentication,
   createAutomationCensusPeriodMiddleware,
+  createAutomationDispatchConfirmationMiddleware,
+  createAutomationDispatchResolutionMiddleware,
+  createAutomationEmptyQueryMiddleware,
+  createAutomationMissedAppointmentsPeriodMiddleware,
   createAutomationOriginMiddleware,
   createAutomationRangeMiddleware,
 } = require('../middleware/automationSecurity');
@@ -28,11 +32,19 @@ function createAutomatizacionesRouter({
   router.get('/proximas-citas', automationNotFound);
   router.get('/censo-primer-control', automationNotFound);
   router.get('/censo-primer-control/excel', automationNotFound);
+  router.get('/inasistencias', automationNotFound);
+  router.post('/inasistencias/preparar', automationNotFound);
+  router.post('/inasistencias/confirmar', automationNotFound);
+  router.post('/inasistencias/resolver', automationNotFound);
 
   if (!config.active) {
     router.get('/v1/proximas-citas', automationNotFound);
     router.get('/v1/censo-primer-control', automationNotFound);
     router.get('/v1/censo-primer-control/excel', automationNotFound);
+    router.get('/v1/inasistencias', automationNotFound);
+    router.post('/v1/inasistencias/preparar', automationNotFound);
+    router.post('/v1/inasistencias/confirmar', automationNotFound);
+    router.post('/v1/inasistencias/resolver', automationNotFound);
     return router;
   }
 
@@ -50,6 +62,10 @@ function createAutomatizacionesRouter({
   });
   const validateRange = createAutomationRangeMiddleware(config);
   const validateCensusPeriod = createAutomationCensusPeriodMiddleware();
+  const validateMissedAppointmentsPeriod = createAutomationMissedAppointmentsPeriodMiddleware();
+  const validateEmptyQuery = createAutomationEmptyQueryMiddleware();
+  const validateDispatchConfirmation = createAutomationDispatchConfirmationMiddleware();
+  const validateDispatchResolution = createAutomationDispatchResolutionMiddleware();
 
   router.get(
     '/v1/proximas-citas',
@@ -76,6 +92,44 @@ function createAutomatizacionesRouter({
     authenticate,
     validateCensusPeriod,
     controllers.censoPrimerControlExcel
+  );
+
+  router.get(
+    '/v1/inasistencias',
+    originMiddleware,
+    limiter,
+    authenticate,
+    validateMissedAppointmentsPeriod,
+    controllers.inasistencias
+  );
+
+  router.post(
+    '/v1/inasistencias/preparar',
+    originMiddleware,
+    limiter,
+    authenticate,
+    validateEmptyQuery,
+    controllers.prepararInasistencias
+  );
+
+  router.post(
+    '/v1/inasistencias/confirmar',
+    originMiddleware,
+    limiter,
+    authenticate,
+    validateEmptyQuery,
+    validateDispatchConfirmation,
+    controllers.confirmarInasistencias
+  );
+
+  router.post(
+    '/v1/inasistencias/resolver',
+    originMiddleware,
+    limiter,
+    authenticate,
+    validateEmptyQuery,
+    validateDispatchResolution,
+    controllers.resolverInasistencias
   );
 
   return router;

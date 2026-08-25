@@ -107,7 +107,7 @@ services:
       N8N_COMMUNITY_PACKAGES_ENABLED: "true"
       N8N_UNVERIFIED_PACKAGES_ENABLED: "false"
       N8N_COMMUNITY_PACKAGES_MANAGED_BY_ENV: "true"
-      N8N_COMMUNITY_PACKAGES: '[{"name":"n8n-nodes-resend","version":"2.8.0"}]'
+      N8N_COMMUNITY_PACKAGES: '[{"name":"n8n-nodes-resend","version":"2.8.0","checksum":"sha512-t5d9NJTd0dA+Zo0+Hs9lQ0UN2Mx5LQxccm52+j1yvOlHnx/xxvkV8tRS8bJFN+rbxBliFWPUJ9QI+pmAY7hKuA=="}]'
       N8N_DIAGNOSTICS_ENABLED: "false"
       N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
       N8N_TEMPLATES_ENABLED: "false"

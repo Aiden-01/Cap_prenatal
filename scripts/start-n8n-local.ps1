@@ -3,6 +3,8 @@ $ErrorActionPreference = "Stop"
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $envPath = Join-Path $repositoryRoot "n8n\.env"
 $requiredN8nVersion = "2.34.4"
+$requiredResendVersion = "2.8.0"
+$requiredResendChecksum = "sha512-t5d9NJTd0dA+Zo0+Hs9lQ0UN2Mx5LQxccm52+j1yvOlHnx/xxvkV8tRS8bJFN+rbxBliFWPUJ9QI+pmAY7hKuA=="
 
 $allowedVariables = @(
   "N8N_ENCRYPTION_KEY",
@@ -132,9 +134,10 @@ try {
 if (
   $communityPackages.Count -ne 1 -or
   $communityPackages[0].name -ne "n8n-nodes-resend" -or
-  $communityPackages[0].version -ne "2.8.0"
+  $communityPackages[0].version -ne $requiredResendVersion -or
+  $communityPackages[0].checksum -ne $requiredResendChecksum
 ) {
-  throw "N8N_COMMUNITY_PACKAGES debe fijar solo n8n-nodes-resend 2.8.0."
+  throw "N8N_COMMUNITY_PACKAGES debe fijar solo n8n-nodes-resend con version y checksum oficiales."
 }
 
 $n8nUserFolder = Join-Path $repositoryRoot ".n8n-local"

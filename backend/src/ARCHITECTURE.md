@@ -271,10 +271,10 @@ la URL anterior llegan al 404 global `ROUTE_NOT_FOUND`. Los mapeos del productor
 privado se retiraron, mientras el saneador y las politicas conservan el
 reconocimiento de eventos historicos de entidad `referencia`.
 
-El esquema final contiene 16 tablas operativas mas `schema_migrations`. La
+El esquema final contiene 17 tablas operativas mas `schema_migrations`. La
 migracion `008_retirar_referencias_efectuadas.sql` bloquea y cuenta antes de
 retirar la tabla vacia, aborta si hay filas y no usa `CASCADE`. El codigo actual
-exige que las migraciones `008` a `013` esten registradas con el checksum de sus
+exige que las migraciones `008` a `014` esten registradas con el checksum de sus
 archivos versionados antes de abrir el puerto HTTP. Esta compuerta solo consulta
 el registro y nunca ejecuta migraciones; cada entorno actualiza su propia base
 con `npm run db:migrate`, sin copiar bases entre PCs.
@@ -282,6 +282,18 @@ con `npm run db:migrate`, sin copiar bases entre PCs.
 La migracion `013_plan_parto_horas_decimales.sql` alinea
 `planes_parto.horas_distancia` con el origen decimal `tiempo_horas` de la ficha
 de riesgo y evita errores `22P02` al prellenar fracciones de hora.
+
+La migracion `014_citas_prenatales.sql` agrega una agenda explicita por
+embarazo, sin backfill. `controlesPrenatalesService` conserva la captura de
+`cita_siguiente` y crea la cita programada usando el mismo cliente y transaccion
+que el control y su auditoria. Origen, cumplimiento y reprogramacion usan
+relaciones compuestas para impedir cruces de embarazo. CITAS-01B completa el
+ciclo: una cita programada puede quedar atendida, cancelada o reprogramada; una
+reprogramacion conserva el origen y crea una hija enlazada en la misma
+transaccion. El siguiente control nuevo cumple la unica cita vigente antes de
+crear su proxima cita. `reportesRepository` y `automatizacionesRepository`
+leen la agenda operativa; `cita_siguiente` permanece solo como historia y
+compatibilidad de respuesta.
 
 Comunidades era el ultimo consumidor productivo del adaptador legacy detectado
 por el barrido. Sus escrituras usan ahora contexto administrativo privado,

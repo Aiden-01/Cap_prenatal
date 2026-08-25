@@ -116,13 +116,22 @@ function createReportesRepository(db = pool) {
           p.id,
           p.nombres || ' ' || p.apellidos AS nombre,
           p.no_expediente,
-          c.cita_siguiente,
-          c.numero_control
-        FROM controles_prenatales c
-        JOIN embarazos e ON e.id = c.embarazo_id AND e.estado = 'activo'
-        JOIN pacientes p ON p.id = c.paciente_id
-        WHERE c.cita_siguiente BETWEEN ${GT_TODAY_SQL} AND ${GT_TODAY_SQL} + 7
-        ORDER BY c.cita_siguiente ASC, p.apellidos ASC, p.nombres ASC
+          cp.id AS cita_id,
+          cp.embarazo_id,
+          cp.fecha_programada AS cita_siguiente,
+          origen.numero_control,
+          COALESCE(com.nombre, p.comunidad) AS comunidad
+        FROM citas_prenatales cp
+        JOIN embarazos e
+          ON e.id = cp.embarazo_id
+         AND e.estado = 'activo'
+        JOIN pacientes p ON p.id = e.paciente_id
+        LEFT JOIN comunidades com ON com.id = p.comunidad_id
+        JOIN controles_prenatales origen ON origen.id = cp.control_origen_id
+        WHERE cp.estado = 'programada'
+          AND cp.control_cumplimiento_id IS NULL
+          AND cp.fecha_programada BETWEEN ${GT_TODAY_SQL} AND ${GT_TODAY_SQL} + 7
+        ORDER BY cp.fecha_programada ASC, p.apellidos ASC, p.nombres ASC
         LIMIT 15
       `),
     ]);

@@ -6,16 +6,21 @@ en [`N8N_OPERACION.md`](N8N_OPERACION.md).
 
 ## Estado conocido
 
-Evidencia local observada el 22 de agosto de 2026:
+Evidencia local observada el 24 de agosto de 2026:
 
 - paquete `n8n-nodes-resend@2.8.0` instalado;
-- los tres workflows locales usan `n8n-nodes-resend.resend`;
+- los cuatro workflows locales usan `n8n-nodes-resend.resend`;
 - todos los nodos Resend tienen una credencial asignada;
 - los remitentes locales pertenecen a `notificaciones.hercor-nexus.com`;
 - existe un destinatario configurado, omitido aquí por privacidad;
-- los workflows están inactivos;
+- los workflows están inactivos/sin publicar;
 - los JSON versionados no contienen credenciales y usan direcciones
   `.invalid`.
+
+Durante N8N-OPS-01A, una ejecución con datos exclusivamente sintéticos fue
+aceptada por Resend y devolvió un ID de envío; no se comprobó de forma
+independiente la recepción final en el buzón. Una segunda ejecución del mismo
+período no volvió a ejecutar Resend.
 
 Según la configuración previamente completada por el responsable, el dominio
 de envío tiene Sending habilitado, Receiving deshabilitado y registros
@@ -31,8 +36,12 @@ CAP fija el paquete mediante:
 N8N_COMMUNITY_PACKAGES_ENABLED=true
 N8N_UNVERIFIED_PACKAGES_ENABLED=false
 N8N_COMMUNITY_PACKAGES_MANAGED_BY_ENV=true
-N8N_COMMUNITY_PACKAGES=[{"name":"n8n-nodes-resend","version":"2.8.0"}]
+N8N_COMMUNITY_PACKAGES=[{"name":"n8n-nodes-resend","version":"2.8.0","checksum":"sha512-t5d9NJTd0dA+Zo0+Hs9lQ0UN2Mx5LQxccm52+j1yvOlHnx/xxvkV8tRS8bJFN+rbxBliFWPUJ9QI+pmAY7hKuA=="}]
 ```
+
+Nombre, versión y checksum quedan fijados. Con el checksum presente, n8n puede
+validar directamente la declaración y no necesita descargar el catálogo
+paginado de nodos verificados durante cada inicio.
 
 El lanzador local acepta estas variables y los Compose local/productivo
 declaran la misma versión. n8n reconcilia el paquete al iniciar. La primera
@@ -85,7 +94,7 @@ Antes de enviar:
 3. en n8n abrir **Credentials > Add credential > Resend API**;
 4. pegar la key en la credencial, no en el nodo;
 5. usar un nombre operativo sin incluir el token;
-6. asignar la credencial a los cinco nodos Resend actuales;
+6. asignar la credencial a los seis nodos Resend actuales;
 7. guardar y eliminar cualquier copia temporal del portapapeles/notas.
 
 La credencial queda cifrada por n8n con `N8N_ENCRYPTION_KEY`. No exportar la
@@ -100,6 +109,10 @@ Para rotar:
 5. registrar fecha/resultado, nunca el valor.
 
 ## Configuración de los nodos
+
+Todas las fechas visibles enviadas por Resend —asunto, cuerpo y nombre de un
+adjunto— se presentan como `DD-MM-YYYY`. n8n conserva `YYYY-MM-DD` para consultar
+la API y validar contratos, y solo transforma la etiqueta destinada al correo.
 
 ### Recordatorio diario
 
@@ -119,6 +132,22 @@ Cada workflow tiene dos nodos:
   `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` y nombre
   `.xlsx` calculado por el workflow.
 
+### Seguimiento semanal de inasistencias
+
+- **Resource:** Email.
+- **Operation:** Send.
+- **From:** `CAP Prenatal` y el buzón de citas del subdominio verificado.
+- **To:** un destinatario institucional autorizado, omitido de Git y esta guía.
+- **Subject/HTML:** expresiones de `Construir mensaje operativo`.
+- **Adjuntos:** ninguno; usa una tabla HTML compacta.
+- **Después de Resend:** `Confirmar despacho en CAP` registra la aceptación
+  para impedir reenvíos del mismo lunes-domingo.
+
+Si Resend devuelve éxito pero la confirmación falla o expira, no ejecutar de
+nuevo Resend. Revisar el ID/evento del proveedor y resolver el despacho como
+`enviado` o autorizar `reintentar` únicamente con evidencia explícita de que
+no hubo entrega.
+
 No activar **Use Template** mientras el contenido se construya en n8n. No
 pegar HTML con información clínica fija. Las plantillas de referencia son:
 
@@ -137,8 +166,8 @@ pegar HTML con información clínica fija. Las plantillas de referencia son:
 8. revisar Resend Events sin copiar direcciones o contenido a tickets;
 9. borrar ejecución local si contiene evidencia innecesaria.
 
-La prueba de la rama `total=0` del recordatorio no debe enviar correo. En los
-censos sí debe enviar un aviso, pero sin adjunto.
+La prueba de la rama `total=0` del recordatorio y de inasistencias no debe
+enviar correo. En los censos sí debe enviar un aviso, pero sin adjunto.
 
 ## Errores frecuentes
 

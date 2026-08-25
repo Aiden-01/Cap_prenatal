@@ -166,6 +166,29 @@ Base: `/pacientes/:pacienteId/controles`
 | `PUT` | `/:id` | `controles.editar` | Actualiza control. |
 | `DELETE` | `/:id` | `controles.editar` | Elimina control. |
 
+Al crear un control nuevo, el backend cumple la unica cita `programada` vigente
+del mismo embarazo y, si existe `cita_siguiente`, crea despues la proxima cita.
+El control, ambas operaciones y sus auditorias comparten transaccion. Editar
+`cita_siguiente` de un control existente sigue respondiendo
+`409 CITA_REPROGRAMACION_REQUERIDA`.
+
+## Citas prenatales
+
+Base: `/pacientes/:pacienteId/citas`
+
+Todas las rutas exigen `embarazo_id` en query y verifican que paciente,
+embarazo y cita correspondan entre si.
+
+| Metodo | Ruta | Permiso | Descripcion |
+| --- | --- | --- | --- |
+| `GET` | `/vigente?embarazo_id=:id` | `pacientes.ver` | Devuelve `{ cita }`, con cero o una programada vigente; inconsistencias multiples responden `409`. |
+| `PATCH` | `/:id/reprogramar?embarazo_id=:id` | `controles.editar` | Recibe `{ "fecha_programada": "YYYY-MM-DD" }`, conserva la original como `reprogramada` y crea la hija. |
+| `PATCH` | `/:id/cancelar?embarazo_id=:id` | `controles.editar` | Conserva la fila como `cancelada`; repetir sobre la misma cancelada es idempotente. |
+
+La reprogramacion rechaza fecha pasada o sin cambio. Citas atendidas,
+canceladas o ya reprogramadas son terminales. Las respuestas no permiten usar
+un ID perteneciente a otro embarazo o paciente.
+
 PDF de control prenatal:
 
 ```text
@@ -392,6 +415,10 @@ X-CAP-Automation-Key: <API_KEY_ALEATORIA>
 | `GET` | `/v1/proximas-citas?offset_days=1&window_days=1` | Citas por fecha con un nombre, un apellido, telefono y comunidad. |
 | `GET` | `/v1/censo-primer-control?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` | Conteo de primeros controles del periodo. |
 | `GET` | `/v1/censo-primer-control/excel?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` | Excel nominal del mismo periodo para adjunto institucional. |
+| `GET` | `/v1/inasistencias?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` | Vista previa de una semana calendario anterior completa. |
+| `POST` | `/v1/inasistencias/preparar` | Calcula y reserva idempotentemente la semana lunes-domingo anterior. |
+| `POST` | `/v1/inasistencias/confirmar` | Confirma mediante token efímero que Resend aceptó el despacho. |
+| `POST` | `/v1/inasistencias/resolver` | Resolución técnica manual de una reserva ambigua. |
 | `GET` | `/proximas-citas` | Endpoint legacy retirado; siempre `404`. |
 
 La key original vive solo en n8n. El backend compara su SHA-256 contra
@@ -400,8 +427,55 @@ CIDR y tiene rate limit propio. La respuesta de citas contiene version, fecha
 de generacion, zona horaria, rango, total, resumen por fecha, `/dashboard` y el
 detalle minimo solicitado: `first_name`, `last_name`, `phone` y `community`.
 No incluye IDs, CUI, expediente, direccion ni informacion clinica.
+La fuente interna es `citas_prenatales`: solo `programada`, sin cumplimiento y
+en embarazo activo. El contrato y los parametros permanecen iguales para no
+modificar el workflow n8n de recordatorio.
 
 El proxy publico Nginx no reenvia este prefijo: responde `404` antes del bloque
 general `/api/`. Solo n8n puede usar la ruta directa
 `http://backend:3001/api/automatizaciones/v1/proximas-citas` dentro de
 `automation_internal`.
+
+### Contrato semanal de inasistencias
+
+El período de `GET /v1/inasistencias` debe ser exactamente lunes-domingo,
+completo y anterior al día actual en `America/Guatemala`. El backend incluye
+solo `citas_prenatales` con:
+
+```text
+fecha_programada BETWEEN desde AND hasta
+estado = programada
+control_cumplimiento_id IS NULL
+embarazo.estado = activo
+created_at >= schema_migrations.applied_at de 014_citas_prenatales.sql
+```
+
+No consulta `cita_siguiente`. Atendidas, canceladas, reprogramadas, citas fuera
+de ventana, previas al corte o de embarazos no activos quedan excluidas.
+
+La respuesta de vista previa y preparación usa `schema_version=1`, zona, tipo,
+rango, `cutoff_at`, estado de despacho, total y `appointments`. Cada elemento
+contiene exactamente `date`, `first_name`, `last_name`, `phone` y `community`.
+No devuelve IDs ni información clínica.
+
+Estados de preparación:
+
+- `ready`: `total > 0`, detalle exacto y token efímero para confirmación;
+- `no_results`: `total=0`, lista vacía y período cerrado sin correo;
+- `already_processed`: período ya enviado o cerrado sin resultados;
+- una reserva pendiente responde HTTP `409` con
+  `AUTOMATION_DISPATCH_UNCERTAIN`.
+
+Confirmación:
+
+```json
+{ "dispatch_token": "<token efimero de preparar>" }
+```
+
+El token se devuelve una sola vez y en PostgreSQL solo se conserva su hash.
+Confirmar otra vez el mismo token es idempotente. El resolver manual exige una
+semana explícita, la confirmación literal
+`REINTENTAR_INASISTENCIAS_SEMANALES`, una resolución `enviado` o `reintentar`
+y el motivo coherente `entrega_confirmada_en_resend` o
+`entrega_no_realizada_confirmada`. No permite reabrir `enviado` ni
+`sin_resultados`.

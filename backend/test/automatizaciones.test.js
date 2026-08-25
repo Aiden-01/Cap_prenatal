@@ -450,15 +450,15 @@ test('repositorio usa consulta parametrizada y devuelve solo el detalle operativ
 
   assert.deepEqual(captured.params, [1, 1]);
   assert.match(captured.sql, /America\/Guatemala/);
-  assert.match(captured.sql, /PARTITION BY c\.embarazo_id/);
-  assert.match(captured.sql, /ORDER BY c\.fecha DESC, c\.numero_control DESC, c\.id DESC/);
-  assert.match(captured.sql, /e\.id = c\.embarazo_id/);
-  assert.match(captured.sql, /e\.paciente_id = c\.paciente_id/);
+  assert.match(captured.sql, /FROM citas_prenatales cp/);
+  assert.match(captured.sql, /e\.id = cp\.embarazo_id/);
   assert.match(captured.sql, /e\.estado = 'activo'/);
-  assert.match(captured.sql, /lc\.rn = 1/);
-  assert.match(captured.sql, /lc\.cita_siguiente IS NOT NULL/);
-  assert.match(captured.sql, /lc\.cita_siguiente >= b\.fecha_desde/);
-  assert.match(captured.sql, /lc\.cita_siguiente < b\.fecha_hasta_exclusiva/);
+  assert.match(captured.sql, /cp\.estado = 'programada'/);
+  assert.match(captured.sql, /cp\.control_cumplimiento_id IS NULL/);
+  assert.match(captured.sql, /cp\.fecha_programada >= b\.fecha_desde/);
+  assert.match(captured.sql, /cp\.fecha_programada < b\.fecha_hasta_exclusiva/);
+  assert.match(captured.sql, /ORDER BY[\s\S]*a\.fecha_proxima_cita ASC/);
+  assert.doesNotMatch(captured.sql, /cita_siguiente|ROW_NUMBER\(\)/);
   assert.match(captured.sql, /SPLIT_PART\(TRIM\(p\.nombres\), ' ', 1\)/);
   assert.match(captured.sql, /SPLIT_PART\(TRIM\(p\.apellidos\), ' ', 1\)/);
   assert.match(captured.sql, /COALESCE\(p\.telefono, ''\)/);

@@ -84,7 +84,8 @@ test('correo contiene un nombre, un apellido, teléfono y comunidad con HTML esc
   };
   const built = runBuilder(payload);
 
-  assert.equal(built.subject, 'CAP Prenatal | Recordatorio de citas | 2026-08-23');
+  assert.equal(built.subject, 'CAP Prenatal | Recordatorio de citas | 23-08-2026');
+  assert.doesNotMatch(built.subject, /2026-08-23/);
   assert.match(built.html, /&lt;Ana&gt; López &amp; Hijos/);
   assert.match(built.html, /5555-0101/);
   assert.match(built.html, /El &quot;Chal&quot;/);

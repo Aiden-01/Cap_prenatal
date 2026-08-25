@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Users, ClipboardList, AlertTriangle,
-  Baby, Phone
+  Baby, Phone, CalendarClock, CalendarX, ExternalLink
 } from "lucide-react";
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
+import { useGlobalToast } from "../context/ToastContext";
+import { getErrorMessage } from "../utils/errorMessage";
+import AppointmentActionDialog from "../components/AppointmentActionDialog";
 
 const COLOR_VARIANTS = {
   primary: "var(--primary)",
@@ -174,16 +177,43 @@ export default function Dashboard() {
   const [loading,        setLoading]        = useState(true);
   const [loadingAlertas, setLoadingAlertas] = useState(true);
   const [tabActiva,      setTabActiva]      = useState("citas");
+  const [statsError,     setStatsError]     = useState("");
+  const [dialog,         setDialog]         = useState(null);
+  const [actionBusy,     setActionBusy]     = useState(false);
+  const [actionError,    setActionError]    = useState("");
 
   const { usuario } = useAuth();
+  const toast = useGlobalToast();
   const navigate = useNavigate();
   const mesActual = new Date().toLocaleDateString("es-GT", { month: "long" });
+  const canManageAppointments = usuario?.permisos?.includes("controles.editar");
+
+  const loadStats = useCallback(async () => {
+    setLoading(true);
+    setStatsError("");
+    try {
+      const { data } = await api.get("/reportes/estadisticas");
+      setStats(data);
+    } catch (error) {
+      setStatsError(getErrorMessage(error, "No fue posible cargar el resumen del dashboard."));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
+    let active = true;
     api.get("/reportes/estadisticas")
-      .then(({ data }) => setStats(data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .then(({ data }) => {
+        if (active) setStats(data);
+      })
+      .catch((error) => {
+        if (active) setStatsError(getErrorMessage(error, "No fue posible cargar el resumen del dashboard."));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -199,7 +229,43 @@ export default function Dashboard() {
       .finally(() => setLoadingAlertas(false));
   }, []);
 
-  const fmtFecha = (d) => d ? new Date(d).toLocaleDateString("es-GT") : "—";
+  const fmtFecha = (d) => {
+    const iso = String(d || "").slice(0, 10);
+    return iso ? new Date(`${iso}T12:00:00`).toLocaleDateString("es-GT") : "—";
+  };
+
+  const closeAppointmentDialog = useCallback(() => {
+    if (actionBusy) return;
+    setDialog(null);
+    setActionError("");
+  }, [actionBusy]);
+
+  const openAppointmentDialog = (event, mode, appointment) => {
+    event.stopPropagation();
+    setActionError("");
+    setDialog({ mode, appointment, returnFocusTarget: event.currentTarget });
+  };
+
+  const confirmAppointmentAction = async (newDate) => {
+    if (!dialog) return;
+    const { appointment, mode } = dialog;
+    setActionBusy(true);
+    setActionError("");
+    try {
+      const endpoint = `/pacientes/${appointment.id}/citas/${appointment.cita_id}/${mode}?embarazo_id=${appointment.embarazo_id}`;
+      await api.patch(endpoint, mode === "reprogramar" ? { fecha_programada: newDate } : {});
+      setDialog(null);
+      toast?.(
+        mode === "reprogramar" ? "Cita reprogramada correctamente." : "Cita cancelada correctamente.",
+        "success"
+      );
+      await loadStats();
+    } catch (error) {
+      setActionError(getErrorMessage(error, "No fue posible actualizar la cita."));
+    } finally {
+      setActionBusy(false);
+    }
+  };
 
   const TABS = [
     {
@@ -233,6 +299,11 @@ export default function Dashboard() {
 
       {loading ? (
         <p style={{ color: "var(--text-muted)" }}>Cargando estadísticas...</p>
+      ) : statsError && !stats ? (
+        <div className="dashboard-load-error" role="alert">
+          <span>{statsError}</span>
+          <button type="button" className="btn-secondary" onClick={loadStats}>Reintentar</button>
+        </div>
       ) : (
         <>
           <div className="stat-grid">
@@ -302,17 +373,51 @@ export default function Dashboard() {
                       <th>Paciente</th>
                       <th>No. Expediente</th>
                       <th>Control</th>
+                      <th>Comunidad</th>
                       <th>Fecha cita</th>
+                      <th>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {stats?.proximas_citas?.map((c, i) => (
-                      <tr key={i} style={{ cursor: "pointer" }}
-                        onClick={() => navigate(`/pacientes/${c.id}`)}>
+                    {stats?.proximas_citas?.map((c) => (
+                      <tr key={c.cita_id}>
                         <td><PatientName>{c.nombre}</PatientName></td>
                         <td><span className="badge badge-blue">{c.no_expediente}</span></td>
                         <td><span className="badge badge-blue">Control {c.numero_control}</span></td>
+                        <td>{c.comunidad || "—"}</td>
                         <td>{fmtFecha(c.cita_siguiente)}</td>
+                        <td>
+                          <div className="appointment-actions">
+                            <button
+                              type="button"
+                              className="appointment-action-button"
+                              onClick={() => navigate(`/pacientes/${c.id}`)}
+                              aria-label={`Ver expediente de ${c.nombre}`}
+                            >
+                              <ExternalLink size={15} /> Ver expediente
+                            </button>
+                            {canManageAppointments ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="appointment-action-button"
+                                  onClick={(event) => openAppointmentDialog(event, "reprogramar", c)}
+                                  aria-label={`Reprogramar cita de ${c.nombre}`}
+                                >
+                                  <CalendarClock size={15} /> Reprogramar
+                                </button>
+                                <button
+                                  type="button"
+                                  className="appointment-action-button is-danger"
+                                  onClick={(event) => openAppointmentDialog(event, "cancelar", c)}
+                                  aria-label={`Cancelar cita de ${c.nombre}`}
+                                >
+                                  <CalendarX size={15} /> Cancelar
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -453,6 +558,18 @@ export default function Dashboard() {
           </div>
         </>
       )}
+
+      {dialog ? (
+        <AppointmentActionDialog
+          mode={dialog.mode}
+          appointment={dialog.appointment}
+          busy={actionBusy}
+          error={actionError}
+          onClose={closeAppointmentDialog}
+          onConfirm={confirmAppointmentAction}
+          returnFocusTarget={dialog.returnFocusTarget}
+        />
+      ) : null}
     </div>
   );
 }

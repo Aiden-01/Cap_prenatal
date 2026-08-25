@@ -46,7 +46,7 @@ function rejectsAsPending(promise, filenamePattern) {
   );
 }
 
-test('008 a 013 presentes con checksums correctos permiten continuar', async () => {
+test('008 a 015 presentes con checksums correctos permiten continuar', async () => {
   const registry = createRegistry();
   await assertSchemaCompatible(registry.db);
 
@@ -210,6 +210,8 @@ test('la lista requerida es explicita y cada checksum procede del archivo versio
     '011_vax4_influenza_aplicaciones_independientes.sql',
     '012_vax5_correccion_final.sql',
     '013_plan_parto_horas_decimales.sql',
+    '014_citas_prenatales.sql',
+    '015_automatizacion_despachos.sql',
   ]);
   assert.equal(REQUIRED_STATE.every(({ checksum }) => /^[a-f0-9]{64}$/.test(checksum)), true);
 });

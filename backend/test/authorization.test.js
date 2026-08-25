@@ -198,6 +198,12 @@ const routeContracts = {
     ["router.put('/:id',   verificarPermiso('controles.editar')"],
     ["router.delete('/:id',verificarPermiso('controles.editar')"],
   ],
+  'citas.js': [
+    ["verificarPermiso('pacientes.ver')"],
+    ["verificarPermiso('controles.editar')"],
+    ["'/:id/reprogramar'"],
+    ["'/:id/cancelar'"],
+  ],
 };
 
 for (const [file, expectations] of Object.entries(routeContracts)) {

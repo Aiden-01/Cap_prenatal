@@ -1110,12 +1110,141 @@ CREATE UNIQUE INDEX ux_vacunas_tdap_embarazo
     AND embarazo_id IS NOT NULL
     AND momento IN ('durante_embarazo', 'postparto_aborto');
 CREATE UNIQUE INDEX IF NOT EXISTS ux_controles_embarazo_numero ON controles_prenatales(embarazo_id, numero_control);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_controles_id_embarazo ON controles_prenatales(id, embarazo_id);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_puerperio_embarazo_numero ON controles_puerperio(embarazo_id, numero_atencion);
 CREATE INDEX IF NOT EXISTS idx_embarazos_paciente      ON embarazos(paciente_id);
 CREATE INDEX IF NOT EXISTS idx_controles_embarazo      ON controles_prenatales(embarazo_id);
 CREATE INDEX IF NOT EXISTS idx_riesgo_embarazo         ON fichas_riesgo_obstetrico(embarazo_id);
 CREATE INDEX IF NOT EXISTS idx_vacunas_paciente       ON vacunas_paciente(paciente_id);
 CREATE INDEX IF NOT EXISTS idx_usuarios_username      ON usuarios(username);
+
+-- ============================================================
+-- MODULO DE CITAS PRENATALES - CORTE DESDE CITAS-01A
+-- No se reconstruyen citas historicas desde cita_siguiente.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS citas_prenatales (
+  id                       BIGSERIAL PRIMARY KEY,
+  embarazo_id              INTEGER NOT NULL REFERENCES embarazos(id) ON DELETE CASCADE,
+  fecha_programada         DATE NOT NULL,
+  estado                   VARCHAR(20) NOT NULL DEFAULT 'programada',
+  control_origen_id        INTEGER NOT NULL,
+  control_cumplimiento_id  INTEGER,
+  reprogramada_desde_id    BIGINT,
+  registrado_por           INTEGER REFERENCES usuarios(id),
+  updated_by               INTEGER REFERENCES usuarios(id),
+  created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT citas_prenatales_estado_check CHECK (
+    estado IN ('programada', 'atendida', 'cancelada', 'reprogramada')
+  ),
+  CONSTRAINT citas_prenatales_cumplimiento_estado_check CHECK (
+    (estado = 'atendida' AND control_cumplimiento_id IS NOT NULL)
+    OR (estado <> 'atendida' AND control_cumplimiento_id IS NULL)
+  ),
+  CONSTRAINT citas_prenatales_controles_distintos_check CHECK (
+    control_cumplimiento_id IS NULL OR control_cumplimiento_id <> control_origen_id
+  ),
+  CONSTRAINT citas_prenatales_reprogramacion_no_circular_check CHECK (
+    reprogramada_desde_id IS NULL OR reprogramada_desde_id <> id
+  ),
+  CONSTRAINT citas_prenatales_id_embarazo_key UNIQUE (id, embarazo_id),
+  CONSTRAINT citas_prenatales_control_origen_embarazo_fkey
+    FOREIGN KEY (control_origen_id, embarazo_id)
+    REFERENCES controles_prenatales(id, embarazo_id)
+    ON DELETE NO ACTION DEFERRABLE INITIALLY DEFERRED,
+  CONSTRAINT citas_prenatales_control_cumplimiento_embarazo_fkey
+    FOREIGN KEY (control_cumplimiento_id, embarazo_id)
+    REFERENCES controles_prenatales(id, embarazo_id)
+    ON DELETE NO ACTION DEFERRABLE INITIALLY DEFERRED,
+  CONSTRAINT citas_prenatales_reprogramada_desde_embarazo_fkey
+    FOREIGN KEY (reprogramada_desde_id, embarazo_id)
+    REFERENCES citas_prenatales(id, embarazo_id)
+    ON DELETE NO ACTION DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_citas_control_origen_raiz
+  ON citas_prenatales(control_origen_id)
+  WHERE reprogramada_desde_id IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_citas_control_cumplimiento
+  ON citas_prenatales(control_cumplimiento_id)
+  WHERE control_cumplimiento_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_citas_reprogramada_desde
+  ON citas_prenatales(reprogramada_desde_id)
+  WHERE reprogramada_desde_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_citas_programada_embarazo
+  ON citas_prenatales(embarazo_id)
+  WHERE estado = 'programada' AND control_cumplimiento_id IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_citas_programadas_fecha
+  ON citas_prenatales(fecha_programada)
+  WHERE estado = 'programada' AND control_cumplimiento_id IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_citas_embarazo_fecha
+  ON citas_prenatales(embarazo_id, fecha_programada DESC);
+
+-- ============================================================
+-- DESPACHOS TECNICOS DE AUTOMATIZACIONES
+-- No almacena detalle clinico ni destinatarios.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS automatizacion_despachos (
+  id                 BIGSERIAL PRIMARY KEY,
+  tipo               VARCHAR(80) NOT NULL,
+  periodo_desde      DATE NOT NULL,
+  periodo_hasta      DATE NOT NULL,
+  estado             VARCHAR(24) NOT NULL,
+  token_hash         CHAR(64),
+  total_registros    INTEGER NOT NULL DEFAULT 0,
+  numero_intento     INTEGER NOT NULL DEFAULT 1,
+  motivo_resolucion  VARCHAR(80),
+  reservado_at       TIMESTAMPTZ,
+  enviado_at         TIMESTAMPTZ,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT automatizacion_despachos_periodo_check CHECK (
+    periodo_desde <= periodo_hasta
+  ),
+  CONSTRAINT automatizacion_despachos_estado_check CHECK (
+    estado IN ('reservado', 'enviado', 'sin_resultados', 'reintento_autorizado')
+  ),
+  CONSTRAINT automatizacion_despachos_total_check CHECK (total_registros >= 0),
+  CONSTRAINT automatizacion_despachos_intento_check CHECK (numero_intento >= 1),
+  CONSTRAINT automatizacion_despachos_token_check CHECK (
+    (estado = 'reservado'
+      AND token_hash IS NOT NULL
+      AND reservado_at IS NOT NULL
+      AND enviado_at IS NULL)
+    OR (estado = 'enviado'
+      AND token_hash IS NOT NULL
+      AND reservado_at IS NOT NULL
+      AND enviado_at IS NOT NULL)
+    OR (estado = 'sin_resultados'
+      AND token_hash IS NULL
+      AND total_registros = 0
+      AND reservado_at IS NULL
+      AND enviado_at IS NULL)
+    OR (estado = 'reintento_autorizado'
+      AND token_hash IS NULL
+      AND reservado_at IS NOT NULL
+      AND enviado_at IS NULL)
+  ),
+  CONSTRAINT automatizacion_despachos_tipo_periodo_key UNIQUE (
+    tipo, periodo_desde, periodo_hasta
+  )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_automatizacion_despachos_token
+  ON automatizacion_despachos(token_hash)
+  WHERE token_hash IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_automatizacion_despachos_estado_periodo
+  ON automatizacion_despachos(tipo, estado, periodo_desde DESC);
 
 -- ============================================================
 -- AJUSTES INCREMENTALES PACIENTES

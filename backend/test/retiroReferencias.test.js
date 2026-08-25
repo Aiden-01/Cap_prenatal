@@ -178,7 +178,7 @@ test('usuarios conserva proteccion historica sin consultar la tabla eliminada', 
   );
 });
 
-test('el backend exige el registro exitoso de 008 a 013 antes de escuchar', async () => {
+test('el backend exige el registro exitoso de 008 a 015 antes de escuchar', async () => {
   const requiredState = loadRequiredMigrations();
   const missingRegistryCalls = [];
   await assert.rejects(
@@ -229,16 +229,19 @@ test('el backend exige el registro exitoso de 008 a 013 antes de escuchar', asyn
   assert.deepEqual(successCalls[1].params, [REQUIRED_MIGRATIONS]);
 });
 
-test('schema final declara 16 tablas operativas mas schema_migrations', () => {
+test('schema final declara 17 tablas operativas y dos tablas tecnicas', () => {
   const schema = fs.readFileSync(path.join(SOURCE_ROOT, 'db/schema.sql'), 'utf8');
   const tables = [...schema.matchAll(
     /^CREATE TABLE IF NOT EXISTS\s+([a-z_][a-z0-9_]*)\s*\(/gim
   )].map((match) => match[1]);
-  const operational = tables.filter((tableName) => tableName !== 'schema_migrations');
+  const technical = new Set(['schema_migrations', 'automatizacion_despachos']);
+  const operational = tables.filter((tableName) => !technical.has(tableName));
 
   assert.equal(new Set(tables).size, tables.length);
-  assert.equal(tables.length, 17);
-  assert.equal(operational.length, 16);
+  assert.equal(tables.length, 19);
+  assert.equal(operational.length, 17);
+  assert.equal(tables.includes('citas_prenatales'), true);
+  assert.equal(tables.includes('automatizacion_despachos'), true);
   assert.equal(tables.includes('referencias_efectuadas'), false);
 });
 

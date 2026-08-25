@@ -16,6 +16,8 @@ const REQUIRED_MIGRATIONS = Object.freeze([
   '011_vax4_influenza_aplicaciones_independientes.sql',
   '012_vax5_correccion_final.sql',
   '013_plan_parto_horas_decimales.sql',
+  '014_citas_prenatales.sql',
+  '015_automatizacion_despachos.sql',
 ]);
 const REQUIRED_MIGRATION = REQUIRED_MIGRATIONS[0];
 const MIGRATION_COMMAND = 'npm run db:migrate';
@@ -67,7 +69,7 @@ async function queryMigrationRegistry(db, requiredMigrations) {
     );
     if (relationRows[0]?.migration_registry === null) {
       throw new SchemaCompatibilityError(migrationInstruction(
-        'El backend requiere el registro schema_migrations y las migraciones 008 a 013.'
+        'El backend requiere el registro schema_migrations y las migraciones 008 a 015.'
       ));
     }
 
@@ -121,7 +123,7 @@ async function assertSchemaCompatible(
       ? `Migraciones pendientes o incompatibles: ${pendingOrModified.join(', ')}.`
       : 'El registro schema_migrations es incompatible.';
     throw new SchemaCompatibilityError(migrationInstruction(
-      `El backend requiere las migraciones 008 a 013 aplicadas con su checksum versionado. ${detail}`
+      `El backend requiere las migraciones 008 a 015 aplicadas con su checksum versionado. ${detail}`
     ));
   }
 }

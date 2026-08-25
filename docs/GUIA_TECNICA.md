@@ -941,15 +941,43 @@ La funcion clinica real permanece en `fichas_riesgo_obstetrico.referida_a` y
 `pacientes.viene_referida` y `pacientes.referida_de` siguen describiendo
 procedencia.
 
-El esquema final tiene 16 tablas operativas mas `schema_migrations`. La
+El esquema final tiene 17 tablas operativas más `schema_migrations` y la tabla
+técnica `automatizacion_despachos`. La
 migracion `008_retirar_referencias_efectuadas.sql` usa timeouts locales,
 bloqueo `ACCESS EXCLUSIVE` y conteo agregado. Aborta sin borrar datos si hay
 filas; si la tabla esta vacia la elimina sin `CASCADE`; si esta ausente finaliza
 de forma segura. Antes de abrir el puerto, el backend comprueba por nombre y
-checksum que `008`, `009`, `010`, `011` y `012` esten registradas. La comprobacion
+checksum que las migraciones `008` a `015` esten registradas. La comprobacion
 es de solo lectura y no ejecuta DDL, DML ni migraciones automaticas. Cada entorno
 mantiene su propia base y aplica pendientes con `npm run db:migrate`; no se
 copian bases entre PCs.
+
+CITAS-01A agrega `citas_prenatales` mediante la migracion 014, sin reconstruir
+historicos. Un control nuevo con `cita_siguiente` crea una cita `programada` en
+la misma transaccion. La tabla deja preparadas relaciones de origen,
+cumplimiento y reprogramacion dentro del mismo embarazo. CITAS-01B implementa
+las transiciones `programada -> atendida|cancelada|reprogramada`. Reprogramar
+marca la cita original y crea una hija con el mismo origen; cancelar conserva
+el registro; un control nuevo cumple la unica cita vigente sin exigir igualdad
+de fechas. Todo usa bloqueo de embarazo/cita, escritura condicional, auditoria
+privada obligatoria y una sola transaccion.
+
+La raiz es unica por control de origen, cada cita admite como maximo una hija y
+un indice parcial garantiza una sola cita `programada` por embarazo. Los
+endpoints anidados bajo `/pacientes/:pacienteId/citas` validan tambien
+`embarazo_id`, evitando IDOR. Lectura requiere `pacientes.ver`; reprogramar y
+cancelar requieren `controles.editar`.
+
+El dashboard de siete dias y el endpoint M2M de recordatorio ahora consultan
+`citas_prenatales` programadas sin cumplimiento. El alias `cita_siguiente` se
+conserva en el contrato del dashboard y el contrato de automatizacion no cambia,
+por lo que el workflow n8n existente no fue modificado. La columna historica
+del control tampoco se reescribe al reprogramar o cancelar.
+
+N8N-OPS-01A sigue pendiente. El modelo ya permite que una consulta futura de la
+semana calendario anterior seleccione exclusivamente citas vencidas que aun
+esten `programada` y sin `control_cumplimiento_id`; atendidas, canceladas y
+originales reprogramadas quedan fuera sin heuristicas.
 
 ## PDF y reportes
 
@@ -1092,12 +1120,15 @@ una `N8N_ENCRYPTION_KEY` estable; el script local lee solo `n8n/.env` y liga el
 editor a loopback. Produccion requiere acceso administrativo privado/HTTPS,
 backups restaurables, egress limitado y gestor de secretos.
 
-Los tres workflows Resend versionados permanecen inactivos y sin credenciales:
+Los cuatro workflows Resend versionados permanecen inactivos y sin credenciales:
 
 - recordatorio diario a las 08:00: sin citas termina sin correo; con citas
   envía un único HTML con el detalle operativo mínimo;
 - censo de mes logístico cada 26 a las 06:00: procesa del 26 al 25;
 - censo de mes calendario cada 3 a las 06:00: procesa el mes anterior.
+- seguimiento de inasistencias cada lunes a las 08:00: CAP Prenatal calcula y
+  reserva la semana anterior; `total=0` o período ya procesado termina sin
+  correo, y Resend se confirma en backend para impedir duplicados.
 
 Los censos envían un aviso sin archivo cuando `total=0`; cuando hay datos
 descargan `binary.data` y adjuntan el XLSX mediante Resend. Todos validan el
@@ -1218,7 +1249,7 @@ PostgreSQL.
 Antes del despliegue, `npm run db:migrate` desde `backend` aplica el schema base y
 las migraciones versionadas pendientes en orden. Cada archivo queda registrado
 por nombre y checksum en `schema_migrations`; `007_auth_sessions.sql` y las
-migraciones estructurales `008` a `012` forman parte de este flujo y no deben
+migraciones estructurales `008` a `015` forman parte de este flujo y no deben
 ejecutarse manualmente por separado. 008 requiere backup, verificacion de
 conteo y despliegue del backend nuevo solo despues de completarse.
 

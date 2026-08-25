@@ -24,6 +24,7 @@ const {
 
 // Sub-routers
 const controlesRouter    = require('./controles');
+const citasRouter        = require('./citas');
 const riesgoRouter       = require('./riesgo');
 const morbilidadRouter   = require('./morbilidad');
 const vacunasRouter      = require('./vacunas');
@@ -46,6 +47,7 @@ router.post('/:id/embarazo/cerrar', verificarPermiso('pacientes.editar'), valida
 
 // Sub-rutas anidadas bajo /pacientes/:pacienteId/...
 router.use('/:pacienteId/controles', validateParams(pacienteIdParam), controlesRouter);
+router.use('/:pacienteId/citas', validateParams(pacienteIdParam), citasRouter);
 router.use('/:pacienteId/riesgo', validateParams(pacienteIdParam), riesgoRouter);
 router.use('/:pacienteId/morbilidad', validateParams(pacienteIdParam), morbilidadRouter);
 router.use('/:pacienteId/vacunas', validateParams(pacienteIdParam), vacunasRouter);

@@ -23,6 +23,9 @@ observaciones u otros campos clínicos.
 CAP Prenatal | Recordatorio de citas | {{FECHA}}
 ```
 
+`{{FECHA}}` se presenta como `DD-MM-YYYY`; el campo `date` recibido desde la API
+permanece en ISO `YYYY-MM-DD` hasta construir el correo.
+
 ## HTML genérico seguro
 
 Los marcadores son ilustrativos. El workflow real valida la lista cerrada de

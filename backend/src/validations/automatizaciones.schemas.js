@@ -4,6 +4,8 @@ const integerString = z.string().regex(/^(?:0|[1-9]\d*)$/);
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_AUTOMATION_CENSUS_DAYS = 31;
+const DISPATCH_TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
+const MISSED_APPOINTMENT_REPLAY_CONFIRMATION = 'REINTENTAR_INASISTENCIAS_SEMANALES';
 
 function isRealIsoDate(value) {
   if (!DATE_RE.test(value)) return false;
@@ -46,9 +48,37 @@ const automationCensusPeriodQuerySchema = z.strictObject({
   }
 });
 
+const automationMissedAppointmentsPeriodSchema = z.strictObject({
+  desde: automationDate,
+  hasta: automationDate,
+});
+
+const automationEmptyQuerySchema = z.strictObject({});
+
+const automationDispatchConfirmationSchema = z.strictObject({
+  dispatch_token: z.string().regex(DISPATCH_TOKEN_RE),
+});
+
+const automationDispatchResolutionSchema = z.strictObject({
+  desde: automationDate,
+  hasta: automationDate,
+  resolucion: z.enum(['enviado', 'reintentar']),
+  confirmacion: z.literal(MISSED_APPOINTMENT_REPLAY_CONFIRMATION),
+  motivo_codigo: z.enum([
+    'entrega_confirmada_en_resend',
+    'entrega_no_realizada_confirmada',
+  ]),
+});
+
 module.exports = {
+  DISPATCH_TOKEN_RE,
   MAX_AUTOMATION_CENSUS_DAYS,
+  MISSED_APPOINTMENT_REPLAY_CONFIRMATION,
   automationCensusPeriodQuerySchema,
+  automationDispatchConfirmationSchema,
+  automationDispatchResolutionSchema,
+  automationEmptyQuerySchema,
+  automationMissedAppointmentsPeriodSchema,
   automationRangeQuerySchema,
   isRealIsoDate,
 };

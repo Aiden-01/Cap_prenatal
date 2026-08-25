@@ -44,7 +44,7 @@ function createHarness({ query = null, closeError = null } = {}) {
   };
 }
 
-test('descubre migraciones versionadas en orden e incluye 007 a 013', () => {
+test('descubre migraciones versionadas en orden e incluye 007 a 015', () => {
   const files = discoverMigrationFiles({
     migrationsDir: 'migrations-test',
     readDirectory: () => [
@@ -100,6 +100,18 @@ test('descubre migraciones versionadas en orden e incluye 007 a 013', () => {
   assert.equal(
     discoverMigrationFiles().some(
       ({ filename }) => filename === '013_plan_parto_horas_decimales.sql'
+    ),
+    true
+  );
+  assert.equal(
+    discoverMigrationFiles().some(
+      ({ filename }) => filename === '014_citas_prenatales.sql'
+    ),
+    true
+  );
+  assert.equal(
+    discoverMigrationFiles().some(
+      ({ filename }) => filename === '015_automatizacion_despachos.sql'
     ),
     true
   );

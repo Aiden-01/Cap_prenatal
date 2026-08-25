@@ -503,12 +503,12 @@ test('correo es texto simple e incluye nombre operativo, teléfono y comunidad',
   assert.equal(built.mail_configuration_valid, true);
   assert.equal(
     built.mail_subject,
-    'CAP Prenatal | Próximas citas — 2026-07-24'
+    'CAP Prenatal | Próximas citas — 24-07-2026'
   );
   assert.equal(
     built.mail_text,
     [
-      'Se identificaron 3 citas prenatales programadas para 2026-07-24.',
+      'Se identificaron 3 citas prenatales programadas para 24-07-2026.',
       '',
       'Detalle operativo:',
       '1. Ana López | Teléfono: 5555-0101 | Comunidad: El Chal',

@@ -5,6 +5,7 @@ const USUARIO_TIENE_HISTORIAL_SQL = `(
   OR EXISTS (SELECT 1 FROM embarazos e WHERE e.registrado_por = u.id OR e.updated_by = u.id)
   OR EXISTS (SELECT 1 FROM vacunas_paciente v WHERE v.registrado_por = u.id OR v.updated_by = u.id)
   OR EXISTS (SELECT 1 FROM controles_prenatales c WHERE c.registrado_por = u.id OR c.updated_by = u.id)
+  OR EXISTS (SELECT 1 FROM citas_prenatales cp WHERE cp.registrado_por = u.id OR cp.updated_by = u.id)
   OR EXISTS (SELECT 1 FROM controles_puerperio cp WHERE cp.registrado_por = u.id OR cp.updated_by = u.id)
   OR EXISTS (SELECT 1 FROM morbilidad_embarazo m WHERE m.registrado_por = u.id OR m.updated_by = u.id)
   OR EXISTS (SELECT 1 FROM fichas_riesgo_obstetrico f WHERE f.registrado_por = u.id OR f.updated_by = u.id)
@@ -18,6 +19,7 @@ const USUARIO_TIENE_HISTORIAL_SQL = `(
           'embarazos',
           'vacunas_paciente',
           'controles_prenatales',
+          'citas_prenatales',
           'controles_puerperio',
           'morbilidad_embarazo',
           'fichas_riesgo_obstetrico',

@@ -12,11 +12,18 @@ destinatarios reales ni datos clínicos. La operación completa está en
 | `workflows/recordatorio-citas-resend-v1.json` | Citas de mañana con nombre operativo, teléfono y comunidad | Diario 08:00 | No envía |
 | `workflows/censo-primer-control-26-25-resend-v1.json` | Censo del mes logístico 26 a 25 | Día 26, 06:00 | Aviso sin archivo |
 | `workflows/censo-primer-control-mes-cerrado-resend-v1.json` | Censo del mes calendario anterior | Día 3, 06:00 | Aviso sin archivo |
+| `workflows/seguimiento-inasistencias-resend-v1.json` | Citas vencidas de la semana lunes-domingo anterior | Lunes 08:00 | No envía |
 | `workflows/proximas-citas-v1.json` | Diseño SMTP heredado y endurecido | Diario 06:00 | No envía |
 
-Los tres primeros son el camino Resend actual. El último no está cargado en la
+Los cuatro primeros son el camino Resend actual. El último no está cargado en la
 instancia local y no debe importarse para la operación nueva; se conserva como
 referencia heredada cubierta por pruebas hasta autorizar su retiro.
+
+`N8N-OPS-01A · Seguimiento de inasistencias` usa el modelo explícito de
+`citas_prenatales` y la idempotencia transaccional de CAP Prenatal. n8n no
+calcula inasistencias, no consulta `cita_siguiente` y no conserva una segunda
+base de deduplicación. El detalle del contrato y la recuperación manual está en
+[`../docs/N8N.md`](../docs/N8N.md#seguimiento-de-inasistencias-n8n-ops-01a).
 
 En el diseño heredado, la concurrencia operativa del workflow debe permanecer en 1:
 su deduplicación con static data es de mejor esfuerzo y no constituye
@@ -28,7 +35,9 @@ Todos los JSON:
 - usan `America/Guatemala`;
 - deshabilitan guardado de ejecuciones y exposición MCP;
 - omiten credenciales y resultados;
-- usan direcciones `.invalid` como bloqueo previo a producción.
+- usan direcciones `.invalid` como bloqueo previo a producción;
+- presentan fechas de correo y nombres de adjuntos como `DD-MM-YYYY`, mientras
+  los contratos y parámetros HTTP permanecen en ISO `YYYY-MM-DD`.
 
 ## Correspondencia local observada
 
@@ -37,8 +46,9 @@ Todos los JSON:
 | `NI4eHXsKQmcCB2Xg` | `CAP Prenatal | Recordatorio de citas | Resend | v1` |
 | `capCenso2625V1A1` | `CAP Prenatal | Censo 26 a 25 | Resend | v1` |
 | `capCensoMesV1A1` | `CAP Prenatal | Censo mes cerrado | Resend | v1` |
+| `JJylxJ7YxtprYjDZ` | `CAP Prenatal | Seguimiento semanal de inasistencias | Resend | v1` |
 
-Los tres estaban inactivos al auditarse. Los nodos HTTP y Resend tenían
+Los cuatro estaban inactivos/sin publicar al auditarse. Los nodos HTTP y Resend tenían
 credenciales locales asignadas; sus identificadores, secretos y destinatarios
 se omiten deliberadamente y no aparecen en estos archivos.
 
@@ -53,7 +63,8 @@ npm run n8n:local
 ```
 
 Completar una `N8N_ENCRYPTION_KEY` propia antes de iniciar. La configuración
-fija n8n `2.34.4` y reconcilia `n8n-nodes-resend@2.8.0`; mantiene deshabilitados
+fija n8n `2.34.4` y reconcilia `n8n-nodes-resend@2.8.0` con su checksum oficial,
+sin descargar el catálogo paginado en cada arranque; mantiene deshabilitados
 los paquetes no verificados.
 
 Detalles de backup, recuperación de acceso y actualización:
@@ -86,7 +97,9 @@ Asignarla a:
 
 - `Consultar citas de mañana`;
 - `Consultar resumen agregado`;
-- `Descargar Excel del censo`.
+- `Descargar Excel del censo`;
+- `Preparar semana anterior`;
+- `Confirmar despacho en CAP`.
 
 La key no debe pegarse como header fijo del nodo. El backend conserva solo su
 hash. Las URLs reales son:
@@ -95,6 +108,10 @@ hash. Las URLs reales son:
 /api/automatizaciones/v1/proximas-citas
 /api/automatizaciones/v1/censo-primer-control
 /api/automatizaciones/v1/censo-primer-control/excel
+/api/automatizaciones/v1/inasistencias
+/api/automatizaciones/v1/inasistencias/preparar
+/api/automatizaciones/v1/inasistencias/confirmar
+/api/automatizaciones/v1/inasistencias/resolver
 ```
 
 En ejecución programada se usa `http://backend:3001` dentro de Docker; una
@@ -107,7 +124,8 @@ Crear una credencial **Resend API** y asignarla a:
 
 - `Enviar recordatorio por Resend`;
 - ambos `Enviar aviso sin datos`;
-- ambos `Enviar correo con Excel`.
+- ambos `Enviar correo con Excel`;
+- `Enviar seguimiento por Resend`.
 
 Configurar un remitente de `notificaciones.hercor-nexus.com` y un destinatario
 institucional aprobado. No guardar el destinatario real en el JSON.
@@ -139,6 +157,22 @@ Schedule -> período -> resumen -> ¿total > 0?
 El resumen no contiene filas nominales. El XLSX solo se solicita en la rama
 con datos y nunca se almacena en el repositorio.
 
+### Seguimiento semanal de inasistencias
+
+```text
+Schedule lunes 08:00 -> POST preparar -> validar contrato
+                                      -> ¿ready y total > 0?
+                                         ├─ no: fin
+                                         └─ sí: HTML mínimo -> Resend
+                                                               -> POST confirmar
+```
+
+CAP Prenatal calcula la semana anterior, filtra la agenda estructurada y
+reserva el período. El correo contiene solo fecha de cita, primer nombre,
+primer apellido, teléfono y comunidad. `total=0`, `no_results` y
+`already_processed` terminan sin correo. Una reserva ambigua bloquea el replay
+automático hasta que personal autorizado revise Resend.
+
 ## Plantillas
 
 - [`templates/recordatorio-citas.md`](templates/recordatorio-citas.md): campos,
@@ -157,6 +191,8 @@ Desde la raíz:
 node --test backend/test/n8nInfrastructure.test.js
 node --test backend/test/n8nResendDailyWorkflow.test.js
 node --test backend/test/n8nCensusWorkflow.test.js
+node --test backend/test/n8nMissedAppointmentsWorkflow.test.js
+node --test backend/test/inasistenciasSemanales.test.js
 node --test backend/test/automatizaciones.test.js
 ```
 

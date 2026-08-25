@@ -186,13 +186,17 @@ test('correo con datos prepara nombre seguro y adjunto Excel, sin URL de reporte
     );
     assert.equal(mail.total, 4);
     assert.equal(mail.has_data, true);
-    assert.match(mail.subject, new RegExp(period.desde + ' al ' + period.hasta));
+    const visibleFrom = period.desde.split('-').reverse().join('-');
+    const visibleTo = period.hasta.split('-').reverse().join('-');
+    assert.match(mail.subject, new RegExp(visibleFrom + ' al ' + visibleTo));
+    assert.match(mail.html, new RegExp(visibleFrom + ' al ' + visibleTo));
+    assert.doesNotMatch(mail.subject + mail.html, new RegExp(period.desde + '|' + period.hasta));
     assert.match(mail.html, /Se adjunta el censo de 4 captadas en primer control/);
     if (entry.triggerDay === 26) {
       assert.match(mail.subject, /mes logístico/);
       assert.match(mail.html, /mes logístico/);
     }
-    assert.match(mail.filename, /^censo_(?:mes_logistico|mes_cerrado)_\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}\.xlsx$/);
+    assert.match(mail.filename, /^censo_(?:mes_logistico|mes_cerrado)_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{4}\.xlsx$/);
     assert.doesNotMatch(mail.html, /https?:\/\/|\/reportes/);
     assert.doesNotMatch(mail.html.toLowerCase(), /cui|expediente|telefono|diagnostico|nombre de paciente/);
 

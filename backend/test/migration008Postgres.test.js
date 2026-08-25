@@ -127,7 +127,7 @@ isolatedTest('migracion 008 en cuatro bases PostgreSQL temporales', async (t) =>
 
       const first = await runMigration(url);
       assert.equal(first.ok, true);
-      assert.match(first.entries.log[0], /9 aplicada\(s\), 0 omitida\(s\)/);
+      assert.match(first.entries.log[0], /10 aplicada\(s\), 0 omitida\(s\)/);
 
       await withClient(url, async (client) => {
         const { rows } = await client.query(
@@ -147,12 +147,12 @@ isolatedTest('migracion 008 en cuatro bases PostgreSQL temporales', async (t) =>
           sentinel: 'intacto',
           registros_008: 1,
         });
-        assert.equal((await publicTables(client)).length, 18);
+        assert.equal((await publicTables(client)).length, 19);
       });
 
       const second = await runMigration(url);
       assert.equal(second.ok, true);
-      assert.match(second.entries.log[0], /0 aplicada\(s\), 9 omitida\(s\)/);
+      assert.match(second.entries.log[0], /0 aplicada\(s\), 10 omitida\(s\)/);
       await withClient(url, async (client) => {
         const { rows } = await client.query(
           `SELECT COUNT(*)::integer AS total, MIN(checksum) AS checksum
@@ -220,14 +220,15 @@ isolatedTest('migracion 008 en cuatro bases PostgreSQL temporales', async (t) =>
       });
     });
 
-    await t.test('C: instalacion limpia registra 008 y conserva 17 tablas finales', async () => {
+    await t.test('C: instalacion limpia registra 008 y conserva 18 tablas finales', async () => {
       const url = databaseUrl(baseUrl, databases.c);
       const result = await runMigration(url);
       assert.equal(result.ok, true);
 
       await withClient(url, async (client) => {
         const tables = await publicTables(client);
-        assert.equal(tables.length, 17);
+        assert.equal(tables.length, 18);
+        assert.equal(tables.includes('citas_prenatales'), true);
         assert.equal(tables.includes('schema_migrations'), true);
         assert.equal(tables.includes('referencias_efectuadas'), false);
         await assertSchemaCompatible(client);
