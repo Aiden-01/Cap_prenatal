@@ -419,6 +419,10 @@ X-CAP-Automation-Key: <API_KEY_ALEATORIA>
 | `POST` | `/v1/inasistencias/preparar` | Calcula y reserva idempotentemente la semana lunes-domingo anterior. |
 | `POST` | `/v1/inasistencias/confirmar` | Confirma mediante token efímero que Resend aceptó el despacho. |
 | `POST` | `/v1/inasistencias/resolver` | Resolución técnica manual de una reserva ambigua. |
+| `POST` | `/v1/tdap/preparar` | Deriva y reserva el seguimiento semanal Tdap de El Chal. |
+| `GET` | `/v1/tdap/xlsx` | Descarga el XLSX de la reserva; exige además `X-CAP-Dispatch-Token`. |
+| `POST` | `/v1/tdap/confirmar` | Confirma la aceptación del único correo Tdap. |
+| `POST` | `/v1/tdap/resolver` | Resolución técnica manual de una reserva Tdap ambigua. |
 | `GET` | `/proximas-citas` | Endpoint legacy retirado; siempre `404`. |
 
 La key original vive solo en n8n. El backend compara su SHA-256 contra
@@ -479,3 +483,70 @@ semana explícita, la confirmación literal
 y el motivo coherente `entrega_confirmada_en_resend` o
 `entrega_no_realizada_confirmada`. No permite reabrir `enviado` ni
 `sin_resultados`.
+
+### Contrato semanal de seguimiento Tdap
+
+`POST /v1/tdap/preparar` calcula la semana calendario lunes-domingo anterior en
+`America/Guatemala`; no acepta rango suministrado por n8n. El backend consulta
+solo embarazos `activo`, exige que `pacientes.municipio` normalizado sea El Chal
+y usa `NOT EXISTS` de Tdap por `vacunas_paciente.embarazo_id` actual. No infiere
+municipio desde comunidad y una Tdap de otro embarazo no excluye el actual.
+
+La clasificación reutiliza `gestationalAgeAtDate(fur, fecha)` y el umbral de
+`VACCINE_RULES.tdap.minimumGestationalDays` (140 días). La regla de 20 semanas
+es institucional/operativa del proyecto y requiere validación clínica final
+antes de activación productiva. Si una candidata sin Tdap carece de FUR válida,
+la ruta responde `409 AUTOMATION_TDAP_GESTATIONAL_SOURCE_INCOMPLETE` y no
+produce un reporte parcial.
+
+Contrato de preparación:
+
+```json
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-31T14:00:00.000Z",
+  "timezone": "America/Guatemala",
+  "report_type": "seguimiento_tdap_el_chal",
+  "range": { "from": "2026-08-24", "to": "2026-08-30" },
+  "as_of": "2026-08-31",
+  "new_opportunities": { "total": 2 },
+  "pending": { "total": 4 },
+  "has_information": true,
+  "xlsx": {
+    "available": true,
+    "download_path": "/api/automatizaciones/v1/tdap/xlsx",
+    "filename": "Seguimiento_Tdap_El_Chal_31-08-2026.xlsx"
+  },
+  "dispatch": { "status": "ready", "token": "<token efimero>" }
+}
+```
+
+`new_opportunities` es el flujo que cruzó el umbral en el período;
+`pending` es el stock al lunes `as_of` excluyendo a quienes ya aparecen en
+`new_opportunities` para ese reporte. Las listas son mutuamente excluyentes y
+la respuesta solo contiene conteos.
+
+La descarga exige los dos headers:
+
+```text
+X-CAP-Automation-Key: <credencial M2M>
+X-CAP-Dispatch-Token: <token de preparar>
+```
+
+El token contiene una huella no reversible del snapshot y PostgreSQL solo
+guarda su SHA-256. Antes de generar el XLSX, el backend vuelve a derivar las
+listas dentro de una transacción; una diferencia responde `409
+AUTOMATION_DISPATCH_SNAPSHOT_CHANGED`. El archivo tiene exactamente dos hojas
+y tres columnas (`Primer nombre`, `Primer apellido`, `Comunidad`).
+
+Estados y errores de idempotencia siguen el patrón de inasistencias:
+
+- `ready`: se permite una descarga y un envío;
+- `no_results`: ambos conteos cero, período cerrado sin correo;
+- `already_processed`: no se permite otro correo;
+- reserva pendiente: `409 AUTOMATION_DISPATCH_UNCERTAIN`;
+- confirmación repetida del mismo token: éxito idempotente.
+
+El resolver Tdap exige la confirmación literal
+`REINTENTAR_SEGUIMIENTO_TDAP_EL_CHAL` y los mismos pares coherentes de
+resolución/motivo que inasistencias.

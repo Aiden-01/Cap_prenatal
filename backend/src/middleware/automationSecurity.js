@@ -9,9 +9,11 @@ const {
   automationCensusPeriodQuerySchema,
   automationDispatchConfirmationSchema,
   automationDispatchResolutionSchema,
+  automationDispatchTokenSchema,
   automationEmptyQuerySchema,
   automationMissedAppointmentsPeriodSchema,
   automationRangeQuerySchema,
+  automationTdapDispatchResolutionSchema,
 } = require('../validations/automatizaciones.schemas');
 
 const EMPTY_HASH = Buffer.alloc(32);
@@ -164,6 +166,31 @@ function createAutomationDispatchResolutionMiddleware() {
   });
 }
 
+function createAutomationDispatchTokenHeaderMiddleware() {
+  return (req, _res, next) => {
+    const result = automationDispatchTokenSchema.safeParse(
+      req.headers['x-cap-dispatch-token']
+    );
+    if (!result.success) {
+      return next(new AppError(
+        400,
+        'Token de descarga de despacho invalido',
+        { code: 'AUTOMATION_INVALID_DISPATCH_TOKEN' }
+      ));
+    }
+    req.automationDispatchToken = result.data;
+    return next();
+  };
+}
+
+function createAutomationTdapDispatchResolutionMiddleware() {
+  return parseAutomationRequest(automationTdapDispatchResolutionSchema, 'body', {
+    code: 'AUTOMATION_INVALID_DISPATCH_RESOLUTION',
+    message: 'Resolucion manual Tdap invalida',
+    target: 'automationDispatchResolution',
+  });
+}
+
 module.exports = {
   AUTOMATION_KEY_PATTERN,
   automationUnauthorized,
@@ -172,10 +199,12 @@ module.exports = {
   createAutomationCensusPeriodMiddleware,
   createAutomationDispatchConfirmationMiddleware,
   createAutomationDispatchResolutionMiddleware,
+  createAutomationDispatchTokenHeaderMiddleware,
   createAutomationEmptyQueryMiddleware,
   createAutomationMissedAppointmentsPeriodMiddleware,
   createAutomationOriginMiddleware,
   createAutomationRangeMiddleware,
+  createAutomationTdapDispatchResolutionMiddleware,
   hashBuffer,
   parseAutomationRequest,
 };

@@ -5,13 +5,13 @@ const { structurallyEqual } = require('./audit/auditDiffBuilder');
 const { HttpError } = require('../utils/httpError');
 const { filtrarCamposVih } = require('../utils/datosSensibles');
 const { resolverEmbarazoParaLectura, requerirEmbarazoId, validarEmbarazoEditable } = require('../utils/embarazos');
+const { esMunicipioElChal } = require('../domain/municipioRules');
 
 const ESTADO_EMBARAZO_ACTIVO = 'activo';
 const ESTADO_EMBARAZO_PUERPERIO = 'puerperio';
 const ESTADO_EMBARAZO_CERRADO = 'cerrado';
 const MENSAJE_EMBARAZO_ACTIVO_DUPLICADO = 'La paciente ya tiene un embarazo activo. Complete el seguimiento y cierre el embarazo actual antes de registrar uno nuevo.';
 const MENSAJE_EMBARAZO_PUERPERIO_DUPLICADO = 'La paciente tiene un embarazo en puerperio. Complete y cierre el puerperio antes de registrar un embarazo nuevo.';
-const MUNICIPIO_EL_CHAL = 'el chal';
 const RESULTADO_EXITOSO = 'exitoso';
 
 const CONTEXTO_AUDITORIA = Object.freeze({
@@ -96,10 +96,6 @@ const normalizeCui = (value) => {
   const clean = emptyToNull(value);
   return clean ? String(clean).trim() : null;
 };
-
-function esMunicipioElChal(municipio) {
-  return String(municipio || '').trim().toLowerCase() === MUNICIPIO_EL_CHAL;
-}
 
 function normalizeComunidadId(value) {
   if (value === '' || value === null || value === undefined) return null;

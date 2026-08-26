@@ -426,6 +426,27 @@ const BASE_CONTEXTUAL_RULES = Object.freeze([
     valueType: AUDIT_VALUE_TYPES.ISO_DATE,
   }),
   Object.freeze({
+    categories: ['automatizaciones'],
+    entities: ['seguimiento_tdap_el_chal'],
+    events: ['consultar', 'preparar', 'confirmar', 'resolver'],
+    fields: ['tipo_automatizacion', 'resultado', 'motivo_codigo'],
+    valueType: AUDIT_VALUE_TYPES.CONTROLLED_CODE,
+  }),
+  Object.freeze({
+    categories: ['automatizaciones'],
+    entities: ['seguimiento_tdap_el_chal'],
+    events: ['consultar', 'preparar', 'confirmar', 'resolver'],
+    fields: ['cantidad_nuevas', 'cantidad_pendientes'],
+    valueType: AUDIT_VALUE_TYPES.NON_NEGATIVE_INTEGER,
+  }),
+  Object.freeze({
+    categories: ['automatizaciones'],
+    entities: ['seguimiento_tdap_el_chal'],
+    events: ['consultar', 'preparar', 'confirmar', 'resolver'],
+    fields: ['fecha_desde', 'fecha_hasta'],
+    valueType: AUDIT_VALUE_TYPES.ISO_DATE,
+  }),
+  Object.freeze({
     categories: ['documentos'],
     entities: ['documento', 'exportacion'],
     events: ['crear', 'generar', 'exportar', 'descargar', 'pdf_clinico_generado'],

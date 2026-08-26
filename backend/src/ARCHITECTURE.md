@@ -127,6 +127,16 @@ nominal en memoria para el adjunto autorizado; ambos validan un periodo de hasta
 el archivo ni sus filas. El endpoint legacy responde `404`. No se modifico la
 base de datos.
 
+`N8N-VAX-01` reutiliza esta frontera y `automatizacion_despachos` con el tipo
+`seguimiento_tdap_el_chal`. El repositorio filtra embarazo activo, municipio El
+Chal y ausencia de Tdap por `embarazo_id`; el servicio reutiliza
+`gestationalAgeAtDate` para derivar nuevas oportunidades y pendientes. La
+clasificacion es excluyente: las nuevas oportunidades del periodo no se
+repiten en pendientes dentro del mismo reporte. La preparacion expone solo
+conteos y un token efimero. El XLSX de dos hojas se
+genera en memoria y exige una huella del mismo snapshot, sin persistir nombres,
+comunidades ni contenido del archivo en la tabla tecnica.
+
 La topologia de Sprint 5B.2A separa `proxy_public`, `app_internal`,
 `data_internal` y `automation_internal`. El proxy y n8n solo comparten el
 backend; n8n no comparte red ni credenciales con PostgreSQL. En produccion solo

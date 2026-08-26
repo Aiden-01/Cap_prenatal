@@ -6,10 +6,12 @@ const {
   createAutomationCensusPeriodMiddleware,
   createAutomationDispatchConfirmationMiddleware,
   createAutomationDispatchResolutionMiddleware,
+  createAutomationDispatchTokenHeaderMiddleware,
   createAutomationEmptyQueryMiddleware,
   createAutomationMissedAppointmentsPeriodMiddleware,
   createAutomationOriginMiddleware,
   createAutomationRangeMiddleware,
+  createAutomationTdapDispatchResolutionMiddleware,
 } = require('../middleware/automationSecurity');
 
 function automationNotFound(_req, res) {
@@ -36,6 +38,10 @@ function createAutomatizacionesRouter({
   router.post('/inasistencias/preparar', automationNotFound);
   router.post('/inasistencias/confirmar', automationNotFound);
   router.post('/inasistencias/resolver', automationNotFound);
+  router.post('/tdap/preparar', automationNotFound);
+  router.get('/tdap/xlsx', automationNotFound);
+  router.post('/tdap/confirmar', automationNotFound);
+  router.post('/tdap/resolver', automationNotFound);
 
   if (!config.active) {
     router.get('/v1/proximas-citas', automationNotFound);
@@ -45,6 +51,10 @@ function createAutomatizacionesRouter({
     router.post('/v1/inasistencias/preparar', automationNotFound);
     router.post('/v1/inasistencias/confirmar', automationNotFound);
     router.post('/v1/inasistencias/resolver', automationNotFound);
+    router.post('/v1/tdap/preparar', automationNotFound);
+    router.get('/v1/tdap/xlsx', automationNotFound);
+    router.post('/v1/tdap/confirmar', automationNotFound);
+    router.post('/v1/tdap/resolver', automationNotFound);
     return router;
   }
 
@@ -66,6 +76,8 @@ function createAutomatizacionesRouter({
   const validateEmptyQuery = createAutomationEmptyQueryMiddleware();
   const validateDispatchConfirmation = createAutomationDispatchConfirmationMiddleware();
   const validateDispatchResolution = createAutomationDispatchResolutionMiddleware();
+  const validateDispatchTokenHeader = createAutomationDispatchTokenHeaderMiddleware();
+  const validateTdapDispatchResolution = createAutomationTdapDispatchResolutionMiddleware();
 
   router.get(
     '/v1/proximas-citas',
@@ -130,6 +142,45 @@ function createAutomatizacionesRouter({
     validateEmptyQuery,
     validateDispatchResolution,
     controllers.resolverInasistencias
+  );
+
+  router.post(
+    '/v1/tdap/preparar',
+    originMiddleware,
+    limiter,
+    authenticate,
+    validateEmptyQuery,
+    controllers.prepararTdap
+  );
+
+  router.get(
+    '/v1/tdap/xlsx',
+    originMiddleware,
+    limiter,
+    authenticate,
+    validateEmptyQuery,
+    validateDispatchTokenHeader,
+    controllers.descargarTdapExcel
+  );
+
+  router.post(
+    '/v1/tdap/confirmar',
+    originMiddleware,
+    limiter,
+    authenticate,
+    validateEmptyQuery,
+    validateDispatchConfirmation,
+    controllers.confirmarTdap
+  );
+
+  router.post(
+    '/v1/tdap/resolver',
+    originMiddleware,
+    limiter,
+    authenticate,
+    validateEmptyQuery,
+    validateTdapDispatchResolution,
+    controllers.resolverTdap
   );
 
   return router;

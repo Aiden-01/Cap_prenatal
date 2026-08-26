@@ -9,7 +9,7 @@ en [`N8N_OPERACION.md`](N8N_OPERACION.md).
 Evidencia local observada el 24 de agosto de 2026:
 
 - paquete `n8n-nodes-resend@2.8.0` instalado;
-- los cuatro workflows locales usan `n8n-nodes-resend.resend`;
+- los workflows Resend locales usan `n8n-nodes-resend.resend`;
 - todos los nodos Resend tienen una credencial asignada;
 - los remitentes locales pertenecen a `notificaciones.hercor-nexus.com`;
 - existe un destinatario configurado, omitido aquí por privacidad;
@@ -94,7 +94,7 @@ Antes de enviar:
 3. en n8n abrir **Credentials > Add credential > Resend API**;
 4. pegar la key en la credencial, no en el nodo;
 5. usar un nombre operativo sin incluir el token;
-6. asignar la credencial a los seis nodos Resend actuales;
+6. asignar la credencial a los siete nodos Resend actuales;
 7. guardar y eliminar cualquier copia temporal del portapapeles/notas.
 
 La credencial queda cifrada por n8n con `N8N_ENCRYPTION_KEY`. No exportar la
@@ -116,8 +116,9 @@ la API y validar contratos, y solo transforma la etiqueta destinada al correo.
 
 ### Recordatorio diario
 
-- **Resource:** Email.
-- **Operation:** Send.
+- **Transporte:** `POST https://api.resend.com/emails` desde el nodo HTTP
+  Request con la credencial predefinida `Resend API`; la API key no aparece en
+  el workflow.
 - **From:** nombre CAP y buzón del subdominio verificado.
 - **To:** destinatario autorizado; su valor real no se documenta.
 - **Subject/HTML:** expresiones producidas por `Construir detalle operativo`.
@@ -148,6 +149,35 @@ nuevo Resend. Revisar el ID/evento del proveedor y resolver el despacho como
 `enviado` o autorizar `reintentar` únicamente con evidencia explícita de que
 no hubo entrega.
 
+### Seguimiento oportuno Tdap de El Chal
+
+- **Resource:** Email.
+- **Operation:** Send.
+- **From:** `CAP Prenatal <citas@notificaciones.hercor-nexus.com>` en la
+  instancia autorizada; el JSON versionado usa `.invalid`.
+- **To:** un destinatario institucional autorizado, omitido de Git.
+- **Subject:** `CAP Prenatal | Seguimiento oportuno Tdap - El Chal`.
+- **HTML:** semana visible en `DD-MM-YYYY`, conteo de nuevas oportunidades,
+  conteo de pendientes y dos tablas con primer nombre, primer apellido y
+  comunidad; las listas son mutuamente excluyentes y no contienen otro detalle
+  nominal ni clínico.
+- **Adjunto:** `binary.data` se materializa con el nodo nativo **Move File to
+  Base64 String** y se envía como `attachments[].content`, con nombre
+  `Seguimiento_Tdap_El_Chal_DD-MM-YYYY.xlsx`.
+- **Después de Resend:** `Confirmar despacho en CAP` registra la aceptación.
+
+CAP Prenatal genera el archivo de dos hojas. n8n no calcula edad gestacional,
+no consulta vacunas y no construye filas del XLSX. Si ambos conteos son cero o
+la preparación devuelve `already_processed`, el nodo Resend no se ejecuta.
+Ante `AUTOMATION_DISPATCH_UNCERTAIN` o timeout después del envío, revisar el ID
+en Resend antes de resolver manualmente; no repetir el workflow.
+
+`n8n-nodes-resend 2.8.0` no debe usarse para este adjunto mientras la instancia
+almacene binarios como `filesystem-v2`: la versión observada copia el
+localizador interno en `attachments[].content`. El síntoma es un adjunto de
+pocos bytes que Excel reporta como corrupto. El transporte HTTP predefinido
+evita ese defecto sin copiar ni exponer la credencial.
+
 No activar **Use Template** mientras el contenido se construya en n8n. No
 pegar HTML con información clínica fija. Las plantillas de referencia son:
 
@@ -167,7 +197,8 @@ pegar HTML con información clínica fija. Las plantillas de referencia son:
 9. borrar ejecución local si contiene evidencia innecesaria.
 
 La prueba de la rama `total=0` del recordatorio y de inasistencias no debe
-enviar correo. En los censos sí debe enviar un aviso, pero sin adjunto.
+enviar correo. En Tdap, `new_opportunities.total=0` y `pending.total=0` tampoco
+envía. En los censos sí debe enviar un aviso, pero sin adjunto.
 
 ## Errores frecuentes
 

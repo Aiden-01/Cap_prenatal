@@ -190,6 +190,99 @@ POST /api/automatizaciones/v1/inasistencias/resolver
 autorización; el siguiente `preparar` crea un token nuevo e incrementa el
 intento.
 
+### Seguimiento oportuno Tdap de El Chal (`N8N-VAX-01`)
+
+Es un único workflow semanal con dos conjuntos lógicos internos:
+
+- `new_opportunities`: embarazos activos de pacientes cuyo municipio
+  normalizado es El Chal, sin Tdap en ese embarazo, que cruzaron 140 días de
+  gestación durante el lunes-domingo anterior;
+- `pending`: los mismos filtros territoriales, de embarazo y vacuna, con 140
+  días o más al lunes posterior al período.
+
+Los 140 días reutilizan `gestationalAgeAtDate` y
+`VACCINE_RULES.tdap.minimumGestationalDays`; no existe una segunda fórmula en
+n8n ni en SQL. La regla de 20 semanas es institucional/operativa de CAP
+Prenatal y queda pendiente de validación final por personal clínico autorizado
+antes de activación en producción. Puerperio y embarazos cerrados se excluyen.
+Una Tdap de un embarazo anterior no satisface el embarazo activo.
+
+La FUR es la fuente oficial que usa actualmente el módulo de vacunas. Como el
+modelo permite FUR nula, la preparación falla de forma cerrada con
+`AUTOMATION_TDAP_GESTATIONAL_SOURCE_INCOMPLETE` si una candidata territorial
+activa sin Tdap actual no tiene una FUR válida; nunca se omite silenciosamente
+ni se estima con una heurística.
+
+Rutas privadas M2M:
+
+```text
+POST /api/automatizaciones/v1/tdap/preparar
+GET  /api/automatizaciones/v1/tdap/xlsx
+POST /api/automatizaciones/v1/tdap/confirmar
+POST /api/automatizaciones/v1/tdap/resolver
+```
+
+`preparar` no acepta query y calcula la semana anterior. Contrato sintético:
+
+```json
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-31T14:00:00.000Z",
+  "timezone": "America/Guatemala",
+  "report_type": "seguimiento_tdap_el_chal",
+  "range": { "from": "2026-08-24", "to": "2026-08-30" },
+  "as_of": "2026-08-31",
+  "new_opportunities": { "total": 2 },
+  "pending": { "total": 4 },
+  "has_information": true,
+  "xlsx": {
+    "available": true,
+    "download_path": "/api/automatizaciones/v1/tdap/xlsx",
+    "filename": "Seguimiento_Tdap_El_Chal_31-08-2026.xlsx"
+  },
+  "dispatch": { "status": "ready", "token": "<token efimero>" }
+}
+```
+
+El resumen no devuelve filas nominales. `ready` es el único estado que permite
+descargar y enviar; `no_results` y `already_processed` llevan ambos conteos en
+cero, `has_information=false`, sin token y sin correo.
+
+La descarga exige la credencial M2M normal y el token efímero en
+`X-CAP-Dispatch-Token`. El token incorpora una huella parcial criptográfica del
+snapshot mínimo. El backend vuelve a derivar las dos listas dentro de una
+transacción y rechaza con `AUTOMATION_DISPATCH_SNAPSHOT_CHANGED` si conteos o
+filas cambiaron. Así el Excel corresponde a la misma reserva sin almacenar
+nombres o comunidades en `automatizacion_despachos`.
+
+El XLSX tiene exactamente dos hojas:
+
+1. `Nuevas oportunidades Tdap`.
+2. `Pendientes de Tdap`.
+
+Cada hoja contiene exactamente `Primer nombre`, `Primer apellido` y
+`Comunidad`. Las listas son mutuamente excluyentes: quien aparece como nueva
+oportunidad no se repite en pendientes dentro del mismo reporte. Pendientes
+contiene únicamente candidatas anteriores que todavía no tienen Tdap. Si una
+hoja no tiene filas, conserva sus tres encabezados. Se excluyen CUI, expediente,
+teléfono, dirección, IDs, edad gestacional exacta, FUR, FPP, riesgo, vacunas
+anteriores, diagnósticos, laboratorios, VIH y morbilidad.
+
+Resolución manual de una reserva ambigua:
+
+```json
+{
+  "desde": "2026-08-24",
+  "hasta": "2026-08-30",
+  "resolucion": "enviado | reintentar",
+  "confirmacion": "REINTENTAR_SEGUIMIENTO_TDAP_EL_CHAL",
+  "motivo_codigo": "entrega_confirmada_en_resend | entrega_no_realizada_confirmada"
+}
+```
+
+No se reintenta automáticamente después de un timeout de Resend. Primero se
+consulta el evento del proveedor y luego se resuelve con evidencia.
+
 ### Citas de mañana
 
 ```text
@@ -296,6 +389,37 @@ Errores HTTP, `401`, `404`, `429`, contrato inválido o credencial ausente no se
 convierten en un correo aparentemente exitoso. La rama falsa del IF no tiene
 conexión al nodo Resend.
 
+## Workflow semanal de seguimiento Tdap
+
+Archivo: `n8n/workflows/seguimiento-tdap-el-chal-resend-v1.json`.
+
+```text
+Schedule lunes 08:00
+    -> POST preparar seguimiento Tdap
+    -> validar contrato y construir correo
+    -> ¿dispatch=ready y algún conteo > 0?
+       ├─ no: fin, ningún correo
+       └─ sí: GET XLSX como binary.data
+              -> materializar el binario filesystem-v2 como base64
+              -> leer las dos hojas para las tablas HTML
+              -> un POST autenticado a Resend con un XLSX
+              -> POST confirmar despacho
+```
+
+n8n no calcula semanas, no comprueba vacunas, no normaliza municipio, no decide
+elegibilidad y no consulta PostgreSQL. El asunto es `CAP Prenatal | Seguimiento
+oportuno Tdap - El Chal`; el cuerpo muestra ambos conteos, la semana en
+`DD-MM-YYYY` y dos tablas derivadas del mismo XLSX. Cada tabla contiene
+exclusivamente primer nombre, primer apellido y comunidad.
+
+La instancia usa almacenamiento binario `filesystem-v2`. Por eso el workflow
+convierte `binary.data` a base64 real mediante el nodo nativo **Extract from
+File / Move File to Base64 String** antes de invocar `POST
+https://api.resend.com/emails` con la credencial predefinida `Resend API`. No se
+debe entregar `binary.data.data` directamente a `n8n-nodes-resend 2.8.0`: en
+esta combinación de versiones ese campo es un localizador interno
+`filesystem-v2:...`, no el contenido del archivo.
+
 ## Workflows mensuales del censo
 
 ### Mes logístico 26 a 25
@@ -332,7 +456,7 @@ archivo del repositorio.
 
 ## Persistencia, retención y privacidad
 
-Los cuatro JSON Resend fijan:
+Los cinco JSON Resend fijan:
 
 ```text
 saveDataSuccessExecution=none
@@ -357,7 +481,7 @@ No copiar a Git:
 
 ## Resend y artefacto SMTP heredado
 
-Los cuatro workflows cargados utilizan `n8n-nodes-resend.resend`. El archivo
+Los cinco workflows Resend utilizan `n8n-nodes-resend.resend`. El archivo
 `n8n/workflows/proximas-citas-v1.json` conserva un diseño endurecido de 40
 nodos con `n8n-nodes-base.emailSend`; no está cargado en la instancia local y
 no es el camino operativo actual. Se mantiene como artefacto heredado cubierto
@@ -400,6 +524,8 @@ node --test backend/test/n8nResendDailyWorkflow.test.js
 node --test backend/test/n8nCensusWorkflow.test.js
 node --test backend/test/n8nMissedAppointmentsWorkflow.test.js
 node --test backend/test/inasistenciasSemanales.test.js
+node --test backend/test/seguimientoTdap.test.js
+node --test backend/test/n8nTdapWorkflow.test.js
 node --test backend/test/automatizaciones.test.js
 ```
 

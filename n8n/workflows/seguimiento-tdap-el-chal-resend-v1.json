@@ -1,0 +1,296 @@
+{
+  "id": "capTdapChalV1A1",
+  "name": "CAP Prenatal | Seguimiento oportuno Tdap El Chal | Resend | v1",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [1],
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "bb36ee0b-593d-4190-b78f-bec3061cff42",
+      "name": "Cada lunes a las 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [-760, 0],
+      "notes": "Horario America/Guatemala. Mantener desactivado hasta validacion clinica y aprobacion manual de produccion."
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "binaryPropertyName": "data",
+        "destinationKey": "attachment_base64",
+        "options": {
+          "keepSource": "json"
+        }
+      },
+      "id": "5c3608c1-2562-4569-93fd-0ad8004c3c87",
+      "name": "Materializar XLSX en base64",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [440, -260],
+      "notes": "Convierte el archivo almacenado por n8n (filesystem-v2) a base64 real. Evita entregar al proveedor un identificador interno en lugar del contenido."
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "binaryPropertyName": "data",
+        "options": {
+          "headerRow": true,
+          "includeEmptyCells": true,
+          "rawData": false,
+          "sheetName": "Nuevas oportunidades Tdap"
+        }
+      },
+      "id": "b3660b7f-335d-48f1-9480-b90b2ec4519a",
+      "name": "Leer nuevas oportunidades",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [440, -100],
+      "alwaysOutputData": true,
+      "notes": "Lee únicamente la hoja producida por CAP Prenatal para mostrar el mismo detalle mínimo en el correo."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const expected = ['Comunidad', 'Primer apellido', 'Primer nombre'];\nconst rows = $input.all().map((item) => item.json).filter((row) => Object.keys(row).length > 0);\nfor (const row of rows) {\n  if (JSON.stringify(Object.keys(row).sort()) !== JSON.stringify(expected)) throw new Error('TDAP_NEW_ROWS_INVALID');\n  for (const value of Object.values(row)) {\n    if (typeof value !== 'string' || value.length > 200) throw new Error('TDAP_NEW_ROWS_INVALID');\n  }\n}\nreturn [{ json: { new_rows: rows } }];"
+      },
+      "id": "439aa5fc-c901-436f-80b1-3ee40d7a596b",
+      "name": "Agrupar nuevas oportunidades",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, -100],
+      "notes": "Agrupa solo las tres columnas permitidas. No calcula elegibilidad ni edad gestacional."
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "binaryPropertyName": "data",
+        "options": {
+          "headerRow": true,
+          "includeEmptyCells": true,
+          "rawData": false,
+          "sheetName": "Pendientes de Tdap"
+        }
+      },
+      "id": "d7779c4c-9910-423c-975c-862323c8d56b",
+      "name": "Leer pendientes Tdap",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [440, 60],
+      "alwaysOutputData": true,
+      "notes": "Lee únicamente la segunda hoja producida por CAP Prenatal para el detalle mínimo del correo."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const expected = ['Comunidad', 'Primer apellido', 'Primer nombre'];\nconst rows = $input.all().map((item) => item.json).filter((row) => Object.keys(row).length > 0);\nfor (const row of rows) {\n  if (JSON.stringify(Object.keys(row).sort()) !== JSON.stringify(expected)) throw new Error('TDAP_PENDING_ROWS_INVALID');\n  for (const value of Object.values(row)) {\n    if (typeof value !== 'string' || value.length > 200) throw new Error('TDAP_PENDING_ROWS_INVALID');\n  }\n}\nreturn [{ json: { pending_rows: rows } }];"
+      },
+      "id": "3afef294-30f4-4acb-9751-30dbd9887d14",
+      "name": "Agrupar pendientes Tdap",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 60],
+      "notes": "Agrupa solo las tres columnas permitidas. No incorpora información clínica adicional."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 3,
+        "options": {}
+      },
+      "id": "4a5ae338-15e9-444d-9e05-a0db16bb0c4a",
+      "name": "Unir adjunto y listas",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [920, -100],
+      "notes": "Sincroniza el base64 real con las dos listas derivadas del mismo XLSX."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const data = $input.first().json;\nconst fail = () => { throw new Error('TDAP_EMAIL_DATA_INVALID'); };\nif (!Array.isArray(data.new_rows) || !Array.isArray(data.pending_rows)) fail();\nif (data.new_rows.length !== data.new_total || data.pending_rows.length !== data.pending_total) fail();\nif (typeof data.attachment_base64 !== 'string' || data.attachment_base64.length < 100 || !data.attachment_base64.startsWith('UEsDB')) fail();\nif (typeof data.filename !== 'string' || !/^Seguimiento_Tdap_El_Chal_\\d{2}-\\d{2}-\\d{4}\\.xlsx$/.test(data.filename)) fail();\nconst padding = (data.attachment_base64.match(/=*$/) || [''])[0].length;\nconst attachmentSize = Math.floor(data.attachment_base64.length * 3 / 4) - padding;\nif (attachmentSize < 1000) fail();\nconst escapeHtml = (value) => String(value).replace(/[&<>\"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[character]);\nconst renderRows = (rows) => rows.length === 0\n  ? '<p style=\"color:#6b7280\">Sin registros para esta sección.</p>'\n  : '<table style=\"border-collapse:collapse;width:100%;max-width:760px\"><thead><tr style=\"background:#155e8e;color:#fff\"><th style=\"padding:8px;text-align:left\">Primer nombre</th><th style=\"padding:8px;text-align:left\">Primer apellido</th><th style=\"padding:8px;text-align:left\">Comunidad</th></tr></thead><tbody>' + rows.map((row) => '<tr><td style=\"padding:8px;border-bottom:1px solid #d1d5db\">' + escapeHtml(row['Primer nombre']) + '</td><td style=\"padding:8px;border-bottom:1px solid #d1d5db\">' + escapeHtml(row['Primer apellido']) + '</td><td style=\"padding:8px;border-bottom:1px solid #d1d5db\">' + escapeHtml(row.Comunidad) + '</td></tr>').join('') + '</tbody></table>';\nconst html = '<div style=\"font-family:Arial,sans-serif;color:#1f2937;line-height:1.6\"><h2 style=\"color:#155e8e;margin-bottom:8px\">Seguimiento oportuno Tdap - El Chal</h2><p>Buen día.</p><p>Se comparte el seguimiento semanal de embarazadas candidatas a Tdap del municipio de El Chal.</p><p><strong>Semana evaluada:</strong> ' + data.range_from.split('-').reverse().join('-') + ' al ' + data.range_to.split('-').reverse().join('-') + '</p><p><strong>Nuevas pacientes que alcanzaron 20 semanas la semana pasada:</strong> ' + data.new_total + '<br><strong>Pacientes pendientes de Tdap actualmente:</strong> ' + data.pending_total + '</p><h3 style=\"color:#155e8e\">Nuevas oportunidades Tdap</h3>' + renderRows(data.new_rows) + '<h3 style=\"color:#155e8e\">Pendientes de Tdap</h3>' + renderRows(data.pending_rows) + '<p>Se adjunta el archivo Excel con las mismas dos listas.</p><p style=\"font-size:12px;color:#6b7280\">Uso exclusivo para personal autorizado. Este es un mensaje automático; no responda a este correo.</p></div>';\nreturn [{ json: { dispatch_token: data.dispatch_token, filename: data.filename, subject: data.subject, html, attachment_base64: data.attachment_base64, attachment_size: attachmentSize } }];"
+      },
+      "id": "0ffdc192-51e0-4d13-99cb-bc9515b32eed",
+      "name": "Construir correo con listas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1160, -100],
+      "notes": "Valida que el XLSX sea un ZIP real, que los conteos coincidan y construye dos tablas HTML únicamente con nombre, apellido y comunidad."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "resendApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { from: 'CAP Prenatal <citas@notificaciones.example.invalid>', to: ['responsable@example.invalid'], subject: $json.subject, html: $json.html, attachments: [{ filename: $json.filename, content: $json.attachment_base64 }] } }}",
+        "options": {
+          "redirect": { "redirect": { "followRedirects": false } },
+          "response": { "response": { "fullResponse": false, "neverError": false, "responseFormat": "json" } },
+          "sendCredentialsOnCrossOriginRedirect": false,
+          "timeout": 30000
+        }
+      },
+      "id": "e13ae44f-891c-494d-a581-f77694320b62",
+      "name": "Enviar seguimiento por Resend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1400, -100],
+      "notes": "Usar la credencial Resend API existente. El contenido del adjunto es base64 real materializado por n8n; nunca se incrusta una API key en el workflow."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/tdap/preparar' : 'http://127.0.0.1:3001/api/automatizaciones/v1/tdap/preparar' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": false,
+        "options": {
+          "redirect": { "redirect": { "followRedirects": false } },
+          "response": { "response": { "fullResponse": false, "neverError": false, "responseFormat": "json" } },
+          "sendCredentialsOnCrossOriginRedirect": false,
+          "timeout": 10000
+        }
+      },
+      "id": "17fdc55f-7cd6-448f-b43d-18b20afc8e26",
+      "name": "Preparar seguimiento Tdap",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-520, 0],
+      "notes": "El backend aplica municipio El Chal, embarazo activo, Tdap del embarazo actual, edad gestacional oficial, periodo e idempotencia. Asignar Header Auth X-CAP-Automation-Key."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw = $json;\nconst fail = () => { throw new Error('CONTRACT_INVALID'); };\nconst rootKeys = ['as_of','dispatch','generated_at','has_information','new_opportunities','pending','range','report_type','schema_version','timezone','xlsx'];\nif (!raw || typeof raw !== 'object' || Array.isArray(raw) || JSON.stringify(Object.keys(raw).sort()) !== JSON.stringify(rootKeys.slice().sort())) fail();\nconst datePattern = /^\\d{4}-\\d{2}-\\d{2}$/;\nconst realDate = (value) => { if (typeof value !== 'string' || !datePattern.test(value)) return false; const parsed = new Date(value + 'T00:00:00Z'); return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value; };\nconst formatDate = (value) => value.split('-').reverse().join('-');\nif (raw.schema_version !== 1 || raw.timezone !== 'America/Guatemala' || raw.report_type !== 'seguimiento_tdap_el_chal') fail();\nif (typeof raw.generated_at !== 'string' || Number.isNaN(Date.parse(raw.generated_at))) fail();\nif (!raw.range || Object.keys(raw.range).sort().join(',') !== 'from,to' || !realDate(raw.range.from) || !realDate(raw.range.to) || !realDate(raw.as_of)) fail();\nconst from = Date.parse(raw.range.from + 'T00:00:00Z');\nconst to = Date.parse(raw.range.to + 'T00:00:00Z');\nif (to - from !== 6 * 86400000 || new Date(from).getUTCDay() !== 1 || new Date(to).getUTCDay() !== 0 || Date.parse(raw.as_of + 'T00:00:00Z') !== to + 86400000) fail();\nfor (const group of [raw.new_opportunities, raw.pending]) { if (!group || Object.keys(group).join(',') !== 'total' || !Number.isSafeInteger(group.total) || group.total < 0 || group.total > 100000) fail(); }\nif (typeof raw.has_information !== 'boolean' || !raw.xlsx || JSON.stringify(Object.keys(raw.xlsx).sort()) !== JSON.stringify(['available','download_path','filename'])) fail();\nif (typeof raw.xlsx.available !== 'boolean' || raw.xlsx.download_path !== '/api/automatizaciones/v1/tdap/xlsx') fail();\nif (!raw.dispatch || typeof raw.dispatch !== 'object' || Array.isArray(raw.dispatch)) fail();\nconst status = raw.dispatch.status;\nif (!['ready','no_results','already_processed'].includes(status)) fail();\nconst totalRows = raw.new_opportunities.total + raw.pending.total;\nconst expectedFilename = 'Seguimiento_Tdap_El_Chal_' + formatDate(raw.as_of) + '.xlsx';\nif (status === 'ready') {\n  if (Object.keys(raw.dispatch).sort().join(',') !== 'status,token' || typeof raw.dispatch.token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(raw.dispatch.token)) fail();\n  if (!raw.has_information || totalRows < 1 || !raw.xlsx.available || raw.xlsx.filename !== expectedFilename) fail();\n} else {\n  if (Object.keys(raw.dispatch).join(',') !== 'status' || raw.has_information || totalRows !== 0 || raw.xlsx.available || raw.xlsx.filename !== null) fail();\n}\nconst fromLabel = formatDate(raw.range.from);\nconst toLabel = formatDate(raw.range.to);\nconst subject = 'CAP Prenatal | Seguimiento oportuno Tdap - El Chal';\nconst html = '<div style=\"font-family:Arial,sans-serif;color:#1f2937;line-height:1.6\"><h2 style=\"color:#155e8e;margin-bottom:8px\">Seguimiento oportuno Tdap - El Chal</h2><p>Buen día.</p><p>Se comparte el seguimiento semanal de embarazadas candidatas a Tdap del municipio de El Chal.</p><p><strong>Semana evaluada:</strong> ' + fromLabel + ' al ' + toLabel + '</p><p><strong>Resumen:</strong><br>- Nuevas pacientes que alcanzaron 20 semanas la semana pasada: ' + raw.new_opportunities.total + '<br>- Pacientes pendientes de Tdap actualmente: ' + raw.pending.total + '</p><p>Se adjunta un archivo Excel con dos hojas:<br>1. Nuevas oportunidades Tdap<br>2. Pendientes de Tdap</p><p>Este reporte contiene únicamente:<br>- Primer nombre<br>- Primer apellido<br>- Comunidad</p><p style=\"font-size:12px;color:#6b7280\">Uso exclusivo para personal autorizado.</p></div>';\nreturn [{ json: { should_send: status === 'ready', dispatch_token: status === 'ready' ? raw.dispatch.token : null, filename: raw.xlsx.filename, subject, html, new_total: raw.new_opportunities.total, pending_total: raw.pending.total, range_from: raw.range.from, range_to: raw.range.to } }];"
+      },
+      "id": "bb287c17-a8cb-4867-8ccc-1bdba3913595",
+      "name": "Validar contrato y construir correo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-280, 0],
+      "notes": "Valida estructura y conteos. Solo conserva resumen, fechas visibles DD-MM-YYYY y token efimero; no recibe filas nominales."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "4eb15ca3-6d13-4070-89cf-f8bd7af2d90a",
+              "leftValue": "={{ $json.should_send }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b4334822-507e-4227-ad13-fb829df397c7",
+      "name": "¿Hay información para enviar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-40, 0],
+      "notes": "La salida falsa termina normalmente para no_results y already_processed; Resend no se ejecuta."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/tdap/xlsx' : 'http://127.0.0.1:3001/api/automatizaciones/v1/tdap/xlsx' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-CAP-Dispatch-Token",
+              "value": "={{ $json.dispatch_token }}"
+            }
+          ]
+        },
+        "options": {
+          "redirect": { "redirect": { "followRedirects": false } },
+          "response": { "response": { "fullResponse": false, "neverError": false, "responseFormat": "file", "outputPropertyName": "data" } },
+          "sendCredentialsOnCrossOriginRedirect": false,
+          "timeout": 30000
+        }
+      },
+      "id": "0091eec0-059b-40b6-bca5-b10ccf3713a7",
+      "name": "Descargar XLSX Tdap",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [200, -100],
+      "notes": "El backend genera el archivo y verifica que coincida con la reserva. n8n solo descarga la propiedad binaria data. Sin reintentos automaticos."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/tdap/confirmar' : 'http://127.0.0.1:3001/api/automatizaciones/v1/tdap/confirmar' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": false,
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { dispatch_token: $node[\"Validar contrato y construir correo\"].json.dispatch_token } }}",
+        "options": {
+          "redirect": { "redirect": { "followRedirects": false } },
+          "response": { "response": { "fullResponse": false, "neverError": false, "responseFormat": "json" } },
+          "sendCredentialsOnCrossOriginRedirect": false,
+          "timeout": 10000
+        }
+      },
+      "id": "cb3742f3-083b-482a-bc88-a184e46cc579",
+      "name": "Confirmar despacho en CAP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1640, -100],
+      "notes": "Confirma solo despues del exito de Resend. Ante timeout ambiguo, no reintentar automaticamente: revisar Resend y resolver manualmente."
+    }
+  ],
+  "connections": {
+    "Cada lunes a las 08:00": { "main": [[{ "node": "Preparar seguimiento Tdap", "type": "main", "index": 0 }]] },
+    "Preparar seguimiento Tdap": { "main": [[{ "node": "Validar contrato y construir correo", "type": "main", "index": 0 }]] },
+    "Validar contrato y construir correo": { "main": [[{ "node": "¿Hay información para enviar?", "type": "main", "index": 0 }]] },
+    "¿Hay información para enviar?": { "main": [[{ "node": "Descargar XLSX Tdap", "type": "main", "index": 0 }], []] },
+    "Descargar XLSX Tdap": { "main": [[
+      { "node": "Materializar XLSX en base64", "type": "main", "index": 0 },
+      { "node": "Leer nuevas oportunidades", "type": "main", "index": 0 },
+      { "node": "Leer pendientes Tdap", "type": "main", "index": 0 }
+    ]] },
+    "Materializar XLSX en base64": { "main": [[{ "node": "Unir adjunto y listas", "type": "main", "index": 0 }]] },
+    "Leer nuevas oportunidades": { "main": [[{ "node": "Agrupar nuevas oportunidades", "type": "main", "index": 0 }]] },
+    "Agrupar nuevas oportunidades": { "main": [[{ "node": "Unir adjunto y listas", "type": "main", "index": 1 }]] },
+    "Leer pendientes Tdap": { "main": [[{ "node": "Agrupar pendientes Tdap", "type": "main", "index": 0 }]] },
+    "Agrupar pendientes Tdap": { "main": [[{ "node": "Unir adjunto y listas", "type": "main", "index": 2 }]] },
+    "Unir adjunto y listas": { "main": [[{ "node": "Construir correo con listas", "type": "main", "index": 0 }]] },
+    "Construir correo con listas": { "main": [[{ "node": "Enviar seguimiento por Resend", "type": "main", "index": 0 }]] },
+    "Enviar seguimiento por Resend": { "main": [[{ "node": "Confirmar despacho en CAP", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Guatemala",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false,
+    "callerPolicy": "none",
+    "availableInMCP": false
+  },
+  "versionId": "4fef601d-9548-4f40-aafe-615449022e3c",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

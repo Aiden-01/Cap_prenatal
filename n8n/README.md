@@ -13,9 +13,10 @@ destinatarios reales ni datos clínicos. La operación completa está en
 | `workflows/censo-primer-control-26-25-resend-v1.json` | Censo del mes logístico 26 a 25 | Día 26, 06:00 | Aviso sin archivo |
 | `workflows/censo-primer-control-mes-cerrado-resend-v1.json` | Censo del mes calendario anterior | Día 3, 06:00 | Aviso sin archivo |
 | `workflows/seguimiento-inasistencias-resend-v1.json` | Citas vencidas de la semana lunes-domingo anterior | Lunes 08:00 | No envía |
+| `workflows/seguimiento-tdap-el-chal-resend-v1.json` | Nuevas oportunidades y pendientes Tdap de El Chal, en un XLSX de dos hojas | Lunes 08:00 | No envía |
 | `workflows/proximas-citas-v1.json` | Diseño SMTP heredado y endurecido | Diario 06:00 | No envía |
 
-Los cuatro primeros son el camino Resend actual. El último no está cargado en la
+Los cinco primeros son el camino Resend actual. El último no está cargado en la
 instancia local y no debe importarse para la operación nueva; se conserva como
 referencia heredada cubierta por pruebas hasta autorizar su retiro.
 
@@ -24,6 +25,12 @@ referencia heredada cubierta por pruebas hasta autorizar su retiro.
 calcula inasistencias, no consulta `cita_siguiente` y no conserva una segunda
 base de deduplicación. El detalle del contrato y la recuperación manual está en
 [`../docs/N8N.md`](../docs/N8N.md#seguimiento-de-inasistencias-n8n-ops-01a).
+
+`N8N-VAX-01 · Seguimiento oportuno Tdap` es un solo workflow con dos conjuntos
+lógicos. CAP Prenatal filtra municipio, embarazo activo, umbral de 20 semanas y
+Tdap del embarazo actual; n8n solo valida conteos, descarga el XLSX, lo adjunta,
+envía y confirma. La regla de 20 semanas es institucional/operativa para este
+proyecto y requiere validación clínica autorizada antes de producción.
 
 En el diseño heredado, la concurrencia operativa del workflow debe permanecer en 1:
 su deduplicación con static data es de mejor esfuerzo y no constituye
@@ -99,6 +106,8 @@ Asignarla a:
 - `Consultar resumen agregado`;
 - `Descargar Excel del censo`;
 - `Preparar semana anterior`;
+- `Preparar seguimiento Tdap`;
+- `Descargar XLSX Tdap`;
 - `Confirmar despacho en CAP`.
 
 La key no debe pegarse como header fijo del nodo. El backend conserva solo su
@@ -112,6 +121,10 @@ hash. Las URLs reales son:
 /api/automatizaciones/v1/inasistencias/preparar
 /api/automatizaciones/v1/inasistencias/confirmar
 /api/automatizaciones/v1/inasistencias/resolver
+/api/automatizaciones/v1/tdap/preparar
+/api/automatizaciones/v1/tdap/xlsx
+/api/automatizaciones/v1/tdap/confirmar
+/api/automatizaciones/v1/tdap/resolver
 ```
 
 En ejecución programada se usa `http://backend:3001` dentro de Docker; una
@@ -126,6 +139,7 @@ Crear una credencial **Resend API** y asignarla a:
 - ambos `Enviar aviso sin datos`;
 - ambos `Enviar correo con Excel`;
 - `Enviar seguimiento por Resend`.
+- `Enviar seguimiento por Resend` del workflow Tdap.
 
 Configurar un remitente de `notificaciones.hercor-nexus.com` y un destinatario
 institucional aprobado. No guardar el destinatario real en el JSON.
@@ -173,6 +187,40 @@ primer apellido, teléfono y comunidad. `total=0`, `no_results` y
 `already_processed` terminan sin correo. Una reserva ambigua bloquea el replay
 automático hasta que personal autorizado revise Resend.
 
+### Seguimiento oportuno Tdap de El Chal
+
+```text
+Schedule lunes 08:00 -> POST preparar -> validar contrato
+                                      -> ¿ready y algún conteo > 0?
+                                         ├─ no: fin
+                                         └─ sí: descargar binary.data
+                                                -> base64 real + leer dos hojas
+                                                -> tablas HTML + POST Resend
+                                                -> POST confirmar
+```
+
+El backend calcula la semana calendario anterior y el estado al lunes siguiente
+en `America/Guatemala`. `new_opportunities` cuenta embarazos activos de El Chal
+que cruzaron exactamente el umbral durante esa semana; `pending` cuenta el
+stock al lunes excluyendo las nuevas oportunidades del mismo reporte. Las dos
+hojas son mutuamente excluyentes: una embarazada nueva no se repite en
+pendientes.
+
+El archivo `Seguimiento_Tdap_El_Chal_DD-MM-YYYY.xlsx` tiene siempre las hojas
+`Nuevas oportunidades Tdap` y `Pendientes de Tdap`; cada una contiene
+exclusivamente `Primer nombre`, `Primer apellido` y `Comunidad`. Si ambos
+conteos son cero, `no_results` termina sin correo. Una huella incluida en el
+token de reserva impide descargar un archivo cuyo contenido haya cambiado
+entre la preparación y la descarga, sin guardar filas nominales en
+`automatizacion_despachos`.
+
+El workflow no pasa `binary.data.data` directamente al nodo comunitario
+Resend. n8n 2.34.4 guarda el archivo como `filesystem-v2`, por lo que primero
+usa **Move File to Base64 String** y luego el HTTP Request autenticado con la
+credencial predefinida `Resend API`. Las dos hojas también se leen con nodos
+nativos para mostrar en el cuerpo exactamente las mismas tres columnas, sin
+duplicar reglas de elegibilidad.
+
 ## Plantillas
 
 - [`templates/recordatorio-citas.md`](templates/recordatorio-citas.md): campos,
@@ -193,6 +241,8 @@ node --test backend/test/n8nResendDailyWorkflow.test.js
 node --test backend/test/n8nCensusWorkflow.test.js
 node --test backend/test/n8nMissedAppointmentsWorkflow.test.js
 node --test backend/test/inasistenciasSemanales.test.js
+node --test backend/test/seguimientoTdap.test.js
+node --test backend/test/n8nTdapWorkflow.test.js
 node --test backend/test/automatizaciones.test.js
 ```
 

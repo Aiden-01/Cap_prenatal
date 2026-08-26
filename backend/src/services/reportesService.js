@@ -205,6 +205,45 @@ function crearWorkbookCenso(rows, {
   return workbook;
 }
 
+function crearWorkbookSeguimientoTdap({ nuevasOportunidades, pendientes }) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'CAP Prenatal';
+  workbook.created = new Date();
+  workbook.subject = 'Seguimiento operativo Tdap de El Chal';
+
+  const addSheet = (name, rows) => {
+    const sheet = workbook.addWorksheet(name, {
+      views: [{ state: 'frozen', ySplit: 1 }],
+      properties: { defaultRowHeight: 19 },
+    });
+    sheet.columns = [
+      { key: 'first_name', header: 'Primer nombre', width: 22 },
+      { key: 'last_name', header: 'Primer apellido', width: 22 },
+      { key: 'community', header: 'Comunidad', width: 34 },
+    ];
+    sheet.getRow(1).height = 24;
+    sheet.getRow(1).eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF155E8E' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+    rows.forEach((row, index) => {
+      const added = sheet.addRow(row);
+      added.eachCell((cell) => {
+        cell.alignment = { vertical: 'middle', wrapText: true };
+        if (index % 2 === 1) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F8FB' } };
+        }
+      });
+    });
+    sheet.autoFilter = `A1:C${Math.max(1, sheet.rowCount)}`;
+  };
+
+  addSheet('Nuevas oportunidades Tdap', nuevasOportunidades);
+  addSheet('Pendientes de Tdap', pendientes);
+  return workbook;
+}
+
 function createReportesService({
   repository = reportesRepository,
   pdfService = reportesPdfService,
@@ -326,6 +365,7 @@ module.exports = {
   ...createReportesService(),
   clasificarRiesgo,
   crearWorkbookCenso,
+  crearWorkbookSeguimientoTdap,
   createReportesService,
   indicadoresRiesgo,
   prepararFilasConRiesgo,

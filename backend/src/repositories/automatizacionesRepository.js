@@ -105,6 +105,33 @@ function createAutomatizacionesRepository(db = pool) {
     return rows;
   }
 
+  async function obtenerCandidatasTdapElChal(queryable = db) {
+    const { rows } = await queryable.query(
+      `SELECT
+         e.fur,
+         p.municipio,
+         SPLIT_PART(TRIM(p.nombres), ' ', 1) AS primer_nombre,
+         SPLIT_PART(TRIM(p.apellidos), ' ', 1) AS primer_apellido,
+         COALESCE(com.nombre, p.comunidad, '') AS comunidad
+       FROM embarazos e
+       JOIN pacientes p ON p.id = e.paciente_id
+       LEFT JOIN comunidades com ON com.id = p.comunidad_id
+       WHERE e.estado = 'activo'
+         AND LOWER(BTRIM(COALESCE(p.municipio, ''))) = 'el chal'
+         AND NOT EXISTS (
+           SELECT 1
+           FROM vacunas_paciente v
+           WHERE v.embarazo_id = e.id
+             AND v.tipo_vacuna = 'tdap'
+         )
+       ORDER BY
+         primer_apellido ASC,
+         primer_nombre ASC,
+         comunidad ASC`
+    );
+    return rows;
+  }
+
   async function obtenerDespacho({ tipo, desde, hasta }, queryable = db, {
     bloquear = false,
   } = {}) {
@@ -250,6 +277,7 @@ function createAutomatizacionesRepository(db = pool) {
     enTransaccion,
     marcarDespachoEnviado,
     marcarDespachoSinResultados,
+    obtenerCandidatasTdapElChal,
     obtenerCorteConfiableCitas,
     obtenerDespacho,
     obtenerDespachoPorTokenHash,

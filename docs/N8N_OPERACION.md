@@ -174,7 +174,7 @@ destinatarios reales, remitentes internos y cualquier resultado de ejecución.
 Orden recomendado:
 
 1. `node --test backend/test/n8nInfrastructure.test.js`;
-2. pruebas estáticas de los cuatro JSON Resend;
+2. pruebas estáticas de los cinco JSON Resend;
 3. health checks de backend y n8n;
 4. HTTP Request con un período/cita sintéticos;
 5. rama `total=0` para confirmar el comportamiento esperado;
@@ -196,8 +196,53 @@ Para `Seguimiento semanal de inasistencias`, el orden manual obligatorio es:
    construir el correo;
 7. revisar **Executions** sin copiar payloads nominales a tickets.
 
+Para `Seguimiento oportuno Tdap El Chal`, mantener `active=false` y:
+
+1. ejecutar `Preparar seguimiento Tdap` con datos sintéticos controlados;
+2. comprobar por separado ambos cero, solo pendientes y ambos conjuntos; el
+   validador estático también cubre solo nuevas;
+3. verificar que ambos cero termina por la salida falsa sin descargar ni enviar;
+4. en un caso positivo, comprobar que el resumen solo contiene conteos y token;
+5. descargar el XLSX con la misma reserva y revisar dos hojas, tres columnas,
+   nombre `DD-MM-YYYY` y ausencia de datos sensibles;
+6. comprobar que `Descargar XLSX Tdap` entrega `binary.data`, que
+   `Materializar XLSX en base64` produce un ZIP base64 que inicia con `UEsDB`
+   y que el tamaño decodificado coincide con el `Content-Length` del backend;
+7. comprobar que el HTML contiene las secciones `Nuevas oportunidades Tdap` y
+   `Pendientes de Tdap`, únicamente con nombre, apellido y comunidad, y que
+   ningún caso sintético de nuevas oportunidades se repite en pendientes;
+8. ejecutar una sola vez Resend a un destinatario autorizado de prueba;
+9. confirmar el despacho y repetir `Preparar seguimiento Tdap`; debe devolver
+   `already_processed` sin volver a Resend;
+10. revisar **Executions** y limpiar solo datos sintéticos mediante el
+   procedimiento seguro de la base temporal.
+
+Si la API responde `AUTOMATION_TDAP_GESTATIONAL_SOURCE_INCOMPLETE`, existe al
+menos una candidata activa de El Chal sin FUR válida. Corregir el dato en CAP
+Prenatal mediante personal autorizado; no excluirla ni estimar semanas en n8n.
+
 No ejecutar el Schedule completo mientras se configuran credenciales. No usar
 una paciente real para probar formato, errores o adjuntos.
+
+### Tdap: XLSX adjunto corrupto
+
+1. descargar directamente el endpoint y validar que ExcelJS/Excel abre el
+   archivo;
+2. comprobar MIME XLSX y nombre `.xlsx` en `Descargar XLSX Tdap`;
+3. verificar en la vista **Binary** que el campo sea `data` y anotar el tamaño;
+4. guardar temporalmente el archivo de almacenamiento de la ejecución y
+   comparar SHA-256 con una captura exacta de la respuesta HTTP;
+5. confirmar que `Materializar XLSX en base64` devuelve el mismo tamaño y
+   SHA-256 después de decodificar;
+6. no conectar el binario almacenado directamente al nodo comunitario Resend
+   2.8.0: `binary.data.data` puede contener `filesystem-v2:...`;
+7. verificar que el nodo `Enviar seguimiento por Resend` use la credencial
+   predefinida `Resend API` y `attachments[].content` desde
+   `attachment_base64`.
+
+Una coincidencia de hash backend → `binary.data` → base64, seguida de un archivo
+pequeño en la bandeja, localiza el defecto en la construcción del adjunto y no
+en el XLSX ni en el HTTP Request de descarga.
 
 ## Actualización de n8n o Resend
 
@@ -299,6 +344,22 @@ La ejecución debe quedar fallida. No interpretar un error como `total=0`. En
 Los nodos HTTP usan 10 segundos y no tienen reintentos automáticos. Un error de
 confirmación posterior a Resend exige el procedimiento de despacho ambiguo.
 
+### Tdap: reserva, snapshot o archivo inválido
+
+`AUTOMATION_DISPATCH_UNCERTAIN` se resuelve con el mismo procedimiento de
+verificación previa en Resend, usando la confirmación literal
+`REINTENTAR_SEGUIMIENTO_TDAP_EL_CHAL`. No borrar la fila técnica.
+
+`AUTOMATION_DISPATCH_SNAPSHOT_CHANGED` significa que municipio, embarazo,
+vacuna, FUR, nombre o comunidad cambiaron entre preparación y descarga. El
+backend bloqueó el archivo para no enviar un XLSX diferente al resumen. No
+reintentar automáticamente; confirmar que no hubo envío, resolver la reserva
+como `reintentar` y comenzar de nuevo.
+
+Si `Descargar XLSX Tdap` falla con token inválido, comprobar que el header
+`X-CAP-Dispatch-Token` toma el token de la misma ejecución y que la credencial
+M2M sigue asignada. El token no se copia a logs, tickets o Notion.
+
 ### Credenciales no descifrables
 
 Detener el proceso y confirmar que se usó la key histórica correcta. No
@@ -307,7 +368,7 @@ compatibles o recrear las credenciales si la clave se perdió.
 
 ## Checklist de cierre local
 
-- [ ] Los cuatro workflows Resend siguen inactivos salvo autorización expresa.
+- [ ] Los cinco workflows Resend siguen inactivos salvo autorización expresa.
 - [ ] No quedó n8n escuchando fuera de loopback.
 - [ ] No hay exports locales o `.env` rastreados por Git.
 - [ ] No se guardaron payloads clínicos o capturas de pacientes.
