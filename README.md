@@ -268,9 +268,29 @@ reconstruir historicos. Al registrar un control nuevo con `cita_siguiente`, el
 backend crea atomicamente una cita `programada`; `cita_siguiente` permanece
 como evidencia historica del control. La verdad operativa vive en
 `citas_prenatales`: el siguiente control valido cumple la unica cita vigente,
-y el dashboard permite reprogramarla o cancelarla sin alterar el control de
-origen. El recordatorio n8n conserva su contrato y ahora consulta internamente
-solo citas `programada` sin cumplimiento.
+y el dashboard presenta un calendario mensual, con semana iniciada en domingo,
+navegacion por meses y consulta unica por el rango visible. Desde ese calendario
+se puede abrir el expediente y, con `controles.editar`, reprogramar o cancelar
+cualquier cita `programada` sin alterar el control de origen. Las citas
+`atendida`, `cancelada` y `reprogramada` permanecen visibles como historial; el
+cumplimiento sigue ocurriendo exclusivamente al registrar un control nuevo.
+
+Si el ultimo control valido fue guardado por error sin proxima cita, su edicion
+puede completar `cita_siguiente: NULL -> fecha`. La misma transaccion verifica
+que no existan controles posteriores, una cita originada por ese control ni
+otra cita programada del embarazo, y crea la fila correspondiente en
+`citas_prenatales`. Una fecha existente solo cambia mediante Reprogramar cita y
+solo deja de estar vigente mediante Cancelar cita.
+
+El calendario no crea citas ni usa `controles_prenatales.cita_siguiente` como
+agenda. Muestra fechas internas `YYYY-MM-DD` como `DD-MM-YYYY` sin conversiones
+de zona horaria, distingue los estados por icono y texto, funciona con teclado,
+modo claro/oscuro y adapta la cuadrícula a una lista del dia en movil. La lectura
+requiere `pacientes.ver`; las mutaciones conservan `controles.editar` y las
+validaciones contra IDOR de CITAS-01B. No existe backfill: periodos anteriores
+al corte de activacion pueden no contener citas estructuradas. El recordatorio
+n8n conserva sin cambios su contrato M2M y consulta solo citas `programada` sin
+cumplimiento.
 
 La migracion `015_automatizacion_despachos.sql` agrega idempotencia persistente
 para el seguimiento semanal de inasistencias. No almacena datos de pacientes o

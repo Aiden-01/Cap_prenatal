@@ -96,7 +96,6 @@ function createReportesRepository(db = pool) {
       embarazosActivos,
       pacientesConRiesgo,
       controlesEsteMes,
-      proximasCitas,
     ] = await Promise.all([
       db.query('SELECT COUNT(*) FROM pacientes'),
       db.query("SELECT COUNT(*) FROM embarazos WHERE estado = 'activo'"),
@@ -111,29 +110,6 @@ function createReportesRepository(db = pool) {
         WHERE fecha >= DATE_TRUNC('month', ${GT_TODAY_SQL})::date
           AND fecha < (DATE_TRUNC('month', ${GT_TODAY_SQL}) + INTERVAL '1 month')::date
       `),
-      db.query(`
-        SELECT
-          p.id,
-          p.nombres || ' ' || p.apellidos AS nombre,
-          p.no_expediente,
-          cp.id AS cita_id,
-          cp.embarazo_id,
-          cp.fecha_programada AS cita_siguiente,
-          origen.numero_control,
-          COALESCE(com.nombre, p.comunidad) AS comunidad
-        FROM citas_prenatales cp
-        JOIN embarazos e
-          ON e.id = cp.embarazo_id
-         AND e.estado = 'activo'
-        JOIN pacientes p ON p.id = e.paciente_id
-        LEFT JOIN comunidades com ON com.id = p.comunidad_id
-        JOIN controles_prenatales origen ON origen.id = cp.control_origen_id
-        WHERE cp.estado = 'programada'
-          AND cp.control_cumplimiento_id IS NULL
-          AND cp.fecha_programada BETWEEN ${GT_TODAY_SQL} AND ${GT_TODAY_SQL} + 7
-        ORDER BY cp.fecha_programada ASC, p.apellidos ASC, p.nombres ASC
-        LIMIT 15
-      `),
     ]);
 
     return {
@@ -141,7 +117,6 @@ function createReportesRepository(db = pool) {
       embarazosActivos: embarazosActivos.rows[0],
       pacientesConRiesgo: pacientesConRiesgo.rows[0],
       controlesEsteMes: controlesEsteMes.rows[0],
-      proximasCitas: proximasCitas.rows,
     };
   }
 

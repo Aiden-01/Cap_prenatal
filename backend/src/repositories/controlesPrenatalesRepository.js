@@ -49,9 +49,37 @@ async function obtenerPorIdYEmbarazo(id, embarazoId, db = pool) {
   return rows[0] || null;
 }
 
-async function obtenerPorId(id, db = pool) {
-  const { rows } = await db.query('SELECT * FROM controles_prenatales WHERE id = $1', [id]);
+async function obtenerPorId(id, db = pool, { bloquear = false } = {}) {
+  const { rows } = await db.query(
+    `SELECT *
+     FROM controles_prenatales
+     WHERE id = $1${bloquear ? '\n     FOR UPDATE' : ''}`,
+    [id]
+  );
   return rows[0] || null;
+}
+
+async function existeControlPosterior({
+  embarazoId,
+  controlId,
+  numeroControl,
+  fecha,
+}, db = pool) {
+  const { rows } = await db.query(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM controles_prenatales
+       WHERE embarazo_id = $1
+         AND id <> $2
+         AND (
+           numero_control > $3
+           OR fecha > $4::date
+           OR (numero_control = $3 AND fecha = $4::date AND id > $2)
+         )
+     ) AS existe`,
+    [embarazoId, controlId, numeroControl, fecha]
+  );
+  return rows[0]?.existe === true;
 }
 
 async function obtenerPorNumeroYEmbarazo(embarazoId, numeroControl, db = pool) {
@@ -154,6 +182,7 @@ module.exports = {
   obtenerPorNumeroYEmbarazo,
   actualizar,
   eliminar,
+  existeControlPosterior,
   upsert,
   enTransaccion,
 };

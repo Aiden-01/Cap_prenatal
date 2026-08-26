@@ -245,7 +245,7 @@ Las migraciones son inmutables y se aplican en orden por checksum:
 migrador toma un advisory lock, ejecuta cada archivo en transaccion, registra
 checksum una sola vez y revierte el archivo completo ante error.
 
-## Citas prenatales (CITAS-01A y CITAS-01B)
+## Citas prenatales (CITAS-01A, CITAS-01B y CITAS-02)
 
 `citas_prenatales` separa la agenda de la observacion historica
 `controles_prenatales.cita_siguiente`. El registro conserva:
@@ -284,11 +284,22 @@ indice unico parcial impide dos hijas desde la misma cita, y
 cumplimiento por embarazo. La lectura idempotente de la raiz evita duplicados
 ante reintentos.
 
-Editar `cita_siguiente` en un control ya existente no modifica ni crea una
-cita: responde `409 CITA_REPROGRAMACION_REQUERIDA`. Esto evita convertir un
-control historico en un mecanismo informal de reprogramacion. Tampoco se puede
-eliminar un control vinculado a una cita (`409 CONTROL_RELACIONADO_CON_CITA`).
-Las demas ediciones del control conservan su comportamiento.
+Editar `cita_siguiente` en un control existente solo admite la correccion
+`NULL -> fecha`: el servicio bloquea y vuelve a leer el control, exige que sea
+el ultimo del embarazo, que no exista una cita raiz originada por el control y
+que tampoco exista otra cita `programada` vigente. Entonces actualiza el dato
+historico, crea la cita estructurada con el mismo `embarazo_id` y
+`control_origen_id`, y registra ambas auditorias dentro de una sola transaccion.
+Un reintento equivalente no duplica la cita. La presencia de un control
+posterior, una cita vigente o un origen ya utilizado produce `409` antes de
+escribir.
+
+Las transiciones `fecha -> otra fecha` y `fecha -> NULL` siguen prohibidas en
+la edicion del control: requieren respectivamente Reprogramar cita y Cancelar
+cita, por lo que responden `CITA_REPROGRAMACION_REQUERIDA` y
+`CITA_CANCELACION_REQUERIDA`. Tampoco se puede eliminar un control vinculado a
+una cita (`409 CONTROL_RELACIONADO_CON_CITA`). Las demas ediciones conservan su
+comportamiento.
 
 No hay `INSERT ... SELECT`, trigger ni seed de citas. La fecha de corte es por
 entorno y corresponde a la activacion conjunta de la migracion 014 y el backend
@@ -298,11 +309,20 @@ del DDL, pero el despliegue debe registrar tambien el momento de activacion del
 backend. Los controles anteriores, aunque tengan `cita_siguiente`, no se
 reconstruyen ni entran automaticamente al futuro seguimiento.
 
-El dashboard de siete dias y `/api/automatizaciones/v1/proximas-citas` leen
-`citas_prenatales` con `estado = 'programada'` y
-`control_cumplimiento_id IS NULL`; el segundo conserva su contrato externo.
-`controles_prenatales.cita_siguiente` no se modifica al reprogramar o cancelar:
-es historia, no la agenda vigente.
+El calendario mensual del Dashboard lee directamente `citas_prenatales` por un
+rango inclusivo de hasta 62 dias. La consulta unica admite el rango visual de
+seis semanas, incluye `programada`, `atendida`, `cancelada` y `reprogramada`, y
+relaciona opcionalmente la hija para mostrar su nueva fecha. Ordena por fecha y
+paciente, minimiza la salida a nombre y comunidad y no depende de
+`controles_prenatales.cita_siguiente`. Los indices existentes de fecha y
+relaciones cubren este acceso; CITAS-02 no agrega migracion ni indice.
+
+`/api/automatizaciones/v1/proximas-citas` permanece separado y sigue leyendo
+solo filas con `estado = 'programada'` y `control_cumplimiento_id IS NULL`, con
+su contrato externo intacto. `controles_prenatales.cita_siguiente` no se
+modifica al reprogramar o cancelar: es historia, no la agenda vigente. No hay
+backfill, por lo que un periodo anterior al corte confiable puede no mostrar
+citas aunque existan proximas fechas en controles historicos.
 
 N8N-OPS-01A consulta la semana calendario anterior y considera solo citas
 vencidas que sigan `programada`, sin cumplimiento, en embarazo activo y creadas

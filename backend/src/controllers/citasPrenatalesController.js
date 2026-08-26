@@ -9,6 +9,11 @@ const vigente = asyncHandler(async (req, res) => {
   return res.json({ cita });
 });
 
+const calendario = asyncHandler(async (req, res) => {
+  const resultado = await citasPrenatalesService.listarCalendario(req.query);
+  return res.json(resultado);
+});
+
 const reprogramar = asyncHandler(async (req, res) => {
   const resultado = await citasPrenatalesService.reprogramarCita({
     pacienteId: req.params.pacienteId,
@@ -30,4 +35,4 @@ const cancelar = asyncHandler(async (req, res) => {
   return res.json(resultado);
 });
 
-module.exports = { cancelar, reprogramar, vigente };
+module.exports = { calendario, cancelar, reprogramar, vigente };

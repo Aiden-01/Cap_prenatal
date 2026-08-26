@@ -2,13 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Users, ClipboardList, AlertTriangle,
-  Baby, Phone, CalendarClock, CalendarX, ExternalLink
+  Baby, Phone
 } from "lucide-react";
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
-import { useGlobalToast } from "../context/ToastContext";
 import { getErrorMessage } from "../utils/errorMessage";
-import AppointmentActionDialog from "../components/AppointmentActionDialog";
+import AppointmentCalendar from "../components/AppointmentCalendar";
 
 const COLOR_VARIANTS = {
   primary: "var(--primary)",
@@ -178,14 +177,11 @@ export default function Dashboard() {
   const [loadingAlertas, setLoadingAlertas] = useState(true);
   const [tabActiva,      setTabActiva]      = useState("citas");
   const [statsError,     setStatsError]     = useState("");
-  const [dialog,         setDialog]         = useState(null);
-  const [actionBusy,     setActionBusy]     = useState(false);
-  const [actionError,    setActionError]    = useState("");
 
   const { usuario } = useAuth();
-  const toast = useGlobalToast();
   const navigate = useNavigate();
   const mesActual = new Date().toLocaleDateString("es-GT", { month: "long" });
+  const canViewAppointments = usuario?.permisos?.includes("pacientes.ver");
   const canManageAppointments = usuario?.permisos?.includes("controles.editar");
 
   const loadStats = useCallback(async () => {
@@ -234,43 +230,10 @@ export default function Dashboard() {
     return iso ? new Date(`${iso}T12:00:00`).toLocaleDateString("es-GT") : "—";
   };
 
-  const closeAppointmentDialog = useCallback(() => {
-    if (actionBusy) return;
-    setDialog(null);
-    setActionError("");
-  }, [actionBusy]);
-
-  const openAppointmentDialog = (event, mode, appointment) => {
-    event.stopPropagation();
-    setActionError("");
-    setDialog({ mode, appointment, returnFocusTarget: event.currentTarget });
-  };
-
-  const confirmAppointmentAction = async (newDate) => {
-    if (!dialog) return;
-    const { appointment, mode } = dialog;
-    setActionBusy(true);
-    setActionError("");
-    try {
-      const endpoint = `/pacientes/${appointment.id}/citas/${appointment.cita_id}/${mode}?embarazo_id=${appointment.embarazo_id}`;
-      await api.patch(endpoint, mode === "reprogramar" ? { fecha_programada: newDate } : {});
-      setDialog(null);
-      toast?.(
-        mode === "reprogramar" ? "Cita reprogramada correctamente." : "Cita cancelada correctamente.",
-        "success"
-      );
-      await loadStats();
-    } catch (error) {
-      setActionError(getErrorMessage(error, "No fue posible actualizar la cita."));
-    } finally {
-      setActionBusy(false);
-    }
-  };
-
   const TABS = [
     {
       id: "citas",
-      label: `Citas próximas (${stats?.proximas_citas?.length ?? 0})`,
+      label: "Calendario de citas",
       alert: false,
     },
     {
@@ -339,8 +302,10 @@ export default function Dashboard() {
               onClick={() => setTabActiva("parto")}
             />
           </div>
+        </>
+      )}
 
-          <div>
+      <div>
             <div className="content-tabs">
               {TABS.map((t) => (
                 <button key={t.id} onClick={() => setTabActiva(t.id)} className={`content-tab ${tabActiva === t.id ? "is-active" : ""}`}>
@@ -359,70 +324,16 @@ export default function Dashboard() {
             </div>
 
             {tabActiva === "citas" && (
-              <SeccionTabla
-                titulo="Citas en los próximos 7 días"
-                badge={`${stats?.proximas_citas?.length ?? 0} pendientes`}
-                badgeVariant="blue"
-                vacia={!stats?.proximas_citas?.length
-                  ? "No hay citas programadas para los próximos 7 días."
-                  : null}
-              >
-                <table className="tabla">
-                  <thead>
-                    <tr>
-                      <th>Paciente</th>
-                      <th>No. Expediente</th>
-                      <th>Control</th>
-                      <th>Comunidad</th>
-                      <th>Fecha cita</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats?.proximas_citas?.map((c) => (
-                      <tr key={c.cita_id}>
-                        <td><PatientName>{c.nombre}</PatientName></td>
-                        <td><span className="badge badge-blue">{c.no_expediente}</span></td>
-                        <td><span className="badge badge-blue">Control {c.numero_control}</span></td>
-                        <td>{c.comunidad || "—"}</td>
-                        <td>{fmtFecha(c.cita_siguiente)}</td>
-                        <td>
-                          <div className="appointment-actions">
-                            <button
-                              type="button"
-                              className="appointment-action-button"
-                              onClick={() => navigate(`/pacientes/${c.id}`)}
-                              aria-label={`Ver expediente de ${c.nombre}`}
-                            >
-                              <ExternalLink size={15} /> Ver expediente
-                            </button>
-                            {canManageAppointments ? (
-                              <>
-                                <button
-                                  type="button"
-                                  className="appointment-action-button"
-                                  onClick={(event) => openAppointmentDialog(event, "reprogramar", c)}
-                                  aria-label={`Reprogramar cita de ${c.nombre}`}
-                                >
-                                  <CalendarClock size={15} /> Reprogramar
-                                </button>
-                                <button
-                                  type="button"
-                                  className="appointment-action-button is-danger"
-                                  onClick={(event) => openAppointmentDialog(event, "cancelar", c)}
-                                  aria-label={`Cancelar cita de ${c.nombre}`}
-                                >
-                                  <CalendarX size={15} /> Cancelar
-                                </button>
-                              </>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </SeccionTabla>
+              canViewAppointments ? (
+                <AppointmentCalendar
+                  canManageAppointments={canManageAppointments}
+                  onViewPatient={(patientId) => navigate(`/pacientes/${patientId}`)}
+                />
+              ) : (
+                <div className="card" role="status">
+                  No tiene permiso para consultar el calendario de citas.
+                </div>
+              )
             )}
 
             {tabActiva === "parto" && (
@@ -555,21 +466,7 @@ export default function Dashboard() {
                 </table>
               </SeccionTabla>
             )}
-          </div>
-        </>
-      )}
-
-      {dialog ? (
-        <AppointmentActionDialog
-          mode={dialog.mode}
-          appointment={dialog.appointment}
-          busy={actionBusy}
-          error={actionError}
-          onClose={closeAppointmentDialog}
-          onConfirm={confirmAppointmentAction}
-          returnFocusTarget={dialog.returnFocusTarget}
-        />
-      ) : null}
+      </div>
     </div>
   );
 }

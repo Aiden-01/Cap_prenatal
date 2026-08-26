@@ -16,6 +16,7 @@ const AUDIT_CONTEXT = Object.freeze({
   crear: Object.freeze({ categoria: 'clinica', entidad: 'control_prenatal', evento: 'crear' }),
   actualizar: Object.freeze({ categoria: 'clinica', entidad: 'control_prenatal', evento: 'actualizar' }),
   eliminar: Object.freeze({ categoria: 'clinica', entidad: 'control_prenatal', evento: 'eliminar' }),
+  citaCrear: Object.freeze({ categoria: 'clinica', entidad: 'cita_prenatal', evento: 'crear' }),
   citaAtender: Object.freeze({ categoria: 'clinica', entidad: 'cita_prenatal', evento: 'atender' }),
 });
 const RESULTADO_EXITOSO = 'exitoso';
@@ -147,6 +148,48 @@ function impedirCambioHistoricoDeCita(modifiedFields) {
     CITA_REPROGRAMACION_REQUERIDA.statusCode,
     CITA_REPROGRAMACION_REQUERIDA.message,
     { code: CITA_REPROGRAMACION_REQUERIDA.code }
+  );
+}
+
+function esValorVacio(value) {
+  return value === null || value === undefined || value === '';
+}
+
+function resolverTransicionDeCita(anterior, nuevo, modifiedFields) {
+  if (!modifiedFields.includes('cita_siguiente')) return null;
+  if (esValorVacio(anterior) && !esValorVacio(nuevo)) return 'crear';
+  if (!esValorVacio(anterior) && esValorVacio(nuevo)) {
+    throw new HttpError(
+      409,
+      'Para quitar una cita vigente debe utilizar el flujo Cancelar cita',
+      { code: 'CITA_CANCELACION_REQUERIDA' }
+    );
+  }
+  impedirCambioHistoricoDeCita(modifiedFields);
+  return null;
+}
+
+function controlHistoricoNoPuedeOriginarCita() {
+  return new HttpError(
+    409,
+    'El control ya no puede originar una proxima cita porque existen controles prenatales posteriores',
+    { code: 'CITA_CONTROL_NO_ES_ULTIMO' }
+  );
+}
+
+function citaVigenteYaExiste() {
+  return new HttpError(
+    409,
+    'El embarazo ya tiene una cita programada vigente',
+    { code: 'CITA_PROGRAMADA_VIGENTE' }
+  );
+}
+
+function citaOriginadaPorControlYaExiste() {
+  return new HttpError(
+    409,
+    'El control ya tiene una cita estructurada asociada',
+    { code: 'CITA_CONTROL_ORIGEN_EXISTENTE' }
   );
 }
 
@@ -325,16 +368,50 @@ async function actualizarControl({ pacienteId, embarazoId, id, body, req }) {
   const { data, campos } = buildUpdateData(bodyPermitido);
   if (campos.length === 0) throw new HttpError(400, 'Sin campos para actualizar');
   return controlesRepository.enTransaccion(async (client) => {
-    const before = await controlesRepository.obtenerPorId(id, client);
-    if (!before) throw new HttpError(404, 'Control no encontrado');
-    if (String(before.embarazo_id) !== String(embarazoId)) {
+    const controlSolicitado = await controlesRepository.obtenerPorId(id, client);
+    if (!controlSolicitado) throw new HttpError(404, 'Control no encontrado');
+    if (String(controlSolicitado.embarazo_id) !== String(embarazoId)) {
       throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
     }
     await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
 
+    const before = await controlesRepository.obtenerPorId(id, client, { bloquear: true });
+    if (!before || String(before.embarazo_id) !== String(embarazoId)) {
+      throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
+    }
+
     const modifiedFields = camposRealmenteModificados(before, data, campos);
     if (modifiedFields.length === 0) return before;
-    impedirCambioHistoricoDeCita(modifiedFields);
+    const transicionCita = resolverTransicionDeCita(
+      before.cita_siguiente,
+      data.cita_siguiente,
+      modifiedFields
+    );
+
+    if (transicionCita === 'crear') {
+      const existePosterior = await controlesRepository.existeControlPosterior({
+        embarazoId,
+        controlId: before.id,
+        numeroControl: before.numero_control,
+        fecha: before.fecha,
+      }, client);
+      if (existePosterior) throw controlHistoricoNoPuedeOriginarCita();
+
+      const citaOriginada = await citasRepository.obtenerOriginadaPorControl(
+        { controlId: before.id, embarazoId },
+        client,
+        { bloquear: true }
+      );
+      if (citaOriginada) throw citaOriginadaPorControlYaExiste();
+
+      const citasVigentes = await citasRepository.listarProgramadasVigentesPorEmbarazo(
+        embarazoId,
+        client,
+        { bloquear: true }
+      );
+      if (citasVigentes.length > 0) throw citaVigenteYaExiste();
+    }
+
     const modifiedData = seleccionarCamposAuditoria(data, modifiedFields);
     const control = await controlesRepository.actualizar({
       id,
@@ -350,6 +427,21 @@ async function actualizarControl({ pacienteId, embarazoId, id, body, req }) {
       throw new HttpError(404, 'Control no encontrado');
     }
 
+    let citaCreada = null;
+    if (transicionCita === 'crear') {
+      citaCreada = await citasRepository.crearProgramadaDesdeControl({
+        embarazoId,
+        controlOrigenId: control.id,
+        fechaProgramada: control.cita_siguiente,
+        usuarioId: req.usuario.id,
+      }, client);
+      if (!citaCreada) {
+        throw new HttpError(409, 'No fue posible crear la cita prenatal', {
+          code: 'CITA_CREACION_NO_REALIZADA',
+        });
+      }
+    }
+
     await registrarAuditoria(req, {
       contexto: AUDIT_CONTEXT.actualizar,
       accion: 'actualizar',
@@ -362,6 +454,24 @@ async function actualizarControl({ pacienteId, embarazoId, id, body, req }) {
       },
       metadata: { resultado: RESULTADO_EXITOSO },
     }, { db: client, obligatorio: true });
+
+    if (citaCreada) {
+      await registrarAuditoria(req, {
+        contexto: AUDIT_CONTEXT.citaCrear,
+        accion: 'crear',
+        entidadId: citaCreada.id,
+        pacienteId,
+        embarazoId,
+        cambios: {
+          nuevos: {
+            estado_cita: citaCreada.estado,
+            fecha_programada: citaCreada.fecha_programada,
+            control_origen_id: Number(control.id),
+          },
+        },
+        metadata: { resultado: RESULTADO_EXITOSO, motivo_codigo: 'cita_agregada_desde_control' },
+      }, { db: client, obligatorio: true });
+    }
 
     return control;
   });
@@ -412,6 +522,7 @@ async function eliminarControl({ pacienteId, embarazoId, id, req }) {
 module.exports = {
   CONTROL_FIELDS,
   resolverCitaProgramadaInequivoca,
+  resolverTransicionDeCita,
   valoresControlEquivalentes,
   listarControles,
   obtenerControl,

@@ -284,7 +284,6 @@ function createReportesService({
       total_pacientes: Number.parseInt(data.totalPacientes.count, 10),
       pacientes_con_riesgo: Number.parseInt(data.pacientesConRiesgo.count, 10),
       controles_este_mes: Number.parseInt(data.controlesEsteMes.count, 10),
-      proximas_citas: data.proximasCitas,
     };
   }
 

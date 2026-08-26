@@ -168,11 +168,65 @@ Base: `/pacientes/:pacienteId/controles`
 
 Al crear un control nuevo, el backend cumple la unica cita `programada` vigente
 del mismo embarazo y, si existe `cita_siguiente`, crea despues la proxima cita.
-El control, ambas operaciones y sus auditorias comparten transaccion. Editar
-`cita_siguiente` de un control existente sigue respondiendo
-`409 CITA_REPROGRAMACION_REQUERIDA`.
+El control, ambas operaciones y sus auditorias comparten transaccion.
+
+`PUT /:id` admite excepcionalmente `cita_siguiente: null -> YYYY-MM-DD` para
+corregir una cita omitida. El control debe ser el ultimo del embarazo, no puede
+tener una cita estructurada de origen y el embarazo no puede tener otra cita
+`programada` vigente. Actualizacion, insercion en `citas_prenatales` y ambas
+auditorias se confirman o revierten juntas. Un control con controles posteriores
+responde `409 CITA_CONTROL_NO_ES_ULTIMO`; una cita vigente,
+`409 CITA_PROGRAMADA_VIGENTE`; y un origen ya utilizado,
+`409 CITA_CONTROL_ORIGEN_EXISTENTE`. `fecha -> otra fecha` conserva
+`409 CITA_REPROGRAMACION_REQUERIDA`; `fecha -> null` responde
+`409 CITA_CANCELACION_REQUERIDA`.
 
 ## Citas prenatales
+
+### Calendario mensual de UI
+
+Base: `/citas`
+
+| Metodo | Ruta | Permiso | Descripcion |
+| --- | --- | --- | --- |
+| `GET` | `/calendario?from=YYYY-MM-DD&to=YYYY-MM-DD` | `pacientes.ver` | Lista las citas estructuradas incluidas en el rango visible del calendario. |
+
+`from` y `to` son fechas ISO date-only obligatorias, inclusivas y con un maximo
+de 62 dias. El rango puede incluir dias adyacentes al mes para completar las
+seis filas de la cuadrícula y se resuelve con una sola consulta. Parametros
+repetidos, fechas imposibles, orden invertido o un rango mayor responden `400`.
+
+Respuesta:
+
+```json
+{
+  "range": {
+    "from": "2026-07-26",
+    "to": "2026-09-05"
+  },
+  "items": [
+    {
+      "id": "701",
+      "date": "2026-08-25",
+      "status": "programada",
+      "patient_id": 41,
+      "pregnancy_id": 91,
+      "patient_name": "Maria Lopez",
+      "community": "Las Flores",
+      "rescheduled_to": null,
+      "editable": true
+    }
+  ]
+}
+```
+
+Los IDs permiten reutilizar las operaciones anidadas, pero no se muestran en la
+interfaz. `editable` describe si la cita y el embarazo admiten una mutacion; el
+frontend exige ademas `controles.editar`. El contrato minimiza datos a nombre y
+comunidad, devuelve los cuatro estados y consulta directamente
+`citas_prenatales`, nunca `controles_prenatales.cita_siguiente`.
+
+### Operaciones de una cita
 
 Base: `/pacientes/:pacienteId/citas`
 

@@ -227,7 +227,7 @@ test('dashboard obtiene embarazos activos separado del total historico de pacien
     async query(sql) {
       statements.push(sql);
       const current = index++;
-      return current === 4 ? { rows: [] } : { rows: [counts[current]] };
+      return { rows: [counts[current]] };
     },
   });
   const base = await repository.obtenerEstadisticasBase();
@@ -238,17 +238,8 @@ test('dashboard obtiene embarazos activos separado del total historico de pacien
   const stats = await service.estadisticas();
   assert.equal(stats.total_pacientes_historico, 99);
   assert.equal(stats.embarazos_activos, 12);
-  assert.match(statements[4], /FROM citas_prenatales cp/);
-  assert.match(statements[4], /cp\.estado = 'programada'/);
-  assert.match(statements[4], /cp\.control_cumplimiento_id IS NULL/);
-  assert.match(statements[4], /e\.estado = 'activo'/);
-  assert.match(statements[4], /America\/Guatemala/);
-  assert.match(statements[4], /cp\.fecha_programada BETWEEN[\s\S]*\+ 7/);
-  assert.match(statements[4], /ORDER BY cp\.fecha_programada ASC/);
-  assert.match(statements[4], /cp\.id AS cita_id/);
-  assert.match(statements[4], /cp\.embarazo_id/);
-  assert.match(statements[4], /cp\.fecha_programada AS cita_siguiente/);
-  assert.doesNotMatch(statements[4], /MAX\(cita_siguiente\)|origen\.cita_siguiente|c\.cita_siguiente/);
+  assert.equal(statements.length, 4);
+  assert.equal('proximas_citas' in stats, false);
 });
 
 test('Excel principal usa oficio horizontal, una pagina de ancho y columnas requeridas', async () => {

@@ -59,6 +59,17 @@ async function obtenerCitaVigente({ pacienteId, embarazoId }) {
   return resolverUnicaProgramada(citas);
 }
 
+async function listarCalendario({ from, to }) {
+  const items = await citasRepository.listarCalendarioPorRango({
+    desde: from,
+    hasta: to,
+  });
+  return {
+    range: { from, to },
+    items,
+  };
+}
+
 async function reprogramarCita({ pacienteId, embarazoId, citaId, fechaProgramada, req }) {
   requerirEmbarazoId(embarazoId);
   return citasRepository.enTransaccion(async (client) => {
@@ -183,6 +194,7 @@ async function cancelarCita({ pacienteId, embarazoId, citaId, req }) {
 
 module.exports = {
   cancelarCita,
+  listarCalendario,
   obtenerCitaVigente,
   reprogramarCita,
   resolverUnicaProgramada,

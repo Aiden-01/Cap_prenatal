@@ -85,7 +85,15 @@ const controlCreateSchema = z.object({
   fecha: requiredPastOrTodayDate,
 }).passthrough();
 
-const controlUpdateSchema = z.object(controlBase).passthrough();
+const controlUpdateAppointmentDate = z.preprocess(
+  (value) => (value === '' ? null : value),
+  z.union([requiredDate, z.null()]).optional()
+);
+
+const controlUpdateSchema = z.object({
+  ...controlBase,
+  cita_siguiente: controlUpdateAppointmentDate,
+}).passthrough();
 
 const puerperioBase = {
   numero_atencion: optionalInt(1, 2),

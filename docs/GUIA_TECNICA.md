@@ -962,17 +962,49 @@ el registro; un control nuevo cumple la unica cita vigente sin exigir igualdad
 de fechas. Todo usa bloqueo de embarazo/cita, escritura condicional, auditoria
 privada obligatoria y una sola transaccion.
 
+La edicion de un control permite corregir una omision `cita_siguiente: NULL ->
+fecha` solo en el ultimo control prenatal del embarazo. Bajo el mismo bloqueo y
+transaccion verifica que no haya controles posteriores, cita estructurada del
+mismo origen ni otra cita programada vigente; luego actualiza el control, crea
+la cita con el mismo embarazo y origen, y audita ambos cambios. Cualquier fallo
+revierte todo. Cambiar una fecha existente exige Reprogramar cita y retirarla
+exige Cancelar cita; nunca se reescribe el historial desde el formulario.
+
 La raiz es unica por control de origen, cada cita admite como maximo una hija y
 un indice parcial garantiza una sola cita `programada` por embarazo. Los
 endpoints anidados bajo `/pacientes/:pacienteId/citas` validan tambien
 `embarazo_id`, evitando IDOR. Lectura requiere `pacientes.ver`; reprogramar y
 cancelar requieren `controles.editar`.
 
-El dashboard de siete dias y el endpoint M2M de recordatorio ahora consultan
-`citas_prenatales` programadas sin cumplimiento. El alias `cita_siguiente` se
-conserva en el contrato del dashboard y el contrato de automatizacion no cambia,
-por lo que el workflow n8n existente no fue modificado. La columna historica
-del control tampoco se reescribe al reprogramar o cancelar.
+CITAS-02 reemplaza la tabla limitada a siete dias por un calendario mensual en
+el Dashboard. `GET /api/citas/calendario` requiere `pacientes.ver`, recibe un
+rango inclusivo `from`/`to` de hasta 62 dias y consulta directamente
+`citas_prenatales` en una sola lectura. Incluye los cuatro estados, nombre y
+comunidad minimizados y la fecha de una hija cuando la original fue
+reprogramada. El endpoint M2M de recordatorio conserva su ruta y contrato, por
+lo que los workflows n8n no se modifican.
+
+El frontend implementa la cuadrícula de seis semanas sin dependencia nueva. La
+semana comienza en domingo; `appointmentCalendar.js` valida y separa
+`YYYY-MM-DD` antes de hacer aritmetica numerica UTC, evitando interpretar la
+fecha clinica como timestamp. Cada cambio de mes emite una sola solicitud por el
+rango visual completo; `AbortController` y una identidad monotona impiden que
+una respuesta tardia sobrescriba el mes actual. Tras reprogramar se conserva la
+original como `reprogramada` y se agrega la hija localmente si cae en el rango;
+cancelar cambia la fila a `cancelada`. La columna historica del control nunca se
+reescribe.
+
+En escritorio y tableta se usa una tabla semantica de siete columnas con limite
+visible y control `+N mas`. En movil se muestra un mes compacto y la lista
+completa del dia seleccionado, sin scroll horizontal global. Eventos y leyenda
+combinan icono, texto accesible y estilo; los dialogos aceptan Escape, atrapan el
+foco y lo restauran. Los tokens existentes cubren modos claro y oscuro. La
+lectura requiere `pacientes.ver`; solo `controles.editar` habilita reprogramar o
+cancelar. El calendario no ofrece creacion manual ni drag-and-drop.
+
+No hay backfill de `controles_prenatales.cita_siguiente`. Antes del corte de
+activacion de la migracion 014 y su backend puede existir un mes correctamente
+vacio aunque los controles historicos conserven una proxima fecha.
 
 N8N-OPS-01A sigue pendiente. El modelo ya permite que una consulta futura de la
 semana calendario anterior seleccione exclusivamente citas vencidas que aun

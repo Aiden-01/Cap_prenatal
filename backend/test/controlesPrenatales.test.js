@@ -168,6 +168,18 @@ test('acepta un control prenatal valido', () => {
   assert.equal(controlCreateSchema.safeParse(VALID_CONTROL).success, true);
 });
 
+test('actualizacion conserva NULL explicito de cita para aplicar la regla de cancelacion', () => {
+  assert.deepEqual(controlUpdateSchema.parse({ cita_siguiente: null }), {
+    cita_siguiente: null,
+  });
+  assert.deepEqual(controlUpdateSchema.parse({ cita_siguiente: '' }), {
+    cita_siguiente: null,
+  });
+  assert.deepEqual(controlUpdateSchema.parse({ cita_siguiente: '2026-09-17' }), {
+    cita_siguiente: '2026-09-17',
+  });
+});
+
 test('rechaza numero de control y fecha obligatorios faltantes', () => {
   const result = controlCreateSchema.safeParse({ motivo_consulta: 'Sin datos obligatorios' });
   assert.equal(result.success, false);
@@ -722,6 +734,395 @@ test('actualiza un control existente según los campos enviados', async () => {
   });
 });
 
+test('NULL a fecha actualiza el ultimo control y crea su cita estructurada atomicamente', async () => {
+  const client = { transaction: 'control-appointment-create' };
+  const before = {
+    id: 301,
+    paciente_id: 41,
+    embarazo_id: 91,
+    numero_control: 2,
+    fecha: '2026-06-15',
+    cita_siguiente: null,
+  };
+  const updated = { ...before, cita_siguiente: '2026-09-17', updated_by: ACTOR.usuario.id };
+  const appointment = {
+    id: 701,
+    embarazo_id: 91,
+    control_origen_id: 301,
+    fecha_programada: '2026-09-17',
+    estado: 'programada',
+  };
+  const calls = [];
+
+  await withService({
+    repository: {
+      enTransaccion: async (operation) => operation(client),
+      obtenerPorId: async (_id, db, options) => {
+        calls.push(['control', db, options]);
+        return before;
+      },
+      existeControlPosterior: async (args, db) => {
+        calls.push(['posterior', args, db]);
+        return false;
+      },
+      actualizar: async (args, db) => {
+        calls.push(['actualizar', args, db]);
+        return updated;
+      },
+    },
+    appointments: {
+      obtenerOriginadaPorControl: async (args, db, options) => {
+        calls.push(['origen', args, db, options]);
+        return null;
+      },
+      listarProgramadasVigentesPorEmbarazo: async (embarazoId, db, options) => {
+        calls.push(['vigentes', embarazoId, db, options]);
+        return [];
+      },
+      crearProgramadaDesdeControl: async (args, db) => {
+        calls.push(['crear-cita', args, db]);
+        return appointment;
+      },
+    },
+    pregnancies: {
+      validarEmbarazoEditable: async (args) => {
+        calls.push(['embarazo', args]);
+        return { id: 91, paciente_id: 41, estado: 'activo' };
+      },
+    },
+    audit: async (_req, event, options) => calls.push(['auditoria', event, options]),
+  }, async (service) => {
+    assert.equal(await service.actualizarControl({
+      pacienteId: 41,
+      embarazoId: 91,
+      id: 301,
+      body: { cita_siguiente: '2026-09-17' },
+      req: ACTOR,
+    }), updated);
+  });
+
+  const updateCall = calls.find(([name]) => name === 'actualizar');
+  assert.deepEqual(updateCall[1].data, { cita_siguiente: '2026-09-17' });
+  assert.equal(updateCall[2], client);
+  const appointmentCall = calls.find(([name]) => name === 'crear-cita');
+  assert.deepEqual(appointmentCall[1], {
+    embarazoId: 91,
+    controlOrigenId: 301,
+    fechaProgramada: '2026-09-17',
+    usuarioId: ACTOR.usuario.id,
+  });
+  assert.equal(appointmentCall[2], client);
+  const auditCalls = calls.filter(([name]) => name === 'auditoria');
+  assert.equal(auditCalls.length, 2);
+  assert.deepEqual(auditCalls.map(([, event]) => event.contexto), [
+    { categoria: 'clinica', entidad: 'control_prenatal', evento: 'actualizar' },
+    { categoria: 'clinica', entidad: 'cita_prenatal', evento: 'crear' },
+  ]);
+  assert.ok(auditCalls.every(([, , options]) => options.db === client && options.obligatorio));
+});
+
+test('retry equivalente de NULL a fecha no duplica la cita estructurada', async () => {
+  let state = {
+    id: 301,
+    paciente_id: 41,
+    embarazo_id: 91,
+    numero_control: 2,
+    fecha: '2026-06-15',
+    cita_siguiente: null,
+  };
+  let updates = 0;
+  let appointments = 0;
+  let audits = 0;
+
+  await withService({
+    repository: {
+      obtenerPorId: async () => state,
+      existeControlPosterior: async () => false,
+      actualizar: async ({ data }) => {
+        updates += 1;
+        state = { ...state, ...data };
+        return state;
+      },
+    },
+    appointments: {
+      obtenerOriginadaPorControl: async () => null,
+      listarProgramadasVigentesPorEmbarazo: async () => [],
+      crearProgramadaDesdeControl: async () => {
+        appointments += 1;
+        return {
+          id: 701,
+          embarazo_id: 91,
+          control_origen_id: 301,
+          fecha_programada: state.cita_siguiente,
+          estado: 'programada',
+        };
+      },
+    },
+    pregnancies: {
+      validarEmbarazoEditable: async () => ({ id: 91, paciente_id: 41, estado: 'activo' }),
+    },
+    audit: async () => { audits += 1; },
+  }, async (service) => {
+    const request = {
+      pacienteId: 41,
+      embarazoId: 91,
+      id: 301,
+      body: { cita_siguiente: '2026-09-17' },
+      req: ACTOR,
+    };
+    await service.actualizarControl(request);
+    await service.actualizarControl(request);
+  });
+
+  assert.equal(updates, 1);
+  assert.equal(appointments, 1);
+  assert.equal(audits, 2);
+});
+
+test('NULL a fecha rechaza un control con controles prenatales posteriores', async () => {
+  const before = {
+    id: 301,
+    paciente_id: 41,
+    embarazo_id: 91,
+    numero_control: 2,
+    fecha: '2026-06-15',
+    cita_siguiente: null,
+  };
+  let writes = 0;
+
+  await withService({
+    repository: {
+      obtenerPorId: async () => before,
+      existeControlPosterior: async () => true,
+      actualizar: async () => { writes += 1; },
+    },
+    pregnancies: {
+      validarEmbarazoEditable: async () => ({ id: 91, paciente_id: 41, estado: 'activo' }),
+    },
+  }, async (service) => {
+    await assert.rejects(
+      service.actualizarControl({
+        pacienteId: 41,
+        embarazoId: 91,
+        id: 301,
+        body: { cita_siguiente: '2026-09-17' },
+        req: ACTOR,
+      }),
+      (error) => error.statusCode === 409 && error.code === 'CITA_CONTROL_NO_ES_ULTIMO'
+    );
+  });
+
+  assert.equal(writes, 0);
+});
+
+test('NULL a fecha rechaza otra cita programada vigente para el embarazo', async () => {
+  const before = {
+    id: 301,
+    paciente_id: 41,
+    embarazo_id: 91,
+    numero_control: 2,
+    fecha: '2026-06-15',
+    cita_siguiente: null,
+  };
+  let writes = 0;
+
+  await withService({
+    repository: {
+      obtenerPorId: async () => before,
+      existeControlPosterior: async () => false,
+      actualizar: async () => { writes += 1; },
+    },
+    appointments: {
+      obtenerOriginadaPorControl: async () => null,
+      listarProgramadasVigentesPorEmbarazo: async () => [{ id: 700, estado: 'programada' }],
+    },
+    pregnancies: {
+      validarEmbarazoEditable: async () => ({ id: 91, paciente_id: 41, estado: 'activo' }),
+    },
+  }, async (service) => {
+    await assert.rejects(
+      service.actualizarControl({
+        pacienteId: 41,
+        embarazoId: 91,
+        id: 301,
+        body: { cita_siguiente: '2026-09-17' },
+        req: ACTOR,
+      }),
+      (error) => error.statusCode === 409 && error.code === 'CITA_PROGRAMADA_VIGENTE'
+    );
+  });
+
+  assert.equal(writes, 0);
+});
+
+test('NULL a fecha rechaza una cita estructurada ya originada por el control', async () => {
+  const before = {
+    id: 301,
+    paciente_id: 41,
+    embarazo_id: 91,
+    numero_control: 2,
+    fecha: '2026-06-15',
+    cita_siguiente: null,
+  };
+  let writes = 0;
+
+  await withService({
+    repository: {
+      obtenerPorId: async () => before,
+      existeControlPosterior: async () => false,
+      actualizar: async () => { writes += 1; },
+    },
+    appointments: {
+      obtenerOriginadaPorControl: async () => ({ id: 701, control_origen_id: 301 }),
+    },
+    pregnancies: {
+      validarEmbarazoEditable: async () => ({ id: 91, paciente_id: 41, estado: 'activo' }),
+    },
+  }, async (service) => {
+    await assert.rejects(
+      service.actualizarControl({
+        pacienteId: 41,
+        embarazoId: 91,
+        id: 301,
+        body: { cita_siguiente: '2026-09-17' },
+        req: ACTOR,
+      }),
+      (error) => error.statusCode === 409 && error.code === 'CITA_CONTROL_ORIGEN_EXISTENTE'
+    );
+  });
+
+  assert.equal(writes, 0);
+});
+
+test('fecha a NULL sigue exigiendo cancelar la cita estructurada', async () => {
+  const before = {
+    id: 301,
+    paciente_id: 41,
+    embarazo_id: 91,
+    numero_control: 2,
+    fecha: '2026-06-15',
+    cita_siguiente: '2026-09-17',
+  };
+  let writes = 0;
+
+  await withService({
+    repository: {
+      obtenerPorId: async () => before,
+      actualizar: async () => { writes += 1; },
+    },
+    pregnancies: {
+      validarEmbarazoEditable: async () => ({ id: 91, paciente_id: 41, estado: 'activo' }),
+    },
+  }, async (service) => {
+    await assert.rejects(
+      service.actualizarControl({
+        pacienteId: 41,
+        embarazoId: 91,
+        id: 301,
+        body: { cita_siguiente: null },
+        req: ACTOR,
+      }),
+      (error) => error.statusCode === 409 && error.code === 'CITA_CANCELACION_REQUERIDA'
+    );
+  });
+
+  assert.equal(writes, 0);
+});
+
+test('fallo al crear la cita revierte el cambio NULL a fecha', async () => {
+  const original = {
+    id: 301,
+    paciente_id: 41,
+    embarazo_id: 91,
+    numero_control: 2,
+    fecha: '2026-06-15',
+    cita_siguiente: null,
+  };
+  let state = { ...original };
+  let rolledBack = false;
+  let audits = 0;
+
+  await withService({
+    repository: {
+      enTransaccion: async (operation) => {
+        try {
+          return await operation({ transaction: 'appointment-create-rollback' });
+        } catch (error) {
+          state = { ...original };
+          rolledBack = true;
+          throw error;
+        }
+      },
+      obtenerPorId: async () => state,
+      existeControlPosterior: async () => false,
+      actualizar: async ({ data }) => {
+        state = { ...state, ...data };
+        return state;
+      },
+    },
+    appointments: {
+      obtenerOriginadaPorControl: async () => null,
+      listarProgramadasVigentesPorEmbarazo: async () => [],
+      crearProgramadaDesdeControl: async () => {
+        throw new Error('appointment insert failed');
+      },
+    },
+    pregnancies: {
+      validarEmbarazoEditable: async () => ({ id: 91, paciente_id: 41, estado: 'activo' }),
+    },
+    audit: async () => { audits += 1; },
+  }, async (service) => {
+    await assert.rejects(
+      service.actualizarControl({
+        pacienteId: 41,
+        embarazoId: 91,
+        id: 301,
+        body: { cita_siguiente: '2026-09-17' },
+        req: ACTOR,
+      }),
+      /appointment insert failed/
+    );
+  });
+
+  assert.equal(rolledBack, true);
+  assert.deepEqual(state, original);
+  assert.equal(audits, 0);
+});
+
+test('NULL a fecha mantiene aislamiento por paciente y embarazo antes de crear cita', async () => {
+  const wrongPregnancyControl = {
+    id: 301,
+    paciente_id: 41,
+    embarazo_id: 92,
+    numero_control: 2,
+    fecha: '2026-06-15',
+    cita_siguiente: null,
+  };
+  let appointmentCalls = 0;
+
+  await withService({
+    repository: {
+      obtenerPorId: async () => wrongPregnancyControl,
+    },
+    appointments: {
+      crearProgramadaDesdeControl: async () => { appointmentCalls += 1; },
+    },
+  }, async (service) => {
+    await assert.rejects(
+      service.actualizarControl({
+        pacienteId: 41,
+        embarazoId: 91,
+        id: 301,
+        body: { cita_siguiente: '2026-09-17' },
+        req: ACTOR,
+      }),
+      (error) => error.statusCode === 404
+    );
+  });
+
+  assert.equal(appointmentCalls, 0);
+});
+
 test('elimina un control existente según la regla actual', async () => {
   const before = { id: 301, paciente_id: 41, embarazo_id: 91 };
   let deleteArgs;
@@ -991,6 +1392,39 @@ test('el repositorio mantiene bloqueo, validacion y upsert en una sola sentencia
   assert.match(calls[0].sql, /FOR UPDATE/);
   assert.match(calls[0].sql, /INSERT INTO controles_prenatales/);
   assert.match(calls[0].sql, /ON CONFLICT \(embarazo_id, numero_control\) DO UPDATE/);
+});
+
+test('el repositorio bloquea el control y detecta controles posteriores del mismo embarazo', async () => {
+  const calls = [];
+  const pool = {
+    query: async (sql, params) => {
+      calls.push({ sql, params });
+      if (/SELECT EXISTS/.test(sql)) return { rows: [{ existe: true }] };
+      return { rows: [{ id: 301, embarazo_id: 91 }] };
+    },
+  };
+
+  await withRepositoryPool(pool, async (repository) => {
+    const control = await repository.obtenerPorId(301, pool, { bloquear: true });
+    const existePosterior = await repository.existeControlPosterior({
+      embarazoId: 91,
+      controlId: 301,
+      numeroControl: 2,
+      fecha: '2026-06-15',
+    }, pool);
+
+    assert.equal(control.id, 301);
+    assert.equal(existePosterior, true);
+  });
+
+  assert.equal(calls.length, 2);
+  assert.match(calls[0].sql, /FROM controles_prenatales/);
+  assert.match(calls[0].sql, /FOR UPDATE/);
+  assert.deepEqual(calls[0].params, [301]);
+  assert.match(calls[1].sql, /embarazo_id = \$1/);
+  assert.match(calls[1].sql, /numero_control > \$3/);
+  assert.match(calls[1].sql, /fecha > \$4/);
+  assert.deepEqual(calls[1].params, [91, 301, 2, '2026-06-15']);
 });
 
 test('confirma el orden y la revalidacion frente a una carrera concurrente', async () => {

@@ -69,6 +69,61 @@ async function obtenerPorIdYEmbarazo(id, embarazoId, db = pool, { bloquear = fal
   return rows[0] || null;
 }
 
+async function listarCalendarioPorRango({ desde, hasta }, db = pool) {
+  const { rows = [] } = await db.query(
+    `SELECT
+       cp.id::text AS id,
+       TO_CHAR(cp.fecha_programada, 'YYYY-MM-DD') AS date,
+       cp.estado AS status,
+       p.id AS patient_id,
+       cp.embarazo_id AS pregnancy_id,
+       TRIM(CONCAT_WS(' ', p.nombres, p.apellidos)) AS patient_name,
+       NULLIF(BTRIM(COALESCE(com.nombre, p.comunidad, '')), '') AS community,
+       TO_CHAR(hija.fecha_programada, 'YYYY-MM-DD') AS rescheduled_to,
+       (
+         cp.estado = 'programada'
+         AND cp.control_cumplimiento_id IS NULL
+         AND e.estado IN ('activo', 'puerperio')
+       ) AS editable
+     FROM citas_prenatales cp
+     JOIN embarazos e
+       ON e.id = cp.embarazo_id
+     JOIN pacientes p
+       ON p.id = e.paciente_id
+     LEFT JOIN comunidades com
+       ON com.id = p.comunidad_id
+     LEFT JOIN citas_prenatales hija
+       ON hija.reprogramada_desde_id = cp.id
+      AND hija.embarazo_id = cp.embarazo_id
+     WHERE cp.fecha_programada BETWEEN $1::date AND $2::date
+     ORDER BY
+       cp.fecha_programada ASC,
+       LOWER(p.apellidos) ASC,
+       LOWER(p.nombres) ASC,
+       cp.id ASC`,
+    [desde, hasta]
+  );
+  return rows;
+}
+
+async function obtenerOriginadaPorControl(
+  { controlId, embarazoId },
+  db = pool,
+  { bloquear = false } = {}
+) {
+  const { rows = [] } = await db.query(
+    `SELECT *
+     FROM citas_prenatales
+     WHERE control_origen_id = $1
+       AND embarazo_id = $2
+       AND reprogramada_desde_id IS NULL
+     ORDER BY id ASC
+     LIMIT 1${bloquear ? '\n     FOR UPDATE' : ''}`,
+    [controlId, embarazoId]
+  );
+  return rows[0] || null;
+}
+
 async function marcarAtendida({ citaId, embarazoId, controlCumplimientoId, usuarioId }, db = pool) {
   const { rows = [] } = await db.query(
     `UPDATE citas_prenatales
@@ -173,9 +228,11 @@ module.exports = {
   crearProgramadaDesdeControl,
   enTransaccion,
   existeRelacionConControl,
+  listarCalendarioPorRango,
   listarProgramadasVigentesPorEmbarazo,
   marcarAtendida,
   marcarCancelada,
   marcarReprogramada,
+  obtenerOriginadaPorControl,
   obtenerPorIdYEmbarazo,
 };

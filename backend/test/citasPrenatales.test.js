@@ -107,19 +107,17 @@ test('indices cubren seguimiento por estado-fecha y consulta por embarazo', () =
   assert.doesNotMatch(sql, /CREATE\s+INDEX[\s\S]*\(estado\)\s*;/i);
 });
 
-test('dashboard y automatizacion migran a citas prenatales sin usar cita_siguiente como fuente', () => {
-  const reportRepository = fs.readFileSync(
-    path.resolve(__dirname, '../src/repositories/reportesRepository.js'),
+test('calendario y automatizacion leen citas_prenatales sin usar cita_siguiente como fuente', () => {
+  const citasRepository = fs.readFileSync(
+    path.resolve(__dirname, '../src/repositories/citasPrenatalesRepository.js'),
     'utf8'
   );
   const automationRepository = fs.readFileSync(
     path.resolve(__dirname, '../src/repositories/automatizacionesRepository.js'),
     'utf8'
   );
-  for (const source of [reportRepository, automationRepository]) {
+  for (const source of [citasRepository, automationRepository]) {
     assert.match(source, /FROM citas_prenatales cp/);
-    assert.match(source, /cp\.estado = 'programada'/);
-    assert.match(source, /cp\.control_cumplimiento_id IS NULL/);
     assert.doesNotMatch(source, /lc\.cita_siguiente|ROW_NUMBER\(\)[\s\S]*cita_siguiente/);
   }
 });
@@ -222,6 +220,33 @@ test('repositorio detecta cualquier relacion de una cita con el control', async 
   assert.deepEqual(captured.params, [302, 91]);
   assert.match(captured.sql, /control_origen_id = \$1 OR control_cumplimiento_id = \$1/);
   assert.match(captured.sql, /embarazo_id = \$2/);
+});
+
+test('repositorio localiza la cita raiz del control y permite bloquearla', async () => {
+  let captured;
+  const pool = {
+    async query(sql, params) {
+      captured = { sql, params };
+      return { rows: [{ id: 701, estado: 'programada', control_origen_id: 302 }] };
+    },
+  };
+
+  await withRepository(pool, async (repository) => {
+    assert.deepEqual(await repository.obtenerOriginadaPorControl({
+      controlId: 302,
+      embarazoId: 91,
+    }, pool, { bloquear: true }), {
+      id: 701,
+      estado: 'programada',
+      control_origen_id: 302,
+    });
+  });
+
+  assert.deepEqual(captured.params, [302, 91]);
+  assert.match(captured.sql, /control_origen_id = \$1/);
+  assert.match(captured.sql, /embarazo_id = \$2/);
+  assert.match(captured.sql, /reprogramada_desde_id IS NULL/);
+  assert.match(captured.sql, /FOR UPDATE/);
 });
 
 test('repositorio resuelve solo la cita programada sin cumplimiento y permite bloquearla', async () => {
