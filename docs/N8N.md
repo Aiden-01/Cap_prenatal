@@ -29,6 +29,7 @@ paneles externos durante esta sesión.
 | `capCenso2625V1A1` | Censo 26 a 25 | Día 26, 06:00 | Envía aviso sin archivo | Resend, XLSX si hay datos |
 | `capCensoMesV1A1` | Censo de mes cerrado | Día 3, 06:00 | Envía aviso sin archivo | Resend, XLSX si hay datos |
 | `JJylxJ7YxtprYjDZ` | Seguimiento semanal de inasistencias | Lunes 08:00 | Termina sin enviar | Resend, tabla HTML |
+| `yVwDfliCVeeOOg1F` | Watchdog semanal de calidad de datos | Lunes 09:00 | Termina sin enviar | Resend, resumen agregado |
 
 Todos usan `America/Guatemala`. Activar un workflow es una decisión operativa
 separada de importarlo o probar nodos individuales.
@@ -283,6 +284,77 @@ Resolución manual de una reserva ambigua:
 No se reintenta automáticamente después de un timeout de Resend. Primero se
 consulta el evento del proveedor y luego se resuelve con evidencia.
 
+### Watchdog semanal de calidad de datos (`N8N-OPS-01B`)
+
+El watchdog calcula en CAP Prenatal la semana calendario anterior completa y
+se propone para los lunes a las 09:00 en `America/Guatemala`. Su primera
+versión incluye únicamente invariantes objetivas ya respaldadas por el modelo,
+las restricciones y las validaciones del backend:
+
+- campos obligatorios de identificación de paciente vacíos;
+- registros prenatales que requieren embarazo y no tienen esa relación;
+- relaciones paciente-embarazo contradictorias;
+- más de un embarazo abierto (`activo` o `puerperio`) para la misma paciente;
+- controles prenatales con fecha posterior al día operativo;
+- citas aún `programada` dentro de embarazos cerrados.
+
+Una vacuna con momento `previo_embarazo` sin `embarazo_id` es válida y no se
+reporta. Tampoco se infieren errores desde FUR, FPP, edad gestacional, riesgo,
+vacunas, laboratorios, diagnósticos o reglas clínicas. La comunidad histórica
+sin `comunidad_id` se conserva como compatibilidad explícita del sistema y no
+se marca como incidencia. Esas posibles ampliaciones quedan como mejoras
+futuras hasta contar con una regla canónica objetiva.
+
+Rutas M2M privadas:
+
+```text
+POST /api/automatizaciones/v1/calidad-datos/preparar
+POST /api/automatizaciones/v1/calidad-datos/confirmar
+POST /api/automatizaciones/v1/calidad-datos/resolver
+```
+
+`preparar` no acepta parámetros: el backend fija período y fecha de corte.
+Contrato sintético de una preparación con incidencias:
+
+```json
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-31T15:00:00.000Z",
+  "timezone": "America/Guatemala",
+  "report_type": "weekly_data_quality_watchdog",
+  "range": { "from": "2026-08-24", "to": "2026-08-30" },
+  "as_of": "2026-08-31",
+  "dispatch": { "status": "ready", "token": "<token efimero>" },
+  "total": 3,
+  "categories": [
+    {
+      "code": "future_prenatal_control",
+      "label": "Controles prenatales con fecha futura",
+      "description": "Hay controles con una fecha posterior al dia operativo actual.",
+      "count": 3
+    }
+  ],
+  "secure_path": "/dashboard"
+}
+```
+
+La respuesta y el correo son agregados: no contienen filas, identificadores,
+nombres, CUI, expedientes, teléfonos, direcciones ni información clínica.
+`no_results` y `already_processed` devuelven total cero, categorías vacías y
+ningún token; ambos terminan sin correo. `ready` reserva el tipo
+`weekly_data_quality_watchdog` y el período en
+`automatizacion_despachos`. Tras la aceptación de Resend, n8n confirma con:
+
+```json
+{ "dispatch_token": "<token efimero recibido en preparar>" }
+```
+
+Una reserva pendiente produce `409 AUTOMATION_DISPATCH_UNCERTAIN` y no debe
+reintentarse automáticamente. Después de comprobar Resend, la recuperación
+manual usa el mismo par coherente resolución/motivo que las otras
+automatizaciones y la confirmación literal
+`REINTENTAR_WATCHDOG_CALIDAD_DATOS`.
+
 ### Citas de mañana
 
 ```text
@@ -420,6 +492,29 @@ debe entregar `binary.data.data` directamente a `n8n-nodes-resend 2.8.0`: en
 esta combinación de versiones ese campo es un localizador interno
 `filesystem-v2:...`, no el contenido del archivo.
 
+## Workflow semanal de calidad de datos
+
+Archivo: `n8n/workflows/watchdog-calidad-datos-resend-v1.json`.
+
+```text
+Schedule lunes 09:00
+    -> POST preparar semana anterior
+    -> validar contrato agregado
+    -> ¿dispatch=ready y total>0?
+       ├─ no: fin, ningún correo
+       └─ sí: construir resumen de categorías
+              -> Resend
+              -> POST confirmar despacho
+```
+
+n8n no ejecuta SQL, no decide qué constituye una inconsistencia y no recibe
+filas nominales. El asunto es `CAP Prenatal | Revisión semanal de calidad de
+datos`; el período se muestra en `DD-MM-YYYY` y cada fila del correo contiene
+solo categoría, cantidad y descripción operativa. Una API no disponible,
+timeout, contrato inesperado, `401`, `409` o error de Resend deja la
+ejecución fallida y nunca se presenta como “cero incidencias”. La confirmación
+solo está conectada después de Resend y no hay reintentos automáticos.
+
 ## Workflows mensuales del censo
 
 ### Mes logístico 26 a 25
@@ -456,7 +551,7 @@ archivo del repositorio.
 
 ## Persistencia, retención y privacidad
 
-Los cinco JSON Resend fijan:
+Los seis JSON Resend fijan:
 
 ```text
 saveDataSuccessExecution=none
@@ -481,7 +576,7 @@ No copiar a Git:
 
 ## Resend y artefacto SMTP heredado
 
-Los cinco workflows Resend utilizan `n8n-nodes-resend.resend`. El archivo
+Los seis workflows Resend utilizan `n8n-nodes-resend.resend`. El archivo
 `n8n/workflows/proximas-citas-v1.json` conserva un diseño endurecido de 40
 nodos con `n8n-nodes-base.emailSend`; no está cargado en la instancia local y
 no es el camino operativo actual. Se mantiene como artefacto heredado cubierto
@@ -526,6 +621,8 @@ node --test backend/test/n8nMissedAppointmentsWorkflow.test.js
 node --test backend/test/inasistenciasSemanales.test.js
 node --test backend/test/seguimientoTdap.test.js
 node --test backend/test/n8nTdapWorkflow.test.js
+node --test backend/test/calidadDatos.test.js
+node --test backend/test/n8nDataQualityWorkflow.test.js
 node --test backend/test/automatizaciones.test.js
 ```
 

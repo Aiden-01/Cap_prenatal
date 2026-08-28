@@ -12,7 +12,41 @@ const {
 const AUTOMATION_TIMEZONE = 'America/Guatemala';
 const MISSED_APPOINTMENTS_TYPE = 'inasistencias_semanales';
 const TDAP_FOLLOWUP_TYPE = 'seguimiento_tdap_el_chal';
+const DATA_QUALITY_WATCHDOG_TYPE = 'weekly_data_quality_watchdog';
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+const DATA_QUALITY_CATEGORY_CATALOG = Object.freeze([
+  Object.freeze({
+    code: 'patient_required_identity_missing',
+    label: 'Identificacion obligatoria de paciente incompleta',
+    description: 'Hay registros con campos obligatorios de identificacion vacios.',
+  }),
+  Object.freeze({
+    code: 'pregnancy_link_missing',
+    label: 'Registros prenatales sin embarazo asociado',
+    description: 'Hay registros que requieren embarazo y no tienen una relacion asociada.',
+  }),
+  Object.freeze({
+    code: 'pregnancy_patient_mismatch',
+    label: 'Relaciones paciente-embarazo inconsistentes',
+    description: 'Hay registros cuyo paciente no coincide con el embarazo relacionado.',
+  }),
+  Object.freeze({
+    code: 'concurrent_open_pregnancies',
+    label: 'Estados de embarazo incompatibles',
+    description: 'Hay pacientes con mas de un embarazo activo o en puerperio.',
+  }),
+  Object.freeze({
+    code: 'future_prenatal_control',
+    label: 'Controles prenatales con fecha futura',
+    description: 'Hay controles con una fecha posterior al dia operativo actual.',
+  }),
+  Object.freeze({
+    code: 'scheduled_appointment_closed_pregnancy',
+    label: 'Citas programadas en embarazos cerrados',
+    description: 'Hay citas aun programadas dentro de embarazos cerrados.',
+  }),
+]);
 
 function dateOnly(value) {
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
@@ -283,6 +317,48 @@ function tdapDispatchResponse({
         : null,
     },
     dispatch: token ? { status, token } : { status },
+  };
+}
+
+function normalizeDataQualityCategories(rows) {
+  if (!Array.isArray(rows)) throw new TypeError('Resultado de calidad de datos invalido');
+  const byCode = new Map();
+  for (const row of rows) {
+    if (!row || typeof row.codigo !== 'string' || byCode.has(row.codigo)) {
+      throw new TypeError('Categorias de calidad de datos invalidas');
+    }
+    byCode.set(row.codigo, appointmentCount(row.total));
+  }
+  if (byCode.size !== DATA_QUALITY_CATEGORY_CATALOG.length
+    || DATA_QUALITY_CATEGORY_CATALOG.some(({ code }) => !byCode.has(code))) {
+    throw new TypeError('Catalogo de calidad de datos incompleto');
+  }
+  return DATA_QUALITY_CATEGORY_CATALOG
+    .map((category) => ({ ...category, count: byCode.get(category.code) }))
+    .filter(({ count }) => count > 0);
+}
+
+function dataQualityDispatchResponse({
+  generatedAt,
+  period,
+  asOf,
+  status,
+  token,
+  categories = [],
+  timezone = AUTOMATION_TIMEZONE,
+}) {
+  const total = categories.reduce((sum, category) => sum + category.count, 0);
+  return {
+    schema_version: 1,
+    generated_at: generatedAt,
+    timezone,
+    report_type: DATA_QUALITY_WATCHDOG_TYPE,
+    range: { from: period.desde, to: period.hasta },
+    as_of: asOf,
+    dispatch: token ? { status, token } : { status },
+    total,
+    categories,
+    secure_path: '/dashboard',
   };
 }
 
@@ -798,7 +874,182 @@ function createAutomatizacionesService({
     });
   }
 
+  async function obtenerReporteCalidadDatos(queryable) {
+    return normalizeDataQualityCategories(
+      await repository.obtenerResumenCalidadDatos(queryable)
+    );
+  }
+
+  function alreadyProcessedDataQualityResponse(period) {
+    return dataQualityDispatchResponse({
+      generatedAt: now().toISOString(),
+      period,
+      asOf: addIsoDays(period.hasta, 1),
+      status: 'already_processed',
+      categories: [],
+      timezone,
+    });
+  }
+
+  async function prepararWatchdogCalidadDatos() {
+    const period = previousCalendarWeek(now(), timezone);
+    const asOf = addIsoDays(period.hasta, 1);
+    return repository.enTransaccion(async (client) => {
+      let existing = await repository.obtenerDespacho({
+        tipo: DATA_QUALITY_WATCHDOG_TYPE,
+        ...period,
+      }, client, { bloquear: true });
+
+      if (existing && ['enviado', 'sin_resultados'].includes(existing.estado)) {
+        return alreadyProcessedDataQualityResponse(period);
+      }
+      if (existing?.estado === 'reservado') {
+        throw new AppError(
+          409,
+          'El despacho de calidad de datos requiere revision antes de reintentarse',
+          { code: 'AUTOMATION_DISPATCH_UNCERTAIN' }
+        );
+      }
+
+      const categories = await obtenerReporteCalidadDatos(client);
+      const total = categories.reduce((sum, category) => sum + category.count, 0);
+      if (total === 0) {
+        if (existing?.estado === 'reintento_autorizado') {
+          await repository.marcarDespachoSinResultados({ despachoId: existing.id }, client);
+        } else {
+          const inserted = await repository.crearDespacho({
+            tipo: DATA_QUALITY_WATCHDOG_TYPE,
+            ...period,
+            estado: 'sin_resultados',
+            total: 0,
+          }, client);
+          if (!inserted) {
+            existing = await repository.obtenerDespacho({
+              tipo: DATA_QUALITY_WATCHDOG_TYPE,
+              ...period,
+            }, client, { bloquear: true });
+            if (existing) return alreadyProcessedDataQualityResponse(period);
+            throw new TypeError('No se pudo registrar el periodo sin incidencias');
+          }
+        }
+        return dataQualityDispatchResponse({
+          generatedAt: now().toISOString(),
+          period,
+          asOf,
+          status: 'no_results',
+          categories: [],
+          timezone,
+        });
+      }
+
+      const token = createDispatchToken();
+      const hash = tokenHash(token);
+      if (existing?.estado === 'reintento_autorizado') {
+        const renewed = await repository.renovarDespacho({
+          despachoId: existing.id,
+          tokenHash: hash,
+          total,
+        }, client);
+        if (!renewed) throw new TypeError('No se pudo reservar el reintento de calidad');
+      } else {
+        const inserted = await repository.crearDespacho({
+          tipo: DATA_QUALITY_WATCHDOG_TYPE,
+          ...period,
+          estado: 'reservado',
+          tokenHash: hash,
+          total,
+        }, client);
+        if (!inserted) {
+          existing = await repository.obtenerDespacho({
+            tipo: DATA_QUALITY_WATCHDOG_TYPE,
+            ...period,
+          }, client, { bloquear: true });
+          if (existing?.estado === 'reservado') {
+            throw new AppError(
+              409,
+              'El despacho de calidad de datos requiere revision antes de reintentarse',
+              { code: 'AUTOMATION_DISPATCH_UNCERTAIN' }
+            );
+          }
+          return alreadyProcessedDataQualityResponse(period);
+        }
+      }
+
+      return dataQualityDispatchResponse({
+        generatedAt: now().toISOString(),
+        period,
+        asOf,
+        status: 'ready',
+        token,
+        categories,
+        timezone,
+      });
+    });
+  }
+
+  async function confirmarWatchdogCalidadDatos({ dispatchToken }) {
+    const hash = tokenHash(dispatchToken);
+    return repository.enTransaccion(async (client) => {
+      const dispatch = await repository.obtenerDespachoPorTokenHash({
+        tipo: DATA_QUALITY_WATCHDOG_TYPE,
+        tokenHash: hash,
+      }, client, { bloquear: true });
+      if (!dispatch || !['reservado', 'enviado'].includes(dispatch.estado)) {
+        throw new AppError(409, 'El despacho de calidad no puede confirmarse', {
+          code: 'AUTOMATION_DISPATCH_CONFIRMATION_INVALID',
+        });
+      }
+      const idempotent = dispatch.estado === 'enviado';
+      const sent = idempotent
+        ? dispatch
+        : await repository.marcarDespachoEnviado({ despachoId: dispatch.id }, client);
+      if (!sent) throw new TypeError('No se pudo confirmar el despacho de calidad');
+      return {
+        schema_version: 1,
+        report_type: DATA_QUALITY_WATCHDOG_TYPE,
+        dispatch: { status: 'sent', idempotent },
+      };
+    });
+  }
+
+  async function resolverWatchdogCalidadDatos({ desde, hasta, resolucion, motivoCodigo }) {
+    const period = validateCompletedCalendarWeek({ desde, hasta }, { now: now(), timezone });
+    const expectedReason = resolucion === 'enviado'
+      ? 'entrega_confirmada_en_resend'
+      : 'entrega_no_realizada_confirmada';
+    if (motivoCodigo !== expectedReason) {
+      throw new AppError(400, 'La resolucion de calidad y el motivo no coinciden', {
+        code: 'AUTOMATION_INVALID_DISPATCH_RESOLUTION',
+      });
+    }
+    return repository.enTransaccion(async (client) => {
+      const dispatch = await repository.obtenerDespacho({
+        tipo: DATA_QUALITY_WATCHDOG_TYPE,
+        ...period,
+      }, client, { bloquear: true });
+      if (!dispatch || dispatch.estado !== 'reservado') {
+        throw new AppError(409, 'El despacho de calidad no admite resolucion manual', {
+          code: 'AUTOMATION_DISPATCH_RESOLUTION_INVALID',
+        });
+      }
+      const estado = resolucion === 'enviado' ? 'enviado' : 'reintento_autorizado';
+      const updated = await repository.resolverDespacho({
+        despachoId: dispatch.id,
+        estado,
+        motivoCodigo,
+      }, client);
+      if (!updated) throw new TypeError('No se pudo resolver el despacho de calidad');
+      return {
+        schema_version: 1,
+        report_type: DATA_QUALITY_WATCHDOG_TYPE,
+        range: { from: desde, to: hasta },
+        dispatch: { status: estado },
+      };
+    });
+  }
+
   return {
+    confirmarWatchdogCalidadDatos,
     confirmarDespachoInasistencias,
     confirmarDespachoTdap,
     consultarInasistenciasSemanales,
@@ -808,8 +1059,10 @@ function createAutomatizacionesService({
     generarSeguimientoTdapExcel,
     prepararDespachoInasistencias,
     prepararDespachoTdap,
+    prepararWatchdogCalidadDatos,
     resolverDespachoInasistencias,
     resolverDespachoTdap,
+    resolverWatchdogCalidadDatos,
   };
 }
 
@@ -817,6 +1070,8 @@ const service = createAutomatizacionesService();
 
 module.exports = {
   AUTOMATION_TIMEZONE,
+  DATA_QUALITY_CATEGORY_CATALOG,
+  DATA_QUALITY_WATCHDOG_TYPE,
   MISSED_APPOINTMENTS_TYPE,
   TDAP_FOLLOWUP_TYPE,
   ...service,
@@ -827,8 +1082,10 @@ module.exports = {
   createAutomatizacionesService,
   createTdapDispatchToken,
   dateOnly,
+  dataQualityDispatchResponse,
   dispatchResponse,
   normalizeMissedAppointments,
+  normalizeDataQualityCategories,
   operationalText,
   previousCalendarWeek,
   snapshotMatchesToken,

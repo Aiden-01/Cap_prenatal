@@ -7,6 +7,7 @@ const {
 } = require('../utils/ipAllowlist');
 const {
   automationCensusPeriodQuerySchema,
+  automationDataQualityDispatchResolutionSchema,
   automationDispatchConfirmationSchema,
   automationDispatchResolutionSchema,
   automationDispatchTokenSchema,
@@ -191,10 +192,19 @@ function createAutomationTdapDispatchResolutionMiddleware() {
   });
 }
 
+function createAutomationDataQualityDispatchResolutionMiddleware() {
+  return parseAutomationRequest(automationDataQualityDispatchResolutionSchema, 'body', {
+    code: 'AUTOMATION_INVALID_DISPATCH_RESOLUTION',
+    message: 'Resolucion manual de calidad de datos invalida',
+    target: 'automationDispatchResolution',
+  });
+}
+
 module.exports = {
   AUTOMATION_KEY_PATTERN,
   automationUnauthorized,
   candidateHash,
+  createAutomationDataQualityDispatchResolutionMiddleware,
   createAutomationAuthentication,
   createAutomationCensusPeriodMiddleware,
   createAutomationDispatchConfirmationMiddleware,

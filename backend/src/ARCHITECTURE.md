@@ -137,6 +137,15 @@ conteos y un token efimero. El XLSX de dos hojas se
 genera en memoria y exige una huella del mismo snapshot, sin persistir nombres,
 comunidades ni contenido del archivo en la tabla tecnica.
 
+`N8N-OPS-01B` reutiliza la misma frontera M2M y la tabla
+`automatizacion_despachos` con el tipo `weekly_data_quality_watchdog`. El
+repositorio evalua invariantes estructurales objetivas y el servicio expone
+solo periodo, total y conteos por categoria. No devuelve filas nominales ni
+ejecuta reglas clinicas. n8n agenda los lunes a las 09:00, valida el contrato,
+termina sin correo cuando el total es cero y confirma unicamente despues de
+Resend. No existe conexion de n8n a PostgreSQL ni estado paralelo de
+deduplicacion.
+
 La topologia de Sprint 5B.2A separa `proxy_public`, `app_internal`,
 `data_internal` y `automation_internal`. El proxy y n8n solo comparten el
 backend; n8n no comparte red ni credenciales con PostgreSQL. En produccion solo

@@ -14,9 +14,10 @@ destinatarios reales ni datos clínicos. La operación completa está en
 | `workflows/censo-primer-control-mes-cerrado-resend-v1.json` | Censo del mes calendario anterior | Día 3, 06:00 | Aviso sin archivo |
 | `workflows/seguimiento-inasistencias-resend-v1.json` | Citas vencidas de la semana lunes-domingo anterior | Lunes 08:00 | No envía |
 | `workflows/seguimiento-tdap-el-chal-resend-v1.json` | Nuevas oportunidades y pendientes Tdap de El Chal, en un XLSX de dos hojas | Lunes 08:00 | No envía |
+| `workflows/watchdog-calidad-datos-resend-v1.json` | Invariantes objetivas resumidas por categoría | Lunes 09:00 | No envía |
 | `workflows/proximas-citas-v1.json` | Diseño SMTP heredado y endurecido | Diario 06:00 | No envía |
 
-Los cinco primeros son el camino Resend actual. El último no está cargado en la
+Los seis primeros son el camino Resend actual. El último no está cargado en la
 instancia local y no debe importarse para la operación nueva; se conserva como
 referencia heredada cubierta por pruebas hasta autorizar su retiro.
 
@@ -31,6 +32,11 @@ lógicos. CAP Prenatal filtra municipio, embarazo activo, umbral de 20 semanas y
 Tdap del embarazo actual; n8n solo valida conteos, descarga el XLSX, lo adjunta,
 envía y confirma. La regla de 20 semanas es institucional/operativa para este
 proyecto y requiere validación clínica autorizada antes de producción.
+
+`N8N-OPS-01B · Watchdog semanal de calidad de datos` reutiliza la frontera
+M2M y `automatizacion_despachos`. CAP Prenatal detecta únicamente invariantes
+objetivas y entrega conteos por categoría; n8n no ejecuta SQL, no recibe
+registros nominales y no contiene reglas clínicas.
 
 En el diseño heredado, la concurrencia operativa del workflow debe permanecer en 1:
 su deduplicación con static data es de mejor esfuerzo y no constituye
@@ -54,6 +60,7 @@ Todos los JSON:
 | `capCenso2625V1A1` | `CAP Prenatal | Censo 26 a 25 | Resend | v1` |
 | `capCensoMesV1A1` | `CAP Prenatal | Censo mes cerrado | Resend | v1` |
 | `JJylxJ7YxtprYjDZ` | `CAP Prenatal | Seguimiento semanal de inasistencias | Resend | v1` |
+| `yVwDfliCVeeOOg1F` | `CAP Prenatal | Watchdog semanal de calidad de datos | Resend | v1` |
 
 Los cuatro estaban inactivos/sin publicar al auditarse. Los nodos HTTP y Resend tenían
 credenciales locales asignadas; sus identificadores, secretos y destinatarios
@@ -108,6 +115,7 @@ Asignarla a:
 - `Preparar semana anterior`;
 - `Preparar seguimiento Tdap`;
 - `Descargar XLSX Tdap`;
+- `Preparar revision de calidad`;
 - `Confirmar despacho en CAP`.
 
 La key no debe pegarse como header fijo del nodo. El backend conserva solo su
@@ -125,6 +133,9 @@ hash. Las URLs reales son:
 /api/automatizaciones/v1/tdap/xlsx
 /api/automatizaciones/v1/tdap/confirmar
 /api/automatizaciones/v1/tdap/resolver
+/api/automatizaciones/v1/calidad-datos/preparar
+/api/automatizaciones/v1/calidad-datos/confirmar
+/api/automatizaciones/v1/calidad-datos/resolver
 ```
 
 En ejecución programada se usa `http://backend:3001` dentro de Docker; una
@@ -140,6 +151,7 @@ Crear una credencial **Resend API** y asignarla a:
 - ambos `Enviar correo con Excel`;
 - `Enviar seguimiento por Resend`.
 - `Enviar seguimiento por Resend` del workflow Tdap.
+- `Enviar watchdog por Resend`.
 
 Configurar un remitente de `notificaciones.hercor-nexus.com` y un destinatario
 institucional aprobado. No guardar el destinatario real en el JSON.
@@ -186,6 +198,25 @@ reserva el período. El correo contiene solo fecha de cita, primer nombre,
 primer apellido, teléfono y comunidad. `total=0`, `no_results` y
 `already_processed` terminan sin correo. Una reserva ambigua bloquea el replay
 automático hasta que personal autorizado revise Resend.
+
+### Watchdog semanal de calidad de datos
+
+```text
+Schedule lunes 09:00 -> POST preparar -> validar contrato agregado
+                                      -> ¿ready y total > 0?
+                                         ├─ no: fin
+                                         └─ sí: resumen HTML -> Resend
+                                                                 -> POST confirmar
+```
+
+El backend busca campos obligatorios vacíos, relaciones prenatales sin
+embarazo, discordancias paciente-embarazo, embarazos abiertos concurrentes,
+controles futuros y citas programadas en embarazos cerrados. Son invariantes
+estructurales; no se agregan reglas clínicas ni heurísticas en n8n. El correo
+solo presenta período, total, categoría, cantidad y descripción operativa. No
+incluye filas ni identificadores de pacientes. `no_results` y
+`already_processed` terminan antes de Resend; una reserva ambigua exige
+verificación manual del proveedor.
 
 ### Seguimiento oportuno Tdap de El Chal
 
@@ -243,6 +274,8 @@ node --test backend/test/n8nMissedAppointmentsWorkflow.test.js
 node --test backend/test/inasistenciasSemanales.test.js
 node --test backend/test/seguimientoTdap.test.js
 node --test backend/test/n8nTdapWorkflow.test.js
+node --test backend/test/calidadDatos.test.js
+node --test backend/test/n8nDataQualityWorkflow.test.js
 node --test backend/test/automatizaciones.test.js
 ```
 

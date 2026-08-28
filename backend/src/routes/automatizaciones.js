@@ -4,6 +4,7 @@ const { createAutomationRateLimiter } = require('../middleware/automationRateLim
 const {
   createAutomationAuthentication,
   createAutomationCensusPeriodMiddleware,
+  createAutomationDataQualityDispatchResolutionMiddleware,
   createAutomationDispatchConfirmationMiddleware,
   createAutomationDispatchResolutionMiddleware,
   createAutomationDispatchTokenHeaderMiddleware,
@@ -42,6 +43,9 @@ function createAutomatizacionesRouter({
   router.get('/tdap/xlsx', automationNotFound);
   router.post('/tdap/confirmar', automationNotFound);
   router.post('/tdap/resolver', automationNotFound);
+  router.post('/calidad-datos/preparar', automationNotFound);
+  router.post('/calidad-datos/confirmar', automationNotFound);
+  router.post('/calidad-datos/resolver', automationNotFound);
 
   if (!config.active) {
     router.get('/v1/proximas-citas', automationNotFound);
@@ -55,6 +59,9 @@ function createAutomatizacionesRouter({
     router.get('/v1/tdap/xlsx', automationNotFound);
     router.post('/v1/tdap/confirmar', automationNotFound);
     router.post('/v1/tdap/resolver', automationNotFound);
+    router.post('/v1/calidad-datos/preparar', automationNotFound);
+    router.post('/v1/calidad-datos/confirmar', automationNotFound);
+    router.post('/v1/calidad-datos/resolver', automationNotFound);
     return router;
   }
 
@@ -78,6 +85,7 @@ function createAutomatizacionesRouter({
   const validateDispatchResolution = createAutomationDispatchResolutionMiddleware();
   const validateDispatchTokenHeader = createAutomationDispatchTokenHeaderMiddleware();
   const validateTdapDispatchResolution = createAutomationTdapDispatchResolutionMiddleware();
+  const validateDataQualityDispatchResolution = createAutomationDataQualityDispatchResolutionMiddleware();
 
   router.get(
     '/v1/proximas-citas',
@@ -181,6 +189,35 @@ function createAutomatizacionesRouter({
     validateEmptyQuery,
     validateTdapDispatchResolution,
     controllers.resolverTdap
+  );
+
+  router.post(
+    '/v1/calidad-datos/preparar',
+    originMiddleware,
+    limiter,
+    authenticate,
+    validateEmptyQuery,
+    controllers.prepararCalidadDatos
+  );
+
+  router.post(
+    '/v1/calidad-datos/confirmar',
+    originMiddleware,
+    limiter,
+    authenticate,
+    validateEmptyQuery,
+    validateDispatchConfirmation,
+    controllers.confirmarCalidadDatos
+  );
+
+  router.post(
+    '/v1/calidad-datos/resolver',
+    originMiddleware,
+    limiter,
+    authenticate,
+    validateEmptyQuery,
+    validateDataQualityDispatchResolution,
+    controllers.resolverCalidadDatos
   );
 
   return router;

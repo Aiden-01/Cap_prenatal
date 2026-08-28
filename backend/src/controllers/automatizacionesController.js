@@ -130,6 +130,44 @@ function tdapFailureEvent(event, reason) {
   };
 }
 
+function dataQualityAuditEvent(result, {
+  event = 'preparar',
+  reason = result.dispatch?.status || 'consulta_completada',
+} = {}) {
+  return {
+    contexto: {
+      categoria: 'automatizaciones',
+      entidad: 'calidad_datos_semanal',
+      evento: event,
+    },
+    accion: event === 'consultar' ? 'consultar' : 'actualizar',
+    metadata: {
+      tipo_automatizacion: 'weekly_data_quality_watchdog',
+      resultado: 'exitoso',
+      motivo_codigo: reason,
+      cantidad_incidencias: result.total ?? 0,
+      fecha_desde: result.range?.from,
+      fecha_hasta: result.range?.to,
+    },
+  };
+}
+
+function dataQualityFailureEvent(event, reason) {
+  return {
+    contexto: {
+      categoria: 'automatizaciones',
+      entidad: 'calidad_datos_semanal',
+      evento: event,
+    },
+    accion: event === 'consultar' ? 'consultar' : 'actualizar',
+    metadata: {
+      tipo_automatizacion: 'weekly_data_quality_watchdog',
+      resultado: 'fallido',
+      motivo_codigo: reason,
+    },
+  };
+}
+
 async function bestEffortAudit(audit, event) {
   try {
     await audit({}, event);
@@ -444,17 +482,94 @@ function createAutomatizacionesController({
     }
   }
 
+  async function prepararCalidadDatos(req, res, next) {
+    try {
+      const result = await service.prepararWatchdogCalidadDatos();
+      await bestEffortAudit(audit, dataQualityAuditEvent(result));
+      res.set({ 'Cache-Control': 'no-store', Pragma: 'no-cache' });
+      return res.json(result);
+    } catch (error) {
+      await bestEffortAudit(audit, dataQualityFailureEvent(
+        'preparar',
+        error.code || 'preparacion_interna_fallida'
+      ));
+      if (error instanceof AppError) return next(error);
+      return next(new AppError(
+        500,
+        'No se pudo preparar la revision de calidad de datos',
+        { code: 'AUTOMATION_INTERNAL_ERROR' }
+      ));
+    }
+  }
+
+  async function confirmarCalidadDatos(req, res, next) {
+    try {
+      const result = await service.confirmarWatchdogCalidadDatos({
+        dispatchToken: req.automationDispatchConfirmation.dispatch_token,
+      });
+      await bestEffortAudit(audit, dataQualityAuditEvent(result, {
+        event: 'confirmar',
+        reason: result.dispatch.status,
+      }));
+      res.set({ 'Cache-Control': 'no-store', Pragma: 'no-cache' });
+      return res.json(result);
+    } catch (error) {
+      await bestEffortAudit(audit, dataQualityFailureEvent(
+        'confirmar',
+        error.code || 'confirmacion_interna_fallida'
+      ));
+      if (error instanceof AppError) return next(error);
+      return next(new AppError(
+        500,
+        'No se pudo confirmar la revision de calidad de datos',
+        { code: 'AUTOMATION_INTERNAL_ERROR' }
+      ));
+    }
+  }
+
+  async function resolverCalidadDatos(req, res, next) {
+    try {
+      const body = req.automationDispatchResolution;
+      const result = await service.resolverWatchdogCalidadDatos({
+        desde: body.desde,
+        hasta: body.hasta,
+        resolucion: body.resolucion,
+        motivoCodigo: body.motivo_codigo,
+      });
+      await bestEffortAudit(audit, dataQualityAuditEvent(result, {
+        event: 'resolver',
+        reason: result.dispatch.status,
+      }));
+      res.set({ 'Cache-Control': 'no-store', Pragma: 'no-cache' });
+      return res.json(result);
+    } catch (error) {
+      await bestEffortAudit(audit, dataQualityFailureEvent(
+        'resolver',
+        error.code || 'resolucion_interna_fallida'
+      ));
+      if (error instanceof AppError) return next(error);
+      return next(new AppError(
+        500,
+        'No se pudo resolver la revision de calidad de datos',
+        { code: 'AUTOMATION_INTERNAL_ERROR' }
+      ));
+    }
+  }
+
   return {
     censoPrimerControl,
     censoPrimerControlExcel,
+    confirmarCalidadDatos,
     confirmarInasistencias,
     confirmarTdap,
     descargarTdapExcel,
     inasistencias,
     prepararInasistencias,
+    prepararCalidadDatos,
     prepararTdap,
     proximasCitas,
     resolverInasistencias,
+    resolverCalidadDatos,
     resolverTdap,
   };
 }
@@ -466,6 +581,8 @@ module.exports = {
   censusAuditEvent,
   censusExcelAuditEvent,
   createAutomatizacionesController,
+  dataQualityAuditEvent,
+  dataQualityFailureEvent,
   missedAppointmentsAuditEvent,
   missedAppointmentsFailureEvent,
   tdapAuditEvent,

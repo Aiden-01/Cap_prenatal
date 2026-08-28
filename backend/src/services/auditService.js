@@ -72,6 +72,7 @@ const PRIVATE_TABLES = Object.freeze({
   censo_primer_control: 'automatizaciones',
   inasistencias_semanales: 'automatizaciones',
   seguimiento_tdap_el_chal: 'automatizaciones',
+  calidad_datos_semanal: 'automatizaciones',
   proximas_citas: 'automatizaciones',
   paciente: 'pacientes',
   embarazo: 'embarazos',

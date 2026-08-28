@@ -1,0 +1,272 @@
+{
+  "id": "capQualityV1A1",
+  "name": "CAP Prenatal | Watchdog semanal de calidad de datos | Resend | v1",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "7557c399-b334-45bf-8b55-fcb5a42010a1",
+      "name": "Cada lunes a las 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -760,
+        0
+      ],
+      "notes": "Horario America/Guatemala. Mantener desactivado hasta aprobacion manual de produccion."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/calidad-datos/preparar' : 'http://127.0.0.1:3001/api/automatizaciones/v1/calidad-datos/preparar' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": false,
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          },
+          "sendCredentialsOnCrossOriginRedirect": false,
+          "timeout": 10000
+        }
+      },
+      "id": "31282ec9-9ea0-40ad-aed6-eb9deaaeb840",
+      "name": "Preparar revision de calidad",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -520,
+        0
+      ],
+      "notes": "CAP Prenatal calcula las categorias, el total, la semana anterior y la reserva idempotente. Asignar Header Auth con X-CAP-Automation-Key. Sin reintentos automaticos."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw = $json;\nconst fail = () => { throw new Error('CONTRACT_INVALID'); };\nconst rootKeys = ['as_of','categories','dispatch','generated_at','range','report_type','schema_version','secure_path','timezone','total'];\nif (!raw || typeof raw !== 'object' || Array.isArray(raw) || JSON.stringify(Object.keys(raw).sort()) !== JSON.stringify(rootKeys.slice().sort())) fail();\nconst datePattern = /^\\d{4}-\\d{2}-\\d{2}$/;\nconst realDate = (value) => { if (typeof value !== 'string' || !datePattern.test(value)) return false; const parsed = new Date(value + 'T00:00:00Z'); return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value; };\nif (raw.schema_version !== 1 || raw.timezone !== 'America/Guatemala' || raw.report_type !== 'weekly_data_quality_watchdog' || raw.secure_path !== '/dashboard') fail();\nif (typeof raw.generated_at !== 'string' || Number.isNaN(Date.parse(raw.generated_at))) fail();\nif (!raw.range || Object.keys(raw.range).sort().join(',') !== 'from,to' || !realDate(raw.range.from) || !realDate(raw.range.to) || !realDate(raw.as_of)) fail();\nconst from = Date.parse(raw.range.from + 'T00:00:00Z');\nconst to = Date.parse(raw.range.to + 'T00:00:00Z');\nif (to - from !== 6 * 86400000 || new Date(from).getUTCDay() !== 1 || new Date(to).getUTCDay() !== 0 || Date.parse(raw.as_of + 'T00:00:00Z') !== to + 86400000) fail();\nif (!Number.isSafeInteger(raw.total) || raw.total < 0 || raw.total > 1000000 || !Array.isArray(raw.categories)) fail();\nif (!raw.dispatch || typeof raw.dispatch !== 'object' || Array.isArray(raw.dispatch)) fail();\nconst status = raw.dispatch.status;\nif (!['ready','no_results','already_processed'].includes(status)) fail();\nconst categoryCatalog = new Map([['patient_required_identity_missing',['Identificacion obligatoria de paciente incompleta','Hay registros con campos obligatorios de identificacion vacios.']],['pregnancy_link_missing',['Registros prenatales sin embarazo asociado','Hay registros que requieren embarazo y no tienen una relacion asociada.']],['pregnancy_patient_mismatch',['Relaciones paciente-embarazo inconsistentes','Hay registros cuyo paciente no coincide con el embarazo relacionado.']],['concurrent_open_pregnancies',['Estados de embarazo incompatibles','Hay pacientes con mas de un embarazo activo o en puerperio.']],['future_prenatal_control',['Controles prenatales con fecha futura','Hay controles con una fecha posterior al dia operativo actual.']],['scheduled_appointment_closed_pregnancy',['Citas programadas en embarazos cerrados','Hay citas aun programadas dentro de embarazos cerrados.']]]);\nconst cleanCategories = [];\nconst seen = new Set();\nlet sum = 0;\nfor (const category of raw.categories) {\n  if (!category || typeof category !== 'object' || Array.isArray(category) || Object.keys(category).sort().join(',') !== 'code,count,description,label') fail();\n  if (typeof category.code !== 'string' || !/^[a-z][a-z0-9_]{2,79}$/.test(category.code) || seen.has(category.code)) fail();\n  if (typeof category.label !== 'string' || category.label.length < 3 || category.label.length > 120 || /[\\u0000-\\u001f\\u007f]/.test(category.label)) fail();\n  if (typeof category.description !== 'string' || category.description.length < 3 || category.description.length > 240 || /[\\u0000-\\u001f\\u007f]/.test(category.description)) fail();\n  const expected = categoryCatalog.get(category.code); if (!expected || category.label !== expected[0] || category.description !== expected[1]) fail();\n  if (!Number.isSafeInteger(category.count) || category.count < 1 || category.count > 1000000) fail();\n  seen.add(category.code); sum += category.count; cleanCategories.push({ code: category.code, label: category.label, description: category.description, count: category.count });\n}\nif (sum !== raw.total) fail();\nif (status === 'ready') {\n  if (Object.keys(raw.dispatch).sort().join(',') !== 'status,token' || typeof raw.dispatch.token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(raw.dispatch.token) || raw.total < 1 || cleanCategories.length < 1) fail();\n} else if (Object.keys(raw.dispatch).join(',') !== 'status' || raw.total !== 0 || cleanCategories.length !== 0) fail();\nreturn [{ json: { should_send: status === 'ready', dispatch_token: status === 'ready' ? raw.dispatch.token : null, range: { from: raw.range.from, to: raw.range.to }, as_of: raw.as_of, total: raw.total, categories: cleanCategories } }];"
+      },
+      "id": "8b9f2698-25c7-49e9-8ac0-b581f43888f8",
+      "name": "Validar contrato de calidad",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -280,
+        0
+      ],
+      "notes": "Valida el contrato cerrado y conserva solo periodo, conteos, categorias agregadas y token efimero. No contiene reglas de deteccion ni datos de pacientes."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7d03ed4d-78df-437a-9329-c521394797dc",
+              "leftValue": "={{ $json.should_send }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "81a5b208-b1c0-4468-a99a-cc12f9745382",
+      "name": "¿Hay incidencias?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -40,
+        0
+      ],
+      "notes": "La salida falsa termina normalmente para no_results y already_processed; Resend no se ejecuta."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw = $json;\nif (!raw.should_send || typeof raw.dispatch_token !== 'string' || !Number.isSafeInteger(raw.total) || raw.total < 1 || !Array.isArray(raw.categories) || raw.categories.length < 1) throw new Error('CONTRACT_INVALID');\nconst escapeHtml = (value) => String(value).replace(/[&<>\\\"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[character]);\nconst formatDate = (value) => value.split('-').reverse().join('-');\nconst rows = raw.categories.map((category) => '<tr><td style=\"padding:8px;border-bottom:1px solid #d1d5db\">' + escapeHtml(category.label) + '</td><td style=\"padding:8px;border-bottom:1px solid #d1d5db;text-align:center\">' + category.count + '</td><td style=\"padding:8px;border-bottom:1px solid #d1d5db\">' + escapeHtml(category.description) + '</td></tr>').join('');\nconst fromLabel = formatDate(raw.range.from);\nconst toLabel = formatDate(raw.range.to);\nconst subject = 'CAP Prenatal | Revisión semanal de calidad de datos';\nconst html = '<div style=\"font-family:Arial,sans-serif;color:#1f2937;line-height:1.6\"><h2 style=\"color:#155e8e;margin-bottom:8px\">Revisión semanal de calidad de datos</h2><p>Buen día.</p><p>CAP Prenatal identificó inconsistencias administrativas que requieren revisión por personal autorizado.</p><p><strong>Período:</strong> ' + fromLabel + ' al ' + toLabel + '<br><strong>Total de incidencias:</strong> ' + raw.total + '</p><table style=\"border-collapse:collapse;width:100%;max-width:860px\"><thead><tr style=\"background:#155e8e;color:#fff\"><th style=\"padding:8px;text-align:left\">Categoría</th><th style=\"padding:8px;text-align:center\">Cantidad</th><th style=\"padding:8px;text-align:left\">Descripción operativa</th></tr></thead><tbody>' + rows + '</tbody></table><p>Ingrese a CAP Prenatal con un usuario autorizado para realizar la revisión correspondiente.</p><p style=\"font-size:12px;color:#6b7280\">Este resumen no contiene datos de pacientes ni información clínica. Mensaje automático; no responda a este correo.</p></div>';\nreturn [{ json: { subject, html, dispatch_token: raw.dispatch_token } }];"
+      },
+      "id": "3a8f105d-d6b5-42dc-a0b9-6bdfbd29cccb",
+      "name": "Construir resumen agregado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        -100
+      ],
+      "notes": "Construye una tabla agregada con categoria, cantidad y descripcion. Escapa HTML y no recibe identificadores ni informacion clinica."
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "from": "CAP Prenatal <citas@notificaciones.example.invalid>",
+        "to": "responsable@example.invalid",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.html }}",
+        "additionalOptions": {}
+      },
+      "id": "cc13b3b8-ac15-4740-8e6a-f475a3c493f3",
+      "name": "Enviar watchdog por Resend",
+      "type": "n8n-nodes-resend.resend",
+      "typeVersion": 1,
+      "position": [
+        440,
+        -100
+      ],
+      "notes": "Asignar la credencial Resend existente y reemplazar los correos .invalid solo en la instancia autorizada. Sin reintentos automaticos."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/calidad-datos/confirmar' : 'http://127.0.0.1:3001/api/automatizaciones/v1/calidad-datos/confirmar' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": false,
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { dispatch_token: $node[\"Construir resumen agregado\"].json.dispatch_token } }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          },
+          "sendCredentialsOnCrossOriginRedirect": false,
+          "timeout": 10000
+        }
+      },
+      "id": "8d410f60-89ec-4358-b6ea-c468a52e4d19",
+      "name": "Confirmar despacho en CAP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        680,
+        -100
+      ],
+      "notes": "Solo confirma despues del exito de Resend. Ante timeout ambiguo, revisar Resend y resolver manualmente; no reintentar automaticamente."
+    }
+  ],
+  "connections": {
+    "Cada lunes a las 09:00": {
+      "main": [
+        [
+          {
+            "node": "Preparar revision de calidad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar revision de calidad": {
+      "main": [
+        [
+          {
+            "node": "Validar contrato de calidad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar contrato de calidad": {
+      "main": [
+        [
+          {
+            "node": "¿Hay incidencias?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay incidencias?": {
+      "main": [
+        [
+          {
+            "node": "Construir resumen agregado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Construir resumen agregado": {
+      "main": [
+        [
+          {
+            "node": "Enviar watchdog por Resend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar watchdog por Resend": {
+      "main": [
+        [
+          {
+            "node": "Confirmar despacho en CAP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Guatemala",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false,
+    "callerPolicy": "none",
+    "availableInMCP": false
+  },
+  "versionId": "86d27979-75a0-4182-9993-5ad3f3a2a274",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

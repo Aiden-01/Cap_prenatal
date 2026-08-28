@@ -132,6 +132,107 @@ function createAutomatizacionesRepository(db = pool) {
     return rows;
   }
 
+  async function obtenerResumenCalidadDatos(queryable = db) {
+    const { rows } = await queryable.query(
+      `WITH registros_sin_embarazo AS (
+         SELECT 'controles_prenatales' AS origen, id
+         FROM controles_prenatales
+         WHERE embarazo_id IS NULL
+         UNION ALL
+         SELECT 'morbilidad_embarazo', id
+         FROM morbilidad_embarazo
+         WHERE embarazo_id IS NULL
+         UNION ALL
+         SELECT 'controles_puerperio', id
+         FROM controles_puerperio
+         WHERE embarazo_id IS NULL
+         UNION ALL
+         SELECT 'planes_parto', id
+         FROM planes_parto
+         WHERE embarazo_id IS NULL
+         UNION ALL
+         SELECT 'fichas_riesgo_obstetrico', id
+         FROM fichas_riesgo_obstetrico
+         WHERE embarazo_id IS NULL
+         UNION ALL
+         SELECT 'vacunas_paciente', id
+         FROM vacunas_paciente
+         WHERE embarazo_id IS NULL
+           AND momento IN ('durante_embarazo', 'postparto_aborto')
+       ),
+       relaciones_inconsistentes AS (
+         SELECT 'controles_prenatales' AS origen, cp.id
+         FROM controles_prenatales cp
+         JOIN embarazos e ON e.id = cp.embarazo_id
+         WHERE cp.paciente_id <> e.paciente_id
+         UNION ALL
+         SELECT 'morbilidad_embarazo', m.id
+         FROM morbilidad_embarazo m
+         JOIN embarazos e ON e.id = m.embarazo_id
+         WHERE m.paciente_id <> e.paciente_id
+         UNION ALL
+         SELECT 'controles_puerperio', cp.id
+         FROM controles_puerperio cp
+         JOIN embarazos e ON e.id = cp.embarazo_id
+         WHERE cp.paciente_id <> e.paciente_id
+         UNION ALL
+         SELECT 'planes_parto', pp.id
+         FROM planes_parto pp
+         JOIN embarazos e ON e.id = pp.embarazo_id
+         WHERE pp.paciente_id <> e.paciente_id
+         UNION ALL
+         SELECT 'fichas_riesgo_obstetrico', r.id
+         FROM fichas_riesgo_obstetrico r
+         JOIN embarazos e ON e.id = r.embarazo_id
+         WHERE r.paciente_id <> e.paciente_id
+         UNION ALL
+         SELECT 'vacunas_paciente', v.id
+         FROM vacunas_paciente v
+         JOIN embarazos e ON e.id = v.embarazo_id
+         WHERE v.paciente_id <> e.paciente_id
+       ),
+       embarazos_abiertos_concurrentes AS (
+         SELECT paciente_id
+         FROM embarazos
+         WHERE estado IN ('activo', 'puerperio')
+         GROUP BY paciente_id
+         HAVING COUNT(*) > 1
+       )
+       SELECT codigo, total
+       FROM (
+         SELECT
+           'patient_required_identity_missing'::text AS codigo,
+           COUNT(*)::integer AS total,
+           1 AS orden
+         FROM pacientes
+         WHERE COALESCE(BTRIM(no_expediente), '') = ''
+            OR COALESCE(BTRIM(nombres), '') = ''
+            OR COALESCE(BTRIM(apellidos), '') = ''
+         UNION ALL
+         SELECT 'pregnancy_link_missing', COUNT(*)::integer, 2
+         FROM registros_sin_embarazo
+         UNION ALL
+         SELECT 'pregnancy_patient_mismatch', COUNT(*)::integer, 3
+         FROM relaciones_inconsistentes
+         UNION ALL
+         SELECT 'concurrent_open_pregnancies', COUNT(*)::integer, 4
+         FROM embarazos_abiertos_concurrentes
+         UNION ALL
+         SELECT 'future_prenatal_control', COUNT(*)::integer, 5
+         FROM controles_prenatales
+         WHERE fecha > (CURRENT_TIMESTAMP AT TIME ZONE 'America/Guatemala')::date
+         UNION ALL
+         SELECT 'scheduled_appointment_closed_pregnancy', COUNT(*)::integer, 6
+         FROM citas_prenatales cp
+         JOIN embarazos e ON e.id = cp.embarazo_id
+         WHERE cp.estado = 'programada'
+           AND e.estado = 'cerrado'
+       ) categorias
+       ORDER BY orden`
+    );
+    return rows;
+  }
+
   async function obtenerDespacho({ tipo, desde, hasta }, queryable = db, {
     bloquear = false,
   } = {}) {
@@ -282,6 +383,7 @@ function createAutomatizacionesRepository(db = pool) {
     obtenerDespacho,
     obtenerDespachoPorTokenHash,
     obtenerInasistenciasSemanales,
+    obtenerResumenCalidadDatos,
     obtenerResumenCensoPrimerControl,
     obtenerResumenProximasCitas,
     renovarDespacho,

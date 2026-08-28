@@ -7,6 +7,7 @@ const MAX_AUTOMATION_CENSUS_DAYS = 31;
 const DISPATCH_TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
 const MISSED_APPOINTMENT_REPLAY_CONFIRMATION = 'REINTENTAR_INASISTENCIAS_SEMANALES';
 const TDAP_REPLAY_CONFIRMATION = 'REINTENTAR_SEGUIMIENTO_TDAP_EL_CHAL';
+const DATA_QUALITY_REPLAY_CONFIRMATION = 'REINTENTAR_WATCHDOG_CALIDAD_DATOS';
 
 function isRealIsoDate(value) {
   if (!DATE_RE.test(value)) return false;
@@ -84,12 +85,25 @@ const automationTdapDispatchResolutionSchema = z.strictObject({
   ]),
 });
 
+const automationDataQualityDispatchResolutionSchema = z.strictObject({
+  desde: automationDate,
+  hasta: automationDate,
+  resolucion: z.enum(['enviado', 'reintentar']),
+  confirmacion: z.literal(DATA_QUALITY_REPLAY_CONFIRMATION),
+  motivo_codigo: z.enum([
+    'entrega_confirmada_en_resend',
+    'entrega_no_realizada_confirmada',
+  ]),
+});
+
 module.exports = {
   DISPATCH_TOKEN_RE,
+  DATA_QUALITY_REPLAY_CONFIRMATION,
   MAX_AUTOMATION_CENSUS_DAYS,
   MISSED_APPOINTMENT_REPLAY_CONFIRMATION,
   TDAP_REPLAY_CONFIRMATION,
   automationCensusPeriodQuerySchema,
+  automationDataQualityDispatchResolutionSchema,
   automationDispatchConfirmationSchema,
   automationDispatchResolutionSchema,
   automationDispatchTokenSchema,

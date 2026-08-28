@@ -174,7 +174,7 @@ destinatarios reales, remitentes internos y cualquier resultado de ejecución.
 Orden recomendado:
 
 1. `node --test backend/test/n8nInfrastructure.test.js`;
-2. pruebas estáticas de los cinco JSON Resend;
+2. pruebas estáticas de los seis JSON Resend;
 3. health checks de backend y n8n;
 4. HTTP Request con un período/cita sintéticos;
 5. rama `total=0` para confirmar el comportamiento esperado;
@@ -216,6 +216,23 @@ Para `Seguimiento oportuno Tdap El Chal`, mantener `active=false` y:
    `already_processed` sin volver a Resend;
 10. revisar **Executions** y limpiar solo datos sintéticos mediante el
    procedimiento seguro de la base temporal.
+
+Para `Watchdog semanal de calidad de datos`, mantener `active=false` y:
+
+1. ejecutar las pruebas unitarias y la prueba PostgreSQL en una base temporal;
+2. comprobar primero una base válida: `no_results` y Resend no ejecutado;
+3. crear únicamente fixtures sintéticos para una o varias categorías;
+4. confirmar que `Preparar revision de calidad` devuelve solo conteos
+   agregados y un token, sin filas ni identificadores;
+5. revisar el HTML antes de Resend: período `DD-MM-YYYY`, total, categoría,
+   cantidad y descripción operativa;
+6. enviar una única vez a un destinatario autorizado de prueba y confirmar el
+   despacho;
+7. repetir `preparar`: debe devolver `already_processed` y no ejecutar
+   Resend;
+8. comprobar en **Executions** que errores API, contrato y Resend queden
+   fallidos, sin reintentos;
+9. limpiar solo los fixtures creados expresamente para la prueba.
 
 Si la API responde `AUTOMATION_TDAP_GESTATIONAL_SOURCE_INCOMPLETE`, existe al
 menos una candidata activa de El Chal sin FUR válida. Corregir el dato en CAP
@@ -360,6 +377,26 @@ Si `Descargar XLSX Tdap` falla con token inválido, comprobar que el header
 `X-CAP-Dispatch-Token` toma el token de la misma ejecución y que la credencial
 M2M sigue asignada. El token no se copia a logs, tickets o Notion.
 
+### Watchdog: cero, contrato inválido o reserva ambigua
+
+`no_results` y `already_processed` son cierres normales por la salida falsa
+del IF y no generan correo. Una API no disponible, timeout, `401`, `409` o
+`CONTRACT_INVALID` debe dejar la ejecución fallida; nunca cambiarlo
+manualmente a total cero.
+
+En **Executions**, revisar en orden:
+
+- `Preparar revision de calidad`: backend, M2M, allowlist o reserva;
+- `Validar contrato de calidad`: versión, período, estado, token o sumatoria;
+- `Enviar watchdog por Resend`: egress, dominio y credencial;
+- `Confirmar despacho en CAP`: comprobar primero el ID/evento de Resend.
+
+Para `AUTOMATION_DISPATCH_UNCERTAIN`, no repetir Resend ni eliminar la fila
+técnica. Resolver solo con evidencia y la confirmación literal
+`REINTENTAR_WATCHDOG_CALIDAD_DATOS`. Si una categoría parece discutible,
+revisar la invariante en backend; no agregar un filtro correctivo dentro de
+n8n.
+
 ### Credenciales no descifrables
 
 Detener el proceso y confirmar que se usó la key histórica correcta. No
@@ -368,7 +405,7 @@ compatibles o recrear las credenciales si la clave se perdió.
 
 ## Checklist de cierre local
 
-- [ ] Los cinco workflows Resend siguen inactivos salvo autorización expresa.
+- [ ] Los seis workflows Resend siguen inactivos salvo autorización expresa.
 - [ ] No quedó n8n escuchando fuera de loopback.
 - [ ] No hay exports locales o `.env` rastreados por Git.
 - [ ] No se guardaron payloads clínicos o capturas de pacientes.

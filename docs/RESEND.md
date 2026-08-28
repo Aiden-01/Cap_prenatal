@@ -178,6 +178,26 @@ localizador interno en `attachments[].content`. El síntoma es un adjunto de
 pocos bytes que Excel reporta como corrupto. El transporte HTTP predefinido
 evita ese defecto sin copiar ni exponer la credencial.
 
+### Watchdog semanal de calidad de datos
+
+- **Resource:** Email.
+- **Operation:** Send.
+- **From:** buzón verificado de CAP Prenatal; el JSON versionado usa
+  `.invalid`.
+- **To:** destinatario institucional autorizado, omitido de Git.
+- **Subject:** `CAP Prenatal | Revisión semanal de calidad de datos`.
+- **HTML:** período en `DD-MM-YYYY`, total y una tabla agregada con categoría,
+  cantidad y descripción operativa.
+- **Adjuntos:** ninguno.
+- **Después de Resend:** `Confirmar despacho en CAP` cierra el período.
+
+El mensaje no contiene nombres, CUI, expedientes, teléfonos, direcciones,
+identificadores internos ni datos clínicos. Si el total es cero o la
+preparación devuelve `already_processed`, Resend no se ejecuta. Si Resend
+falla, la ejecución debe quedar fallida. Si Resend acepta el correo pero la
+confirmación falla, no repetir el envío: revisar el evento del proveedor y
+resolver la reserva con evidencia.
+
 No activar **Use Template** mientras el contenido se construya en n8n. No
 pegar HTML con información clínica fija. Las plantillas de referencia son:
 
@@ -198,7 +218,8 @@ pegar HTML con información clínica fija. Las plantillas de referencia son:
 
 La prueba de la rama `total=0` del recordatorio y de inasistencias no debe
 enviar correo. En Tdap, `new_opportunities.total=0` y `pending.total=0` tampoco
-envía. En los censos sí debe enviar un aviso, pero sin adjunto.
+envía. En el watchdog, `total=0` tampoco envía. En los censos sí debe enviar
+un aviso, pero sin adjunto.
 
 ## Errores frecuentes
 

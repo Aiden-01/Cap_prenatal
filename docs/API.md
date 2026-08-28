@@ -477,6 +477,9 @@ X-CAP-Automation-Key: <API_KEY_ALEATORIA>
 | `GET` | `/v1/tdap/xlsx` | Descarga el XLSX de la reserva; exige además `X-CAP-Dispatch-Token`. |
 | `POST` | `/v1/tdap/confirmar` | Confirma la aceptación del único correo Tdap. |
 | `POST` | `/v1/tdap/resolver` | Resolución técnica manual de una reserva Tdap ambigua. |
+| `POST` | `/v1/calidad-datos/preparar` | Resume y reserva el watchdog de la semana calendario anterior. |
+| `POST` | `/v1/calidad-datos/confirmar` | Confirma la aceptación del correo agregado de calidad. |
+| `POST` | `/v1/calidad-datos/resolver` | Resolución técnica manual de una reserva de calidad ambigua. |
 | `GET` | `/proximas-citas` | Endpoint legacy retirado; siempre `404`. |
 
 La key original vive solo en n8n. El backend compara su SHA-256 contra
@@ -537,6 +540,48 @@ semana explícita, la confirmación literal
 y el motivo coherente `entrega_confirmada_en_resend` o
 `entrega_no_realizada_confirmada`. No permite reabrir `enviado` ni
 `sin_resultados`.
+
+### Contrato semanal de calidad de datos
+
+`POST /v1/calidad-datos/preparar` calcula en `America/Guatemala` la semana
+lunes-domingo anterior y el corte del lunes siguiente. No acepta fechas,
+filtros ni SQL suministrados por n8n. El backend evalúa únicamente invariantes
+objetivas: campos obligatorios vacíos, relaciones prenatales sin embarazo,
+discordancias paciente-embarazo, embarazos abiertos concurrentes, controles
+con fecha futura y citas programadas en embarazos cerrados. Una vacuna
+`previo_embarazo` sin embarazo es válida. No aplica reglas clínicas ni
+heurísticas de FUR, FPP, riesgo, vacuna, laboratorio o diagnóstico.
+
+```json
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-31T15:00:00.000Z",
+  "timezone": "America/Guatemala",
+  "report_type": "weekly_data_quality_watchdog",
+  "range": { "from": "2026-08-24", "to": "2026-08-30" },
+  "as_of": "2026-08-31",
+  "dispatch": { "status": "ready", "token": "<token efimero>" },
+  "total": 3,
+  "categories": [
+    {
+      "code": "future_prenatal_control",
+      "label": "Controles prenatales con fecha futura",
+      "description": "Hay controles con una fecha posterior al dia operativo actual.",
+      "count": 3
+    }
+  ],
+  "secure_path": "/dashboard"
+}
+```
+
+`categories` contiene únicamente código controlado, etiqueta, descripción
+operativa y cantidad; no existe `items` ni detalle nominal. `no_results` y
+`already_processed` llevan total cero y arreglo vacío. `ready` es el único
+estado con token y reutiliza `automatizacion_despachos` bajo el tipo
+`weekly_data_quality_watchdog`. Una reserva pendiente responde `409
+AUTOMATION_DISPATCH_UNCERTAIN`; no se reintenta correo automáticamente. El
+resolver exige `REINTENTAR_WATCHDOG_CALIDAD_DATOS` y los mismos pares
+resolución/motivo documentados para inasistencias.
 
 ### Contrato semanal de seguimiento Tdap
 
