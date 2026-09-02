@@ -360,8 +360,47 @@ function drawTextBox(page, font, value, cfg, label) {
   });
 }
 
+function drawCenteredCellText(page, font, value, cfg, label) {
+  if (!cfg) return;
+  const text = safe(value);
+  if (!text) return;
+
+  const size = cfg.size || 7;
+  const fitted = fitText(text, font, size, cfg.w);
+  const textWidth = font.widthOfTextAtSize(fitted, size);
+  const textHeight = font.heightAtSize(size, { descender: false });
+  const cellBottom = page.getHeight() - cfg.y - cfg.h;
+  const x = cfg.x + Math.max((cfg.w - textWidth) / 2, 0);
+  const y = cellBottom + Math.max((cfg.h - textHeight) / 2, 0);
+
+  debugPoint(page, cfg.x + cfg.w / 2, cfg.y + cfg.h / 2, label, font);
+  page.drawText(fitted, {
+    x,
+    y,
+    size,
+    font,
+    color: rgb(0.05, 0.05, 0.05),
+  });
+}
+
 function drawDate(page, font, value, cfg, label, tiny = false) {
   const parts = dateParts(value);
+  if (cfg.cells) {
+    const size = cfg.size || (tiny ? 5.2 : 5.6);
+    [
+      { value: parts.d, cfg: cfg.cells.day },
+      { value: parts.m, cfg: cfg.cells.month },
+      { value: parts.y, cfg: cfg.cells.year },
+    ].forEach((cell, index) => drawCenteredCellText(
+      page,
+      font,
+      cell.value,
+      { ...cell.cfg, size },
+      `${label || 'date'}:${index}`
+    ));
+    return;
+  }
+
   const gap = tiny ? 25 : 22;
   const yearOffset = cfg.yearOffset ?? (tiny ? 50 : 43);
   const size = tiny ? 5.2 : 5.6;
@@ -381,6 +420,13 @@ function drawDate(page, font, value, cfg, label, tiny = false) {
 
 function drawTime(page, font, value, cfg, label) {
   const parts = timeParts(value);
+  if (cfg.cells) {
+    const size = cfg.size || 5.2;
+    drawCenteredCellText(page, font, parts.h, { ...cfg.cells.hour, size }, `${label}:hour`);
+    drawCenteredCellText(page, font, parts.m, { ...cfg.cells.minute, size }, `${label}:minute`);
+    return;
+  }
+
   drawTextBox(page, font, parts.h, { ...cfg.hour, w: 12, size: 5.2, align: 'center' }, `${label}:hour`);
   drawTextBox(page, font, parts.m, { ...cfg.minute, w: 12, size: 5.2, align: 'center' }, `${label}:minute`);
 }

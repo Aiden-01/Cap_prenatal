@@ -21,6 +21,7 @@ function fakeDrawing() {
     },
     font: {
       widthOfTextAtSize: (text, size) => String(text).length * size * 0.52,
+      heightAtSize: (size) => size * 0.72,
     },
   };
 }
@@ -107,6 +108,97 @@ test('un evento de morbilidad coloca todos sus campos en el primer bloque', () =
   ]) {
     assert.match(contenido, new RegExp(esperado));
   }
+});
+
+test('fecha y hora de morbilidad se centran en cada celda por sus metricas reales', () => {
+  const drawing = fakeDrawing();
+  helpers.drawPage3({
+    ...drawing,
+    embarazo: { id: 20 },
+    morbilidad: [morbilidad({ fecha: '2026-07-13', hora: '22:56:00' })],
+  });
+
+  const cfg = coords.pages[3].morbidity[0];
+  const size = cfg.fecha.size;
+  const expected = [
+    { text: '13', cell: cfg.fecha.cells.day },
+    { text: '07', cell: cfg.fecha.cells.month },
+    { text: '2026', cell: cfg.fecha.cells.year },
+    { text: '22', cell: cfg.hora.cells.hour },
+    { text: '56', cell: cfg.hora.cells.minute },
+  ];
+
+  expected.forEach(({ text, cell }) => {
+    const draw = drawing.draws.find((item) => item.text === text);
+    const textWidth = drawing.font.widthOfTextAtSize(text, size);
+    const textHeight = drawing.font.heightAtSize(size, { descender: false });
+    assert.ok(draw, `se dibujo ${text}`);
+    assert.equal(draw.x, cell.x + (cell.w - textWidth) / 2);
+    assert.equal(
+      draw.y,
+      drawing.page.getHeight() - cell.y - cell.h + (cell.h - textHeight) / 2
+    );
+  });
+});
+
+test('centrado cubre dias, meses, anios, horas y minutos validos', () => {
+  const cfg = coords.pages[3].morbidity[0];
+  const cases = [
+    ...Array.from({ length: 31 }, (_, index) => ({
+      fecha: `2026-01-${String(index + 1).padStart(2, '0')}`,
+      hora: '00:00:00',
+      drawIndex: 0,
+      cell: cfg.fecha.cells.day,
+      expected: String(index + 1).padStart(2, '0'),
+    })),
+    ...Array.from({ length: 12 }, (_, index) => ({
+      fecha: `2026-${String(index + 1).padStart(2, '0')}-01`,
+      hora: '00:00:00',
+      drawIndex: 1,
+      cell: cfg.fecha.cells.month,
+      expected: String(index + 1).padStart(2, '0'),
+    })),
+    ...[1000, 2026, 9999].map((year) => ({
+      fecha: `${year}-01-01`,
+      hora: '00:00:00',
+      drawIndex: 2,
+      cell: cfg.fecha.cells.year,
+      expected: String(year),
+    })),
+    ...Array.from({ length: 24 }, (_, hour) => ({
+      fecha: '2026-01-01',
+      hora: `${String(hour).padStart(2, '0')}:00:00`,
+      drawIndex: 3,
+      cell: cfg.hora.cells.hour,
+      expected: String(hour).padStart(2, '0'),
+    })),
+    ...Array.from({ length: 60 }, (_, minute) => ({
+      fecha: '2026-01-01',
+      hora: `00:${String(minute).padStart(2, '0')}:00`,
+      drawIndex: 4,
+      cell: cfg.hora.cells.minute,
+      expected: String(minute).padStart(2, '0'),
+    })),
+  ];
+
+  cases.forEach(({ fecha, hora, drawIndex, cell, expected }) => {
+    const drawing = fakeDrawing();
+    helpers.drawPage3({
+      ...drawing,
+      embarazo: { id: 20 },
+      morbilidad: [morbilidad({ fecha, hora })],
+    });
+
+    const draw = drawing.draws[drawIndex];
+    const textWidth = drawing.font.widthOfTextAtSize(expected, cfg.fecha.size);
+    const textHeight = drawing.font.heightAtSize(cfg.fecha.size, { descender: false });
+    assert.equal(draw.text, expected);
+    assert.equal(draw.x, cell.x + (cell.w - textWidth) / 2);
+    assert.equal(
+      draw.y,
+      drawing.page.getHeight() - cell.y - cell.h + (cell.h - textHeight) / 2
+    );
+  });
 });
 
 test('persona que atiende usa el nombre real asociado cuando el campo clinico esta vacio', () => {

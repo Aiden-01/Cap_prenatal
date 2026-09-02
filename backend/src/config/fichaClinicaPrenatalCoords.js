@@ -361,11 +361,30 @@ const morbidityText = ({ firstLineX, firstLineWidth, y, maxLines = 3 }) => ({
   lineHeight: 13,
 });
 
+const page3MorbidityDateBox = { x: 53, y: 215.5, w: 65.5, h: 22 };
+const page3MorbidityTimeBox = { x: 161, y: 215.5, w: 46, h: 22 };
+const subdivision = (box, index, count) => ({
+  x: box.x + (box.w / count) * index,
+  y: box.y,
+  w: box.w / count,
+  h: box.h,
+});
+
 const morbidityBlock = (offsetY = 0, includeHeader = false) => ({
-  fecha: includeHeader ? { x: 55, y: 228, yearOffset: 49 } : null,
+  fecha: includeHeader ? {
+    size: 5.2,
+    cells: {
+      day: subdivision(page3MorbidityDateBox, 0, 3),
+      month: subdivision(page3MorbidityDateBox, 1, 3),
+      year: subdivision(page3MorbidityDateBox, 2, 3),
+    },
+  } : null,
   hora: includeHeader ? {
-    hour: { x: 162, y: 228 },
-    minute: { x: 186, y: 228 },
+    size: 5.2,
+    cells: {
+      hour: subdivision(page3MorbidityTimeBox, 0, 2),
+      minute: subdivision(page3MorbidityTimeBox, 1, 2),
+    },
   } : null,
   motivoConsulta: includeHeader ? {
     ...morbidityText({ firstLineX: 300, firstLineWidth: 286, y: 214, maxLines: 2 }),
