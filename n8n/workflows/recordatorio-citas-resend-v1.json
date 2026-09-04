@@ -25,7 +25,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/proximas-citas' : 'http://127.0.0.1:3001/api/automatizaciones/v1/proximas-citas' }}",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://127.0.0.1:3335/api/automatizaciones/v1/proximas-citas' : 'http://127.0.0.1:3335/api/automatizaciones/v1/proximas-citas' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendQuery": true,
@@ -90,7 +90,7 @@
       "parameters": {
         "authentication": "apiKey",
         "from": "CAP Prenatal <citas@notificaciones.example.invalid>",
-        "to": "responsable@example.invalid",
+        "to": "distritoelchalsaludreproductiv@gmail.com",
         "subject": "={{ $json.subject }}",
         "html": "={{ $json.html }}",
         "additionalOptions": {}

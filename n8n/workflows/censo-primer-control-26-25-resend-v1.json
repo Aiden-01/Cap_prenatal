@@ -45,7 +45,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/censo-primer-control' : 'http://127.0.0.1:3001/api/automatizaciones/v1/censo-primer-control' }}",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://127.0.0.1:3335/api/automatizaciones/v1/censo-primer-control' : 'http://127.0.0.1:3335/api/automatizaciones/v1/censo-primer-control' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendQuery": true,
@@ -142,7 +142,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/censo-primer-control/excel' : 'http://127.0.0.1:3001/api/automatizaciones/v1/censo-primer-control/excel' }}",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://127.0.0.1:3335/api/automatizaciones/v1/censo-primer-control/excel' : 'http://127.0.0.1:3335/api/automatizaciones/v1/censo-primer-control/excel' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendQuery": true,
@@ -192,7 +192,7 @@
       "parameters": {
         "authentication": "apiKey",
         "from": "CAP Prenatal <censo@notificaciones.example.invalid>",
-        "to": "responsable@example.invalid",
+        "to": "distritoelchalsaludreproductiv@gmail.com",
         "subject": "={{ $json.subject }}",
         "html": "={{ $json.html }}",
         "additionalOptions": {}
@@ -211,7 +211,7 @@
       "parameters": {
         "authentication": "apiKey",
         "from": "CAP Prenatal <censo@notificaciones.example.invalid>",
-        "to": "responsable@example.invalid",
+        "to": "distritoelchalsaludreproductiv@gmail.com",
         "subject": "={{ $node[\"Validar y preparar correo\"].json.subject }}",
         "html": "={{ $node[\"Validar y preparar correo\"].json.html }}",
         "additionalOptions": {

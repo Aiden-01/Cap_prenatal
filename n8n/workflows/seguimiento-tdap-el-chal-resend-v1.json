@@ -136,7 +136,7 @@
         "nodeCredentialType": "resendApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { from: 'CAP Prenatal <citas@notificaciones.example.invalid>', to: ['responsable@example.invalid'], subject: $json.subject, html: $json.html, attachments: [{ filename: $json.filename, content: $json.attachment_base64 }] } }}",
+        "jsonBody": "={{ { from: 'CAP Prenatal <citas@notificaciones.example.invalid>', to: ['distritoelchalsaludreproductiv@gmail.com'], subject: $json.subject, html: $json.html, attachments: [{ filename: $json.filename, content: $json.attachment_base64 }] } }}",
         "options": {
           "redirect": { "redirect": { "followRedirects": false } },
           "response": { "response": { "fullResponse": false, "neverError": false, "responseFormat": "json" } },
@@ -154,7 +154,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/tdap/preparar' : 'http://127.0.0.1:3001/api/automatizaciones/v1/tdap/preparar' }}",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://127.0.0.1:3335/api/automatizaciones/v1/tdap/preparar' : 'http://127.0.0.1:3335/api/automatizaciones/v1/tdap/preparar' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": false,
@@ -210,7 +210,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/tdap/xlsx' : 'http://127.0.0.1:3001/api/automatizaciones/v1/tdap/xlsx' }}",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://127.0.0.1:3335/api/automatizaciones/v1/tdap/xlsx' : 'http://127.0.0.1:3335/api/automatizaciones/v1/tdap/xlsx' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -239,7 +239,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/tdap/confirmar' : 'http://127.0.0.1:3001/api/automatizaciones/v1/tdap/confirmar' }}",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://127.0.0.1:3335/api/automatizaciones/v1/tdap/confirmar' : 'http://127.0.0.1:3335/api/automatizaciones/v1/tdap/confirmar' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": false,

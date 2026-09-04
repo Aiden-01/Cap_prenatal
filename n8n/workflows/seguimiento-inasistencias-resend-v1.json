@@ -27,7 +27,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/inasistencias/preparar' : 'http://127.0.0.1:3001/api/automatizaciones/v1/inasistencias/preparar' }}",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://127.0.0.1:3335/api/automatizaciones/v1/inasistencias/preparar' : 'http://127.0.0.1:3335/api/automatizaciones/v1/inasistencias/preparar' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": false,
@@ -96,7 +96,7 @@
       "parameters": {
         "authentication": "apiKey",
         "from": "CAP Prenatal <citas@notificaciones.example.invalid>",
-        "to": "responsable@example.invalid",
+        "to": "distritoelchalsaludreproductiv@gmail.com",
         "subject": "={{ $json.subject }}",
         "html": "={{ $json.html }}",
         "additionalOptions": {}
@@ -111,7 +111,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $execution.mode === 'trigger' ? 'http://backend:3001/api/automatizaciones/v1/inasistencias/confirmar' : 'http://127.0.0.1:3001/api/automatizaciones/v1/inasistencias/confirmar' }}",
+        "url": "={{ $execution.mode === 'trigger' ? 'http://127.0.0.1:3335/api/automatizaciones/v1/inasistencias/confirmar' : 'http://127.0.0.1:3335/api/automatizaciones/v1/inasistencias/confirmar' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": false,
