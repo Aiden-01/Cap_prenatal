@@ -176,6 +176,44 @@ test('embarazo cerrado continua rechazando escrituras', async () => {
   }
 });
 
+test('validacion de creacion de control acepta solo embarazo activo', async () => {
+  const poolPath = require.resolve('../src/db/pool');
+  const embarazosPath = require.resolve('../src/utils/embarazos');
+  const previousPool = require.cache[poolPath];
+  const previousEmbarazos = require.cache[embarazosPath];
+  let estado = 'activo';
+
+  require.cache[poolPath] = {
+    id: poolPath,
+    filename: poolPath,
+    loaded: true,
+    exports: {
+      query: async () => ({ rows: [{ id: 7, paciente_id: 42, estado }] }),
+    },
+  };
+  delete require.cache[embarazosPath];
+
+  try {
+    const { validarEmbarazoActivo } = require('../src/utils/embarazos');
+    assert.equal(
+      (await validarEmbarazoActivo({ pacienteId: 42, embarazoId: 7, bloquear: true })).estado,
+      'activo'
+    );
+
+    for (estado of ['puerperio', 'cerrado']) {
+      await assert.rejects(
+        validarEmbarazoActivo({ pacienteId: 42, embarazoId: 7, bloquear: true }),
+        (error) => error.statusCode === 409 && error.code === 'NO_ACTIVE_PREGNANCY'
+      );
+    }
+  } finally {
+    if (previousPool) require.cache[poolPath] = previousPool;
+    else delete require.cache[poolPath];
+    if (previousEmbarazos) require.cache[embarazosPath] = previousEmbarazos;
+    else delete require.cache[embarazosPath];
+  }
+});
+
 const routeContracts = {
   'riesgo.js': [
     ["router.get('/', verificarPermiso('pacientes.ver')"],

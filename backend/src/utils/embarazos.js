@@ -3,6 +3,12 @@ const { HttpError } = require('./httpError');
 
 const ESTADOS_EDITABLES = ['activo', 'puerperio'];
 
+function errorSinEmbarazoActivo() {
+  return new HttpError(409, 'No hay embarazo activo para registrar controles prenatales', {
+    code: 'NO_ACTIVE_PREGNANCY',
+  });
+}
+
 function requerirEmbarazoId(embarazoId) {
   if (!embarazoId) {
     throw new HttpError(400, 'embarazo_id es obligatorio', {
@@ -68,6 +74,22 @@ async function validarEmbarazoEditable({
   return embarazo;
 }
 
+async function validarEmbarazoActivo({
+  pacienteId,
+  embarazoId,
+  db = pool,
+  bloquear = false,
+}) {
+  const embarazo = await obtenerEmbarazoDePaciente({ pacienteId, embarazoId, db, bloquear });
+  if (!embarazo) {
+    throw new HttpError(404, 'Embarazo no encontrado para esta paciente', {
+      code: 'PREGNANCY_NOT_FOUND',
+    });
+  }
+  if (embarazo.estado !== 'activo') throw errorSinEmbarazoActivo();
+  return embarazo;
+}
+
 async function obtenerEmbarazoActivoId(pacienteId) {
   const { rows } = await pool.query(
     `SELECT id
@@ -83,12 +105,7 @@ async function obtenerEmbarazoActivoId(pacienteId) {
 
 async function obtenerEmbarazoActivoRequeridoId(pacienteId) {
   const embarazoId = await obtenerEmbarazoActivoId(pacienteId);
-  if (!embarazoId) {
-    const error = new Error('No hay embarazo activo para registrar controles prenatales');
-    error.status = 409;
-    error.code = 'NO_ACTIVE_PREGNANCY';
-    throw error;
-  }
+  if (!embarazoId) throw errorSinEmbarazoActivo();
   return embarazoId;
 }
 
@@ -134,6 +151,7 @@ module.exports = {
   requerirEmbarazoId,
   obtenerEmbarazoDePaciente,
   resolverEmbarazoParaLectura,
+  validarEmbarazoActivo,
   validarEmbarazoEditable,
   obtenerEmbarazoActivoId,
   obtenerEmbarazoActivoRequeridoId,

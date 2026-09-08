@@ -3,6 +3,7 @@ const citasRepository = require('../repositories/citasPrenatalesRepository');
 const {
   requerirEmbarazoId,
   resolverEmbarazoParaLectura,
+  validarEmbarazoActivo,
   validarEmbarazoEditable,
 } = require('../utils/embarazos');
 const { withGuatemalaTimeFallback } = require('../utils/guatemalaTime');
@@ -260,7 +261,7 @@ async function crearControl({ pacienteId, embarazoId, body, req }) {
   const dataWithTime = withGuatemalaTimeFallback(body);
   requerirEmbarazoId(embarazoId);
   return controlesRepository.enTransaccion(async (client) => {
-    await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
+    await validarEmbarazoActivo({ pacienteId, embarazoId, db: client, bloquear: true });
     const before = await controlesRepository.obtenerPorNumeroYEmbarazo(
       embarazoId,
       dataWithTime.numero_control,
@@ -297,7 +298,7 @@ async function crearControl({ pacienteId, embarazoId, body, req }) {
       updateFields: before ? modifiedFields : updateFields,
     }, client);
     if (!control) {
-      await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
+      await validarEmbarazoActivo({ pacienteId, embarazoId, db: client, bloquear: true });
       throw new HttpError(409, 'No fue posible guardar el control');
     }
 

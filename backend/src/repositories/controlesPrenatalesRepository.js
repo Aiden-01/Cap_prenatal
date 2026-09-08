@@ -138,13 +138,13 @@ async function upsert({ data, updateFields }, db = pool) {
   const embarazoParam = campos.indexOf('embarazo_id') + 1;
 
   const { rows } = await db.query(
-    `WITH embarazo_editable AS (
+    `WITH embarazo_activo AS (
        SELECT id FROM embarazos
        WHERE id=$${embarazoParam} AND paciente_id=$${pacienteParam}
-         AND estado IN ('activo', 'puerperio') FOR UPDATE
+         AND estado = 'activo' FOR UPDATE
      )
      INSERT INTO controles_prenatales (${campos.join(', ')})
-     SELECT ${placeholders} FROM embarazo_editable
+     SELECT ${placeholders} FROM embarazo_activo
      ON CONFLICT (embarazo_id, numero_control) DO UPDATE SET
         ${updateSet},
         updated_at = NOW(),

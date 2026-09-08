@@ -97,6 +97,11 @@ async function withService({ repository = {}, appointments = {}, audit, pregnanc
       resolverEmbarazoParaLectura: pregnancies.resolverEmbarazoParaLectura || (async () => {
         throw new Error('Llamada inesperada a resolverEmbarazoParaLectura');
       }),
+      validarEmbarazoActivo: pregnancies.validarEmbarazoActivo
+        || pregnancies.validarEmbarazoEditable
+        || (async () => {
+          throw new Error('Llamada inesperada a validarEmbarazoActivo');
+        }),
       validarEmbarazoEditable: pregnancies.validarEmbarazoEditable || (async () => {
         throw new Error('Llamada inesperada a validarEmbarazoEditable');
       }),
@@ -734,6 +739,108 @@ test('actualiza un control existente según los campos enviados', async () => {
   });
 });
 
+test('CAP-56 no bloquea la edicion actual de un control existente en puerperio', async () => {
+  const before = { id: 301, paciente_id: 41, embarazo_id: 91, peso_kg: 62.5 };
+  const updated = { ...before, peso_kg: 63.2, updated_by: ACTOR.usuario.id };
+  let validations = 0;
+  let updates = 0;
+
+  await withService({
+    repository: {
+      obtenerPorId: async () => before,
+      actualizar: async () => {
+        updates += 1;
+        return updated;
+      },
+    },
+    pregnancies: {
+      validarEmbarazoEditable: async () => {
+        validations += 1;
+        return { id: 91, paciente_id: 41, estado: 'puerperio' };
+      },
+    },
+  }, async (service) => {
+    assert.equal(await service.actualizarControl({
+      pacienteId: 41,
+      embarazoId: 91,
+      id: 301,
+      body: { peso_kg: 63.2 },
+      req: ACTOR,
+    }), updated);
+  });
+
+  assert.equal(validations, 1);
+  assert.equal(updates, 1);
+});
+
+for (const estado of ['activo', 'puerperio', 'cerrado']) {
+  test(`crear control exige embarazo activo y evita efectos parciales en estado ${estado}`, async () => {
+    const calls = [];
+    const created = { id: 301, paciente_id: 41, embarazo_id: 91, ...VALID_CONTROL };
+
+    await withService({
+      repository: {
+        obtenerPorNumeroYEmbarazo: async () => {
+          calls.push('buscar-control');
+          return null;
+        },
+        upsert: async () => {
+          calls.push('insertar-control');
+          return created;
+        },
+      },
+      appointments: {
+        listarProgramadasVigentesPorEmbarazo: async () => {
+          calls.push('buscar-citas');
+          return [];
+        },
+        crearProgramadaDesdeControl: async () => {
+          calls.push('crear-cita');
+          return { id: 701 };
+        },
+      },
+      pregnancies: {
+        validarEmbarazoActivo: async () => {
+          calls.push('validar-embarazo-activo');
+          if (estado !== 'activo') {
+            throw new HttpError(409, 'No hay embarazo activo para registrar controles prenatales', {
+              code: 'NO_ACTIVE_PREGNANCY',
+            });
+          }
+          return { id: 91, paciente_id: 41, estado };
+        },
+      },
+      audit: async () => calls.push('auditoria'),
+    }, async (service) => {
+      const request = {
+        pacienteId: 41,
+        embarazoId: 91,
+        body: { ...VALID_CONTROL, cita_siguiente: '2026-07-13' },
+        req: ACTOR,
+      };
+
+      if (estado === 'activo') {
+        assert.equal(await service.crearControl(request), created);
+        assert.deepEqual(calls, [
+          'validar-embarazo-activo',
+          'buscar-control',
+          'buscar-citas',
+          'insertar-control',
+          'crear-cita',
+          'auditoria',
+        ]);
+        return;
+      }
+
+      await assert.rejects(
+        service.crearControl(request),
+        (error) => error.statusCode === 409 && error.code === 'NO_ACTIVE_PREGNANCY'
+      );
+      assert.deepEqual(calls, ['validar-embarazo-activo']);
+    });
+  });
+}
+
 test('NULL a fecha actualiza el ultimo control y crea su cita estructurada atomicamente', async () => {
   const client = { transaction: 'control-appointment-create' };
   const before = {
@@ -1362,7 +1469,7 @@ test('un fallo de escritura no genera auditoria ni una segunda escritura parcial
   });
 });
 
-test('el repositorio mantiene bloqueo, validacion y upsert en una sola sentencia', async () => {
+test('el repositorio restringe el upsert atomico a un embarazo activo', async () => {
   const calls = [];
   const pool = {
     query: async (sql, params) => {
@@ -1388,7 +1495,9 @@ test('el repositorio mantiene bloqueo, validacion y upsert en una sola sentencia
   });
 
   assert.equal(calls.length, 1);
-  assert.match(calls[0].sql, /WITH embarazo_editable AS/);
+  assert.match(calls[0].sql, /WITH embarazo_activo AS/);
+  assert.match(calls[0].sql, /estado = 'activo'/);
+  assert.doesNotMatch(calls[0].sql, /puerperio/);
   assert.match(calls[0].sql, /FOR UPDATE/);
   assert.match(calls[0].sql, /INSERT INTO controles_prenatales/);
   assert.match(calls[0].sql, /ON CONFLICT \(embarazo_id, numero_control\) DO UPDATE/);

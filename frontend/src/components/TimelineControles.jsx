@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { isValidPregnancyId } from "../utils/pregnancyState";
 import {
+  canCreatePrenatalControl,
   canConsultPrenatalControl,
   prenatalControlDetailPath,
 } from "../utils/prenatalControlAccess";
@@ -152,10 +153,16 @@ export default function TimelineControles({
   isReadOnly = false,
   puedeConsultar = false,
   puedeCrear = false,
+  estadoEmbarazo,
 }) {
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState(null);
   const hasEmbarazoId = isValidPregnancyId(embarazoId);
+  const puedeRegistrar = canCreatePrenatalControl({
+    canWrite: puedeCrear,
+    pregnancyState: estadoEmbarazo,
+    pregnancyId: embarazoId,
+  });
 
   const controlesOrdenados = Array.isArray(controles)
     ? [...controles].sort((a, b) => controlTime(b) - controlTime(a))
@@ -166,7 +173,7 @@ export default function TimelineControles({
       <div className="card empty-state" style={{ display: "grid", justifyItems: "center", gap: "0.85rem" }}>
         <ClipboardList size={28} style={{ color: "var(--primary)" }} />
         <span>Sin controles registrados aun</span>
-        {!isReadOnly && puedeCrear && hasEmbarazoId && (
+        {!isReadOnly && puedeRegistrar && hasEmbarazoId && (
           <button className="btn-primary" onClick={() => navigate(`/pacientes/${pacienteId}/controles/nuevo?embarazo_id=${encodeURIComponent(embarazoId)}`)}>
             Registrar primer control
           </button>

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import {
+  canCreatePrenatalControl,
   canConsultPrenatalControl,
   canEditPrenatalControl,
   prenatalControlDetailPath,
@@ -15,6 +16,33 @@ const controlContext = {
   embarazoId: 88,
   controlId: 201,
 };
+
+for (const [estado, permitido] of [
+  ["activo", true],
+  ["puerperio", false],
+  ["cerrado", false],
+]) {
+  test(`crear control prenatal en embarazo ${estado}: ${permitido ? "permitido" : "rechazado"}`, () => {
+    assert.equal(canCreatePrenatalControl({
+      canWrite: true,
+      pregnancyState: estado,
+      pregnancyId: 88,
+    }), permitido);
+  });
+}
+
+test("crear control activo tambien exige permiso e identificador de embarazo", () => {
+  assert.equal(canCreatePrenatalControl({
+    canWrite: false,
+    pregnancyState: "activo",
+    pregnancyId: 88,
+  }), false);
+  assert.equal(canCreatePrenatalControl({
+    canWrite: true,
+    pregnancyState: "activo",
+    pregnancyId: null,
+  }), false);
+});
 
 for (const estado of ["activo", "puerperio", "cerrado"]) {
   test(`separa consulta y edicion del control en embarazo ${estado}`, () => {
@@ -68,7 +96,7 @@ test("el detalle cerrado carga el GET y muestra el formulario en solo lectura", 
   assert.match(detail, /disabled=\{soloLectura\}/);
   assert.match(detail, /workflowMode = soloLectura \? "readonly"/);
   assert.match(workflow, /readonly: "Solo lectura"/);
-  assert.match(detail, /\{puedeEditar && \(/);
+  assert.match(detail, /\{puedeGuardar && \(/);
   assert.match(detail, /\{soloLectura \? "Volver" : "Cancelar"\}/);
   assert.doesNotMatch(detail, />\s*Eliminar\s*</);
 });
@@ -80,4 +108,24 @@ test("el expediente entrega permisos separados de lectura y creacion", async () 
   assert.match(expediente, /puedeCrearControles.*"controles\.crear"/);
   assert.match(expediente, /puedeConsultar=\{puedeConsultarControles\}/);
   assert.match(expediente, /puedeCrear=\{puedeCrearControles\}/);
+  assert.match(expediente, /estadoEmbarazo=\{estadoEmbarazo\}/);
+  assert.match(expediente, /const puedeRegistrarPrenatal = canCreatePrenatalControl/);
+});
+
+test("TimelineControles no ofrece el primer control sin embarazo activo", async () => {
+  const timeline = await source("src/components/TimelineControles.jsx");
+
+  assert.match(timeline, /const puedeRegistrar = canCreatePrenatalControl/);
+  assert.match(timeline, /pregnancyState: estadoEmbarazo/);
+  assert.match(timeline, /!isReadOnly && puedeRegistrar && hasEmbarazoId/);
+});
+
+test("la ruta directa de nuevo control rechaza puerperio sin afectar la edicion", async () => {
+  const detail = await source("src/pages/NuevoControl.jsx");
+
+  assert.match(detail, /const puedeCrear = canCreatePrenatalControl/);
+  assert.match(detail, /if \(!editando && selectedState !== "activo"\)/);
+  assert.match(detail, /Los controles prenatales nuevos solo se registran en un embarazo activo/);
+  assert.match(detail, /const puedeGuardar = editando \? puedeEditar : puedeCrear/);
+  assert.match(detail, /await api\.put\(`\/pacientes\/\$\{id\}\/controles\/\$\{controlId\}`/);
 });

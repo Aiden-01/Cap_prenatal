@@ -29,6 +29,7 @@ import {
   ClinicalWorkflowShell,
 } from "../components/clinical/ClinicalWorkflow";
 import {
+  canCreatePrenatalControl,
   canConsultPrenatalControl,
   canEditPrenatalControl,
 } from "../utils/prenatalControlAccess";
@@ -388,6 +389,7 @@ export default function NuevoControl() {
   const [fur, setFur]         = useState("");
   const [paciente, setPaciente] = useState(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
+  const [pregnancyState, setPregnancyState] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const todayInputValue = getGuatemalaDateInputValue();
   const puedeConsultar = editando && canConsultPrenatalControl({
@@ -403,10 +405,16 @@ export default function NuevoControl() {
       isReadOnly,
     })
     : Boolean(hasEmbarazoId && tienePermisoEscritura && !isReadOnly);
+  const puedeCrear = canCreatePrenatalControl({
+    canWrite: tienePermisoEscritura,
+    pregnancyState,
+    pregnancyId: embarazoId,
+  });
+  const puedeGuardar = editando ? puedeEditar : puedeCrear;
   const soloLectura = editando && puedeConsultar && !puedeEditar;
 
   const set = (k, v) => {
-    if (soloLectura) return;
+    if (!puedeGuardar) return;
     setForm((f) => ({ ...f, [k]: v }));
     setFieldErrors((errors) => {
       if (!errors[k]) return errors;
@@ -417,7 +425,7 @@ export default function NuevoControl() {
   };
   const inputClass = (name) => `input-field ${fieldErrors[name] ? "input-error" : ""}`;
   const fieldError = (name) => fieldErrors[name];
-  const p = { form, set, errors: fieldErrors, disabled: soloLectura };
+  const p = { form, set, errors: fieldErrors, disabled: !puedeGuardar };
   const handleTabKeyDown = (event, currentTabId) => {
     const currentIndex = TABS.findIndex((item) => item.id === currentTabId);
     let nextIndex;
@@ -466,9 +474,16 @@ export default function NuevoControl() {
     Promise.all([controlesRequest, api.get(`/pacientes/${id}/expediente`, { params: { embarazo_id: embarazoId } })])
       .then(([{ data }, { data: expediente }]) => {
         const readOnly = Boolean(expediente?.is_read_only);
+        const selectedState = expediente?.embarazo_seleccionado?.estado || null;
         setIsReadOnly(readOnly);
+        setPregnancyState(selectedState);
         if (readOnly && !editando) {
           toast("El embarazo esta cerrado y es de solo lectura", "error");
+          navigate(expedientePath, { replace: true });
+          return;
+        }
+        if (!editando && selectedState !== "activo") {
+          toast("Los controles prenatales nuevos solo se registran en un embarazo activo", "error");
           navigate(expedientePath, { replace: true });
           return;
         }
@@ -521,7 +536,7 @@ export default function NuevoControl() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!puedeEditar) {
+    if (!puedeGuardar) {
       toast("Este control es de solo lectura", "error");
       return;
     }
@@ -598,7 +613,7 @@ export default function NuevoControl() {
           </ClinicalNotice>
         )}
 
-        <fieldset disabled={soloLectura} className="control-form-fieldset">
+        <fieldset disabled={!puedeGuardar} className="control-form-fieldset">
         <div className="control-context-summary" aria-label="Resumen del control">
           <div className="control-context-item">
             <span className="control-context-icon" aria-hidden="true"><ClipboardList size={16} /></span>
@@ -1053,7 +1068,7 @@ export default function NuevoControl() {
           <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>
             {soloLectura ? "Volver" : "Cancelar"}
           </button>
-          {puedeEditar && (
+          {puedeGuardar && (
             <button type="submit" className="btn-primary" disabled={loading}
               style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
               <Save size={15} />

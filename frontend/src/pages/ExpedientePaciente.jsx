@@ -25,6 +25,7 @@ import {
   pregnancyActionLabel,
   selectedPregnancy,
 } from "../utils/pregnancyState";
+import { canCreatePrenatalControl } from "../utils/prenatalControlAccess";
 import {
   VACCINE_TYPES,
   getVaccineStatus,
@@ -827,7 +828,11 @@ export default function ExpedientePaciente() {
       : nombreCompleto.length > 24
         ? "is-medium"
       : "";
-  const puedeRegistrarPrenatal = estadoEmbarazo === "activo" && puedeCrearControles;
+  const puedeRegistrarPrenatal = canCreatePrenatalControl({
+    canWrite: puedeCrearControles,
+    pregnancyState: estadoEmbarazo,
+    pregnancyId: embarazoSeleccionado?.id,
+  });
   const puedeRegistrarPuerperio = estadoEmbarazo === "activo" || estadoEmbarazo === "puerperio";
   const riskTotalCriteria = riskTotalCount();
   const riskPositiveCriteria = exp.ficha_riesgo
@@ -1424,6 +1429,7 @@ export default function ExpedientePaciente() {
             isReadOnly={isReadOnly}
             puedeConsultar={puedeConsultarControles}
             puedeCrear={puedeCrearControles}
+            estadoEmbarazo={estadoEmbarazo}
           />
         </div>
       )}

@@ -27,6 +27,18 @@ export function canEditPrenatalControl({
   return Boolean(canConsult && canWrite && !isReadOnly);
 }
 
+export function canCreatePrenatalControl({
+  canWrite = false,
+  pregnancyState,
+  pregnancyId,
+}) {
+  return Boolean(
+    canWrite
+    && isValidPregnancyId(pregnancyId)
+    && String(pregnancyState || "").trim().toLowerCase() === "activo"
+  );
+}
+
 export function prenatalControlDetailPath({ pacienteId, embarazoId, controlId }) {
   if (!isValidEntityId(pacienteId) || !isValidPregnancyId(embarazoId) || !isValidEntityId(controlId)) {
     return null;
