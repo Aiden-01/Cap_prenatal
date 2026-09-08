@@ -39,6 +39,12 @@ export function canCreatePrenatalControl({
   );
 }
 
+export function preparePrenatalControlUpdatePayload(payload, structuredAppointment) {
+  const nextPayload = { ...payload };
+  if (structuredAppointment?.id) delete nextPayload.cita_siguiente;
+  return nextPayload;
+}
+
 export function prenatalControlDetailPath({ pacienteId, embarazoId, controlId }) {
   if (!isValidEntityId(pacienteId) || !isValidPregnancyId(embarazoId) || !isValidEntityId(controlId)) {
     return null;

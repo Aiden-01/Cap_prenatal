@@ -186,14 +186,6 @@ function citaVigenteYaExiste() {
   );
 }
 
-function citaOriginadaPorControlYaExiste() {
-  return new HttpError(
-    409,
-    'El control ya tiene una cita estructurada asociada',
-    { code: 'CITA_CONTROL_ORIGEN_EXISTENTE' }
-  );
-}
-
 function resolverCitaProgramadaInequivoca(citas) {
   if (citas.length <= 1) return citas[0] || null;
   throw new HttpError(
@@ -254,7 +246,19 @@ async function obtenerControl({ pacienteId, embarazoId = null, id }) {
   if (embarazoId && String(control.embarazo_id) !== String(embarazoId)) {
     throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
   }
-  return control;
+  const citaEstructurada = await citasRepository.obtenerUltimaPorControl({
+    controlId: control.id,
+    embarazoId: control.embarazo_id,
+  });
+  if (!citaEstructurada) return control;
+  return {
+    ...control,
+    cita_estructurada: {
+      id: citaEstructurada.id,
+      fecha_programada: citaEstructurada.fecha_programada,
+      estado: citaEstructurada.estado,
+    },
+  };
 }
 
 async function crearControl({ pacienteId, embarazoId, body, req }) {
@@ -381,13 +385,42 @@ async function actualizarControl({ pacienteId, embarazoId, id, body, req }) {
       throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
     }
 
-    const modifiedFields = camposRealmenteModificados(before, data, campos);
+    const citaFueEnviada = campos.includes('cita_siguiente');
+    const camposClinicos = campos.filter((campo) => campo !== 'cita_siguiente');
+    const modifiedFields = camposRealmenteModificados(before, data, camposClinicos);
+    let transicionCita = null;
+
+    if (citaFueEnviada) {
+      const citaEstructurada = await citasRepository.obtenerUltimaPorControl(
+        { controlId: before.id, embarazoId },
+        client,
+        { bloquear: true }
+      );
+      if (citaEstructurada) {
+        if (esValorVacio(data.cita_siguiente)) {
+          throw new HttpError(
+            409,
+            'Para quitar una cita vigente debe utilizar el flujo Cancelar cita',
+            { code: 'CITA_CANCELACION_REQUERIDA' }
+          );
+        }
+        if (!valoresControlEquivalentes(
+          citaEstructurada.fecha_programada,
+          data.cita_siguiente
+        )) {
+          impedirCambioHistoricoDeCita(['cita_siguiente']);
+        }
+      } else if (!valoresControlEquivalentes(before.cita_siguiente, data.cita_siguiente)) {
+        modifiedFields.push('cita_siguiente');
+        transicionCita = resolverTransicionDeCita(
+          before.cita_siguiente,
+          data.cita_siguiente,
+          modifiedFields
+        );
+      }
+    }
+
     if (modifiedFields.length === 0) return before;
-    const transicionCita = resolverTransicionDeCita(
-      before.cita_siguiente,
-      data.cita_siguiente,
-      modifiedFields
-    );
 
     if (transicionCita === 'crear') {
       const existePosterior = await controlesRepository.existeControlPosterior({
@@ -397,13 +430,6 @@ async function actualizarControl({ pacienteId, embarazoId, id, body, req }) {
         fecha: before.fecha,
       }, client);
       if (existePosterior) throw controlHistoricoNoPuedeOriginarCita();
-
-      const citaOriginada = await citasRepository.obtenerOriginadaPorControl(
-        { controlId: before.id, embarazoId },
-        client,
-        { bloquear: true }
-      );
-      if (citaOriginada) throw citaOriginadaPorControlYaExiste();
 
       const citasVigentes = await citasRepository.listarProgramadasVigentesPorEmbarazo(
         embarazoId,

@@ -28,12 +28,24 @@ test("NuevoControl conserva rutas, payload y barreras funcionales", async () => 
   assert.match(control, /api\.get\(`\/pacientes\/\$\{id\}\/controles`/);
   assert.match(control, /api\.put\(`\/pacientes\/\$\{id\}\/controles\/\$\{controlId\}`, payload/);
   assert.match(control, /api\.post\(`\/pacientes\/\$\{id\}\/controles`, payload/);
-  assert.match(control, /const payload = \{\s*\.\.\.form,/);
+  assert.match(control, /let payload = \{\s*\.\.\.form,/);
+  assert.match(control, /preparePrenatalControlUpdatePayload\(payload, structuredAppointment\)/);
   assert.match(control, /delete payload\.vih_realizado/);
   assert.match(control, /canConsultPrenatalControl/);
   assert.match(control, /canEditPrenatalControl/);
   assert.match(control, /fieldset disabled=\{soloLectura\}/);
   assert.match(control, /disabled=\{loading\}/);
+});
+
+test("la edicion separa datos clinicos de una cita estructurada", async () => {
+  const control = await source("src/pages/NuevoControl.jsx");
+
+  assert.match(control, /setStructuredAppointment\(data\?\.cita_estructurada \|\| null\)/);
+  assert.match(control, /editando && structuredAppointment/);
+  assert.match(control, /value=\{toDateInputValue\(structuredAppointment\.fecha_programada\)\}/);
+  assert.match(control, /readOnly/);
+  assert.match(control, /utiliza Reprogramar/);
+  assert.match(control, /Su historial no se modifica desde este control/);
 });
 
 test("UX-02A mantiene pestañas, accesibilidad y movimiento reducible", async () => {

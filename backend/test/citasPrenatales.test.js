@@ -249,6 +249,36 @@ test('repositorio localiza la cita raiz del control y permite bloquearla', async
   assert.match(captured.sql, /FOR UPDATE/);
 });
 
+test('repositorio localiza la ultima cita de la cadena del control', async () => {
+  let captured;
+  const latest = {
+    id: 702,
+    estado: 'programada',
+    control_origen_id: 302,
+    reprogramada_desde_id: 701,
+  };
+  const pool = {
+    async query(sql, params) {
+      captured = { sql, params };
+      return { rows: [latest] };
+    },
+  };
+
+  await withRepository(pool, async (repository) => {
+    assert.equal(await repository.obtenerUltimaPorControl({
+      controlId: 302,
+      embarazoId: 91,
+    }, pool, { bloquear: true }), latest);
+  });
+
+  assert.deepEqual(captured.params, [302, 91]);
+  assert.match(captured.sql, /control_origen_id = \$1/);
+  assert.match(captured.sql, /embarazo_id = \$2/);
+  assert.match(captured.sql, /ORDER BY created_at DESC, id DESC/);
+  assert.doesNotMatch(captured.sql, /reprogramada_desde_id IS NULL/);
+  assert.match(captured.sql, /FOR UPDATE/);
+});
+
 test('repositorio resuelve solo la cita programada sin cumplimiento y permite bloquearla', async () => {
   let captured;
   await withRepository({

@@ -124,6 +124,23 @@ async function obtenerOriginadaPorControl(
   return rows[0] || null;
 }
 
+async function obtenerUltimaPorControl(
+  { controlId, embarazoId },
+  db = pool,
+  { bloquear = false } = {}
+) {
+  const { rows = [] } = await db.query(
+    `SELECT *
+     FROM citas_prenatales
+     WHERE control_origen_id = $1
+       AND embarazo_id = $2
+     ORDER BY created_at DESC, id DESC
+     LIMIT 1${bloquear ? '\n     FOR UPDATE' : ''}`,
+    [controlId, embarazoId]
+  );
+  return rows[0] || null;
+}
+
 async function marcarAtendida({ citaId, embarazoId, controlCumplimientoId, usuarioId }, db = pool) {
   const { rows = [] } = await db.query(
     `UPDATE citas_prenatales
@@ -234,5 +251,6 @@ module.exports = {
   marcarCancelada,
   marcarReprogramada,
   obtenerOriginadaPorControl,
+  obtenerUltimaPorControl,
   obtenerPorIdYEmbarazo,
 };

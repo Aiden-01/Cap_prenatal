@@ -425,6 +425,13 @@ html.dark .control-lab-state.is-complete {
   }
 }
 
+.control-field-hint {
+  margin: 0.4rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .control-workflow-notice,
   .control-tab-panel,

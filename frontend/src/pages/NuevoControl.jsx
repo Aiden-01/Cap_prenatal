@@ -32,6 +32,7 @@ import {
   canCreatePrenatalControl,
   canConsultPrenatalControl,
   canEditPrenatalControl,
+  preparePrenatalControlUpdatePayload,
 } from "../utils/prenatalControlAccess";
 import "./nuevo-control.css";
 
@@ -390,6 +391,7 @@ export default function NuevoControl() {
   const [paciente, setPaciente] = useState(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [pregnancyState, setPregnancyState] = useState(null);
+  const [structuredAppointment, setStructuredAppointment] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const todayInputValue = getGuatemalaDateInputValue();
   const puedeConsultar = editando && canConsultPrenatalControl({
@@ -490,6 +492,7 @@ export default function NuevoControl() {
         setFur(expediente?.embarazo_seleccionado?.fur || "");
         setPaciente(expediente?.paciente || null);
         if (editando) {
+          setStructuredAppointment(data?.cita_estructurada || null);
           setForm(parseControl(data));
           return;
         }
@@ -546,7 +549,7 @@ export default function NuevoControl() {
     }
     setLoading(true);
     setFieldErrors({});
-    const payload = {
+    let payload = {
       ...form,
       edad_gestacional_semanas: edadGestacionalSemanas,
       vih_resultado_valor: "",
@@ -554,6 +557,9 @@ export default function NuevoControl() {
       torch_resultado_valor: "",
       papanicolau_ivaa_fecha_toma: "",
     };
+    if (editando) {
+      payload = preparePrenatalControlUpdatePayload(payload, structuredAppointment);
+    }
     if (editando && !puedeVerVih) {
       delete payload.vih_realizado;
       delete payload.vih_resultado;
@@ -629,7 +635,10 @@ export default function NuevoControl() {
           </div>
           <div className="control-context-item">
             <span className="control-context-icon" aria-hidden="true"><CalendarDays size={16} /></span>
-            <div><span>Próxima cita</span><strong>{form.cita_siguiente || "Por definir"}</strong></div>
+            <div>
+              <span>Próxima cita</span>
+              <strong>{toDateInputValue(structuredAppointment?.fecha_programada) || form.cita_siguiente || "Por definir"}</strong>
+            </div>
           </div>
         </div>
 
@@ -800,7 +809,26 @@ export default function NuevoControl() {
                     aria-describedby={fieldError("tratamiento") ? "control-tratamiento-error" : undefined}
                     onChange={(e) => set("tratamiento", e.target.value)} />
                 </Field>
-                <Inp label="Cita siguiente" name="cita_siguiente" type="date" {...p} />
+                {editando && structuredAppointment ? (
+                  <Field label="Cita siguiente" htmlFor="control-cita_siguiente">
+                    <input
+                      id="control-cita_siguiente"
+                      name="cita_siguiente"
+                      className="input-field"
+                      type="date"
+                      value={toDateInputValue(structuredAppointment.fecha_programada)}
+                      aria-describedby="control-cita_siguiente-hint"
+                      readOnly
+                    />
+                    <p id="control-cita_siguiente-hint" className="control-field-hint">
+                      {structuredAppointment.estado === "programada"
+                        ? "Esta cita se gestiona desde el calendario. Para cambiarla, utiliza Reprogramar."
+                        : `Cita ${structuredAppointment.estado}. Su historial no se modifica desde este control.`}
+                    </p>
+                  </Field>
+                ) : (
+                  <Inp label="Cita siguiente" name="cita_siguiente" type="date" {...p} />
+                )}
               </div>
             </ClinicalSection>
           </div>

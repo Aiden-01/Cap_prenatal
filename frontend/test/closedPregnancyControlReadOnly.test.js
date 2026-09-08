@@ -6,6 +6,7 @@ import {
   canCreatePrenatalControl,
   canConsultPrenatalControl,
   canEditPrenatalControl,
+  preparePrenatalControlUpdatePayload,
   prenatalControlDetailPath,
 } from "../src/utils/prenatalControlAccess.js";
 
@@ -42,6 +43,17 @@ test("crear control activo tambien exige permiso e identificador de embarazo", (
     pregnancyState: "activo",
     pregnancyId: null,
   }), false);
+});
+
+test("payload de edicion omite la cita gestionada y conserva NULL a fecha sin cita estructurada", () => {
+  const payload = { motivo_consulta: "Actualizado", cita_siguiente: "2026-09-17" };
+
+  assert.deepEqual(
+    preparePrenatalControlUpdatePayload(payload, { id: 701, estado: "programada" }),
+    { motivo_consulta: "Actualizado" }
+  );
+  assert.deepEqual(preparePrenatalControlUpdatePayload(payload, null), payload);
+  assert.deepEqual(payload, { motivo_consulta: "Actualizado", cita_siguiente: "2026-09-17" });
 });
 
 for (const estado of ["activo", "puerperio", "cerrado"]) {
