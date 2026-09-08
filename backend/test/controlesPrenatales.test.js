@@ -770,39 +770,88 @@ test('consulta de control informa la ultima cita estructurada sin exponer su his
   });
 });
 
-test('CAP-56 no bloquea la edicion actual de un control existente en puerperio', async () => {
+test('CAP-66 bloquea la edicion de un control existente en puerperio sin efectos parciales', async () => {
   const before = { id: 301, paciente_id: 41, embarazo_id: 91, peso_kg: 62.5 };
-  const updated = { ...before, peso_kg: 63.2, updated_by: ACTOR.usuario.id };
   let validations = 0;
   let updates = 0;
+  let appointmentCalls = 0;
+  let audits = 0;
 
   await withService({
     repository: {
       obtenerPorId: async () => before,
       actualizar: async () => {
         updates += 1;
-        return updated;
       },
+    },
+    appointments: {
+      obtenerUltimaPorControl: async () => { appointmentCalls += 1; },
+      crearProgramadaDesdeControl: async () => { appointmentCalls += 1; },
     },
     pregnancies: {
-      validarEmbarazoEditable: async () => {
+      validarEmbarazoEditable: async (args) => {
         validations += 1;
-        return { id: 91, paciente_id: 41, estado: 'puerperio' };
+        assert.deepEqual(args.estadosPermitidos, ['activo']);
+        throw closedPregnancyError();
       },
     },
+    audit: async () => { audits += 1; },
   }, async (service) => {
-    assert.equal(await service.actualizarControl({
-      pacienteId: 41,
-      embarazoId: 91,
-      id: 301,
-      body: { peso_kg: 63.2 },
-      req: ACTOR,
-    }), updated);
+    await assert.rejects(
+      service.actualizarControl({
+        pacienteId: 41,
+        embarazoId: 91,
+        id: 301,
+        body: { peso_kg: 63.2, cita_siguiente: '2026-09-17' },
+        req: ACTOR,
+      }),
+      (error) => error.statusCode === 409 && error.code === 'PREGNANCY_READ_ONLY'
+    );
   });
 
   assert.equal(validations, 1);
-  assert.equal(updates, 1);
+  assert.equal(updates, 0);
+  assert.equal(appointmentCalls, 0);
+  assert.equal(audits, 0);
 });
+
+for (const estado of ['puerperio', 'cerrado']) {
+  test(`CAP-66 bloquea eliminar un control en embarazo ${estado} antes de citas y auditoria`, async () => {
+    const before = { id: 301, paciente_id: 41, embarazo_id: 91 };
+    let deletes = 0;
+    let appointmentCalls = 0;
+    let audits = 0;
+
+    await withService({
+      repository: {
+        obtenerPorId: async () => before,
+        eliminar: async () => { deletes += 1; },
+      },
+      appointments: {
+        existeRelacionConControl: async () => {
+          appointmentCalls += 1;
+          return false;
+        },
+      },
+      pregnancies: {
+        validarEmbarazoEditable: async (args) => {
+          assert.deepEqual(args.estadosPermitidos, ['activo']);
+          throw closedPregnancyError();
+        },
+      },
+      audit: async () => { audits += 1; },
+    }, async (service) => {
+      await assert.rejects(
+        service.eliminarControl({ pacienteId: 41, embarazoId: 91, id: 301, req: ACTOR }),
+        (error) => error.statusCode === 409 && error.code === 'PREGNANCY_READ_ONLY'
+      );
+    });
+
+    assert.equal(deletes, 0);
+    assert.equal(appointmentCalls, 0);
+    assert.equal(audits, 0);
+  });
+}
 
 for (const estado of ['activo', 'puerperio', 'cerrado']) {
   test(`crear control exige embarazo activo y evita efectos parciales en estado ${estado}`, async () => {
@@ -1687,6 +1736,38 @@ test('el repositorio restringe el upsert atomico a un embarazo activo', async ()
   assert.match(calls[0].sql, /FOR UPDATE/);
   assert.match(calls[0].sql, /INSERT INTO controles_prenatales/);
   assert.match(calls[0].sql, /ON CONFLICT \(embarazo_id, numero_control\) DO UPDATE/);
+});
+
+test('el repositorio restringe actualizar y eliminar controles a un embarazo activo', async () => {
+  const calls = [];
+  const pool = {
+    query: async (sql, params) => {
+      calls.push({ sql, params });
+      if (/DELETE FROM controles_prenatales/.test(sql)) return { rows: [], rowCount: 0 };
+      return { rows: [] };
+    },
+  };
+
+  await withRepositoryPool(pool, async (repository) => {
+    await repository.actualizar({
+      id: 301,
+      embarazoId: 91,
+      pacienteId: 41,
+      data: { motivo_consulta: 'Actualizado' },
+      campos: ['motivo_consulta'],
+      updatedBy: ACTOR.usuario.id,
+    }, pool);
+    await repository.eliminar({ id: 301, embarazoId: 91, pacienteId: 41 }, pool);
+  });
+
+  assert.equal(calls.length, 2);
+  for (const { sql } of calls) {
+    assert.match(sql, /estado = 'activo'/);
+    assert.doesNotMatch(sql, /puerperio/);
+    assert.match(sql, /FOR UPDATE/);
+  }
+  assert.match(calls[0].sql, /UPDATE controles_prenatales/);
+  assert.match(calls[1].sql, /DELETE FROM controles_prenatales/);
 });
 
 test('el repositorio bloquea el control y detecta controles posteriores del mismo embarazo', async () => {

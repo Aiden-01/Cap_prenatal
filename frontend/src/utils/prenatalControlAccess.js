@@ -23,8 +23,14 @@ export function canEditPrenatalControl({
   canConsult = false,
   canWrite = false,
   isReadOnly = true,
+  pregnancyState,
 }) {
-  return Boolean(canConsult && canWrite && !isReadOnly);
+  return Boolean(
+    canConsult
+    && canWrite
+    && !isReadOnly
+    && String(pregnancyState || "").trim().toLowerCase() === "activo"
+  );
 }
 
 export function canCreatePrenatalControl({

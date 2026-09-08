@@ -99,7 +99,7 @@ async function actualizar({ id, embarazoId, pacienteId, data, campos, updatedBy 
     `WITH embarazo_editable AS (
        SELECT id FROM embarazos
        WHERE id = $${valores.length - 1} AND paciente_id = $${valores.length}
-         AND estado IN ('activo', 'puerperio')
+         AND estado = 'activo'
        FOR UPDATE
      )
      UPDATE controles_prenatales SET ${sets}, updated_at = NOW(), updated_by = $${valores.length - 3}
@@ -116,7 +116,7 @@ async function eliminar({ id, embarazoId, pacienteId }, db = pool) {
   const { rows, rowCount } = await db.query(
     `WITH embarazo_editable AS (
        SELECT id FROM embarazos WHERE id = $2 AND paciente_id = $3
-         AND estado IN ('activo', 'puerperio') FOR UPDATE
+         AND estado = 'activo' FOR UPDATE
      )
      DELETE FROM controles_prenatales
      WHERE id = $1 AND embarazo_id = $2 AND EXISTS (SELECT 1 FROM embarazo_editable)

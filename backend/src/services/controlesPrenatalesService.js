@@ -26,6 +26,18 @@ const CITA_REPROGRAMACION_REQUERIDA = Object.freeze({
   message: 'La fecha de una cita existente debe cambiarse desde el flujo de reprogramacion',
   code: 'CITA_REPROGRAMACION_REQUERIDA',
 });
+const ESTADOS_MUTACION_CONTROL_PRENATAL = Object.freeze(['activo']);
+
+function validarEmbarazoParaMutarControl({ pacienteId, embarazoId, db, bloquear = false }) {
+  return validarEmbarazoEditable({
+    pacienteId,
+    embarazoId,
+    estadosPermitidos: ESTADOS_MUTACION_CONTROL_PRENATAL,
+    mensajeSoloLectura: 'Los controles prenatales de este embarazo son de solo lectura',
+    db,
+    bloquear,
+  });
+}
 
 const CONTROL_FIELDS = [
   'numero_control', 'fecha', 'hora', 'motivo_consulta',
@@ -378,7 +390,7 @@ async function actualizarControl({ pacienteId, embarazoId, id, body, req }) {
     if (String(controlSolicitado.embarazo_id) !== String(embarazoId)) {
       throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
     }
-    await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
+    await validarEmbarazoParaMutarControl({ pacienteId, embarazoId, db: client, bloquear: true });
 
     const before = await controlesRepository.obtenerPorId(id, client, { bloquear: true });
     if (!before || String(before.embarazo_id) !== String(embarazoId)) {
@@ -450,7 +462,7 @@ async function actualizarControl({ pacienteId, embarazoId, id, body, req }) {
     }, client);
 
     if (!control) {
-      await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
+      await validarEmbarazoParaMutarControl({ pacienteId, embarazoId, db: client, bloquear: true });
       throw new HttpError(404, 'Control no encontrado');
     }
 
@@ -512,7 +524,7 @@ async function eliminarControl({ pacienteId, embarazoId, id, req }) {
     if (String(before.embarazo_id) !== String(embarazoId)) {
       throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
     }
-    await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
+    await validarEmbarazoParaMutarControl({ pacienteId, embarazoId, db: client, bloquear: true });
     if (await citasRepository.existeRelacionConControl({ controlId: id, embarazoId }, client)) {
       throw new HttpError(
         409,
@@ -526,7 +538,7 @@ async function eliminarControl({ pacienteId, embarazoId, id, req }) {
     );
 
     if (rowCount === 0) {
-      await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
+      await validarEmbarazoParaMutarControl({ pacienteId, embarazoId, db: client, bloquear: true });
       throw new HttpError(404, 'Control no encontrado');
     }
 

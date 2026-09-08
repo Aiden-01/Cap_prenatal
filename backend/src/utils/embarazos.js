@@ -57,6 +57,7 @@ async function validarEmbarazoEditable({
   pacienteId,
   embarazoId,
   estadosPermitidos = ESTADOS_EDITABLES,
+  mensajeSoloLectura = 'El embarazo esta cerrado y su expediente es de solo lectura',
   db = pool,
   bloquear = false,
 }) {
@@ -67,7 +68,7 @@ async function validarEmbarazoEditable({
     });
   }
   if (!estadosPermitidos.includes(embarazo.estado)) {
-    throw new HttpError(409, 'El embarazo esta cerrado y su expediente es de solo lectura', {
+    throw new HttpError(409, mensajeSoloLectura, {
       code: 'PREGNANCY_READ_ONLY',
     });
   }

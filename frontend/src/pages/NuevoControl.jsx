@@ -405,6 +405,7 @@ export default function NuevoControl() {
       canConsult: puedeConsultar,
       canWrite: tienePermisoEscritura,
       isReadOnly,
+      pregnancyState,
     })
     : Boolean(hasEmbarazoId && tienePermisoEscritura && !isReadOnly);
   const puedeCrear = canCreatePrenatalControl({
@@ -609,7 +610,9 @@ export default function NuevoControl() {
       <form className="control-workflow-form" onSubmit={handleSubmit}>
         {soloLectura && (
           <ClinicalNotice variant="readonly" title="Consulta histórica" className="control-workflow-notice">
-            Este embarazo está cerrado. Puedes revisar toda la información del control, pero no modificarla.
+            {pregnancyState === "puerperio"
+              ? "Este control pertenece a un embarazo en puerperio. Puedes revisar toda la información, pero no modificarla."
+              : "Este embarazo está cerrado. Puedes revisar toda la información del control, pero no modificarla."}
           </ClinicalNotice>
         )}
 
