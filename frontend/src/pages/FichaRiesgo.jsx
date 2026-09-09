@@ -34,13 +34,14 @@ function useFormErrorUi() {
   return useContext(FormErrorContext);
 }
 
-function Field({ label, children, name, inputId }) {
+function Field({ label, children, name, inputId, hint }) {
   const { fieldError } = useFormErrorUi();
   const error = name ? fieldError(name) : "";
   return (
     <div className="form-group">
       <label className="input-label" htmlFor={inputId}>{label}</label>
       {children}
+      {hint && <div id={`${inputId}-hint`} className="secondary-field-hint">{hint}</div>}
       {error && <div id={`${inputId}-error`} className="field-error-text" role="alert">{error}</div>}
     </div>
   );
@@ -50,12 +51,15 @@ function blurNumberInputOnWheel(event) {
   event.currentTarget.blur();
 }
 
-function Input({ label, name, form, set, type = "text", ...rest }) {
+function Input({ label, name, form, set, type = "text", hint, preserveDecimal = false, ...rest }) {
   const { fieldError, inputClass } = useFormErrorUi();
   const inputId = `risk-${name}`;
   const error = fieldError(name);
+  const describedBy = [hint ? `${inputId}-hint` : "", error ? `${inputId}-error` : ""]
+    .filter(Boolean)
+    .join(" ") || undefined;
   return (
-    <Field label={label} name={name} inputId={inputId}>
+    <Field label={label} name={name} inputId={inputId} hint={hint}>
       <input
         id={inputId}
         className={inputClass(name)}
@@ -63,9 +67,14 @@ function Input({ label, name, form, set, type = "text", ...rest }) {
         type={type}
         value={form[name] ?? ""}
         aria-invalid={Boolean(error)}
-        aria-describedby={error ? `${inputId}-error` : undefined}
+        aria-describedby={describedBy}
         onWheel={type === "number" ? blurNumberInputOnWheel : undefined}
-        onChange={(e) => set(name, type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
+        onChange={(e) => set(
+          name,
+          type === "number" && !preserveDecimal
+            ? (e.target.value === "" ? "" : Number(e.target.value))
+            : e.target.value
+        )}
         {...rest}
       />
     </Field>
@@ -495,8 +504,30 @@ export default function FichaRiesgo() {
                   <Input label="Estado civil" name="estado_civil" form={form} set={set} />
                   <Input label="Escolaridad" name="escolaridad" form={form} set={set} />
                   <Input label="Ocupación" name="ocupacion" form={form} set={set} />
-                  <Input label="Distancia al servicio (km)" name="distancia_servicio_km" type="number" form={form} set={set} min="0" />
-                  <Input label="Tiempo al servicio (horas)" name="tiempo_horas" type="number" form={form} set={set} min="0" />
+                  <Input
+                    label="Distancia al servicio (km)"
+                    name="distancia_servicio_km"
+                    type="number"
+                    form={form}
+                    set={set}
+                    min="0"
+                    max="500"
+                    step="0.01"
+                    preserveDecimal
+                    hint="Ej.: 0.5 km = 500 m"
+                  />
+                  <Input
+                    label="Tiempo al servicio (horas)"
+                    name="tiempo_horas"
+                    type="number"
+                    form={form}
+                    set={set}
+                    min="0"
+                    max="72"
+                    step="0.01"
+                    preserveDecimal
+                    hint="Ej.: 0.25 h = 15 min · 0.5 h = 30 min · 1.5 h = 1 h 30 min"
+                  />
                   <Input label="FUR" name="fecha_ultima_regla" type="date" form={form} set={set} />
                   <Input label="FPP" name="fecha_probable_parto" type="date" form={form} set={set} />
                 </div>

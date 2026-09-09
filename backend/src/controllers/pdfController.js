@@ -1329,6 +1329,8 @@ function createPdfController(overrides = {}) {
 const pdfController = createPdfController();
 
 module.exports = {
+  buildRiskCellMap,
+  buildRiskPdfHtml,
   createPdfController,
   exportExcelTemplateToPdf,
   pdfControl: asyncHandler(pdfController.pdfControl),

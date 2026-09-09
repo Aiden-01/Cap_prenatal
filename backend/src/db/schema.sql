@@ -670,7 +670,7 @@ CREATE TABLE IF NOT EXISTS fichas_riesgo_obstetrico (
   escolaridad_esposo                VARCHAR(50),
   ocupacion_esposo                  VARCHAR(100),
   distancia_servicio_km             DECIMAL(6,2),
-  tiempo_horas                      DECIMAL(4,1),
+  tiempo_horas                      DECIMAL(4,2),
   fecha_ultima_regla                DATE,
   fecha_probable_parto              DATE,
   no_embarazos                      INTEGER,
