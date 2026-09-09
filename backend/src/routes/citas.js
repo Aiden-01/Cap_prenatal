@@ -3,7 +3,7 @@ const citasController = require('../controllers/citasPrenatalesController');
 const { verificarPermiso } = require('../middleware/permisos');
 const { validateBody, validateParams, validateQuery } = require('../middleware/validate');
 const { nestedIdParams, pacienteIdParam } = require('../validations/common.schemas');
-const { citaQuerySchema, citaReprogramarSchema } = require('../validations/citas.schemas');
+const { citaAsignarSchema, citaQuerySchema, citaReprogramarSchema } = require('../validations/citas.schemas');
 
 const router = express.Router({ mergeParams: true });
 
@@ -13,6 +13,14 @@ router.get(
   validateParams(pacienteIdParam),
   validateQuery(citaQuerySchema),
   citasController.vigente
+);
+router.post(
+  '/asignar',
+  verificarPermiso('controles.editar'),
+  validateParams(pacienteIdParam),
+  validateQuery(citaQuerySchema),
+  validateBody(citaAsignarSchema),
+  citasController.asignar
 );
 router.patch(
   '/:id/reprogramar',

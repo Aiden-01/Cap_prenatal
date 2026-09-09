@@ -8,6 +8,12 @@ const citaReprogramarSchema = z.strictObject({
   fecha_programada: requiredDate,
 });
 
+const citaAsignarSchema = z.strictObject({
+  fecha_programada: requiredDate,
+});
+
+const citasSinProximaQuerySchema = z.strictObject({});
+
 const MAX_CALENDAR_RANGE_DAYS = 62;
 const MS_PER_DAY = 86_400_000;
 
@@ -36,8 +42,10 @@ const citasCalendarioQuerySchema = z.strictObject({
 });
 
 module.exports = {
+  citaAsignarSchema,
   citaQuerySchema,
   citaReprogramarSchema,
   citasCalendarioQuerySchema,
+  citasSinProximaQuerySchema,
   MAX_CALENDAR_RANGE_DAYS,
 };

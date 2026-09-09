@@ -2,6 +2,7 @@ const citasRepository = require('../repositories/citasPrenatalesRepository');
 const {
   requerirEmbarazoId,
   resolverEmbarazoParaLectura,
+  validarEmbarazoActivo,
   validarEmbarazoEditable,
 } = require('../utils/embarazos');
 const { getGuatemalaDateInputValue } = require('../utils/guatemalaTime');
@@ -15,6 +16,9 @@ const AUDIT_CONTEXT = Object.freeze({
   }),
   cancelar: Object.freeze({
     categoria: 'clinica', entidad: 'cita_prenatal', evento: 'cancelar',
+  }),
+  asignar: Object.freeze({
+    categoria: 'clinica', entidad: 'cita_prenatal', evento: 'crear',
   }),
 });
 
@@ -68,6 +72,113 @@ async function listarCalendario({ from, to }) {
     range: { from, to },
     items,
   };
+}
+
+async function listarSinProximaCita() {
+  return citasRepository.listarSinProximaCita();
+}
+
+function citaRequiereControlOrigen() {
+  return new HttpError(
+    409,
+    'El embarazo necesita al menos un control prenatal antes de asignar una cita',
+    { code: 'CITA_REQUIERE_CONTROL_ORIGEN' }
+  );
+}
+
+async function asignarCita({ pacienteId, embarazoId, fechaProgramada, req }) {
+  requerirEmbarazoId(embarazoId);
+  const nuevaFecha = fechaIso(fechaProgramada);
+  if (nuevaFecha < getGuatemalaDateInputValue()) {
+    throw new HttpError(400, 'La fecha programada no puede estar en el pasado', {
+      code: 'CITA_FECHA_PASADA',
+    });
+  }
+
+  try {
+    return await citasRepository.enTransaccion(async (client) => {
+      await validarEmbarazoActivo({
+        pacienteId,
+        embarazoId,
+        db: client,
+        bloquear: true,
+      });
+
+      const vigentes = await citasRepository.listarProgramadasVigentesPorEmbarazo(
+        embarazoId,
+        client,
+        { bloquear: true }
+      );
+      if (vigentes.length > 0) {
+        throw new HttpError(409, 'El embarazo ya tiene una cita programada vigente', {
+          code: 'CITA_PROGRAMADA_VIGENTE',
+        });
+      }
+
+      const control = await citasRepository.obtenerUltimoControlElegible(
+        embarazoId,
+        client,
+        { bloquear: true }
+      );
+      if (!control) throw citaRequiereControlOrigen();
+
+      const ultimaDelControl = await citasRepository.obtenerUltimaPorControl(
+        { controlId: control.id, embarazoId },
+        client,
+        { bloquear: true }
+      );
+
+      const cita = ultimaDelControl
+        ? await citasRepository.crearProgramadaComoContinuacion({
+          citaAnterior: ultimaDelControl,
+          fechaProgramada: nuevaFecha,
+          usuarioId: req.usuario.id,
+        }, client)
+        : await citasRepository.crearProgramadaDesdeControl({
+          embarazoId,
+          controlOrigenId: control.id,
+          fechaProgramada: nuevaFecha,
+          usuarioId: req.usuario.id,
+        }, client);
+
+      if (!cita || cita.estado !== 'programada') {
+        throw new HttpError(409, 'No fue posible crear la cita prenatal', {
+          code: 'CITA_CREACION_NO_REALIZADA',
+        });
+      }
+
+      await registrarAuditoria(req, {
+        contexto: AUDIT_CONTEXT.asignar,
+        accion: 'crear',
+        entidadId: cita.id,
+        pacienteId,
+        embarazoId,
+        cambios: {
+          nuevos: {
+            estado_cita: cita.estado,
+            fecha_programada: fechaIso(cita.fecha_programada),
+            control_origen_id: Number(control.id),
+            reprogramada_desde_id: ultimaDelControl ? Number(ultimaDelControl.id) : null,
+          },
+        },
+        metadata: {
+          resultado: RESULTADO_EXITOSO,
+          motivo_codigo: ultimaDelControl
+            ? 'cita_asignada_continuando_historial'
+            : 'cita_asignada_desde_ultimo_control',
+        },
+      }, { db: client, obligatorio: true });
+
+      return { cita, idempotente: false };
+    });
+  } catch (error) {
+    if (error?.code === '23505' && error?.constraint === 'ux_citas_programada_embarazo') {
+      throw new HttpError(409, 'El embarazo ya tiene una cita programada vigente', {
+        code: 'CITA_PROGRAMADA_VIGENTE',
+      });
+    }
+    throw error;
+  }
 }
 
 async function reprogramarCita({ pacienteId, embarazoId, citaId, fechaProgramada, req }) {
@@ -193,8 +304,10 @@ async function cancelarCita({ pacienteId, embarazoId, citaId, req }) {
 }
 
 module.exports = {
+  asignarCita,
   cancelarCita,
   listarCalendario,
+  listarSinProximaCita,
   obtenerCitaVigente,
   reprogramarCita,
   resolverUnicaProgramada,

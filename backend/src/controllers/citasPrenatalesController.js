@@ -14,6 +14,21 @@ const calendario = asyncHandler(async (req, res) => {
   return res.json(resultado);
 });
 
+const sinProxima = asyncHandler(async (_req, res) => {
+  const items = await citasPrenatalesService.listarSinProximaCita();
+  return res.json({ items });
+});
+
+const asignar = asyncHandler(async (req, res) => {
+  const resultado = await citasPrenatalesService.asignarCita({
+    pacienteId: req.params.pacienteId,
+    embarazoId: req.query.embarazo_id,
+    fechaProgramada: req.body.fecha_programada,
+    req,
+  });
+  return res.status(201).json(resultado);
+});
+
 const reprogramar = asyncHandler(async (req, res) => {
   const resultado = await citasPrenatalesService.reprogramarCita({
     pacienteId: req.params.pacienteId,
@@ -35,4 +50,4 @@ const cancelar = asyncHandler(async (req, res) => {
   return res.json(resultado);
 });
 
-module.exports = { calendario, cancelar, reprogramar, vigente };
+module.exports = { asignar, calendario, cancelar, reprogramar, sinProxima, vigente };

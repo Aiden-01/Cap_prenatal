@@ -15,6 +15,7 @@ import {
   shiftMonth,
   todayInGuatemala,
 } from "../src/utils/appointmentCalendar.js";
+import { getMissingAppointmentTabState } from "../src/utils/missingAppointmentQueue.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(dirname, "..");
@@ -189,6 +190,86 @@ test("dark y light reutilizan tokens sin colores semanticos hardcodeados", async
 test("calendario no crea citas ni implementa drag and drop", async () => {
   const source = await read("src/components/AppointmentCalendar.jsx");
   assert.doesNotMatch(source, /Nueva cita|Crear evento|Agregar cita|draggable|onDrag|onDrop/);
+});
+
+test("dashboard incorpora la cola sin próxima cita con permisos existentes", async () => {
+  const [dashboard, queue] = await Promise.all([
+    read("src/pages/Dashboard.jsx"),
+    read("src/components/MissingAppointmentQueue.jsx"),
+  ]);
+  assert.match(queue, /Sin próxima cita/);
+  assert.match(dashboard, /<MissingAppointmentQueue/);
+  assert.match(dashboard, /canManageAppointments=\{canManageAppointments\}/);
+  assert.match(dashboard, /items=\{sinProximaCita\}/);
+  assert.match(dashboard, /onRefresh=\{loadMissingAppointments\}/);
+  assert.match(dashboard, /No tiene permiso para consultar pacientes sin próxima cita/);
+});
+
+test("cola carga, reintenta y conserva la fila cuando falla asignar", async () => {
+  const [dashboard, queue] = await Promise.all([
+    read("src/pages/Dashboard.jsx"),
+    read("src/components/MissingAppointmentQueue.jsx"),
+  ]);
+  assert.match(dashboard, /api\.get\("\/citas\/sin-proxima"/);
+  assert.match(dashboard, /setSinCitaError\(getErrorMessage/);
+  assert.match(queue, /Cargando pacientes/);
+  assert.match(queue, /Todos los embarazos elegibles tienen una próxima cita programada/);
+  assert.match(queue, /setSaveError\(getErrorMessage/);
+  assert.match(queue, /onClick=\{onRefresh\}/);
+  assert.doesNotMatch(queue, /setItems\(.*filter/);
+});
+
+test("asignación confirmada cierra el diálogo y refresca desde servidor sin optimismo", async () => {
+  const source = await read("src/components/MissingAppointmentQueue.jsx");
+  const post = source.indexOf("await api.post(");
+  const close = source.indexOf("setSelected(null)", post);
+  const refresh = source.indexOf("await onRefresh()", close);
+  const toast = source.indexOf('toast("Cita asignada correctamente", "success")', refresh);
+  assert.ok(post >= 0 && close > post && refresh > close && toast > refresh);
+  assert.doesNotMatch(source, /window\.location\.reload/);
+  assert.doesNotMatch(source, /setItems\(/);
+  assert.match(source, /mountedRef\.current/);
+});
+
+test("dashboard mantiene conteo e indicador sincronizados con la respuesta de la cola", async () => {
+  const source = await read("src/pages/Dashboard.jsx");
+  assert.match(source, /setSinProximaCita\(Array\.isArray\(data\?\.items\) \? data\.items : \[\]\)/);
+  assert.deepEqual(getMissingAppointmentTabState([{ embarazo_id: 1 }, { embarazo_id: 2 }]), {
+    label: "Sin próxima cita (2)",
+    alert: true,
+  });
+  assert.deepEqual(getMissingAppointmentTabState([]), {
+    label: "Sin próxima cita (0)",
+    alert: false,
+  });
+  assert.match(source, /getMissingAppointmentTabState\(sinProximaCita\)/);
+  assert.match(source, /if \(t\.id === "sincita" && canViewAppointments\) loadMissingAppointments\(\)/);
+  assert.match(source, /sinCitaRequestRef\.current\?\.abort\(\)/);
+  assert.match(source, /dashboardMountedRef\.current/);
+});
+
+test("asignación usa contrato mínimo, fecha válida y acción solo con permiso", async () => {
+  const [queue, dialog] = await Promise.all([
+    read("src/components/MissingAppointmentQueue.jsx"),
+    read("src/components/AssignAppointmentDialog.jsx"),
+  ]);
+  assert.match(queue, /\/pacientes\/\$\{selected\.paciente_id\}\/citas\/asignar/);
+  assert.match(queue, /params: \{ embarazo_id: selected\.embarazo_id \}/);
+  assert.match(queue, /\{ fecha_programada: fechaProgramada \}/);
+  assert.match(queue, /canManageAppointments \? \(/);
+  assert.match(dialog, /type="date"/);
+  assert.match(dialog, /min=\{todayInGuatemala\(\)\}/);
+  assert.match(dialog, /role="dialog"/);
+  assert.match(dialog, /event\.key === "Escape"/);
+});
+
+test("cola es responsive y usa tokens de tema", async () => {
+  const css = await read("src/components/missing-appointment-queue.css");
+  assert.match(css, /@media \(max-width: 640px\)/);
+  assert.match(css, /data-label/);
+  assert.match(css, /var\(--surface\)/);
+  assert.match(css, /var\(--border\)/);
+  assert.doesNotMatch(css, /#[0-9a-f]{3,8}/i);
 });
 
 test("dialogo de CITAS-01B valida nueva fecha date-only y conserva historial", async () => {

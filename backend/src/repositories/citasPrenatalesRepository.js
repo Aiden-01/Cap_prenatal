@@ -106,6 +106,94 @@ async function listarCalendarioPorRango({ desde, hasta }, db = pool) {
   return rows;
 }
 
+async function listarSinProximaCita(db = pool) {
+  const { rows = [] } = await db.query(
+    `SELECT
+       p.id AS paciente_id,
+       e.id AS embarazo_id,
+       TRIM(CONCAT_WS(' ', p.nombres, p.apellidos)) AS paciente_nombre,
+       NULLIF(BTRIM(COALESCE(com.nombre, p.comunidad, '')), '') AS comunidad,
+       TO_CHAR(ultimo_control.fecha, 'YYYY-MM-DD') AS ultimo_control_fecha,
+       ultimo_control.id AS ultimo_control_id,
+       CASE
+         WHEN ultima_cita.estado = 'cancelada' THEN 'cita_cancelada'
+         WHEN ultimo_control.cita_siguiente IS NULL
+           AND NOT EXISTS (
+             SELECT 1
+             FROM citas_prenatales cita_control
+             WHERE cita_control.embarazo_id = e.id
+               AND cita_control.control_origen_id = ultimo_control.id
+           ) THEN 'ultimo_control_sin_cita'
+         ELSE 'sin_cita_previa'
+       END AS motivo
+     FROM embarazos e
+     JOIN pacientes p ON p.id = e.paciente_id
+     LEFT JOIN comunidades com ON com.id = p.comunidad_id
+     JOIN LATERAL (
+       SELECT c.id, c.fecha, c.numero_control, c.cita_siguiente
+       FROM controles_prenatales c
+       WHERE c.embarazo_id = e.id
+       ORDER BY c.numero_control DESC, c.fecha DESC, c.id DESC
+       LIMIT 1
+     ) ultimo_control ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT cp.estado
+       FROM citas_prenatales cp
+       WHERE cp.embarazo_id = e.id
+       ORDER BY cp.created_at DESC, cp.id DESC
+       LIMIT 1
+     ) ultima_cita ON TRUE
+     WHERE e.estado = 'activo'
+       AND NOT EXISTS (
+         SELECT 1
+         FROM citas_prenatales vigente
+         WHERE vigente.embarazo_id = e.id
+           AND vigente.estado = 'programada'
+           AND vigente.control_cumplimiento_id IS NULL
+       )
+     ORDER BY ultimo_control.fecha ASC, LOWER(p.apellidos) ASC, LOWER(p.nombres) ASC, e.id ASC`
+  );
+  return rows;
+}
+
+async function obtenerUltimoControlElegible(
+  embarazoId,
+  db = pool,
+  { bloquear = false } = {}
+) {
+  const { rows = [] } = await db.query(
+    `SELECT *
+     FROM controles_prenatales
+     WHERE embarazo_id = $1
+     ORDER BY numero_control DESC, fecha DESC, id DESC
+     LIMIT 1${bloquear ? '\n     FOR UPDATE' : ''}`,
+    [embarazoId]
+  );
+  return rows[0] || null;
+}
+
+async function crearProgramadaComoContinuacion({
+  citaAnterior,
+  fechaProgramada,
+  usuarioId,
+}, db = pool) {
+  const { rows = [] } = await db.query(
+    `INSERT INTO citas_prenatales (
+       embarazo_id, control_origen_id, fecha_programada, estado,
+       reprogramada_desde_id, registrado_por, updated_by
+     ) VALUES ($1, $2, $3, 'programada', $4, $5, $5)
+     RETURNING *`,
+    [
+      citaAnterior.embarazo_id,
+      citaAnterior.control_origen_id,
+      fechaProgramada,
+      citaAnterior.id,
+      usuarioId,
+    ]
+  );
+  return rows[0] || null;
+}
+
 async function obtenerOriginadaPorControl(
   { controlId, embarazoId },
   db = pool,
@@ -242,15 +330,18 @@ async function enTransaccion(callback) {
 
 module.exports = {
   crearHijaReprogramada,
+  crearProgramadaComoContinuacion,
   crearProgramadaDesdeControl,
   enTransaccion,
   existeRelacionConControl,
   listarCalendarioPorRango,
+  listarSinProximaCita,
   listarProgramadasVigentesPorEmbarazo,
   marcarAtendida,
   marcarCancelada,
   marcarReprogramada,
   obtenerOriginadaPorControl,
+  obtenerUltimoControlElegible,
   obtenerUltimaPorControl,
   obtenerPorIdYEmbarazo,
 };

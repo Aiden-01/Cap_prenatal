@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Users, ClipboardList, AlertTriangle,
@@ -7,7 +7,9 @@ import {
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessage";
+import { getMissingAppointmentTabState } from "../utils/missingAppointmentQueue";
 import AppointmentCalendar from "../components/AppointmentCalendar";
+import MissingAppointmentQueue from "../components/MissingAppointmentQueue";
 
 const COLOR_VARIANTS = {
   primary: "var(--primary)",
@@ -177,12 +179,51 @@ export default function Dashboard() {
   const [loadingAlertas, setLoadingAlertas] = useState(true);
   const [tabActiva,      setTabActiva]      = useState("citas");
   const [statsError,     setStatsError]     = useState("");
+  const [sinProximaCita, setSinProximaCita] = useState([]);
+  const [loadingSinCita, setLoadingSinCita] = useState(true);
+  const [sinCitaError,   setSinCitaError]   = useState("");
+  const sinCitaRequestRef = useRef(null);
+  const dashboardMountedRef = useRef(true);
 
   const { usuario } = useAuth();
   const navigate = useNavigate();
   const mesActual = new Date().toLocaleDateString("es-GT", { month: "long" });
   const canViewAppointments = usuario?.permisos?.includes("pacientes.ver");
   const canManageAppointments = usuario?.permisos?.includes("controles.editar");
+
+  const loadMissingAppointments = useCallback(async () => {
+    if (!dashboardMountedRef.current) return false;
+    sinCitaRequestRef.current?.abort();
+    const controller = new AbortController();
+    sinCitaRequestRef.current = controller;
+    setLoadingSinCita(true);
+    setSinCitaError("");
+    try {
+      const { data } = await api.get("/citas/sin-proxima", { signal: controller.signal });
+      if (dashboardMountedRef.current && !controller.signal.aborted) {
+        setSinProximaCita(Array.isArray(data?.items) ? data.items : []);
+      }
+      return true;
+    } catch (error) {
+      if (dashboardMountedRef.current && error?.code !== "ERR_CANCELED" && !controller.signal.aborted) {
+        setSinCitaError(getErrorMessage(error, "No se pudo cargar la cola sin próxima cita."));
+      }
+      return false;
+    } finally {
+      if (dashboardMountedRef.current && sinCitaRequestRef.current === controller) {
+        sinCitaRequestRef.current = null;
+        setLoadingSinCita(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    dashboardMountedRef.current = true;
+    return () => {
+      dashboardMountedRef.current = false;
+      sinCitaRequestRef.current?.abort();
+    };
+  }, []);
 
   const loadStats = useCallback(async () => {
     setLoading(true);
@@ -225,10 +266,21 @@ export default function Dashboard() {
       .finally(() => setLoadingAlertas(false));
   }, []);
 
+  useEffect(() => {
+    if (!canViewAppointments) return undefined;
+    const frame = requestAnimationFrame(loadMissingAppointments);
+    return () => {
+      cancelAnimationFrame(frame);
+      sinCitaRequestRef.current?.abort();
+    };
+  }, [canViewAppointments, loadMissingAppointments]);
+
   const fmtFecha = (d) => {
     const iso = String(d || "").slice(0, 10);
     return iso ? new Date(`${iso}T12:00:00`).toLocaleDateString("es-GT") : "—";
   };
+
+  const missingAppointmentTab = getMissingAppointmentTabState(sinProximaCita);
 
   const TABS = [
     {
@@ -240,6 +292,10 @@ export default function Dashboard() {
       id: "parto",
       label: `Próximas al Parto (${proximasParir.length})`,
       alert: proximasParir.some((p) => p.dias_restantes <= 7),
+    },
+    {
+      id: "sincita",
+      ...missingAppointmentTab,
     },
     {
       id: "sincontrol",
@@ -308,7 +364,14 @@ export default function Dashboard() {
       <div>
             <div className="content-tabs">
               {TABS.map((t) => (
-                <button key={t.id} onClick={() => setTabActiva(t.id)} className={`content-tab ${tabActiva === t.id ? "is-active" : ""}`}>
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    setTabActiva(t.id);
+                    if (t.id === "sincita" && canViewAppointments) loadMissingAppointments();
+                  }}
+                  className={`content-tab ${tabActiva === t.id ? "is-active" : ""}`}
+                >
                   {t.label}
                   {t.alert && (
                     <span style={{
@@ -465,6 +528,22 @@ export default function Dashboard() {
                   </tbody>
                 </table>
               </SeccionTabla>
+            )}
+
+            {tabActiva === "sincita" && (
+              canViewAppointments ? (
+                <MissingAppointmentQueue
+                  canManageAppointments={canManageAppointments}
+                  items={sinProximaCita}
+                  loading={loadingSinCita}
+                  error={sinCitaError}
+                  onRefresh={loadMissingAppointments}
+                />
+              ) : (
+                <div className="card" role="status">
+                  No tiene permiso para consultar pacientes sin próxima cita.
+                </div>
+              )
             )}
       </div>
     </div>

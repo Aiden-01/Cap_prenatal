@@ -205,6 +205,37 @@ test('endpoint exige pacientes.ver y devuelve el rango validado', async () => {
   assert.deepEqual(received, { from: '2026-08-01', to: '2026-08-31' });
 });
 
+test('endpoint de cola exige pacientes.ver y devuelve contrato minimo', async () => {
+  const items = [{
+    paciente_id: 41,
+    embarazo_id: 91,
+    paciente_nombre: 'Paciente Prueba',
+    comunidad: 'Centro',
+    ultimo_control_fecha: '2026-08-20',
+    ultimo_control_id: 501,
+    motivo: 'ultimo_control_sin_cita',
+  }];
+  await withServer({
+    calendario(_req, res) { res.json({ items: [] }); },
+    sinProxima(_req, res) { res.json({ items }); },
+  }, async (baseUrl, permission) => {
+    const denied = await fetch(`${baseUrl}/api/citas/sin-proxima`);
+    assert.equal(denied.status, 403);
+
+    const response = await fetch(`${baseUrl}/api/citas/sin-proxima`, {
+      headers: { 'x-permissions': 'pacientes.ver' },
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { items });
+    assert.equal(permission(), 'pacientes.ver');
+
+    const filtered = await fetch(`${baseUrl}/api/citas/sin-proxima?paciente_id=41`, {
+      headers: { 'x-permissions': 'pacientes.ver' },
+    });
+    assert.equal(filtered.status, 400);
+  });
+});
+
 test('endpoint rechaza rango invertido, demasiado amplio y fechas no ISO', async () => {
   let calls = 0;
   await withServer({

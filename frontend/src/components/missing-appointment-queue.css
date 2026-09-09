@@ -1,0 +1,69 @@
+.missing-appointment-card { padding: 0; overflow: hidden; background: var(--surface); }
+
+.missing-appointment-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.missing-appointment-header h2 { margin: 0; font-size: 1rem; }
+.missing-appointment-header p { margin: 0.25rem 0 0; color: var(--text-muted); font-size: 0.78rem; }
+
+.missing-appointment-feedback {
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+.missing-appointment-feedback.is-error { color: var(--danger); }
+.missing-appointment-table-wrap { overflow-x: auto; }
+.missing-appointment-table { min-width: 720px; }
+.missing-appointment-table tr { cursor: default; }
+.missing-appointment-action { min-height: 38px; display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+.missing-appointment-dialog { width: min(100%, 470px); }
+.missing-appointment-date-field { display: grid; gap: 0.35rem; margin-top: 1rem; }
+
+@media (max-width: 640px) {
+  .missing-appointment-header { align-items: stretch; flex-direction: column; }
+  .missing-appointment-header .badge { align-self: flex-start; }
+  .missing-appointment-table-wrap { overflow: visible; padding: 0.75rem; }
+  .missing-appointment-table { min-width: 0; display: block; }
+  .missing-appointment-table thead { display: none; }
+  .missing-appointment-table tbody { display: grid; gap: 0.75rem; }
+  .missing-appointment-table tr {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface2);
+  }
+  .missing-appointment-table td {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr);
+    gap: 0.5rem;
+    padding: 0;
+    border: 0;
+  }
+  .missing-appointment-table td::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 750;
+    text-transform: uppercase;
+  }
+  .missing-appointment-action { width: 100%; justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .missing-appointment-action { transition: none; }
+}

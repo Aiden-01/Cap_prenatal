@@ -120,6 +120,56 @@ test('HTTP reprograma y cancela con controles.editar y contrato estricto', async
   }, { pacienteId: 41, embarazoId: 91, citaId: 702 });
 });
 
+test('HTTP asigna cita con controles.editar, fecha estricta y respuesta 201', async () => {
+  let received;
+  await withServer({
+    asignarCita: async (args) => {
+      received = args;
+      return { cita: { id: 801, estado: 'programada' }, idempotente: false };
+    },
+  }, async (baseUrl) => {
+    const denied = await fetch(
+      `${baseUrl}/api/pacientes/41/citas/asignar?embarazo_id=91`,
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }
+    );
+    assert.equal(denied.status, 403);
+
+    const response = await fetch(
+      `${baseUrl}/api/pacientes/41/citas/asignar?embarazo_id=91`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-permissions': 'controles.editar' },
+        body: JSON.stringify({ fecha_programada: '2030-09-20' }),
+      }
+    );
+    assert.equal(response.status, 201);
+    assert.deepEqual(await response.json(), {
+      cita: { id: 801, estado: 'programada' }, idempotente: false,
+    });
+
+    const extra = await fetch(
+      `${baseUrl}/api/pacientes/41/citas/asignar?embarazo_id=91`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-permissions': 'controles.editar' },
+        body: JSON.stringify({ fecha_programada: '2030-09-20', control_origen_id: 999 }),
+      }
+    );
+    assert.equal(extra.status, 400);
+  });
+
+  assert.deepEqual({
+    pacienteId: received.pacienteId,
+    embarazoId: received.embarazoId,
+    fechaProgramada: received.fechaProgramada,
+  }, {
+    pacienteId: 41,
+    embarazoId: 91,
+    fechaProgramada: '2030-09-20',
+  });
+  assert.equal(received.req.usuario.id, 83);
+});
+
 test('HTTP rechaza permiso ausente, IDs invalidos y query incompleta antes del servicio', async () => {
   let calls = 0;
   const service = {
