@@ -149,6 +149,8 @@ export default function MapaRiesgo() {
 
         .mapa-riesgo-map-shell {
           position: relative;
+          display: flex;
+          flex-direction: column;
           flex: 1;
           min-height: 620px;
           overflow: hidden;
@@ -158,8 +160,8 @@ export default function MapaRiesgo() {
         }
 
         .mapa-riesgo-map {
-          height: 100%;
-          min-height: 620px;
+          flex: 1;
+          min-height: 0;
           width: 100%;
         }
 
@@ -387,8 +389,7 @@ export default function MapaRiesgo() {
             justify-content: space-between;
           }
 
-          .mapa-riesgo-map-shell,
-          .mapa-riesgo-map {
+          .mapa-riesgo-map-shell {
             min-height: 560px;
           }
         }
