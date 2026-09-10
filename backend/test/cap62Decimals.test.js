@@ -2,10 +2,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const zlib = require('node:zlib');
 
 const { riesgoSchema } = require('../src/validations/riesgo.schemas');
 const riesgoRepository = require('../src/repositories/riesgoRepository');
-const { buildRiskCellMap, buildRiskPdfHtml } = require('../src/controllers/pdfController');
+const { buildRiskCellMap } = require('../src/controllers/pdfController');
+const { renderRiskPdf } = require('../src/services/riskPdfRenderer');
 
 const root = path.resolve(__dirname, '..');
 
@@ -72,7 +74,16 @@ test('CAP-62 schema y migracion conservan centesimas solo en tiempo_horas', () =
   assert.doesNotMatch(migration, /distancia_servicio_km/);
 });
 
-test('CAP-62 PDF oficial imprime 0.25, 0.5 y 1.5 sin ayudas ni conversiones', () => {
+function pdfOperators(bytes) {
+  const source = Buffer.from(bytes).toString('latin1');
+  return [...source.matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)]
+    .map((match) => {
+      try { return zlib.inflateSync(Buffer.from(match[1], 'latin1')).toString('latin1'); } catch { return ''; }
+    })
+    .join('\n');
+}
+
+test('CAP-62 PDF oficial imprime 0.25, 0.5 y 1.5 sin ayudas ni conversiones', async () => {
   for (const value of ['0.25', '0.5', '1.5']) {
     const data = {
       paciente: { nombres: 'Paciente', apellidos: 'Decimal' },
@@ -80,11 +91,14 @@ test('CAP-62 PDF oficial imprime 0.25, 0.5 y 1.5 sin ayudas ni conversiones', ()
       riesgo: { distancia_servicio_km: value, tiempo_horas: value },
     };
     const cellMap = buildRiskCellMap(data);
-    const html = buildRiskPdfHtml(data);
+    const pdf = await renderRiskPdf(data);
+    const operators = pdfOperators(pdf);
 
     assert.equal(cellMap.K18, value);
     assert.equal(cellMap.X18, value);
-    assert.match(html, new RegExp(`>${value.replace('.', '\\.')}`));
-    assert.doesNotMatch(html, /500 m|15 min|30 min|1 h 30 min/);
+    assert.match(operators, new RegExp(Buffer.from(value, 'latin1').toString('hex'), 'i'));
+    for (const converted of ['500 m', '15 min', '30 min', '1 h 30 min']) {
+      assert.doesNotMatch(operators, new RegExp(Buffer.from(converted, 'latin1').toString('hex'), 'i'));
+    }
   }
 });

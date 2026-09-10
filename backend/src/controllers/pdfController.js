@@ -8,6 +8,7 @@ const { AppError } = require('../utils/appError');
 const { registrarEventoPrivado } = require('../services/auditService');
 const { consumePdfQuota } = require('../middleware/pdfRateLimit');
 const { generarFichaClinicaPrenatalPdf } = require('../services/fichaClinicaPrenatalPdf');
+const { renderRiskPdf } = require('../services/riskPdfRenderer');
 const { sendPdfResponse } = require('../utils/pdfResponse');
 const { randomTempBase, withPdfTempDir } = require('../utils/pdfTemp');
 const { buildPuppeteerLaunchOptions } = require('../utils/puppeteerLaunch');
@@ -1226,14 +1227,8 @@ async function pdfRiesgoObstetricoHandler(req, res, dependencies) {
       throw new AppError(404, 'La paciente no tiene ficha de riesgo registrada', { code: 'RISK_FORM_NOT_FOUND' });
     }
 
-    const cellMap = buildRiskCellMap({
-      paciente,
-      embarazo,
-      riesgo,
-    });
-    const templatePath = path.join(__dirname, '../assets/official_forms/riesgo_oficial.xlsx');
     dependencies.consumePdfQuota(req);
-    const pdf = await dependencies.exportExcelTemplateToPdf(templatePath, cellMap);
+    const pdf = await dependencies.renderRiskPdf({ paciente, embarazo, riesgo });
 
     await dependencies.registrarEventoPrivado(req, {
       contexto: {
@@ -1314,6 +1309,7 @@ function createPdfController(overrides = {}) {
     pdfService,
     puppeteerClient: puppeteer,
     registrarEventoPrivado,
+    renderRiskPdf,
     sendPdfResponse,
     ...overrides,
   };
