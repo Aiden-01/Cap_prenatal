@@ -31,14 +31,14 @@ const RISK_PDF_FIELDS = Object.freeze({
   tiempo: { x: 435, y: 528.3, width: 110, size: 7.8, align: 'center' },
   fur: { x: 118, y: 517.2, width: 88, size: 7.8, align: 'center' },
   fpp: { x: 293, y: 517.2, width: 94, size: 7.8, align: 'center' },
-  embarazos: { x: 453, y: 517.2, width: 92, size: 7.8, align: 'center' },
+  embarazos: { x: 445, y: 517.2, width: 83, size: 7.8, align: 'center' },
   partos: { x: 92, y: 506.2, width: 57, size: 7.8, align: 'center' },
   cesareas: { x: 205, y: 506.2, width: 59, size: 7.8, align: 'center' },
   abortos: { x: 318, y: 506.2, width: 69, size: 7.8, align: 'center' },
-  hijosVivos: { x: 451, y: 506.2, width: 94, size: 7.8, align: 'center' },
+  hijosVivos: { x: 445, y: 506.2, width: 83, size: 7.8, align: 'center' },
   hijosMuertos: { x: 117, y: 495.1, width: 52, size: 7.8, align: 'center' },
   edadGestacional: { x: 235, y: 495.1, width: 66, size: 7.8, align: 'center' },
-  referidaA: { x: 237, y: 123.5, width: 308, size: 8, minSize: 5.4 },
+  referidaA: { x: 244, y: 123.5, width: 301, size: 8, minSize: 5.4 },
   personalAtendio: { x: 314, y: 102.5, width: 231, size: 8, minSize: 5.4, align: 'center' },
 });
 
