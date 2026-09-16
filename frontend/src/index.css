@@ -2008,6 +2008,185 @@ h1, h2, h3, h4 {
   }
 }
 
+/* ========================================================================
+   Responsive baseline
+
+   The viewport declaration in index.html is the primary mobile fix. These
+   rules keep shared shells, forms and overlays inside that real viewport;
+   component-specific table/card behavior remains authoritative below it.
+   ======================================================================== */
+
+html,
+body,
+#root,
+.app-shell,
+.app-main {
+  width: 100%;
+  min-width: 0;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+}
+
+.card,
+.form-section,
+.form-section-body,
+.page-header,
+.patients-header,
+.form-page-header,
+.dashboard-heading,
+.table-card-header,
+.action-row,
+.modal-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.page-header > div,
+.patients-header > div,
+.form-page-header > div,
+.dashboard-heading > div,
+.table-card-header > div {
+  min-width: 0;
+}
+
+.page-header h1,
+.patients-header h1,
+.form-page-header h1,
+.dashboard-heading h1,
+.table-card-header h2,
+.patient-hero-title {
+  overflow-wrap: anywhere;
+}
+
+.modal-card {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 767px) {
+  .app-main {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding: calc(4rem + env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left)) !important;
+  }
+
+  input,
+  select,
+  textarea,
+  .input-field {
+    min-width: 0;
+    max-width: 100%;
+    font-size: 16px;
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  button,
+  [role="button"],
+  .btn-primary,
+  .btn-secondary,
+  .btn-create,
+  .btn-critical,
+  .btn-danger,
+  .content-tab {
+    min-height: 44px;
+  }
+
+  .page-header,
+  .patients-header,
+  .form-page-header,
+  .dashboard-heading,
+  .table-card-header {
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .content-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+  }
+
+  .patient-hero-title,
+  .patient-hero-title.is-medium,
+  .patient-hero-title.is-long,
+  .patient-hero-title.is-extra-long {
+    white-space: normal;
+  }
+
+  .patient-hero-meta > span {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .modal-backdrop,
+  .appointment-dialog-backdrop {
+    align-items: flex-start;
+    padding: max(0.5rem, env(safe-area-inset-top)) max(0.5rem, env(safe-area-inset-right)) max(0.5rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));
+    overflow-y: auto;
+  }
+
+  .modal-card,
+  .appointment-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 1rem);
+  }
+
+  .action-row > button,
+  .action-row > a,
+  .table-actions > button {
+    min-width: min(10rem, 100%);
+  }
+}
+
+@media (max-width: 430px) {
+  .card {
+    padding: 0.85rem;
+  }
+
+  .form-section-body {
+    padding: 0.85rem;
+    gap: 0.8rem;
+  }
+
+  .page-header,
+  .patients-header,
+  .form-page-header,
+  .dashboard-heading,
+  .table-card-header,
+  .action-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-header > button,
+  .patients-header > button,
+  .form-page-header > button,
+  .dashboard-heading > button,
+  .table-card-header > button,
+  .action-row > button,
+  .action-row > a {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .modal-card,
+  .password-modal,
+  .appointment-dialog {
+    padding: 1rem;
+  }
+}
+
 .patients-page,
 .record-page {
   display: grid;
@@ -9880,5 +10059,19 @@ html.dark .patient-file-transition__kicker {
 
   .patient-orbit-card {
     transition: none !important;
+  }
+}
+
+/* Keep native mobile form controls at the platform-safe text size. This rule
+   intentionally closes the cascade after screen-specific visual layers. */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea,
+  .input-field,
+  .login-panel-right .input-field,
+  .usuarios-search input,
+  .usuarios-role-filter {
+    font-size: 16px;
   }
 }

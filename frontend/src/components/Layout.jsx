@@ -132,6 +132,8 @@ export default function Layout() {
         {isMobile && (
           <button
             onClick={() => setMenuOpen(true)}
+            type="button"
+            aria-label="Abrir navegación principal"
             style={{
               position: "fixed", top: 14, left: 14, zIndex: 200,
               background: "var(--primary)", color: "#fff",
