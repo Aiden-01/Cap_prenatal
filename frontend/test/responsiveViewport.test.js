@@ -17,3 +17,11 @@ test("keeps shared mobile controls and overlays usable", () => {
   assert.match(css, /max-height:\s*calc\(100dvh - 1rem\)/);
   assert.match(css, /\.content-tabs\s*\{[\s\S]*overflow-x:\s*auto/);
 });
+
+test("keeps native date controls inside their responsive field columns", () => {
+  assert.match(css, /\.form-group\s*\{[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/);
+  assert.match(
+    css,
+    /input\[type=["']date["']\]\.input-field\s*\{[\s\S]*?inline-size:\s*100%;[\s\S]*?min-inline-size:\s*0;[\s\S]*?max-inline-size:\s*100%;/,
+  );
+});

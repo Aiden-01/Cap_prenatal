@@ -348,7 +348,26 @@ h1, h2, h3, h4 {
   letter-spacing: 0;
 }
 
-.form-group { display: flex; flex-direction: column; gap: 0.3rem; }
+.form-group {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+/* Safari/iOS gives native date controls an intrinsic inline size based on the
+   localized value. Constrain that size to the field column without removing
+   the platform date picker. */
+input[type="date"].input-field {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  inline-size: 100%;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
 
 .community-autocomplete {
   position: relative;
