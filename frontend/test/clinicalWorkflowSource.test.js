@@ -67,4 +67,9 @@ test("UX-02A mantiene pestañas, accesibilidad y movimiento reducible", async ()
   assert.match(sharedStyles, /prefers-reduced-motion: reduce/);
   assert.match(controlStyles, /prefers-reduced-motion: reduce/);
   assert.match(controlStyles, /overflow-x: auto/);
+  assert.match(controlStyles, /\.control-workflow-tabs\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0;[^}]*z-index:\s*20;/s);
+  assert.match(
+    controlStyles,
+    /@media \(max-width: 767px\)[\s\S]*?\.control-workflow-tabs\s*\{[^}]*top:\s*calc\(4rem \+ env\(safe-area-inset-top\)\);/,
+  );
 });

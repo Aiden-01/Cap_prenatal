@@ -142,6 +142,9 @@
 }
 
 .control-workflow-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.35rem;
@@ -151,6 +154,7 @@
   border-radius: 14px;
   background: color-mix(in srgb, var(--surface) 94%, var(--surface2));
   box-shadow: var(--shadow-sm);
+  isolation: isolate;
   scrollbar-width: thin;
 }
 
@@ -349,6 +353,7 @@ html.dark .control-lab-state.is-complete {
 
 @media (max-width: 767px) {
   .control-workflow-tabs {
+    top: calc(4rem + env(safe-area-inset-top));
     display: flex;
     scroll-snap-type: x proximity;
   }
