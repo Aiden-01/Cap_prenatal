@@ -369,6 +369,24 @@ input[type="date"].input-field {
   max-inline-size: 100%;
 }
 
+/* iOS Safari can ignore the host width above while its native date appearance
+   keeps a locale-dependent intrinsic size. Use WebKit's available width only
+   on touch Safari and constrain the internal rendered value as well. */
+@supports (-webkit-touch-callout: none) {
+  input[type="date"].input-field {
+    width: -webkit-fill-available;
+    inline-size: -webkit-fill-available;
+    -webkit-appearance: none;
+    appearance: none;
+    overflow: hidden;
+  }
+
+  input[type="date"].input-field::-webkit-date-and-time-value {
+    min-width: 0;
+    text-align: start;
+  }
+}
+
 .community-autocomplete {
   position: relative;
 }

@@ -24,4 +24,9 @@ test("keeps native date controls inside their responsive field columns", () => {
     css,
     /input\[type=["']date["']\]\.input-field\s*\{[\s\S]*?inline-size:\s*100%;[\s\S]*?min-inline-size:\s*0;[\s\S]*?max-inline-size:\s*100%;/,
   );
+  assert.match(
+    css,
+    /@supports \(-webkit-touch-callout:\s*none\)[\s\S]*?input\[type=["']date["']\]\.input-field\s*\{[\s\S]*?width:\s*-webkit-fill-available;[\s\S]*?-webkit-appearance:\s*none;/,
+  );
+  assert.match(css, /::-webkit-date-and-time-value\s*\{[\s\S]*?min-width:\s*0;/);
 });
