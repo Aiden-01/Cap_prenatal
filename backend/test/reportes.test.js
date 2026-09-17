@@ -356,8 +356,13 @@ test('exportaciones responden con nombre seguro, no-store y auditoria minima sin
     xlsx: { async write(res) { res.write('xlsx-sintetico'); } },
   };
   const service = {
-    async workbookCensoPrimerControl() { return { workbook: fakeWorkbook, total: 7 }; },
-    async pdfCensoPrimerControl() { return { pdf: Buffer.from('%PDF-sintetico'), total: 7 }; },
+    async exportReport(_reportId, format) {
+      return {
+        config: { slug: 'Captadas_primer_control' },
+        columns: [{ key: 'nombre' }], total: 7,
+        ...(format === 'excel' ? { workbook: fakeWorkbook } : { pdf: Buffer.from('%PDF-sintetico') }),
+      };
+    },
   };
   const controllers = createReportesController({
     service,
@@ -367,17 +372,17 @@ test('exportaciones responden con nombre seguro, no-store y auditoria minima sin
 
   await withServer(app, async (baseUrl) => {
     const headers = { Authorization: 'Bearer test', 'X-Permissions': 'reportes.exportar' };
-    const query = '?desde=2026-07-01&hasta=2026-07-31';
+    const query = '?desde=2026-07-01&hasta=2026-07-31&columnas=nombre';
     const pdf = await fetch(`${baseUrl}/api/reportes/censo/primer-control/pdf${query}`, { headers });
     assert.equal(pdf.status, 200);
     assert.equal(pdf.headers.get('content-type'), 'application/pdf');
     assert.equal(pdf.headers.get('cache-control'), 'private, no-store, max-age=0');
     assert.equal(pdf.headers.get('x-content-type-options'), 'nosniff');
-    assert.equal(pdf.headers.get('content-disposition'), 'attachment; filename="censo_primer_control_2026-07-01_2026-07-31.pdf"');
+    assert.match(pdf.headers.get('content-disposition'), /^attachment; filename="Captadas_primer_control_\d{4}-\d{2}-\d{2}\.pdf"/);
 
     const excel = await fetch(`${baseUrl}/api/reportes/censo/primer-control/excel${query}`, { headers });
     assert.equal(excel.status, 200);
-    assert.match(excel.headers.get('content-disposition'), /^attachment; filename="censo_primer_control_/);
+    assert.match(excel.headers.get('content-disposition'), /^attachment; filename="Captadas_primer_control_/);
   });
 
   assert.equal(audits.length, 2);
@@ -389,4 +394,107 @@ test('exportaciones responden con nombre seguro, no-store y auditoria minima sin
     const serialized = JSON.stringify(audit);
     assert.doesNotMatch(serialized, /Paciente Sintetica|1234567890101|pdf-sintetico/);
   }
+});
+
+test('cada reporte visible protege Excel y PDF con reportes.exportar', async () => {
+  const endpoints = [
+    '/censo/excel?columnas=nombre', '/censo/pdf?columnas=nombre',
+    '/proximas-a-parir/excel?columnas=paciente', '/proximas-a-parir/pdf?columnas=paciente',
+    '/sin-control-reciente/excel?columnas=paciente', '/sin-control-reciente/pdf?columnas=paciente',
+    '/pacientes-riesgo/excel?columnas=paciente', '/pacientes-riesgo/pdf?columnas=paciente',
+    '/resumen-comunidades/excel?columnas=comunidad', '/resumen-comunidades/pdf?columnas=comunidad',
+  ];
+  await withServer(reportRouteApp(), async (baseUrl) => {
+    for (const endpoint of endpoints) {
+      const forbidden = await fetch(`${baseUrl}/api/reportes${endpoint}`, {
+        headers: { Authorization: 'Bearer test', 'X-Permissions': 'reportes.ver' },
+      });
+      assert.equal(forbidden.status, 403, endpoint);
+      const allowed = await fetch(`${baseUrl}/api/reportes${endpoint}`, {
+        headers: { Authorization: 'Bearer test', 'X-Permissions': 'reportes.exportar' },
+      });
+      assert.equal(allowed.status, 204, endpoint);
+    }
+  });
+});
+
+test('todos los reportes preparan exportacion Excel y PDF con columnas reales y filtros', async () => {
+  const repositories = {
+    obtenerRowsCensoPrimerControl: async () => [paciente()],
+    obtenerRowsCensoGeneral: async () => [paciente()],
+    obtenerProximasAParir: async () => [{ nombre: 'Paciente', no_expediente: '1', comunidad: 'Centro', fpp: '2026-10-01', dias_restantes: 14, semanas_actuales: 38 }],
+    obtenerSinControlReciente: async () => [{ nombre: 'Paciente', no_expediente: '1', comunidad: 'Centro', estado_seguimiento: 'nunca_control' }],
+    obtenerPacientesConRiesgo: async () => [{ nombre: 'Paciente', no_expediente: '1', edad: 29, comunidad: 'Centro', tiene_riesgo: true }],
+    obtenerResumenPorComunidad: async () => [{ comunidad: 'Centro', territorio: 1, sector: 'A', embarazos_activos: 2, con_riesgo: 1, proximas_a_parir: 1, sin_control_reciente: 0 }],
+  };
+  const pdfCalls = [];
+  const service = createReportesService({
+    repository: repositories,
+    pdfService: { async renderReportPdf(data) { pdfCalls.push(data); return Buffer.from('%PDF'); } },
+    now: () => new Date('2026-09-17T12:00:00Z'),
+  });
+  const selections = {
+    primer_control: { ...PERIODO, columnas: 'nombre,primer_control' },
+    activos: { columnas: 'nombre,estado' },
+    proximas_parto: { columnas: 'paciente,fpp' },
+    sin_control: { columnas: 'paciente,seguimiento' },
+    riesgo: { columnas: 'paciente,riesgo' },
+    comunidades: { columnas: 'comunidad,embarazos_activos' },
+  };
+  for (const [reportId, query] of Object.entries(selections)) {
+    const excel = await service.exportReport(reportId, 'excel', query);
+    assert.equal(excel.total, 1, reportId);
+    assert.deepEqual(excel.columns.map(({ key }) => key), query.columnas.split(','), reportId);
+    assert.ok(await excel.workbook.xlsx.writeBuffer(), reportId);
+    const pdf = await service.exportReport(reportId, 'pdf', query);
+    assert.ok(Buffer.isBuffer(pdf.pdf), reportId);
+  }
+  assert.equal(pdfCalls.length, 6);
+});
+
+test('los seis reportes vacios rechazan Excel y PDF antes de generar archivos', async () => {
+  let workbookCalls = 0;
+  let pdfCalls = 0;
+  const service = createReportesService({
+    repository: {
+      obtenerRowsCensoPrimerControl: async () => [],
+      obtenerRowsCensoGeneral: async () => [],
+      obtenerProximasAParir: async () => [],
+      obtenerSinControlReciente: async () => [],
+      obtenerPacientesConRiesgo: async () => [],
+      obtenerResumenPorComunidad: async () => [],
+    },
+    reportWorkbookFactory() { workbookCalls += 1; return {}; },
+    pdfService: { async renderReportPdf() { pdfCalls += 1; return Buffer.from('%PDF'); } },
+  });
+  const selections = {
+    primer_control: { ...PERIODO, columnas: 'nombre' },
+    activos: { columnas: 'nombre' },
+    proximas_parto: { columnas: 'paciente' },
+    sin_control: { columnas: 'paciente' },
+    riesgo: { columnas: 'paciente' },
+    comunidades: { columnas: 'comunidad' },
+  };
+  for (const [reportId, query] of Object.entries(selections)) {
+    for (const format of ['excel', 'pdf']) {
+      await assert.rejects(
+        () => service.exportReport(reportId, format, query),
+        (error) => error.status === 409
+          && error.code === 'EMPTY_REPORT'
+          && error.message === 'No hay registros para exportar con los filtros actuales.',
+        `${reportId}/${format}`
+      );
+    }
+  }
+  assert.equal(workbookCalls, 0);
+  assert.equal(pdfCalls, 0);
+});
+
+test('exportacion rechaza columnas ausentes o no permitidas', async () => {
+  const nonEmpty = createReportesService({
+    repository: { obtenerRowsCensoGeneral: async () => [paciente()] },
+    pdfService: {},
+  });
+  await assert.rejects(() => nonEmpty.exportReport('activos', 'excel', { columnas: '' }), (error) => error.code === 'INVALID_REPORT_COLUMNS');
+  await assert.rejects(() => nonEmpty.exportReport('activos', 'excel', { columnas: 'secreto' }), (error) => error.code === 'INVALID_REPORT_COLUMNS');
 });

@@ -1,6 +1,8 @@
 const ExcelJS = require('exceljs');
 const reportesRepository = require('../repositories/reportesRepository');
 const reportesPdfService = require('./reportesPdfService');
+const { AppError } = require('../utils/appError');
+const { getReportExportConfig } = require('../config/reportExportConfig');
 const {
   formatGuatemalaDateTime,
   getGuatemalaDateInputValue,
@@ -32,6 +34,88 @@ function excelDate(value) {
   const iso = String(value).slice(0, 10);
   const date = new Date(`${iso}T00:00:00Z`);
   return Number.isNaN(date.getTime()) ? String(value) : date;
+}
+
+function displayDate(value) {
+  if (!value) return '';
+  if (value instanceof Date) return value.toLocaleDateString('es-GT', { timeZone: 'UTC' });
+  const iso = String(value).slice(0, 10);
+  const [year, month, day] = iso.split('-');
+  return year && month && day ? `${day}/${month}/${year}` : String(value);
+}
+
+function normalizeCensoRow(row) {
+  return {
+    expediente: row.no_expediente || '', cui: row.cui || '', nombre: row.nombre_completo || '',
+    edad: row.edad ?? '', etnia: row.etnia || '', comunidad: row.comunidad || '',
+    fur: row.fur, fpp: row.fpp, primer_control: row.fecha_primer_control,
+    semanas: row.semanas_gestacion ?? '', gestas: row.gestas ?? '', partos: row.partos ?? '',
+    abortos: row.abortos ?? '', riesgo: row.nivel_riesgo || clasificarRiesgo(row),
+    estado: row.estado_embarazo || 'activo',
+  };
+}
+
+function normalizeOperationalRow(reportId, row) {
+  if (reportId === 'comunidades') return { ...row };
+  return {
+    paciente: row.nombre || '', expediente: row.no_expediente || '', edad: row.edad ?? '',
+    comunidad: row.comunidad || '', fpp: row.fpp, dias_restantes: row.dias_restantes ?? '',
+    semanas_actuales: row.semanas_actuales ?? '',
+    ultimo_control: row.ultimo_control_fecha,
+    dias_sin_control: row.dias_sin_control ?? 'Sin controles',
+    evaluacion_riesgo: row.fecha_evaluacion_riesgo,
+    riesgo: reportId === 'riesgo' ? 'ALTO' : clasificarRiesgo(row),
+    seguimiento: row.estado_seguimiento === 'nunca_control' ? 'Nunca ha tenido control' : 'Control atrasado',
+  };
+}
+
+function selectExportColumns(config, selected) {
+  const requested = String(selected || '').split(',').map((value) => value.trim()).filter(Boolean);
+  const allowed = new Set(config.columns.map(({ key }) => key));
+  const unique = [...new Set(requested)];
+  if (!unique.length || unique.some((key) => !allowed.has(key))) {
+    throw new AppError(400, 'Selecciona al menos una columna válida.', { code: 'INVALID_REPORT_COLUMNS' });
+  }
+  return config.columns.filter(({ key }) => unique.includes(key));
+}
+
+function crearWorkbookReporte({ title, columns, rows, filters, generadoEn }) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'CAP El Chal';
+  workbook.created = new Date();
+  workbook.subject = 'Reporte confidencial';
+  const sheet = workbook.addWorksheet('Reporte', {
+    views: [{ state: 'frozen', ySplit: 5 }],
+    pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+  });
+  sheet.columns = columns.map(({ key, width }) => ({ key, width }));
+  const last = sheet.getColumn(columns.length).letter;
+  for (const rowNumber of [1, 2, 3]) sheet.mergeCells(`A${rowNumber}:${last}${rowNumber}`);
+  sheet.getCell('A1').value = 'MINISTERIO DE SALUD PUBLICA Y ASISTENCIA SOCIAL · CAP El Chal';
+  sheet.getCell('A2').value = title;
+  sheet.getCell('A3').value = `${filters} · ${rows.length} registros · Generado: ${generadoEn}`;
+  [1, 2, 3].forEach((rowNumber) => {
+    const cell = sheet.getCell(`A${rowNumber}`);
+    cell.font = { bold: rowNumber < 3, size: rowNumber === 2 ? 14 : 10, color: { argb: rowNumber === 1 ? 'FFFFFFFF' : 'FF172033' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  });
+  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF155E8E' } };
+  const header = sheet.getRow(5);
+  header.values = columns.map(({ header: label }) => label);
+  header.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF155E8E' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  });
+  rows.forEach((row, index) => {
+    const values = Object.fromEntries(columns.map(({ key, type }) => [key, type === 'date' ? excelDate(row[key]) : row[key]]));
+    const added = sheet.addRow(values);
+    if (index % 2 === 1) added.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FBFD' } }; });
+  });
+  columns.filter(({ type }) => type === 'date').forEach(({ key }) => { sheet.getColumn(key).numFmt = 'dd/mm/yyyy'; });
+  columns.filter(({ key }) => ['expediente', 'cui'].includes(key)).forEach(({ key }) => { sheet.getColumn(key).numFmt = '@'; });
+  sheet.autoFilter = `A5:${last}${Math.max(5, sheet.rowCount)}`;
+  return workbook;
 }
 
 function crearWorkbookCenso(rows, {
@@ -248,6 +332,7 @@ function createReportesService({
   repository = reportesRepository,
   pdfService = reportesPdfService,
   now = () => new Date(),
+  reportWorkbookFactory = crearWorkbookReporte,
 } = {}) {
   async function censoMensual({ desde, hasta }) {
     const rows = prepararFilasConRiesgo(await repository.obtenerRowsCensoGeneral());
@@ -346,6 +431,45 @@ function createReportesService({
     return { pdf, total: rows.length };
   }
 
+  async function exportData(reportId, query = {}) {
+    const config = getReportExportConfig(reportId);
+    if (!config) throw new AppError(404, 'Reporte no encontrado.', { code: 'REPORT_NOT_FOUND' });
+    let rawRows;
+    if (reportId === 'primer_control') rawRows = await repository.obtenerRowsCensoPrimerControl(query.desde, query.hasta);
+    else if (reportId === 'activos') rawRows = await repository.obtenerRowsCensoGeneral();
+    else if (reportId === 'proximas_parto') rawRows = await repository.obtenerProximasAParir();
+    else if (reportId === 'sin_control') rawRows = await repository.obtenerSinControlReciente();
+    else if (reportId === 'riesgo') rawRows = await repository.obtenerPacientesConRiesgo();
+    else rawRows = await repository.obtenerResumenPorComunidad();
+    if (!rawRows.length) {
+      throw new AppError(409, 'No hay registros para exportar con los filtros actuales.', { code: 'EMPTY_REPORT' });
+    }
+    const prepared = ['primer_control', 'activos'].includes(reportId)
+      ? prepararFilasConRiesgo(rawRows).map(normalizeCensoRow)
+      : rawRows.map((row) => normalizeOperationalRow(reportId, row));
+    const columns = selectExportColumns(config, query.columnas);
+    const filters = reportId === 'primer_control'
+      ? `Filtros activos: ${query.desde} al ${query.hasta}`
+      : 'Filtros activos: estado al momento de la consulta';
+    return { config, columns, rows: prepared, filters, total: prepared.length };
+  }
+
+  async function exportReport(reportId, format, query = {}) {
+    const data = await exportData(reportId, query);
+    const generadoEn = formatGuatemalaDateTime(now());
+    if (format === 'excel') {
+      return { ...data, workbook: reportWorkbookFactory({ ...data, title: data.config.title, generadoEn }) };
+    }
+    const pdfRows = data.rows.map((row) => Object.fromEntries(data.columns.map(({ key, type }) => [
+      key, type === 'date' ? displayDate(row[key]) : row[key],
+    ])));
+    const pdf = await pdfService.renderReportPdf({
+      title: data.config.title, columns: data.columns, rows: pdfRows,
+      filters: data.filters, generadoEn,
+    });
+    return { ...data, pdf };
+  }
+
   return {
     censoMensual,
     censoMensualPrimerControl,
@@ -357,6 +481,8 @@ function createReportesService({
     workbookCensoGeneral,
     workbookCensoPrimerControl,
     pdfCensoPrimerControl,
+    exportData,
+    exportReport,
   };
 }
 
@@ -365,7 +491,11 @@ module.exports = {
   clasificarRiesgo,
   crearWorkbookCenso,
   crearWorkbookSeguimientoTdap,
+  crearWorkbookReporte,
   createReportesService,
+  normalizeCensoRow,
+  normalizeOperationalRow,
+  selectExportColumns,
   indicadoresRiesgo,
   prepararFilasConRiesgo,
 };

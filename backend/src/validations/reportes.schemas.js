@@ -21,6 +21,7 @@ const reportDate = z.string({ error: 'Campo requerido' })
 const periodoReportesQuerySchema = z.object({
   desde: reportDate,
   hasta: reportDate,
+  columnas: z.string().min(1).max(500).regex(/^[a-z_,]+$/, 'Columnas invalidas').optional(),
 }).strict('Parametro no permitido').superRefine(({ desde, hasta }, ctx) => {
   if (!isRealIsoDate(desde) || !isRealIsoDate(hasta)) return;
 
@@ -43,8 +44,13 @@ const periodoReportesQuerySchema = z.object({
   }
 });
 
+const exportReportQuerySchema = z.object({
+  columnas: z.string().min(1).max(500).regex(/^[a-z_,]+$/, 'Columnas invalidas'),
+}).strict('Parametro no permitido');
+
 module.exports = {
   MAX_REPORT_DAYS,
   isRealIsoDate,
   periodoReportesQuerySchema,
+  exportReportQuerySchema,
 };

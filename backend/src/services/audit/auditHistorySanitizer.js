@@ -108,6 +108,12 @@ const VALID_DOCUMENT_TYPES = new Set([
 const VALID_REPORT_TYPES = new Set([
   'censo_embarazos_activos',
   'censo_primer_control',
+  'primer_control',
+  'activos',
+  'proximas_parto',
+  'sin_control',
+  'riesgo',
+  'comunidades',
 ]);
 const VALID_FORMATS = new Set(['pdf', 'xlsx']);
 

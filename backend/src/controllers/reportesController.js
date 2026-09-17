@@ -2,6 +2,7 @@ const reportesService = require('../services/reportesService');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { registrarEventoPrivado } = require('../services/auditService');
 const { PDF_RESPONSE_HEADERS, sanitizePdfFilename } = require('../utils/pdfResponse');
+const { getGuatemalaDateInputValue } = require('../utils/guatemalaTime');
 
 function setPrivateDownloadHeaders(res) {
   res.set({
@@ -48,6 +49,27 @@ function createReportesController({
   service = reportesService,
   audit = registrarEventoPrivado,
 } = {}) {
+  const createExportHandler = (reportId, format) => asyncHandler(async (req, res) => {
+    const result = await service.exportReport(reportId, format, req.query);
+    await audit(req, {
+      contexto: { categoria: 'reportes', entidad: 'exportacion', evento: 'exportacion_reporte' },
+      accion: 'exportar',
+      metadata: {
+        tipo_reporte: reportId,
+        formato: format === 'excel' ? 'xlsx' : 'pdf',
+        desde: reportId === 'primer_control' ? req.query.desde : undefined,
+        hasta: reportId === 'primer_control' ? req.query.hasta : undefined,
+        cantidad_filas: result.total,
+        resultado: 'generado',
+      },
+    });
+    const extension = format === 'excel' ? 'xlsx' : 'pdf';
+    const filename = `${result.config.slug}_${getGuatemalaDateInputValue()}.${extension}`;
+    return format === 'excel'
+      ? writeWorkbook(res, result.workbook, filename)
+      : sendReportPdf(res, result.pdf, filename);
+  });
+
   const censoMensual = asyncHandler(async (_req, res) => {
     const result = await service.censoMensual({});
     return res.json(result);
@@ -144,6 +166,18 @@ function createReportesController({
     proximasAParir,
     sinControlReciente,
     resumenPorComunidad,
+    exportarPrimerControlExcel: createExportHandler('primer_control', 'excel'),
+    exportarPrimerControlPdf: createExportHandler('primer_control', 'pdf'),
+    exportarActivosExcel: createExportHandler('activos', 'excel'),
+    exportarActivosPdf: createExportHandler('activos', 'pdf'),
+    exportarProximasPartoExcel: createExportHandler('proximas_parto', 'excel'),
+    exportarProximasPartoPdf: createExportHandler('proximas_parto', 'pdf'),
+    exportarSinControlExcel: createExportHandler('sin_control', 'excel'),
+    exportarSinControlPdf: createExportHandler('sin_control', 'pdf'),
+    exportarRiesgoExcel: createExportHandler('riesgo', 'excel'),
+    exportarRiesgoPdf: createExportHandler('riesgo', 'pdf'),
+    exportarComunidadesExcel: createExportHandler('comunidades', 'excel'),
+    exportarComunidadesPdf: createExportHandler('comunidades', 'pdf'),
   };
 }
 

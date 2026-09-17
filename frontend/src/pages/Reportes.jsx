@@ -6,7 +6,6 @@ import {
   CheckCircle,
   Clock3,
   Download,
-  FileText,
   Loader2,
   MapPinned,
   Search,
@@ -16,10 +15,16 @@ import {
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessage";
+import ReportExportModal from "../components/ReportExportModal";
+import { getReportExportConfig } from "../config/reportExportConfig";
+import { useGlobalToast } from "../context/ToastContext";
 import {
   getDefaultReportPeriod,
   getReportPeriodFromSearch,
+  getReportQueryKey,
+  getReportRecordCount,
   getReportRiskLevel,
+  isReportExportAvailable,
   REPORTES,
   safeDownloadFilename,
 } from "../utils/reportes";
@@ -219,21 +224,49 @@ export default function Reportes() {
   const [hasta, setHasta] = useState(initialPeriod.hasta);
   const [reporteActivo, setReporteActivo] = useState(REPORTES.PRIMER_CONTROL);
   const [resultado, setResultado] = useState(null);
+  const [generatedQueryKey, setGeneratedQueryKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState("");
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportNotice, setExportNotice] = useState(null);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
   const requestRef = useRef(null);
+  const noticeTimerRef = useRef(null);
   const { usuario } = useAuth();
-  const canExport = Boolean(usuario?.permisos?.includes("reportes.exportar"));
+  const toast = useGlobalToast();
+  const hasExportPermission = Boolean(usuario?.permisos?.includes("reportes.exportar"));
+  const currentQueryKey = getReportQueryKey(reporteActivo, { desde, hasta });
+  const recordCount = getReportRecordCount(reporteActivo, resultado);
+  const exportAvailable = isReportExportAvailable({
+    hasPermission: hasExportPermission,
+    loading,
+    reportId: reporteActivo,
+    resultado,
+    generatedQueryKey,
+    currentQueryKey,
+  });
+  const generatedEmptyReport = resultado !== null
+    && generatedQueryKey === currentQueryKey
+    && recordCount === 0;
 
-  useEffect(() => () => requestRef.current?.abort(), []);
+  useEffect(() => () => {
+    requestRef.current?.abort();
+    window.clearTimeout(noticeTimerRef.current);
+  }, []);
+
+  const showExportNotice = (message) => {
+    window.clearTimeout(noticeTimerRef.current);
+    setExportNotice({ message, id: Date.now() });
+    noticeTimerRef.current = window.setTimeout(() => setExportNotice(null), 3200);
+  };
 
   const seleccionarReporte = (tipo) => {
     requestRef.current?.abort();
     requestRef.current = null;
     setReporteActivo(tipo);
     setResultado(null);
+    setGeneratedQueryKey("");
     setLoading(false);
     setError("");
     setFieldErrors({});
@@ -258,9 +291,11 @@ export default function Reportes() {
 
     requestRef.current?.abort();
     const controller = new AbortController();
+    const requestQueryKey = currentQueryKey;
     requestRef.current = controller;
     setLoading(true);
     setResultado(null);
+    setGeneratedQueryKey("");
     setError("");
     setFieldErrors({});
 
@@ -268,7 +303,13 @@ export default function Reportes() {
       const config = { signal: controller.signal };
       if (reporteActivo === REPORTES.PRIMER_CONTROL) config.params = { desde, hasta };
       const { data } = await api.get(ENDPOINTS[reporteActivo], config);
-      if (requestRef.current === controller) setResultado(data);
+      if (requestRef.current === controller) {
+        setResultado(data);
+        setGeneratedQueryKey(requestQueryKey);
+        if (getReportRecordCount(reporteActivo, data) === 0) {
+          showExportNotice("No hay datos para exportar con los filtros actuales.");
+        }
+      }
     } catch (err) {
       if (err.code === "ERR_CANCELED") return;
       const details = err.response?.data?.details || [];
@@ -286,14 +327,18 @@ export default function Reportes() {
     }
   };
 
-  const exportar = async (formato) => {
-    if (!canExport || !resultado || reporteActivo !== REPORTES.PRIMER_CONTROL || downloading) return;
+  const exportar = async (formato, columnas) => {
+    if (!exportAvailable || downloading) return;
     setDownloading(formato);
     setError("");
     try {
       const extension = formato === "pdf" ? "pdf" : "xlsx";
-      const response = await api.get(`/reportes/censo/primer-control/${formato}`, {
-        params: { desde, hasta },
+      const exportConfig = getReportExportConfig(reporteActivo);
+      const response = await api.get(`${exportConfig.endpoint}/${formato}`, {
+        params: {
+          ...(reporteActivo === REPORTES.PRIMER_CONTROL ? { desde, hasta } : {}),
+          columnas: columnas.join(","),
+        },
         responseType: "blob",
       });
       const blob = new Blob([response.data], {
@@ -301,7 +346,7 @@ export default function Reportes() {
           ? "application/pdf"
           : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
-      const fallback = `censo_primer_control_${desde}_${hasta}.${extension}`;
+      const fallback = `reporte_${new Date().toISOString().slice(0, 10)}.${extension}`;
       const filename = safeDownloadFilename(response.headers["content-disposition"], fallback);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -311,8 +356,19 @@ export default function Reportes() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      setExportOpen(false);
+      toast(`${exportConfig.title} exportado correctamente`, "success");
     } catch (err) {
-      setError(getErrorMessage(err, `No fue posible descargar el archivo ${formato.toUpperCase()}.`));
+      let message = `No fue posible descargar el archivo ${formato.toUpperCase()}.`;
+      if (err.response?.data instanceof Blob) {
+        try {
+          const body = JSON.parse(await err.response.data.text());
+          message = body.message || message;
+        } catch { /* La respuesta no contiene JSON. */ }
+      } else {
+        message = getErrorMessage(err, message);
+      }
+      toast(message, "error");
     } finally {
       setDownloading("");
     }
@@ -369,18 +425,18 @@ export default function Reportes() {
             {loading ? <Loader2 className="spin" size={15} /> : <Search size={15} />}
             {loading ? "Consultando..." : "Generar reporte"}
           </button>
-          {isPrimerControl && resultado && canExport && <>
-            <button className="btn-secondary btn-download" onClick={() => exportar("excel")}
-              disabled={Boolean(downloading) || loading}>
-              {downloading === "excel" ? <Loader2 className="spin" size={15} /> : <Download size={15} />} Excel
+          {hasExportPermission && <span onPointerDownCapture={() => {
+            if (generatedEmptyReport) showExportNotice("No es posible exportar porque no existen datos.");
+          }}>
+            <button className="btn-secondary btn-download"
+              onClick={() => { if (exportAvailable) setExportOpen(true); }}
+              disabled={!exportAvailable || Boolean(downloading)}
+              title={!exportAvailable ? "Genera un reporte con al menos un registro antes de exportar." : undefined}>
+              <Download size={15} /> Exportar
             </button>
-            <button className="btn-secondary btn-download" onClick={() => exportar("pdf")}
-              disabled={Boolean(downloading) || loading}>
-              {downloading === "pdf" ? <Loader2 className="spin" size={15} /> : <FileText size={15} />} PDF
-            </button>
-          </>}
+          </span>}
         </div>
-        {isPrimerControl && !canExport && (
+        {!hasExportPermission && (
           <p className="reportes-permission-note">La consulta está disponible. La exportación requiere el permiso reportes.exportar.</p>
         )}
         {error && <div className="error-box">{error}</div>}
@@ -390,7 +446,7 @@ export default function Reportes() {
         <div className="card-header reportes-card-header"><div><h3>{selected.title}</h3>
           <p>{isPrimerControl ? `${formatDateGt(desde)} al ${formatDateGt(hasta)}` : "Estado al momento de la consulta"}</p></div>
           <span className="badge badge-blue">
-            {Array.isArray(resultado) ? resultado.length : resultado.total ?? resultado.totales?.embarazos_activos ?? 0} registros
+            {recordCount} registros
           </span></div>
 
         {isPrimerControl && <>
@@ -414,6 +470,14 @@ export default function Reportes() {
           ? <RiesgoTable rows={rows} /> : <EmptyReport>No hay embarazos activos con ficha de riesgo positiva.</EmptyReport>)}
         {reporteActivo === REPORTES.COMUNIDADES && (resultado.comunidades?.length
           ? <ComunidadesTable resultado={resultado} /> : <EmptyReport>No hay embarazos activos para resumir.</EmptyReport>)}
+      </div>}
+      {exportOpen && <ReportExportModal config={getReportExportConfig(reporteActivo)}
+        busy={Boolean(downloading)} onClose={() => setExportOpen(false)} onExport={exportar} />}
+      {exportNotice && <div className="reportes-export-notice-layer" aria-live="assertive">
+        <div key={exportNotice.id} className="reportes-export-notice" role="alert">
+          <AlertTriangle size={28} aria-hidden="true" />
+          <div><strong>Exportación no disponible</strong><span>{exportNotice.message}</span></div>
+        </div>
       </div>}
     </div>
   );

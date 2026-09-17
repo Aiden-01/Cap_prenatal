@@ -463,6 +463,18 @@ test('reportes aceptan solo tipo, formato, fechas ISO y cantidad', async () => {
     tipo_reporte: 'censo_primer_control',
   });
   assertNoSensitiveAuditData(recorder.events[0]);
+
+  for (const tipoReporte of ['primer_control', 'activos', 'proximas_parto', 'sin_control', 'riesgo', 'comunidades']) {
+    await recorder.registrarEventoPrivado({ usuario: { id: 7 } }, {
+      contexto: { categoria: 'reportes', entidad: 'exportacion', evento: 'exportacion_reporte' },
+      accion: 'exportar',
+      metadata: { tipo_reporte: tipoReporte, formato: 'pdf', cantidad_filas: 1 },
+    });
+  }
+  assert.deepEqual(
+    recorder.events.slice(1).map(({ datosNuevos }) => datosNuevos.tipo_reporte),
+    ['primer_control', 'activos', 'proximas_parto', 'sin_control', 'riesgo', 'comunidades']
+  );
 });
 
 test('el camino legado central sigue disponible solo para compatibilidad', async () => {

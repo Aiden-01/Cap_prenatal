@@ -101,6 +101,49 @@ function buildCensoPrimerControlHtml({ rows, desde, hasta, generadoEn }) {
 }
 
 function createReportesPdfService({ puppeteerClient = puppeteer } = {}) {
+  async function renderHtmlPdf(html) {
+    let browser = null;
+    try {
+      browser = await puppeteerClient.launch(buildPuppeteerLaunchOptions());
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+      return await page.pdf({
+        format: 'A4', landscape: true, preferCSSPageSize: true, printBackground: true,
+        displayHeaderFooter: true, headerTemplate: '<span></span>',
+        footerTemplate: '<div style="width:100%;font:7pt Arial;color:#5f7185;text-align:center">Pagina <span class="pageNumber"></span> de <span class="totalPages"></span></div>',
+        margin: { top: '12mm', right: '8mm', bottom: '14mm', left: '8mm' },
+      });
+    } finally {
+      if (browser) await browser.close();
+    }
+  }
+
+  function buildReportHtml({ title, columns, rows, filters, generadoEn }) {
+    const header = columns.map(({ header }) => `<th>${escapeHtml(header)}</th>`).join('');
+    const body = rows.map((row) => `<tr>${columns.map(({ key }) => `<td>${escapeHtml(row[key] ?? '—')}</td>`).join('')}</tr>`).join('');
+    return `<!doctype html><html><head><meta charset="utf-8"><style>
+      @page { size: A4 landscape; margin: 12mm 8mm 14mm; }
+      body { font-family: Arial, sans-serif; color: #172033; font-size: 8pt; }
+      h1 { margin: 0; color: #155e8e; font-size: 17pt; text-align: center; }
+      .institution, .meta { text-align: center; } .institution { font-weight: 700; margin-bottom: 4px; }
+      .meta { margin: 8px 0; color: #44566c; } table { width: 100%; border-collapse: collapse; }
+      thead { display: table-header-group; } tr { break-inside: avoid; }
+      th, td { border: .5px solid #9fb6c8; padding: 4px; overflow-wrap: anywhere; }
+      th { background: #155e8e; color: #fff; } tbody tr:nth-child(even) { background: #f8fbfd; }
+      .confidential { margin-top: 8px; color: #5f7185; text-align: center; font-size: 7pt; }
+    </style></head><body>
+      <div class="institution">MINISTERIO DE SALUD PUBLICA Y ASISTENCIA SOCIAL · CAP El Chal</div>
+      <h1>${escapeHtml(title)}</h1>
+      <div class="meta">${escapeHtml(filters)} · ${rows.length} registros · Generado: ${escapeHtml(generadoEn)}</div>
+      <table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>
+      <p class="confidential">Documento confidencial para uso institucional. Proteja los datos nominales de las pacientes.</p>
+    </body></html>`;
+  }
+
+  async function renderReportPdf(data) {
+    return renderHtmlPdf(buildReportHtml(data));
+  }
+
   async function renderCensoPrimerControlPdf(data) {
     let browser = null;
     try {
@@ -125,7 +168,7 @@ function createReportesPdfService({ puppeteerClient = puppeteer } = {}) {
     }
   }
 
-  return { renderCensoPrimerControlPdf };
+  return { buildReportHtml, renderCensoPrimerControlPdf, renderReportPdf };
 }
 
 module.exports = {

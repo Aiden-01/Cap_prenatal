@@ -52,10 +52,15 @@ test("tabla principal muestra datos nominales requeridos y no IDs tecnicos", asy
 
 test("exportaciones dependen de reportes.exportar e incluyen Excel y PDF", async () => {
   const reportes = await source("src/pages/Reportes.jsx");
+  const modal = await source("src/components/ReportExportModal.jsx");
+  const config = await source("src/config/reportExportConfig.js");
   assert.match(reportes, /usuario\?\.permisos\?\.includes\("reportes\.exportar"\)/);
-  assert.match(reportes, /resultado && canExport/);
-  assert.match(reportes, /exportar\("excel"\)/);
-  assert.match(reportes, /exportar\("pdf"\)/);
+  assert.match(reportes, /hasExportPermission && <button/);
+  assert.match(reportes, /disabled=\{!exportAvailable \|\| Boolean\(downloading\)\}/);
+  assert.match(reportes, /ReportExportModal/);
+  assert.match(modal, /id: "excel"/);
+  assert.match(modal, /id: "pdf"/);
+  assert.match(config, /REPORT_EXPORT_CONFIG/);
   assert.match(reportes, /response\.headers\["content-disposition"\]/);
 });
 
@@ -68,6 +73,16 @@ test("cambio de reporte cancela solicitudes y limpia resultados anteriores", asy
     "/reportes/censo", "/reportes/proximas-a-parir", "/reportes/sin-control-reciente",
     "/reportes/pacientes-riesgo", "/reportes/resumen-comunidades",
   ]) assert.ok(reportes.includes(endpoint));
+});
+
+test("los seis reportes comparten configuración de exportación Excel y PDF", async () => {
+  const config = await source("src/config/reportExportConfig.js");
+  for (const report of ["PRIMER_CONTROL", "ACTIVOS", "PROXIMAS_PARTO", "SIN_CONTROL", "RIESGO", "COMUNIDADES"]) {
+    assert.ok(config.includes(`REPORTES.${report}`), `Falta configuración: ${report}`);
+  }
+  assert.match(config, /endpoint: "\/reportes\/censo\/primer-control"/);
+  assert.match(config, /endpoint: "\/reportes\/resumen-comunidades"/);
+  assert.doesNotMatch(config, /telefono|control_id|embarazo_id/i);
 });
 
 test("seguimiento sin control separa nunca atendidas y controles atrasados", async () => {

@@ -9,6 +9,36 @@ export const REPORTES = Object.freeze({
   COMUNIDADES: "comunidades",
 });
 
+export function getReportRecordCount(reportId, resultado) {
+  if (!resultado) return 0;
+  if (Array.isArray(resultado)) return resultado.length;
+  if (reportId === REPORTES.COMUNIDADES) return resultado.comunidades?.length ?? 0;
+  return Number(resultado.total) || 0;
+}
+
+export function getReportQueryKey(reportId, { desde = "", hasta = "" } = {}) {
+  return reportId === REPORTES.PRIMER_CONTROL
+    ? `${reportId}:${desde}:${hasta}`
+    : reportId;
+}
+
+export function isReportExportAvailable({
+  hasPermission,
+  loading,
+  reportId,
+  resultado,
+  generatedQueryKey,
+  currentQueryKey,
+}) {
+  return Boolean(
+    hasPermission
+    && !loading
+    && resultado !== null
+    && generatedQueryKey === currentQueryKey
+    && getReportRecordCount(reportId, resultado) > 0
+  );
+}
+
 export function getDefaultReportPeriod(now = new Date()) {
   const hasta = getGuatemalaDateInputValue(now);
   return { desde: `${hasta.slice(0, 8)}01`, hasta };
