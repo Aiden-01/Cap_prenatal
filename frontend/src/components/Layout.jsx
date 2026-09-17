@@ -131,19 +131,14 @@ export default function Layout() {
         {/* Botón hamburguesa — solo móvil */}
         {isMobile && (
           <button
-            onClick={() => setMenuOpen(true)}
+            onClick={() => setMenuOpen((open) => !open)}
             type="button"
-            aria-label="Abrir navegación principal"
-            style={{
-              position: "fixed", top: 14, left: 14, zIndex: 200,
-              background: "var(--primary)", color: "#fff",
-              border: "none", padding: "0.5rem",
-              borderRadius: 8, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "var(--shadow-md)",
-            }}
+            className={`mobile-menu-toggle ${menuOpen ? "is-open" : ""}`}
+            aria-label={menuOpen ? "Cerrar navegación principal" : "Abrir navegación principal"}
+            aria-expanded={menuOpen}
+            aria-controls="app-sidebar"
           >
-            <Menu size={22} />
+            {menuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         )}
 

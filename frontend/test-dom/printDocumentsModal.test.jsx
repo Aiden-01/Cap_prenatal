@@ -47,12 +47,9 @@ test("los modos son excluyentes y combinado bloquea la selección individual en 
 });
 
 test("documento faltante queda deshabilitado e impide combinado", async () => {
-  const user = userEvent.setup();
   renderModal({ availability: { expediente: true, plan: false, riesgo: true } });
   assert.equal(screen.getByRole("checkbox", { name: /plan de parto/i }).disabled, true);
-  await user.click(screen.getByRole("radio", { name: /todo en un solo pdf/i }));
-  assert.equal(screen.getByRole("button", { name: /generar pdf/i }).disabled, true);
-  assert.match(screen.getByRole("alert").textContent, /completa los documentos/i);
+  assert.equal(screen.getByRole("radio", { name: /todo en un solo pdf/i }).disabled, true);
 });
 
 test("cierra por botón y Escape", () => {
@@ -61,4 +58,36 @@ test("cierra por botón y Escape", () => {
   assert.deepEqual(calls, ["close"]);
   fireEvent.click(screen.getByRole("button", { name: /cerrar selector/i }));
   assert.deepEqual(calls, ["close", "close"]);
+});
+
+test("genera exactamente los documentos individuales seleccionados", async () => {
+  const user = userEvent.setup();
+  const calls = renderModal();
+  await user.click(screen.getByRole("checkbox", { name: /expediente/i }));
+  await user.click(screen.getByRole("checkbox", { name: /plan de parto/i }));
+  await user.click(screen.getByRole("checkbox", { name: /ficha de riesgo/i }));
+  await user.click(screen.getByRole("button", { name: /generar pdf/i }));
+  assert.deepEqual(calls, [{ mode: "individual", selected: ["plan", "riesgo"] }]);
+});
+
+test("loading bloquea controles, cierre y doble envío", () => {
+  const calls = renderModal({ busy: true });
+  screen.getAllByRole("radio").forEach((control) => assert.equal(control.disabled, true));
+  screen.getAllByRole("checkbox").forEach((control) => assert.equal(control.disabled, true));
+  assert.equal(screen.getByRole("button", { name: /generando pdf/i }).disabled, true);
+  fireEvent.keyDown(document, { key: "Escape" });
+  assert.deepEqual(calls, []);
+});
+
+test("restaura foco y scroll al desmontar", () => {
+  const trigger = document.createElement("button");
+  document.body.appendChild(trigger);
+  trigger.focus();
+  renderModal();
+  assert.notEqual(document.activeElement, trigger);
+  assert.equal(document.body.style.overflow, "hidden");
+  cleanup();
+  assert.equal(document.activeElement, trigger);
+  assert.equal(document.body.style.overflow, "");
+  trigger.remove();
 });

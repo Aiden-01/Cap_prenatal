@@ -11,14 +11,26 @@ export default function PrintDocumentsModal({ availability, busy, onClose, onGen
   const [mode, setMode] = useState("individual");
   const [selected, setSelected] = useState(["expediente"]);
   const dialogRef = useRef(null);
+  const busyRef = useRef(busy);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
     const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     dialog?.querySelector("input:not(:disabled), button:not(:disabled)")?.focus();
 
     const handleKeyDown = (event) => {
-      if (event.key === "Escape" && !busy) onClose();
+      if (event.key === "Escape" && !busyRef.current) onCloseRef.current();
       if (event.key !== "Tab" || !dialog) return;
       const focusable = [...dialog.querySelectorAll("button:not(:disabled), input:not(:disabled)")];
       if (!focusable.length) return;
@@ -36,9 +48,10 @@ export default function PrintDocumentsModal({ availability, busy, onClose, onGen
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
       previousFocus?.focus?.();
     };
-  }, [busy, onClose]);
+  }, []);
 
   const toggleDocument = (id) => {
     setSelected((current) => current.includes(id)
@@ -78,8 +91,8 @@ export default function PrintDocumentsModal({ availability, busy, onClose, onGen
                 <span><strong>Documentos individuales</strong><small>Selecciona los documentos que deseas generar.</small></span>
                 {mode === "individual" && <Check size={18} aria-hidden="true" />}
               </label>
-              <label className={`print-mode-card ${mode === "combined" ? "is-selected" : ""}`}>
-                <input type="radio" name="print-mode" value="combined" checked={mode === "combined"} onChange={() => setMode("combined")} disabled={busy} />
+              <label className={`print-mode-card ${mode === "combined" ? "is-selected" : ""} ${!combinedAvailable ? "is-disabled" : ""}`}>
+                <input type="radio" name="print-mode" value="combined" checked={mode === "combined"} onChange={() => setMode("combined")} disabled={busy || !combinedAvailable} />
                 <span><strong>Todo en un solo PDF</strong><small>Genera un único PDF con todos los documentos.</small></span>
                 {mode === "combined" && <Check size={18} aria-hidden="true" />}
               </label>

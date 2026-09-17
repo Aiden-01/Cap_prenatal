@@ -2,7 +2,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, UserPlus, BarChart3,
-  Settings, X, LogOut, Menu, Moon, Sun, KeyRound, MapPin, MapPinned
+  Settings, LogOut, Menu, Moon, Sun, KeyRound, MapPin, MapPinned
 } from "lucide-react";
 
 const NAV = [
@@ -106,6 +106,8 @@ export default function Sidebar({
       {isMobile && menuOpen && (
         <div
           onClick={() => setMenuOpen(false)}
+          className="sidebar-mobile-overlay"
+          aria-hidden="true"
           style={{
             position: "fixed", inset: 0,
             background: "rgba(0,0,0,0.45)",
@@ -117,6 +119,7 @@ export default function Sidebar({
 
       {/* SIDEBAR */}
       <aside
+        id="app-sidebar"
         data-app-sidebar
         style={{
           position: "fixed",
@@ -137,12 +140,12 @@ export default function Sidebar({
         }}
       >
         {/* HEADER */}
-        <div style={{ padding: "1rem 1rem 0.5rem" }}>
-          <button
-            onClick={() => {
-              if (isMobile) setMenuOpen(!menuOpen);
-              else setCollapsed(!collapsed);
-            }}
+        <div className="sidebar-header" style={{ padding: "1rem 1rem 0.5rem" }}>
+          {isMobile && <div className="mobile-sidebar-toggle-slot" aria-hidden="true" />}
+          {!isMobile && <button
+            onClick={() => setCollapsed(!collapsed)}
+            type="button"
+            aria-label={collapsed ? "Expandir navegación principal" : "Contraer navegación principal"}
             style={{
               background: "transparent", border: "none",
               color: "#fff", cursor: "pointer",
@@ -150,8 +153,8 @@ export default function Sidebar({
               display: "flex",
             }}
           >
-            {isMobile ? <X size={20} /> : <Menu size={20} />}
-          </button>
+            <Menu size={20} />
+          </button>}
 
           {!collapsed && (
             <div style={{ marginTop: "0.75rem" }}>
@@ -169,7 +172,7 @@ export default function Sidebar({
         </div>
 
         {/* NAV */}
-        <nav style={{ flex: 1, padding: "0.75rem 0.5rem", overflowY: "auto" }}>
+        <nav className="sidebar-nav" style={{ flex: 1, padding: "0.75rem 0.5rem", overflowY: "auto" }}>
           {items.map(({ label, path, icon: Icon, delay }) => {
             const isActive = location.pathname.startsWith(path);
             return (

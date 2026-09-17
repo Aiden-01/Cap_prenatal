@@ -18,6 +18,45 @@ test("keeps shared mobile controls and overlays usable", () => {
   assert.match(css, /\.content-tabs\s*\{[\s\S]*overflow-x:\s*auto/);
 });
 
+test("mobile navigation toggle morphs, closes on a second press and respects reduced motion", () => {
+  const layout = readFileSync(new URL("../src/components/Layout.jsx", import.meta.url), "utf8");
+  const sidebar = readFileSync(new URL("../src/components/Sidebar.jsx", import.meta.url), "utf8");
+
+  assert.match(layout, /setMenuOpen\(\(open\) => !open\)/);
+  assert.match(layout, /aria-expanded=\{menuOpen\}/);
+  assert.match(layout, /mobile-menu-toggle \$\{menuOpen \? "is-open" : ""\}/);
+  assert.match(sidebar, /\{!isMobile && <button/);
+  assert.match(sidebar, /className="sidebar-mobile-overlay"[\s\S]*?aria-hidden="true"/);
+  assert.match(sidebar, /onClick=\{\(\) => setMenuOpen\(false\)\}/);
+  assert.match(css, /\.mobile-menu-toggle\.is-open\s*\{[\s\S]*?border-radius:[\s\S]*?transform:/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.mobile-menu-toggle/);
+});
+
+test("mobile sidebar reserves a safe-area-aware structural slot above navigation", () => {
+  const sidebar = readFileSync(new URL("../src/components/Sidebar.jsx", import.meta.url), "utf8");
+
+  assert.match(sidebar, /isMobile && <div className="mobile-sidebar-toggle-slot" aria-hidden="true"/);
+  assert.match(sidebar, /<nav className="sidebar-nav"/);
+  assert.match(css, /--mobile-sidebar-toggle-size:\s*44px/);
+  assert.match(css, /--mobile-sidebar-toggle-gap:\s*14px/);
+  assert.match(css, /\.mobile-menu-toggle\s*\{[\s\S]*?top:\s*max\(14px, env\(safe-area-inset-top\)\)/);
+  assert.match(
+    css,
+    /@media \(max-width: 767px\)[\s\S]*?\.mobile-sidebar-toggle-slot\s*\{[\s\S]*?height:\s*calc\([\s\S]*?var\(--mobile-sidebar-toggle-size\)[\s\S]*?var\(--mobile-sidebar-toggle-gap\)[\s\S]*?env\(safe-area-inset-top\)/,
+  );
+});
+
+test("desktop main consumes the space left by the fixed sidebar without widening the document", () => {
+  assert.match(
+    css,
+    /\.app-main\s*\{[\s\S]*?width:\s*auto;[\s\S]*?max-width:\s*100%;[\s\S]*?min-width:\s*0;/,
+  );
+  assert.doesNotMatch(
+    css,
+    /html,\s*body,\s*#root,\s*\.app-shell,\s*\.app-main\s*\{[\s\S]*?width:\s*100%;/,
+  );
+});
+
 test("keeps native date controls inside their responsive field columns", () => {
   assert.match(css, /\.form-group\s*\{[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/);
   assert.match(
