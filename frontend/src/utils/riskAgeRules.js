@@ -1,12 +1,32 @@
-function dateParts(value) {
+function canonicalFromParts(year, month, day) {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+export function normalizeClinicalDate(value) {
   if (!value) return null;
-  const match = String(value).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return canonicalFromParts(value.getFullYear(), value.getMonth() + 1, value.getDate());
+  }
+  if (typeof value !== "string") return null;
+
+  const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const isoDateTime = value.match(/^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/);
+  const match = dateOnly || isoDateTime;
+  if (!match || (isoDateTime && Number.isNaN(Date.parse(value)))) return null;
+  return canonicalFromParts(Number(match[1]), Number(match[2]), Number(match[3]));
+}
+
+function dateParts(value) {
+  const normalized = normalizeClinicalDate(value);
+  if (!normalized) return null;
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
   const year = Number(match[1]);
   const month = Number(match[2]);
   const day = Number(match[3]);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
   return { year, month, day };
 }
 

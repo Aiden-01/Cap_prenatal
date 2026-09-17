@@ -657,6 +657,35 @@ test('riesgo sobrescribe payload manipulado con factores canónicos según edad 
   }
 });
 
+test('riesgo guarda la regresión de 17 años cuando PostgreSQL entrega objetos Date', async () => {
+  let inserted;
+  await withClinicalService('risk', {
+    repository: {
+      obtenerContextoEdad: async () => ({ fecha_nacimiento: new Date(2009, 3, 12) }),
+      obtenerPorEmbarazo: async () => null,
+      insertar: async (data) => {
+        inserted = data;
+        return { id: 701, ...data, tiene_riesgo: data.menor_20_anos || data.mayor_35_anos };
+      },
+    },
+  }, async (service) => {
+    const saved = await service.guardarFichaRiesgo({
+      pacienteId: 41,
+      embarazoId: 91,
+      body: completeRisk(service, {
+        fecha: '2026-06-17',
+        menor_20_anos: false,
+        mayor_35_anos: true,
+      }),
+      req: ACTOR,
+    });
+    assert.equal(saved.id, 701);
+  });
+
+  assert.equal(inserted.menor_20_anos, true);
+  assert.equal(inserted.mayor_35_anos, false);
+});
+
 test('riesgo rechaza persistencia si falta o es inconsistente el contexto de edad', async () => {
   for (const birth of [null, 'fecha-invalida', '2027-01-01']) {
     await assert.rejects(withClinicalService('risk', {

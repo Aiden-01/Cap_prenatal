@@ -348,19 +348,19 @@ test('servicio PDF entrega solo datos del embarazo prevalidado', async () => {
 
 test('servicio PDF entrega factores de edad y riesgo general canónicos', async () => {
   const cases = [
-    ['2007-09-17', true, false],
-    ['1998-09-17', false, false],
-    ['1989-09-17', false, true],
+    [new Date(2009, 3, 12), new Date(2026, 5, 17), true, false],
+    ['1998-09-17T06:00:00.000Z', '2026-09-17T06:00:00.000Z', false, false],
+    ['1989-09-17', '2026-09-17', false, true],
   ];
 
-  for (const [fechaNacimiento, menor20, mayor35] of cases) {
+  for (const [fechaNacimiento, fechaEvaluacion, menor20, mayor35] of cases) {
     const service = createPdfService({
       repository: {
         obtenerPacientePorId: async () => ({ id: 41, fecha_nacimiento: fechaNacimiento }),
         resolverEmbarazoParaPdf: async () => ({ id: 91, paciente_id: 41 }),
         obtenerFichaRiesgoData: async () => ({
           riesgo: {
-            fecha: '2026-09-17',
+            fecha: fechaEvaluacion,
             menor_20_anos: !menor20,
             mayor_35_anos: !mayor35,
             tiene_riesgo: true,

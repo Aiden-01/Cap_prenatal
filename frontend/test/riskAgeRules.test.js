@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateAgeOnDate, deriveAgeRiskFactors } from "../src/utils/riskAgeRules.js";
+import { calculateAgeOnDate, deriveAgeRiskFactors, normalizeClinicalDate } from "../src/utils/riskAgeRules.js";
+
+test("normaliza DATE de PostgreSQL e ISO de API sin desplazar el día clínico", () => {
+  assert.equal(normalizeClinicalDate(new Date(2026, 5, 17)), "2026-06-17");
+  assert.equal(normalizeClinicalDate("2026-06-17"), "2026-06-17");
+  assert.equal(normalizeClinicalDate("2026-06-17T06:00:00.000Z"), "2026-06-17");
+  assert.equal(normalizeClinicalDate("17/06/2026"), null);
+  assert.deepEqual(
+    deriveAgeRiskFactors("2009-04-12T06:00:00.000Z", "2026-06-17T06:00:00.000Z"),
+    { valid: true, age: 17, menor_20_anos: true, mayor_35_anos: false }
+  );
+});
 
 test("edad clínica respeta el día exacto del cumpleaños", () => {
   assert.equal(calculateAgeOnDate("2006-09-17", "2026-09-16"), 19);

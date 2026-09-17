@@ -1,11 +1,42 @@
 const assert = require('node:assert/strict');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const test = require('node:test');
 
 const {
   applyAgeRiskFactors,
   calculateAgeOnDate,
   deriveAgeRiskFactors,
+  normalizeClinicalDate,
 } = require('../src/domain/riskAgeRules');
+
+test('normaliza las representaciones legítimas que producen PostgreSQL y la API', () => {
+  const birthFromPostgres = new Date(2009, 3, 12);
+  const evaluationFromPostgres = new Date(2026, 5, 17);
+
+  assert.equal(normalizeClinicalDate(birthFromPostgres), '2009-04-12');
+  assert.equal(normalizeClinicalDate(evaluationFromPostgres), '2026-06-17');
+  assert.equal(normalizeClinicalDate('2026-06-17'), '2026-06-17');
+  assert.equal(normalizeClinicalDate('2026-06-17T06:00:00.000Z'), '2026-06-17');
+  assert.deepEqual(deriveAgeRiskFactors(birthFromPostgres, evaluationFromPostgres), {
+    valid: true,
+    age: 17,
+    menor_20_anos: true,
+    mayor_35_anos: false,
+  });
+});
+
+test('normalizar un DATE clínico no cambia el día por timezone', () => {
+  const modulePath = path.resolve(__dirname, '../src/domain/riskAgeRules.js');
+  const script = `const { normalizeClinicalDate } = require(${JSON.stringify(modulePath)}); process.stdout.write(normalizeClinicalDate(new Date(2026, 5, 17)));`;
+  for (const timezone of ['UTC', 'America/Guatemala', 'Asia/Tokyo']) {
+    const output = execFileSync(process.execPath, ['-e', script], {
+      env: { ...process.env, TZ: timezone },
+      encoding: 'utf8',
+    });
+    assert.equal(output, '2026-06-17');
+  }
+});
 
 test('calcula edad por año, mes y día alrededor del cumpleaños 20', () => {
   assert.equal(calculateAgeOnDate('2006-09-17', '2026-09-16'), 19);
@@ -38,6 +69,8 @@ test('maneja año bisiesto y rechaza fechas inválidas o nacimiento posterior', 
     [null, '2026-09-17'],
     ['fecha-invalida', '2026-09-17'],
     ['2000-02-30', '2026-09-17'],
+    ['17/06/2000', '2026-09-17'],
+    ['2000-01-01', '17/06/2026'],
     ['2027-01-01', '2026-09-17'],
     ['2000-01-01', null],
   ]) assert.equal(deriveAgeRiskFactors(birth, reference).valid, false);
