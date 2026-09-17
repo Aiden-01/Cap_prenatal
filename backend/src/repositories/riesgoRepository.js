@@ -8,6 +8,17 @@ async function obtenerPorEmbarazo(embarazoId, db = pool) {
   return rows[0] || null;
 }
 
+async function obtenerContextoEdad({ pacienteId, embarazoId }, db = pool) {
+  const { rows } = await db.query(
+    `SELECT p.fecha_nacimiento, e.fur
+     FROM pacientes p
+     JOIN embarazos e ON e.paciente_id = p.id
+     WHERE p.id = $1 AND e.id = $2`,
+    [pacienteId, embarazoId]
+  );
+  return rows[0] || null;
+}
+
 async function insertar(data, db = pool) {
   const campos = Object.keys(data);
   const valores = campos.map((field) => data[field]);
@@ -88,6 +99,7 @@ async function enTransaccion(callback) {
 }
 
 module.exports = {
+  obtenerContextoEdad,
   obtenerPorEmbarazo,
   insertar,
   actualizarPorEmbarazo,

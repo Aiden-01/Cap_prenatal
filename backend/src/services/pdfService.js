@@ -1,5 +1,17 @@
 const pdfRepository = require('../repositories/pdfRepository');
 const { AppError } = require('../utils/appError');
+const { applyAgeRiskFactors, deriveAgeRiskFactors } = require('../domain/riskAgeRules');
+
+function canonicalRiskForPdf(risk, patient) {
+  if (!risk) return null;
+  const derived = deriveAgeRiskFactors(patient?.fecha_nacimiento, risk.fecha);
+  if (!derived.valid) {
+    throw new AppError(422, 'No es posible calcular la edad clínica para generar la ficha de riesgo', {
+      code: 'RISK_AGE_CONTEXT_INVALID',
+    });
+  }
+  return applyAgeRiskFactors(risk, patient.fecha_nacimiento, risk.fecha);
+}
 
 function createPdfService({ repository = pdfRepository } = {}) {
   async function preflightPaciente(pacienteId) {
@@ -58,7 +70,12 @@ function createPdfService({ repository = pdfRepository } = {}) {
       pacienteId,
       embarazoId: embarazo?.id || null,
     });
-    return { paciente, embarazo, ...data };
+    return {
+      paciente,
+      embarazo,
+      ...data,
+      riesgo: canonicalRiskForPdf(data.riesgo, paciente),
+    };
   }
 
   async function obtenerFichaRiesgoData(pacienteId, embarazoIdSolicitado = null) {
@@ -67,7 +84,12 @@ function createPdfService({ repository = pdfRepository } = {}) {
       pacienteId,
       embarazoId: embarazo?.id || null,
     });
-    return { paciente, embarazo, ...data };
+    return {
+      paciente,
+      embarazo,
+      ...data,
+      riesgo: canonicalRiskForPdf(data.riesgo, paciente),
+    };
   }
 
   async function obtenerPlanPartoData(pacienteId, embarazoIdSolicitado = null) {

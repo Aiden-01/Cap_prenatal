@@ -8,6 +8,12 @@ const { registrarEventoPrivado: registrarAuditoria } = require('./auditService')
 const { structurallyEqual } = require('./audit/auditDiffBuilder');
 const { HttpError } = require('../utils/httpError');
 const { filtrarCamposVih, VIH_FIELDS } = require('../utils/datosSensibles');
+const {
+  AUTOMATIC_AGE_FIELDS,
+  RISK_FACTOR_FIELDS,
+  applyAgeRiskFactors,
+  deriveAgeRiskFactors,
+} = require('../domain/riskAgeRules');
 
 const emptyToNull = (value) => (value === '' || value === undefined ? null : value);
 const boolOrFalse = (value) => value ?? false;
@@ -40,34 +46,6 @@ const RIESGO_FIELDS = [
   'hipertension_arterial', 'consumo_drogas_alcohol_tabaco',
   'otra_enfermedad_severa', 'otra_enfermedad_descripcion',
   'referida_a', 'nombre_personal_atendio',
-];
-
-const RISK_FACTOR_FIELDS = [
-  'muerte_fetal_neonatal_previa',
-  'abortos_espontaneos_3mas',
-  'gestas_3mas',
-  'peso_ultimo_bebe_menor_2500g',
-  'peso_ultimo_bebe_mayor_4500g',
-  'antec_hipertension_preeclampsia',
-  'cirugias_tracto_reproductivo',
-  'embarazo_multiple',
-  'menor_20_anos',
-  'mayor_35_anos',
-  'paciente_rh_negativo',
-  'hemorragia_vaginal',
-  'vih_positivo_sifilis',
-  'presion_diastolica_90mas',
-  'anemia',
-  'desnutricion_obesidad',
-  'dolor_abdominal',
-  'sintomatologia_urinaria',
-  'ictericia',
-  'diabetes',
-  'enfermedad_renal',
-  'enfermedad_corazon',
-  'hipertension_arterial',
-  'consumo_drogas_alcohol_tabaco',
-  'otra_enfermedad_severa',
 ];
 
 const BOOLEAN_FIELDS = new Set(['migrante', ...RISK_FACTOR_FIELDS]);
@@ -146,6 +124,31 @@ function buildRiesgoData(body, fields = RIESGO_FIELDS) {
   return data;
 }
 
+function invalidAgeContextError() {
+  return new HttpError(422, 'No es posible calcular la edad clínica de la paciente', {
+    code: 'RISK_AGE_CONTEXT_INVALID',
+    details: [{
+      campo: 'fecha',
+      mensaje: 'Verifica la fecha de nacimiento y la fecha de evaluación de la ficha',
+    }],
+  });
+}
+
+async function canonicalAgeFactors({ pacienteId, embarazoId, fecha }, db) {
+  const context = await riesgoRepository.obtenerContextoEdad({ pacienteId, embarazoId }, db);
+  const derived = deriveAgeRiskFactors(context?.fecha_nacimiento, fecha);
+  if (!derived.valid) throw invalidAgeContextError();
+  return derived;
+}
+
+function withCanonicalAgeFields(data, derived) {
+  return {
+    ...data,
+    menor_20_anos: derived.menor_20_anos,
+    mayor_35_anos: derived.mayor_35_anos,
+  };
+}
+
 function riesgoFieldsPermitidos(permisos = []) {
   const puedeVerVih = permisos.includes('controles.ver_vih');
   return puedeVerVih
@@ -155,7 +158,12 @@ function riesgoFieldsPermitidos(permisos = []) {
 
 async function obtenerFichaRiesgo(pacienteId, embarazoIdSolicitado = null) {
   const embarazo = await resolverEmbarazoParaLectura({ pacienteId, embarazoId: embarazoIdSolicitado });
-  return embarazo ? riesgoRepository.obtenerPorEmbarazo(embarazo.id) : null;
+  if (!embarazo) return null;
+  const [ficha, context] = await Promise.all([
+    riesgoRepository.obtenerPorEmbarazo(embarazo.id),
+    riesgoRepository.obtenerContextoEdad({ pacienteId, embarazoId: embarazo.id }),
+  ]);
+  return ficha ? applyAgeRiskFactors(ficha, context?.fecha_nacimiento, ficha.fecha) : null;
 }
 
 async function guardarFichaRiesgo({ pacienteId, embarazoId, body, req }) {
@@ -167,10 +175,15 @@ async function guardarFichaRiesgo({ pacienteId, embarazoId, body, req }) {
       throw new HttpError(409, 'Esta paciente ya tiene una ficha de riesgo registrada');
     }
 
+    const derivedAge = await canonicalAgeFactors({
+      pacienteId,
+      embarazoId,
+      fecha: body.fecha,
+    }, client);
     const data = {
       paciente_id: pacienteId,
       embarazo_id: embarazoId,
-      ...buildRiesgoData(body, RIESGO_FIELDS),
+      ...withCanonicalAgeFields(buildRiesgoData(body, RIESGO_FIELDS), derivedAge),
       registrado_por: req.usuario.id,
       updated_by: req.usuario.id,
     };
@@ -199,11 +212,14 @@ async function actualizarFichaRiesgo({ pacienteId, embarazoId, body, req }) {
   const fields = riesgoFieldsPermitidos(req.usuario.permisos);
   const bodyPermitido = filtrarCamposVih(body, req.usuario.permisos);
   requerirEmbarazoId(embarazoId);
-  const data = buildRiesgoData(bodyPermitido, fields);
   return riesgoRepository.enTransaccion(async (client) => {
     await validarEmbarazoEditable({ pacienteId, embarazoId, db: client, bloquear: true });
     const before = await riesgoRepository.obtenerPorEmbarazo(embarazoId, client);
     if (!before) throw new HttpError(404, 'Ficha de riesgo no encontrada');
+
+    const referenceDate = bodyPermitido.fecha || before.fecha;
+    const derivedAge = await canonicalAgeFactors({ pacienteId, embarazoId, fecha: referenceDate }, client);
+    const data = withCanonicalAgeFields(buildRiesgoData(bodyPermitido, fields), derivedAge);
 
     const modifiedFields = camposRealmenteModificados(before, data, fields);
     if (modifiedFields.length === 0) return before;
@@ -278,6 +294,7 @@ async function eliminarFichaRiesgo({ pacienteId, embarazoId, req }) {
 }
 
 module.exports = {
+  AUTOMATIC_AGE_FIELDS,
   RIESGO_FIELDS,
   RISK_FACTOR_FIELDS,
   valoresRiesgoEquivalentes,

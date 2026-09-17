@@ -6,6 +6,7 @@ const { HttpError } = require('../utils/httpError');
 const { filtrarCamposVih } = require('../utils/datosSensibles');
 const { resolverEmbarazoParaLectura, requerirEmbarazoId, validarEmbarazoEditable } = require('../utils/embarazos');
 const { esMunicipioElChal } = require('../domain/municipioRules');
+const { applyAgeRiskFactors } = require('../domain/riskAgeRules');
 
 const ESTADO_EMBARAZO_ACTIVO = 'activo';
 const ESTADO_EMBARAZO_PUERPERIO = 'puerperio';
@@ -463,8 +464,16 @@ async function expedienteCompleto(id, embarazoIdSolicitado = null) {
     pacientesRepository.obtenerEmbarazoActual(id),
   ]);
   if (!expediente.paciente) throw new HttpError(404, 'Paciente no encontrado');
+  const fichaRiesgo = expediente.ficha_riesgo
+    ? applyAgeRiskFactors(
+      expediente.ficha_riesgo,
+      expediente.paciente.fecha_nacimiento,
+      expediente.ficha_riesgo.fecha
+    )
+    : null;
   return {
     ...expediente,
+    ficha_riesgo: fichaRiesgo,
     embarazo_seleccionado: embarazoSeleccionado || null,
     embarazo_actual: embarazoActual || null,
     embarazo_activo: embarazoSeleccionado || null,

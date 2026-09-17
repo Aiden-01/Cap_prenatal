@@ -22,7 +22,7 @@ test("UX-02B reutiliza la estructura clínica sin alterar contratos de riesgo", 
     assert.match(risk, new RegExp(component));
   }
 
-  assert.match(risk, /const hasRiskFeatures = RISK_FIELDS\.some\(\(field\) => Boolean\(form\[field\]\)\)/);
+  assert.match(risk, /const hasRiskFeatures = RISK_FIELDS\.some\(\(field\) => Boolean\(effectiveRiskForm\[field\]\)\)/);
   assert.match(risk, /if \(hasRiskFeatures && referralMissing\)/);
   assert.match(risk, /const payload = \{ \.\.\.form \}/);
   assert.match(risk, /delete payload\.vih_positivo_sifilis/);

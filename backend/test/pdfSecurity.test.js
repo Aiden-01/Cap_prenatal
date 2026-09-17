@@ -346,6 +346,36 @@ test('servicio PDF entrega solo datos del embarazo prevalidado', async () => {
   assert.deepEqual(calls[2], ['datos', { pacienteId: 41, embarazoId: 91 }]);
 });
 
+test('servicio PDF entrega factores de edad y riesgo general canónicos', async () => {
+  const cases = [
+    ['2007-09-17', true, false],
+    ['1998-09-17', false, false],
+    ['1989-09-17', false, true],
+  ];
+
+  for (const [fechaNacimiento, menor20, mayor35] of cases) {
+    const service = createPdfService({
+      repository: {
+        obtenerPacientePorId: async () => ({ id: 41, fecha_nacimiento: fechaNacimiento }),
+        resolverEmbarazoParaPdf: async () => ({ id: 91, paciente_id: 41 }),
+        obtenerFichaRiesgoData: async () => ({
+          riesgo: {
+            fecha: '2026-09-17',
+            menor_20_anos: !menor20,
+            mayor_35_anos: !mayor35,
+            tiene_riesgo: true,
+          },
+        }),
+      },
+    });
+
+    const data = await service.obtenerFichaRiesgoData(41, 91);
+    assert.equal(data.riesgo.menor_20_anos, menor20);
+    assert.equal(data.riesgo.mayor_35_anos, mayor35);
+    assert.equal(data.riesgo.tiene_riesgo, menor20 || mayor35);
+  }
+});
+
 test('servicio PDF conserva el enlace control-paciente-embarazo', async () => {
   let controlArgs;
   const service = createPdfService({

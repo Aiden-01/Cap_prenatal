@@ -175,6 +175,35 @@
   border-top: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
 }
 
+.secondary-workflow .toggle-control.is-automatic {
+  position: relative;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.secondary-workflow .toggle-control.is-automatic:not(.is-on) {
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface2) 72%, var(--surface));
+  border-style: dashed;
+}
+
+.secondary-workflow .toggle-control.is-automatic.is-on {
+  opacity: 1;
+}
+
+.toggle-automatic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  min-width: 0;
+  color: currentColor;
+  font-size: 0.64rem;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
 .risk-factor-group {
   display: grid;
   gap: 0.85rem;
@@ -507,6 +536,15 @@ html.dark .secondary-dialog {
 }
 
 @media (max-width: 390px) {
+  .secondary-workflow .toggle-control.is-automatic {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .toggle-automatic {
+    grid-column: 2;
+    justify-content: flex-start;
+    white-space: normal;
+  }
   .secondary-workflow-notice,
   .secondary-chapter,
   .risk-evaluation-section,

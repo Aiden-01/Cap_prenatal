@@ -4,6 +4,7 @@ import {
   CalendarDays,
   ClipboardList,
   HeartPulse,
+  LockKeyhole,
   MapPinned,
   Save,
   ShieldCheck,
@@ -21,6 +22,7 @@ import {
 import { useGlobalToast } from "../context/ToastContext";
 import { useFieldErrors } from "../hooks/useFieldErrors";
 import { useAuth } from "../hooks/useAuth";
+import { deriveAgeRiskFactors } from "../utils/riskAgeRules";
 import "./clinical-secondary-workflows.css";
 
 const FormErrorContext = createContext({
@@ -105,17 +107,21 @@ function Select({ label, name, options, form, set }) {
   );
 }
 
-function Toggle({ label, name, form, set }) {
+function Toggle({ label, name, form, set, automatic = false }) {
   const val = form[name] ?? false;
   return (
     <button
       type="button"
       aria-pressed={val}
+      aria-label={automatic ? `${label}. Factor automático según edad` : label}
       onClick={() => set(name, !val)}
-      className={`toggle-control ${val ? "is-on" : ""}`}
+      className={`toggle-control ${val ? "is-on" : ""} ${automatic ? "is-automatic" : ""}`}
+      disabled={automatic}
+      title={automatic ? "Este factor se determina automáticamente según la edad de la paciente." : undefined}
     >
       <span className="toggle-mark" aria-hidden="true">{val && "✓"}</span>
       <span className="toggle-label">{label}</span>
+      {automatic && <span className="toggle-automatic"><LockKeyhole size={12} aria-hidden="true" />{val ? "Automático" : "Según edad"}</span>}
     </button>
   );
 }
@@ -206,25 +212,13 @@ function toDateInput(value) {
   return value ? value.split("T")[0] : "";
 }
 
-function calcularEdadAnios(fechaNacimiento) {
-  if (!fechaNacimiento) return null;
-  const nacimiento = new Date(`${toDateInput(fechaNacimiento)}T00:00:00`);
-  if (Number.isNaN(nacimiento.getTime())) return null;
-
-  const hoy = new Date();
-  let edad = hoy.getFullYear() - nacimiento.getFullYear();
-  const mes = hoy.getMonth() - nacimiento.getMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) edad -= 1;
-  return edad;
-}
-
 function formatEdad(edad) {
   if (edad === null || edad === undefined || edad === "") return "";
   return `${edad} año${edad === 1 ? "" : "s"}`;
 }
 
-function defaultsDesdePaciente(paciente = {}, embarazo = {}) {
-  const edad = calcularEdadAnios(paciente.fecha_nacimiento);
+function defaultsDesdePaciente(paciente = {}, embarazo = {}, referenceDate = INIT.fecha) {
+  const ageRisk = deriveAgeRiskFactors(paciente.fecha_nacimiento, referenceDate);
   const hijosMuertos =
     Number(paciente.nacidos_muertos || 0) +
     Number(paciente.muertos_antes_1sem || 0) +
@@ -251,8 +245,8 @@ function defaultsDesdePaciente(paciente = {}, embarazo = {}) {
     peso_ultimo_bebe_menor_2500g: Boolean(paciente.rn_menor_2500g),
     antec_hipertension_preeclampsia: Boolean(paciente.antec_hipertension || paciente.antec_preeclampsia),
     cirugias_tracto_reproductivo: Boolean(paciente.cirugia_genito_urinaria || paciente.cirugia_genito_urinaria_pers),
-    menor_20_anos: edad !== null ? edad < 20 : false,
-    mayor_35_anos: edad !== null ? edad > 35 : false,
+    menor_20_anos: ageRisk.menor_20_anos,
+    mayor_35_anos: ageRisk.mayor_35_anos,
     vih_positivo_sifilis: Boolean(paciente.antec_vih_positivo),
     diabetes: Boolean(paciente.antec_diabetes),
     enfermedad_renal: Boolean(paciente.antec_nefropatia),
@@ -288,8 +282,15 @@ export default function FichaRiesgo() {
   const set = (k, v) => fieldErrors.setFormValue(setForm, k, v);
   const p = { form, set };
   const puedeCapturarVih = !existingRisk || puedeVerVih;
-  const edadPaciente = paciente ? calcularEdadAnios(paciente.fecha_nacimiento) : null;
-  const hasRiskFeatures = RISK_FIELDS.some((field) => Boolean(form[field]));
+  const ageRisk = deriveAgeRiskFactors(paciente?.fecha_nacimiento, form.fecha);
+  const edadPaciente = ageRisk.age;
+  const effectiveRiskForm = {
+    ...form,
+    menor_20_anos: ageRisk.menor_20_anos,
+    mayor_35_anos: ageRisk.mayor_35_anos,
+  };
+  const automaticP = { form: effectiveRiskForm, set };
+  const hasRiskFeatures = RISK_FIELDS.some((field) => Boolean(effectiveRiskForm[field]));
   const referralMissing = !String(form.referida_a || "").trim();
   const nombrePaciente = paciente ? `${paciente.nombres || ""} ${paciente.apellidos || ""}`.trim() : "";
 
@@ -325,7 +326,7 @@ export default function FichaRiesgo() {
 
         setForm((f) => ({
           ...f,
-          ...defaultsDesdePaciente(pacienteData, embarazoData),
+          ...defaultsDesdePaciente(pacienteData, embarazoData, f.fecha),
         }));
       })
       .catch(() => toast("Error al cargar datos de la paciente", "error"))
@@ -376,6 +377,8 @@ export default function FichaRiesgo() {
     setLoading(true);
     fieldErrors.clearFieldErrors();
     const payload = { ...form };
+    delete payload.menor_20_anos;
+    delete payload.mayor_35_anos;
     if (existingRisk && !puedeVerVih) {
       delete payload.vih_positivo_sifilis;
     }
@@ -583,8 +586,8 @@ export default function FichaRiesgo() {
                   </div>
                   <div className="risk-toggle-grid">
                     <Toggle label="Embarazo múltiple" name="embarazo_multiple" {...p} />
-                    <Toggle label="Menor de 20 años" name="menor_20_anos" {...p} />
-                    <Toggle label="Mayor de 35 años" name="mayor_35_anos" {...p} />
+                    <Toggle label="Menor de 20 años" name="menor_20_anos" automatic {...automaticP} />
+                    <Toggle label="Mayor de 35 años" name="mayor_35_anos" automatic {...automaticP} />
                     <Toggle label="Paciente Rh negativo" name="paciente_rh_negativo" {...p} />
                     <Toggle label="Hemorragia vaginal" name="hemorragia_vaginal" {...p} />
                     {puedeCapturarVih && <Toggle label="VIH+ / Sífilis" name="vih_positivo_sifilis" {...p} />}

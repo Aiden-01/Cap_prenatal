@@ -84,6 +84,10 @@ async function withClinicalService(kind, {
       fecha_inicio: '2026-01-01',
       fecha_cierre: null,
     }]),
+    obtenerContextoEdad: async () => ({
+      fecha_nacimiento: '1998-04-15',
+      fur: '2026-01-01',
+    }),
     ...repository,
   };
   const restore = [
@@ -614,6 +618,60 @@ test('una aplicación de Influenza equivalente crea un registro nuevo', async ()
 
   assert.equal(writes, 1);
   assert.equal(audits, 1);
+});
+
+test('riesgo sobrescribe payload manipulado con factores canónicos según edad clínica', async () => {
+  const cases = [
+    { birth: '2007-06-15', sent: [false, true], expected: [true, false] },
+    { birth: '1998-06-15', sent: [true, true], expected: [false, false] },
+    { birth: '1989-06-15', sent: [true, false], expected: [false, true] },
+  ];
+
+  for (const scenario of cases) {
+    let inserted;
+    await withClinicalService('risk', {
+      repository: {
+        obtenerContextoEdad: async () => ({ fecha_nacimiento: scenario.birth, fur: '2026-01-01' }),
+        obtenerPorEmbarazo: async () => null,
+        insertar: async (data) => {
+          inserted = data;
+          return { id: 700, ...data, tiene_riesgo: data.menor_20_anos || data.mayor_35_anos };
+        },
+      },
+    }, async (service) => {
+      await service.guardarFichaRiesgo({
+        pacienteId: 41,
+        embarazoId: 91,
+        body: completeRisk(service, {
+          fecha: '2026-06-15',
+          menor_20_anos: scenario.sent[0],
+          mayor_35_anos: scenario.sent[1],
+        }),
+        req: ACTOR,
+      });
+    });
+    assert.deepEqual(
+      [inserted.menor_20_anos, inserted.mayor_35_anos],
+      scenario.expected
+    );
+  }
+});
+
+test('riesgo rechaza persistencia si falta o es inconsistente el contexto de edad', async () => {
+  for (const birth of [null, 'fecha-invalida', '2027-01-01']) {
+    await assert.rejects(withClinicalService('risk', {
+      repository: {
+        obtenerContextoEdad: async () => ({ fecha_nacimiento: birth, fur: '2026-01-01' }),
+        obtenerPorEmbarazo: async () => null,
+        insertar: async () => assert.fail('No debe persistir una edad clínica inválida'),
+      },
+    }, async (service) => service.guardarFichaRiesgo({
+      pacienteId: 41,
+      embarazoId: 91,
+      body: completeRisk(service, { fecha: '2026-06-15' }),
+      req: ACTOR,
+    })), (error) => error.status === 422 && error.code === 'RISK_AGE_CONTEXT_INVALID');
+  }
 });
 
 test('fallo de auditoria revierte atomicamente la vacuna', async () => {
