@@ -6,6 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
 import SemaforoCompletitud from "../components/SemaforoCompletitud";
 import TimelineControles from "../components/TimelineControles";
+import PrintDocumentsModal from "../components/PrintDocumentsModal";
 import {
   ChevronLeft, Plus, AlertTriangle, CheckCircle, Pencil, Trash2,
   Syringe, Activity, FlaskConical, Baby, FileText, Printer,
@@ -691,6 +692,7 @@ export default function ExpedientePaciente() {
   const [loadError, setLoadError] = useState(() => initialFilePrefetch?.status === "rejected" ? EXPEDIENTE_LOAD_ERROR : "");
   const [vaccineNotice] = useState(() => location.state?.vaccineNotice || null);
   const [printing, setPrinting] = useState(false);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
   const [creatingPregnancy, setCreatingPregnancy] = useState(false);
   const [antecedentesVacunas, setAntecedentesVacunas] = useState([]);
   const [selectedLabControlId, setSelectedLabControlId] = useState(null);
@@ -995,131 +997,47 @@ export default function ExpedientePaciente() {
     navigate(rutaClinica(`/pacientes/${id}/puerperio/nuevo`));
   };
 
-  const imprimirFichaMspas = async () => {
-    if (!hasEmbarazo) {
-      toast("Selecciona o inicia un embarazo antes de generar el PDF", "error");
-      return;
-    }
-    setPrinting(true);
-    try {
-      const res = await api.get(`/pacientes/${id}/mspas/pdf`, {
-        responseType: "blob",
-        params: embarazoSeleccionado?.id ? { embarazo_id: embarazoSeleccionado.id } : undefined,
-      });
-      const contentType = res.headers["content-type"] || "";
-      if (!contentType.includes("application/pdf")) {
-        const errorText = await res.data.text();
-        let message = "Error al generar expediente";
-        try {
-          const payload = JSON.parse(errorText);
-          message = getErrorMessage({ response: { data: payload } }, message);
-        } catch {
-          message = errorText || message;
-        }
-        throw new Error(message);
-      }
-      const blob = new Blob([res.data], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener,noreferrer");
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch (err) {
-      let message = getErrorMessage(err, "Error al generar expediente");
-      if (err.response?.data instanceof Blob) {
-        const errorText = await err.response.data.text();
-        try {
-          const payload = JSON.parse(errorText);
-          message = getErrorMessage({ response: { data: payload } }, message);
-        } catch {
-          message = errorText || message;
-        }
-      }
-      toast(message, "error");
-    } finally {
-      setPrinting(false);
-    }
+  const downloadPdf = async (path, filename) => {
+    const res = await api.get(path, {
+      responseType: "blob",
+      params: embarazoSeleccionado?.id ? { embarazo_id: embarazoSeleccionado.id } : undefined,
+    });
+    const contentType = res.headers["content-type"] || "";
+    if (!contentType.includes("application/pdf")) throw new Error("El servidor no devolvió un PDF válido");
+    const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
-  const imprimirFichaRiesgo = async () => {
-    if (!hasEmbarazo) {
-      toast("Selecciona un embarazo antes de generar la ficha de riesgo", "error");
-      return;
-    }
+  const generarDocumentos = async (mode, selected) => {
+    const documentConfig = {
+      expediente: { path: `/pacientes/${id}/mspas/pdf`, filename: `Expediente_${p.no_expediente}.pdf` },
+      plan: { path: `/pacientes/${id}/plan-parto/pdf`, filename: `Plan_de_parto_${p.no_expediente}.pdf` },
+      riesgo: { path: `/pacientes/${id}/riesgo/pdf`, filename: `Ficha_de_riesgo_${p.no_expediente}.pdf` },
+    };
     setPrinting(true);
     try {
-      const res = await api.get(`/pacientes/${id}/riesgo/pdf`, {
-        responseType: "blob",
-        params: embarazoSeleccionado?.id ? { embarazo_id: embarazoSeleccionado.id } : undefined,
-      });
-      const contentType = res.headers["content-type"] || "";
-      if (!contentType.includes("application/pdf")) {
-        const errorText = await res.data.text();
-        let message = "Error al generar ficha de riesgo";
-        try {
-          const payload = JSON.parse(errorText);
-          message = getErrorMessage({ response: { data: payload } }, message);
-        } catch {
-          message = errorText || message;
+      if (mode === "combined") {
+        await downloadPdf(`/pacientes/${id}/documentos/pdf`, `Expediente_completo_${p.no_expediente}.pdf`);
+      } else {
+        for (const documentId of selected) {
+          const config = documentConfig[documentId];
+          if (config) await downloadPdf(config.path, config.filename);
         }
-        throw new Error(message);
       }
-      const blob = new Blob([res.data], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener,noreferrer");
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setPrintModalOpen(false);
+      toast(mode === "combined" ? "PDF combinado generado" : "Documentos generados", "success");
     } catch (err) {
-      let message = getErrorMessage(err, "Error al generar ficha de riesgo");
+      let message = getErrorMessage(err, "Error al generar los documentos");
       if (err.response?.data instanceof Blob) {
         const errorText = await err.response.data.text();
-        try {
-          const payload = JSON.parse(errorText);
-          message = getErrorMessage({ response: { data: payload } }, message);
-        } catch {
-          message = errorText || message;
-        }
-      }
-      toast(message, "error");
-    } finally {
-      setPrinting(false);
-    }
-  };
-
-  const imprimirPlanParto = async () => {
-    if (!hasEmbarazo) {
-      toast("Selecciona un embarazo antes de generar el plan de parto", "error");
-      return;
-    }
-    setPrinting(true);
-    try {
-      const res = await api.get(`/pacientes/${id}/plan-parto/pdf`, {
-        responseType: "blob",
-        params: embarazoSeleccionado?.id ? { embarazo_id: embarazoSeleccionado.id } : undefined,
-      });
-      const contentType = res.headers["content-type"] || "";
-      if (!contentType.includes("application/pdf")) {
-        const errorText = await res.data.text();
-        let message = "Error al generar plan de parto";
-        try {
-          const payload = JSON.parse(errorText);
-          message = getErrorMessage({ response: { data: payload } }, message);
-        } catch {
-          message = errorText || message;
-        }
-        throw new Error(message);
-      }
-      const blob = new Blob([res.data], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener,noreferrer");
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch (err) {
-      let message = getErrorMessage(err, "Error al generar plan de parto");
-      if (err.response?.data instanceof Blob) {
-        const errorText = await err.response.data.text();
-        try {
-          const payload = JSON.parse(errorText);
-          message = getErrorMessage({ response: { data: payload } }, message);
-        } catch {
-          message = errorText || message;
-        }
+        try { message = getErrorMessage({ response: { data: JSON.parse(errorText) } }, message); }
+        catch { message = errorText || message; }
       }
       toast(message, "error");
     } finally {
@@ -1183,11 +1101,11 @@ export default function ExpedientePaciente() {
           )}
           <button
             className="btn-secondary"
-            onClick={imprimirFichaMspas}
+            onClick={() => setPrintModalOpen(true)}
             disabled={printing || !hasEmbarazo}
             title={!hasEmbarazo ? "Inicia un embarazo antes de generar el PDF clinico" : undefined}
           >
-            <Printer size={14} /> {printing ? "Generando..." : "Expediente"}
+            <Printer size={14} /> Expediente
           </button>
           {hasEmbarazo && puedeCrearEmbarazo && (
             <button className="btn-create" onClick={crearNuevoEmbarazo} disabled={creatingPregnancy}>
@@ -1694,9 +1612,6 @@ export default function ExpedientePaciente() {
                     : <span className="badge badge-green risk-status-badge"><CheckCircle size={13} /> Sin riesgo</span>}
                 </div>
                 <div className="risk-action-row">
-                  <button className="btn-secondary risk-action-button" onClick={imprimirFichaRiesgo} disabled={printing}>
-                    <Printer size={13} /> {printing ? "Generando..." : "Imprimir"}
-                  </button>
                   {!isReadOnly && <button className="btn-secondary risk-action-button" onClick={() => navigate(rutaClinica(`/pacientes/${id}/riesgo`))}>
                     <Pencil size={13} /> Editar
                   </button>}
@@ -1783,9 +1698,6 @@ export default function ExpedientePaciente() {
                   <p>Preparación, traslado y atención planificada para el parto.</p>
                 </div>
                 <div className="birth-plan-actions">
-                  <button className="btn-secondary birth-plan-action" onClick={imprimirPlanParto} disabled={printing}>
-                    <Printer size={13} /> {printing ? "Generando..." : "Imprimir"}
-                  </button>
                   {!isReadOnly && <button className="btn-secondary birth-plan-action" onClick={() => navigate(rutaClinica(`/pacientes/${id}/plan-parto`))}>
                     <Pencil size={13} /> Editar
                   </button>}
@@ -2071,6 +1983,19 @@ export default function ExpedientePaciente() {
             </>
           )}
         </div>
+      )}
+
+      {printModalOpen && (
+        <PrintDocumentsModal
+          availability={{
+            expediente: true,
+            plan: Boolean(exp.plan_parto),
+            riesgo: Boolean(exp.ficha_riesgo),
+          }}
+          busy={printing}
+          onClose={() => setPrintModalOpen(false)}
+          onGenerate={generarDocumentos}
+        />
       )}
 
     </div>

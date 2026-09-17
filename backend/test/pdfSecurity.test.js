@@ -162,6 +162,7 @@ function createPdfRouteTestApp({ calls, beforeController = () => {} }) {
     return next();
   }, pdfRouter.createPdfRouter({
     controllers: {
+      pdfCombinado: controller('combinado'),
       pdfControl: controller('control'),
       pdfMspas: controller('mspas'),
       pdfPlanParto: controller('plan'),
@@ -172,13 +173,14 @@ function createPdfRouteTestApp({ calls, beforeController = () => {} }) {
   return app;
 }
 
-test('las cuatro rutas PDF exigen autenticacion y pacientes.ver, no controles.ver_vih', async () => {
+test('las cinco rutas PDF exigen autenticacion y pacientes.ver, no controles.ver_vih', async () => {
   const calls = [];
   const app = createPdfRouteTestApp({ calls });
   const urls = [
     '/api/pacientes/41/mspas/pdf?embarazo_id=9',
     '/api/pacientes/41/riesgo/pdf?embarazo_id=9',
     '/api/pacientes/41/plan-parto/pdf?embarazo_id=9',
+    '/api/pacientes/41/documentos/pdf?embarazo_id=9',
     '/api/pacientes/41/17/pdf?embarazo_id=9',
   ];
 
@@ -203,7 +205,7 @@ test('las cuatro rutas PDF exigen autenticacion y pacientes.ver, no controles.ve
       });
       assert.equal(allowed.status, 204, url);
     }
-    assert.deepEqual(calls, ['mspas', 'riesgo', 'plan', 'control']);
+    assert.deepEqual(calls, ['mspas', 'riesgo', 'plan', 'combinado', 'control']);
   });
 });
 

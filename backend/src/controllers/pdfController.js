@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer');
 const ExcelJS = require('exceljs');
+const { PDFDocument } = require('pdf-lib');
 const pdfService = require('../services/pdfService');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { AppError } = require('../utils/appError');
@@ -1300,8 +1301,73 @@ async function pdfPlanPartoHandler(req, res, dependencies) {
   }
 }
 
+async function combinePdfBuffers(buffers) {
+  const combined = await PDFDocument.create();
+  for (const bytes of buffers) {
+    const source = await PDFDocument.load(bytes);
+    const pages = await combined.copyPages(source, source.getPageIndices());
+    pages.forEach((page) => combined.addPage(page));
+  }
+  return Buffer.from(await combined.save());
+}
+
+async function pdfCombinadoHandler(req, res, dependencies) {
+  const pacienteId = Number(req.params.pacienteId);
+  const embarazoId = req.query.embarazo_id ? Number(req.query.embarazo_id) : null;
+
+  try {
+    const [expedienteData, riesgoData, planData] = await Promise.all([
+      dependencies.pdfService.obtenerFichaMspasData(pacienteId, embarazoId),
+      dependencies.pdfService.obtenerFichaRiesgoData(pacienteId, embarazoId),
+      dependencies.pdfService.obtenerPlanPartoData(pacienteId, embarazoId),
+    ]);
+
+    if (!riesgoData.riesgo || !planData.plan) {
+      const missing = [
+        !planData.plan && 'Plan de parto',
+        !riesgoData.riesgo && 'Ficha de riesgo',
+      ].filter(Boolean);
+      throw new AppError(409, `No se puede generar el PDF combinado. Falta: ${missing.join(', ')}`, {
+        code: 'COMBINED_PDF_DOCUMENTS_MISSING',
+        details: { missing },
+      });
+    }
+
+    dependencies.consumePdfQuota(req);
+    const templatePath = path.join(__dirname, '../assets/official_forms/plan_parto_oficial.xlsx');
+    const [expedientePdf, planPartoPdf, riesgoPdf] = await Promise.all([
+      dependencies.generarFichaClinicaPrenatalPdf(expedienteData),
+      dependencies.exportExcelTemplateToPdf(templatePath, buildPlanPartoCellMap({
+        paciente: planData.paciente,
+        plan: planData.plan,
+      })),
+      dependencies.renderRiskPdf(riesgoData),
+    ]);
+    const pdf = await dependencies.combinePdfBuffers([expedientePdf, planPartoPdf, riesgoPdf]);
+
+    await dependencies.registrarEventoPrivado(req, {
+      contexto: { categoria: 'documentos', entidad: 'documento', evento: 'pdf_clinico_generado' },
+      accion: 'generar_pdf',
+      entidadId: pacienteId,
+      pacienteId,
+      embarazoId: expedienteData.embarazo?.id || null,
+      metadata: {
+        tipo_documento: 'expediente_completo',
+        formato: 'pdf',
+        resultado: 'generado',
+      },
+    });
+
+    return dependencies.sendPdfResponse(res, pdf, `expediente-completo-${pacienteId}.pdf`);
+  } catch (err) {
+    if (err.status) throw err;
+    throw new AppError(500, 'Error al generar el PDF combinado', { code: 'COMBINED_PDF_GENERATION_ERROR' });
+  }
+}
+
 function createPdfController(overrides = {}) {
   const dependencies = {
+    combinePdfBuffers,
     consumePdfQuota,
     exportExcelTemplateToPdf,
     fsApi: fs,
@@ -1315,6 +1381,7 @@ function createPdfController(overrides = {}) {
   };
 
   return {
+    pdfCombinado: (req, res) => pdfCombinadoHandler(req, res, dependencies),
     pdfControl: (req, res) => pdfControlHandler(req, res, dependencies),
     pdfMspas: (req, res) => pdfMspasHandler(req, res, dependencies),
     pdfPlanParto: (req, res) => pdfPlanPartoHandler(req, res, dependencies),
@@ -1325,10 +1392,12 @@ function createPdfController(overrides = {}) {
 const pdfController = createPdfController();
 
 module.exports = {
+  combinePdfBuffers,
   buildRiskCellMap,
   buildRiskPdfHtml,
   createPdfController,
   exportExcelTemplateToPdf,
+  pdfCombinado: asyncHandler(pdfController.pdfCombinado),
   pdfControl: asyncHandler(pdfController.pdfControl),
   pdfMspas: asyncHandler(pdfController.pdfMspas),
   pdfPlanParto: asyncHandler(pdfController.pdfPlanParto),
