@@ -15,6 +15,7 @@ import MorbilidadForm from "./pages/MorbilidadForm";
 import VacunaForm from "./pages/VacunaForm";
 import Reportes from "./pages/Reportes";
 import Usuarios from "./pages/Usuarios";
+import NotFoundPage from "./pages/NotFoundPage";
 
 const MapaRiesgo = lazy(() => import("./pages/MapaRiesgo"));
 const Comunidades = lazy(() => import("./pages/Comunidades"));
@@ -63,7 +64,8 @@ export default function App() {
           <Route path="comunidades" element={<PrivateRoute directorOnly><LazyPage><Comunidades /></LazyPage></PrivateRoute>} />
           <Route path="usuarios" element={<PrivateRoute adminOnly><Usuarios /></PrivateRoute>} />
         </Route>
-        <Route path="*" element={<Navigate to="/dashboard" />} />
+        <Route path="/404" element={<NotFoundPage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );
