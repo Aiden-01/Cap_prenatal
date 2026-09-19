@@ -34,7 +34,7 @@ function databaseUrl(baseUrl, databaseName) {
   return url.toString();
 }
 
-postgresTest('015 y consulta semanal funcionan sobre PostgreSQL temporal con datos sinteticos', async (t) => {
+postgresTest('consulta semanal v2 funciona sobre PostgreSQL temporal con inasistencias persistentes', async (t) => {
   const connectionString = process.env.INASISTENCIAS_TEST_DATABASE_URL;
   assert.ok(connectionString, 'Falta INASISTENCIAS_TEST_DATABASE_URL');
   const baseUrl = assertTemporaryClusterTarget(connectionString);
@@ -90,15 +90,21 @@ postgresTest('015 y consulta semanal funcionan sobre PostgreSQL temporal con dat
       );
 
       const cases = [
-        { key: 'missed', first: 'Incluida', last: 'Uno', state: 'activo', date: '2026-08-19', appointment: 'programada' },
+        { key: 'missed', first: 'Incluida', last: 'Uno', state: 'activo', date: '2026-08-19', appointment: 'inasistente' },
+        { key: 'previous', first: 'Pendiente', last: 'Anterior', state: 'puerperio', date: '2026-08-10', appointment: 'inasistente' },
         { key: 'attended', first: 'Atendida', last: 'Dos', state: 'activo', date: '2026-08-18', appointment: 'atendida' },
         { key: 'future', first: 'Futura', last: 'Tres', state: 'activo', date: '2026-08-25', appointment: 'programada' },
         { key: 'cancelled', first: 'Cancelada', last: 'Cuatro', state: 'activo', date: '2026-08-20', appointment: 'cancelada' },
         { key: 'rescheduled', first: 'Reprogramada', last: 'Cinco', state: 'activo', date: '2026-08-21', appointment: 'reprogramada' },
-        { key: 'outside', first: 'Fuera', last: 'Seis', state: 'activo', date: '2026-08-16', appointment: 'programada' },
-        { key: 'precutover', first: 'Historica', last: 'Siete', state: 'activo', date: '2026-08-22', appointment: 'programada', beforeCutover: true },
-        { key: 'closed', first: 'Cerrada', last: 'Ocho', state: 'cerrado', date: '2026-08-23', appointment: 'programada' },
-        { key: 'nextweek', first: 'Reintento', last: 'Nueve', state: 'activo', date: '2026-08-27', appointment: 'programada' },
+        { key: 'outside', first: 'Fuera', last: 'Seis', state: 'activo', date: '2026-08-16', appointment: 'inasistente' },
+        { key: 'precutover', first: 'Historica', last: 'Siete', state: 'activo', date: '2026-08-22', appointment: 'inasistente', beforeCutover: true },
+        { key: 'closed', first: 'Cerrada', last: 'Ocho', state: 'cerrado', date: '2026-08-23', appointment: 'inasistente' },
+        { key: 'nextweek', first: 'Reintento', last: 'Nueve', state: 'activo', date: '2026-08-27', appointment: 'inasistente' },
+        { key: 'new-derived', first: 'Derivada', last: 'Nueva', state: 'activo', date: '2026-08-20', appointment: 'inasistente', derived: '2026-08-28' },
+        { key: 'new-control', first: 'Control', last: 'Nuevo', state: 'activo', date: '2026-08-21', appointment: 'inasistente', laterControl: '2026-08-22' },
+        { key: 'old-derived', first: 'Derivada', last: 'Anterior', state: 'activo', date: '2026-08-09', appointment: 'inasistente', derived: '2026-08-29' },
+        { key: 'old-control', first: 'Control', last: 'Anterior', state: 'activo', date: '2026-08-08', appointment: 'inasistente', laterControl: '2026-08-09' },
+        { key: 'reconciled', first: 'Reconciliada', last: 'Tardia', state: 'activo', date: '2026-08-22', appointment: 'inasistente', reconciled: true },
       ];
 
       for (let index = 0; index < cases.length; index += 1) {
@@ -130,7 +136,7 @@ postgresTest('015 y consulta semanal funcionan sobre PostgreSQL temporal con dat
              registrado_por, updated_by
            ) VALUES
              ($1, $2, 1, '2026-08-01', $3, $4, $4),
-             ($1, $2, 2, '2026-08-24', NULL, $4, $4)
+             ($1, $2, 2, $3::date, NULL, $4, $4)
            RETURNING id, numero_control`,
           [patient.rows[0].id, pregnancy.rows[0].id, entry.date, user.rows[0].id]
         );
@@ -138,7 +144,7 @@ postgresTest('015 y consulta semanal funcionan sobre PostgreSQL temporal con dat
         const fulfillment = entry.appointment === 'atendida'
           ? controls.rows.find(({ numero_control: number }) => number === 2).id
           : null;
-        await db.query(
+        const appointment = await db.query(
           `INSERT INTO citas_prenatales (
              embarazo_id, fecha_programada, estado, control_origen_id,
              control_cumplimiento_id, registrado_por, updated_by, created_at
@@ -148,7 +154,7 @@ postgresTest('015 y consulta semanal funcionan sobre PostgreSQL temporal con dat
                THEN $8::timestamptz - INTERVAL '1 second'
                ELSE $8::timestamptz + INTERVAL '1 second'
              END
-           )`,
+           ) RETURNING id`,
           [
             pregnancy.rows[0].id,
             entry.date,
@@ -160,6 +166,39 @@ postgresTest('015 y consulta semanal funcionan sobre PostgreSQL temporal con dat
             cutoverAt,
           ]
         );
+        if (entry.derived) {
+          await db.query(
+            `INSERT INTO citas_prenatales (
+               embarazo_id, fecha_programada, estado, control_origen_id,
+               seguimiento_inasistencia_desde_id, registrado_por, updated_by
+             ) VALUES ($1, $2::date, 'programada', $3, $4, $5, $5)`,
+            [
+              pregnancy.rows[0].id,
+              entry.derived,
+              origin,
+              appointment.rows[0].id,
+              user.rows[0].id,
+            ]
+          );
+        }
+        if (entry.laterControl) {
+          await db.query(
+            `INSERT INTO controles_prenatales (
+               paciente_id, embarazo_id, numero_control, fecha,
+               registrado_por, updated_by
+             ) VALUES ($1, $2, 3, $3::date, $4, $4)`,
+            [patient.rows[0].id, pregnancy.rows[0].id, entry.laterControl, user.rows[0].id]
+          );
+        }
+        if (entry.reconciled) {
+          const matchingControl = controls.rows.find(({ numero_control: number }) => number === 2).id;
+          await db.query(
+            `UPDATE citas_prenatales
+             SET estado = 'atendida', control_cumplimiento_id = $2
+             WHERE id = $1`,
+            [appointment.rows[0].id, matchingControl]
+          );
+        }
       }
 
       const repository = createAutomatizacionesRepository(db);
@@ -169,18 +208,35 @@ postgresTest('015 y consulta semanal funcionan sobre PostgreSQL temporal con dat
         createDispatchToken: () => 'a'.repeat(43),
       });
 
-      await t.test('mezcla incluye solo vencida programada, sin control, activa y posterior al corte', async () => {
+      await t.test('clasifica nuevas y pendientes anteriores con la semantica persistente', async () => {
         const result = await service.consultarInasistenciasSemanales({
           desde: '2026-08-17',
           hasta: '2026-08-23',
         });
-        assert.equal(result.total, 1);
+        assert.equal(result.schema_version, 2);
+        assert.equal(result.total, 3);
+        assert.deepEqual(result.summary, { new: 1, previous_pending: 2, total: 3 });
         assert.deepEqual(result.appointments, [{
+          date: '2026-08-10',
+          first_name: 'Pendiente',
+          last_name: 'Anterior',
+          phone: '5555-1001',
+          community: 'Comunidad Sintetica',
+          category: 'previous_pending',
+        }, {
+          date: '2026-08-16',
+          first_name: 'Fuera',
+          last_name: 'Seis',
+          phone: '5555-1006',
+          community: 'Comunidad Sintetica',
+          category: 'previous_pending',
+        }, {
           date: '2026-08-19',
           first_name: 'Incluida',
           last_name: 'Uno',
           phone: '5555-1000',
           community: 'Comunidad Sintetica',
+          category: 'new',
         }]);
         assert.deepEqual(result.range, { from: '2026-08-17', to: '2026-08-23' });
         assert.equal(result.cutoff_at, new Date(cutoverAt).toISOString());
@@ -196,6 +252,7 @@ postgresTest('015 y consulta semanal funcionan sobre PostgreSQL temporal con dat
           hasta: '2026-08-09',
         });
         assert.equal(result.total, 0);
+        assert.deepEqual(result.summary, { new: 0, previous_pending: 0, total: 0 });
         assert.deepEqual(result.appointments, []);
         assert.equal(result.dispatch.status, 'preview');
       });
@@ -203,7 +260,7 @@ postgresTest('015 y consulta semanal funcionan sobre PostgreSQL temporal con dat
       await t.test('reserva real bloquea doble ejecucion, confirma y evita reenvio', async () => {
         const prepared = await service.prepararDespachoInasistencias();
         assert.equal(prepared.dispatch.status, 'ready');
-        assert.equal(prepared.total, 1);
+        assert.equal(prepared.total, 3);
 
         await assert.rejects(
           service.prepararDespachoInasistencias(),
@@ -226,7 +283,7 @@ postgresTest('015 y consulta semanal funcionan sobre PostgreSQL temporal con dat
         assert.deepEqual(stored.rows, [{
           tipo: 'inasistencias_semanales',
           estado: 'enviado',
-          total_registros: 1,
+          total_registros: 3,
           numero_intento: 1,
         }]);
       });
@@ -242,7 +299,7 @@ postgresTest('015 y consulta semanal funcionan sobre PostgreSQL temporal con dat
           ][tokenIndex++],
         });
         const prepared = await replayService.prepararDespachoInasistencias();
-        assert.equal(prepared.total, 2);
+        assert.equal(prepared.total, 4);
         assert.equal(prepared.dispatch.token, 'b'.repeat(43));
 
         const resolved = await replayService.resolverDespachoInasistencias({

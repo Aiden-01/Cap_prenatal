@@ -36,6 +36,8 @@ async function withService({ repository = {}, validate, audit }, callback) {
   const restore = [
     cacheModule(REPOSITORY_PATH, {
       enTransaccion: async (operation) => operation(client),
+      listarProgramadasVencidas: async () => [],
+      listarInasistenciasConSeguimiento: async () => [],
       ...repository,
     }),
     cacheModule(AUDIT_PATH, { registrarEventoPrivado: audit || (async () => {}) }),

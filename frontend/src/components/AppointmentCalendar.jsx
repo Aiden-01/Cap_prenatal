@@ -193,6 +193,10 @@ export default function AppointmentCalendar({ canManageAppointments, onViewPatie
   const confirmAction = async (newDate) => {
     if (!actionDialog) return;
     const { appointment, mode } = actionDialog;
+    const isMissedFollowUp = mode === "reprogramar" && (
+      appointment.status === "inasistente"
+      || (appointment.status === "programada" && appointment.date < today)
+    );
     setActionBusy(true);
     setActionError("");
     try {
@@ -202,7 +206,7 @@ export default function AppointmentCalendar({ canManageAppointments, onViewPatie
         mode === "reprogramar" ? { fecha_programada: newDate } : {}
       );
 
-      setItems((current) => {
+      if (!isMissedFollowUp) setItems((current) => {
         if (mode === "cancelar") {
           return current.map((item) => String(item.id) === String(appointment.id)
             ? { ...item, status: "cancelada", editable: false }
@@ -228,12 +232,21 @@ export default function AppointmentCalendar({ canManageAppointments, onViewPatie
       });
 
       setActionDialog(null);
+      if (isMissedFollowUp) {
+        setRequestState({ loading: true, error: "" });
+        setRetryToken((value) => value + 1);
+      }
       toast?.(
-        mode === "reprogramar" ? "Cita reprogramada correctamente." : "Cita cancelada correctamente.",
+        isMissedFollowUp
+          ? "Nueva cita asignada correctamente."
+          : mode === "reprogramar" ? "Cita reprogramada correctamente." : "Cita cancelada correctamente.",
         "success"
       );
     } catch (requestError) {
       setActionError(getErrorMessage(requestError, "No fue posible actualizar la cita."));
+      if (isMissedFollowUp) {
+        setRetryToken((value) => value + 1);
+      }
     } finally {
       setActionBusy(false);
     }
@@ -401,7 +414,7 @@ export default function AppointmentCalendar({ canManageAppointments, onViewPatie
       {actionDialog ? (
         <AppointmentActionDialog
           mode={actionDialog.mode}
-          appointment={{ cita_siguiente: actionDialog.appointment.date }}
+          appointment={actionDialog.appointment}
           busy={actionBusy}
           error={actionError}
           onClose={closeActionDialog}

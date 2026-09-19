@@ -7,6 +7,9 @@ const REPOSITORY_PATH = require.resolve('../src/repositories/citasPrenatalesRepo
 const POOL_PATH = require.resolve('../src/db/pool');
 const MIGRATION_FILENAME = '014_citas_prenatales.sql';
 const MIGRATION_PATH = path.resolve(__dirname, '../src/db/migrations', MIGRATION_FILENAME);
+const INASISTENCIAS_MIGRATION_PATH = path.resolve(
+  __dirname, '../src/db/migrations/017_citas_inasistencias.sql'
+);
 const SCHEMA_PATH = path.resolve(__dirname, '../src/db/schema.sql');
 
 function cacheModule(modulePath, exports) {
@@ -42,6 +45,18 @@ test('014 crea citas prenatales de forma aditiva y no reconstruye historicos', (
   assert.match(sql, /No reconstruye citas historicas/i);
   assert.doesNotMatch(sql, /INSERT\s+INTO\s+citas_prenatales[\s\S]*SELECT/i);
   assert.doesNotMatch(sql, /UPDATE\s+controles_prenatales|DELETE\s+FROM|DROP\s+TABLE/i);
+});
+
+test('017 agrega inasistente, derivacion exclusiva y backfill solo sobre programadas vencidas', () => {
+  const sql = fs.readFileSync(INASISTENCIAS_MIGRATION_PATH, 'utf8');
+  assert.match(sql, /'inasistente'/);
+  assert.match(sql, /seguimiento_inasistencia_desde_id BIGINT/);
+  assert.match(sql, /FOREIGN KEY \(seguimiento_inasistencia_desde_id, embarazo_id\)/);
+  assert.match(sql, /reprogramada_desde_id IS NULL OR seguimiento_inasistencia_desde_id IS NULL/);
+  assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS ux_citas_seguimiento_inasistencia_desde/);
+  assert.match(sql, /HAVING COUNT\(\*\) <> 1/);
+  assert.match(sql, /WHERE estado = 'programada'[\s\S]*fecha_programada </);
+  assert.doesNotMatch(sql, /WHERE estado IN \('reprogramada', 'cancelada', 'atendida'\)/);
 });
 
 test('schema final y migracion declaran el mismo modelo de cita', () => {
@@ -151,7 +166,7 @@ test('repositorio crea programada con trazabilidad y parametros, sin SQL dinamic
   assert.deepEqual(calls[0].params, [91, 302, '2026-07-13', 83]);
   assert.match(calls[0].sql, /'programada'/);
   assert.match(calls[0].sql, /registrado_por, updated_by/);
-  assert.match(calls[0].sql, /ON CONFLICT \(control_origen_id\) WHERE reprogramada_desde_id IS NULL DO NOTHING/);
+  assert.match(calls[0].sql, /ON CONFLICT \(control_origen_id\) WHERE reprogramada_desde_id IS NULL[\s\S]*seguimiento_inasistencia_desde_id IS NULL DO NOTHING/);
   assert.doesNotMatch(calls[0].sql, /\$\{|\+\s*embarazoId/);
 });
 

@@ -5,6 +5,7 @@ const SERVICE_PATH = require.resolve('../src/services/citasPrenatalesService');
 const REPOSITORY_PATH = require.resolve('../src/repositories/citasPrenatalesRepository');
 const AUDIT_PATH = require.resolve('../src/services/auditService');
 const PREGNANCIES_PATH = require.resolve('../src/utils/embarazos');
+const MATERIALIZER_PATH = require.resolve('../src/services/citasInasistenciasService');
 
 const ACTOR = {
   usuario: { id: 83, permisos: ['pacientes.ver', 'controles.editar'] },
@@ -45,6 +46,7 @@ async function withService({ repository = {}, audit, pregnancies = {} }, callbac
   const restore = [
     cacheModule(REPOSITORY_PATH, strictMock({
       enTransaccion: async (operation) => operation(client),
+      listarProgramadasVencidas: async () => [],
       ...repository,
     }, 'citasRepository')),
     cacheModule(AUDIT_PATH, {
@@ -69,12 +71,16 @@ async function withService({ repository = {}, audit, pregnancies = {} }, callbac
     }),
   ];
   const previousService = require.cache[SERVICE_PATH];
+  const previousMaterializer = require.cache[MATERIALIZER_PATH];
   delete require.cache[SERVICE_PATH];
+  delete require.cache[MATERIALIZER_PATH];
   try {
     return await callback(require(SERVICE_PATH), client);
   } finally {
     delete require.cache[SERVICE_PATH];
+    delete require.cache[MATERIALIZER_PATH];
     if (previousService) require.cache[SERVICE_PATH] = previousService;
+    if (previousMaterializer) require.cache[MATERIALIZER_PATH] = previousMaterializer;
     for (const restoreModule of restore.reverse()) restoreModule();
   }
 }
@@ -321,6 +327,78 @@ test('consulta vigente devuelve cero o una cita y falla ante ambiguedad', async 
     await assert.rejects(
       service.obtenerCitaVigente({ pacienteId: 41, embarazoId: 91 }),
       (error) => error.statusCode === 409 && error.code === 'CITAS_VIGENTES_AMBIGUAS'
+    );
+  });
+});
+
+test('cita vencida se vuelve inasistente y la nueva fecha usa vinculo de seguimiento', async () => {
+  let state = { ...PROGRAMADA, fecha_programada: '2020-09-15' };
+  let childArgs;
+  await withService({
+    repository: {
+      listarProgramadasVencidas: async () => state.estado === 'programada' ? [state] : [],
+      listarControlesCoincidentes: async () => [],
+      marcarInasistente: async () => (state = { ...state, estado: 'inasistente' }),
+      obtenerPorIdYEmbarazo: async () => state,
+      obtenerEstadoSeguimientoInasistencia: async () => ({ seguimiento_pendiente: true }),
+      crearSeguimientoDeInasistencia: async (args) => {
+        childArgs = args;
+        return {
+          id: 702, embarazo_id: 91, fecha_programada: '2030-09-23',
+          estado: 'programada', seguimiento_inasistencia_desde_id: 701,
+        };
+      },
+    },
+    audit: async () => {},
+  }, async (service) => {
+    const result = await service.reprogramarCita({
+      pacienteId: 41, embarazoId: 91, citaId: 701,
+      fechaProgramada: '2030-09-23', req: ACTOR,
+    });
+    assert.equal(result.cita_anterior.estado, 'inasistente');
+    assert.equal(result.cita_nueva.seguimiento_inasistencia_desde_id, 701);
+  });
+  assert.equal(childArgs.citaAnterior.id, 701);
+});
+
+test('inasistencia resuelta rechaza crear otro seguimiento con conflicto estable', async () => {
+  let writes = 0;
+  await withService({
+    repository: {
+      obtenerPorIdYEmbarazo: async () => ({
+        ...PROGRAMADA, estado: 'inasistente', fecha_programada: '2030-09-15',
+      }),
+      obtenerEstadoSeguimientoInasistencia: async () => ({
+        seguimiento_pendiente: false, fecha_seguimiento: '2030-09-23',
+      }),
+      crearSeguimientoDeInasistencia: async () => { writes += 1; },
+    },
+  }, async (service) => {
+    await assert.rejects(
+      service.reprogramarCita({
+        pacienteId: 41, embarazoId: 91, citaId: 701,
+        fechaProgramada: '2030-09-30', req: ACTOR,
+      }),
+      (error) => error.statusCode === 409 && error.code === 'CITA_SEGUIMIENTO_YA_RESUELTO'
+    );
+  });
+  assert.equal(writes, 0);
+});
+
+test('cita vencida no puede convertirse en cancelada', async () => {
+  let state = { ...PROGRAMADA, fecha_programada: '2020-09-15' };
+  await withService({
+    repository: {
+      listarProgramadasVencidas: async () => state.estado === 'programada' ? [state] : [],
+      listarControlesCoincidentes: async () => [],
+      marcarInasistente: async () => (state = { ...state, estado: 'inasistente' }),
+      obtenerPorIdYEmbarazo: async () => state,
+    },
+    audit: async () => {},
+  }, async (service) => {
+    await assert.rejects(
+      service.cancelarCita({ pacienteId: 41, embarazoId: 91, citaId: 701, req: ACTOR }),
+      (error) => error.statusCode === 409 && error.code === 'CITA_TRANSICION_INVALIDA'
     );
   });
 });

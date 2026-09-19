@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { CalendarClock, CalendarX } from "lucide-react";
+import { CalendarClock, CalendarPlus, CalendarX } from "lucide-react";
+import { todayInGuatemala } from "../utils/appointmentCalendar";
 
 const FOCUSABLE_SELECTOR = "button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex='-1'])";
 
@@ -11,15 +12,6 @@ function formatDate(value) {
   const iso = dateOnly(value);
   if (!iso) return "—";
   return new Date(`${iso}T12:00:00`).toLocaleDateString("es-GT");
-}
-
-function todayGuatemala() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Guatemala",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
 }
 
 export default function AppointmentActionDialog({
@@ -40,8 +32,15 @@ export default function AppointmentActionDialog({
   const onCloseRef = useRef(onClose);
   const restoreFocusFrameRef = useRef(null);
   const [newDate, setNewDate] = useState("");
-  const currentDate = dateOnly(appointment?.cita_siguiente);
+  const currentDate = dateOnly(appointment?.date);
   const isReschedule = mode === "reprogramar";
+  const isMissedFollowUp = isReschedule && (
+    appointment?.status === "inasistente"
+    || (appointment?.status === "programada" && currentDate < todayInGuatemala())
+  );
+  const followUpDescription = appointment?.status === "inasistente"
+    ? "La paciente no asistió a esta cita. La nueva fecha se registrará como seguimiento y la inasistencia permanecerá en el historial."
+    : "La paciente no asistió a la cita programada. Al asignar una nueva fecha, la cita anterior quedará registrada como ‘No asistió’.";
   const localError = isReschedule && newDate === currentDate
     ? "La nueva fecha debe ser diferente."
     : "";
@@ -109,11 +108,17 @@ export default function AppointmentActionDialog({
         aria-busy={busy}
       >
         <div className={`appointment-dialog-icon ${isReschedule ? "is-reschedule" : "is-cancel"}`} aria-hidden="true">
-          {isReschedule ? <CalendarClock size={24} /> : <CalendarX size={24} />}
+          {isMissedFollowUp
+            ? <CalendarPlus size={24} />
+            : isReschedule ? <CalendarClock size={24} /> : <CalendarX size={24} />}
         </div>
-        <h2 id={titleId}>{isReschedule ? "Reprogramar cita" : "Cancelar cita"}</h2>
+        <h2 id={titleId}>
+          {isMissedFollowUp ? "Asignar nueva cita" : isReschedule ? "Reprogramar cita" : "Cancelar cita"}
+        </h2>
         <p id={descriptionId}>
-          {isReschedule
+          {isMissedFollowUp
+            ? followUpDescription
+            : isReschedule
             ? "El control prenatal original conservará la fecha indicada durante la atención."
             : `¿Desea cancelar la cita programada para el ${formatDate(currentDate)}? El registro permanecerá en el historial.`}
         </p>
@@ -131,7 +136,7 @@ export default function AppointmentActionDialog({
                   ref={dateRef}
                   className={`input-field ${localError ? "input-error" : ""}`}
                   type="date"
-                  min={todayGuatemala()}
+                  min={todayInGuatemala()}
                   value={newDate}
                   onChange={(event) => setNewDate(event.target.value)}
                   disabled={busy}
@@ -161,6 +166,7 @@ export default function AppointmentActionDialog({
             >
               {busy
                 ? "Guardando..."
+                : isMissedFollowUp ? "Asignar nueva cita"
                 : isReschedule ? "Confirmar nueva fecha" : "Cancelar cita"}
             </button>
           </div>

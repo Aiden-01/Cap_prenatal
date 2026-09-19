@@ -1,8 +1,8 @@
 import { useEffect, useId, useRef } from "react";
-import { CalendarClock, CalendarX, ExternalLink, X } from "lucide-react";
+import { CalendarClock, CalendarPlus, CalendarX, ExternalLink, X } from "lucide-react";
 import { AppointmentStatusIcon } from "./AppointmentStatus";
 import { getAppointmentStatus } from "./appointmentStatusMeta";
-import { formatDateDisplay } from "../utils/appointmentCalendar";
+import { formatDateDisplay, todayInGuatemala } from "../utils/appointmentCalendar";
 
 const FOCUSABLE_SELECTOR = "button:not([disabled]), [href], [tabindex]:not([tabindex='-1'])";
 
@@ -20,7 +20,16 @@ export default function AppointmentDetailDialog({
   const closeRef = useRef(null);
   const skipRestoreRef = useRef(false);
   const status = getAppointmentStatus(appointment.status);
-  const canModify = appointment.status === "programada" && appointment.editable && canManage;
+  const isExpiredProgramada = appointment.status === "programada"
+    && appointment.date < todayInGuatemala();
+  const canModifyProgramada = appointment.status === "programada"
+    && appointment.editable
+    && canManage;
+  const canAssignFollowUp = (canModifyProgramada && isExpiredProgramada)
+    || (canManage && appointment.status === "inasistente" && appointment.follow_up_pending === true);
+  const canModifyFuture = canModifyProgramada && !isExpiredProgramada;
+  const followUpResolved = appointment.status === "inasistente"
+    && appointment.follow_up_pending === false;
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -135,7 +144,28 @@ export default function AppointmentDetailDialog({
           >
             <ExternalLink size={16} aria-hidden="true" /> Ver expediente
           </button>
-          {canModify ? (
+          {canAssignFollowUp ? (
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => transition(() => onAction("reprogramar"))}
+            >
+              <CalendarPlus size={16} aria-hidden="true" /> Asignar nueva cita
+            </button>
+          ) : null}
+          {followUpResolved ? (
+            <div>
+              <dt>Seguimiento</dt>
+              <dd>Seguimiento resuelto</dd>
+            </div>
+          ) : null}
+          {followUpResolved && appointment.follow_up_date ? (
+            <div>
+              <dt>Nueva cita</dt>
+              <dd>{formatDateDisplay(appointment.follow_up_date)}</dd>
+            </div>
+          ) : null}
+          {canModifyFuture ? (
             <>
               <button
                 type="button"

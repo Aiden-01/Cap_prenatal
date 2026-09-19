@@ -1,4 +1,5 @@
 const automatizacionesService = require('../services/automatizacionesService');
+const citasInasistenciasService = require('../services/citasInasistenciasService');
 const { registrarEventoPrivado } = require('../services/auditService');
 const { AppError } = require('../utils/appError');
 
@@ -178,8 +179,21 @@ async function bestEffortAudit(audit, event) {
 
 function createAutomatizacionesController({
   service = automatizacionesService,
+  appointmentsService = citasInasistenciasService,
   audit = registrarEventoPrivado,
 } = {}) {
+  async function materializarInasistencias(_req, res, next) {
+    try {
+      const result = await appointmentsService.materializarGlobal();
+      res.set({ 'Cache-Control': 'no-store', Pragma: 'no-cache' });
+      return res.json(result);
+    } catch (error) {
+      if (error instanceof AppError) return next(error);
+      return next(new AppError(500, 'No se pudieron materializar las citas vencidas', {
+        code: 'AUTOMATION_INTERNAL_ERROR',
+      }));
+    }
+  }
   async function proximasCitas(req, res, next) {
     try {
       const result = await service.consultarProximasCitas(req.automationRange);
@@ -300,6 +314,7 @@ function createAutomatizacionesController({
 
   async function prepararInasistencias(req, res, next) {
     try {
+      await appointmentsService.materializarGlobal();
       const result = await service.prepararDespachoInasistencias();
       await bestEffortAudit(audit, missedAppointmentsAuditEvent(result, {
         event: 'preparar',
@@ -564,6 +579,7 @@ function createAutomatizacionesController({
     confirmarTdap,
     descargarTdapExcel,
     inasistencias,
+    materializarInasistencias,
     prepararInasistencias,
     prepararCalidadDatos,
     prepararTdap,

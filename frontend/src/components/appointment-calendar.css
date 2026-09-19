@@ -133,6 +133,7 @@
 .is-atendida { color: var(--accent); }
 .is-reprogramada { color: var(--info); }
 .is-cancelada { color: var(--danger); }
+.is-inasistente { color: var(--warn); }
 
 .appointment-status-legend .is-programada,
 .appointment-status-badge.is-programada { background: var(--primary-lt); }
@@ -142,6 +143,11 @@
 .appointment-status-badge.is-reprogramada { background: var(--info-lt); }
 .appointment-status-legend .is-cancelada,
 .appointment-status-badge.is-cancelada { background: var(--danger-lt); }
+.appointment-status-legend .is-inasistente,
+.appointment-status-badge.is-inasistente {
+  background: var(--warn-lt);
+  border-style: dashed;
+}
 
 .calendar-feedback {
   display: flex;
@@ -303,6 +309,10 @@
 .calendar-event.is-atendida { background: var(--accent-lt); opacity: 0.82; }
 .calendar-event.is-reprogramada { background: var(--info-lt); opacity: 0.82; }
 .calendar-event.is-cancelada { background: var(--danger-lt); opacity: 0.76; }
+.calendar-event.is-inasistente {
+  background: var(--warn-lt);
+  border-style: dashed;
+}
 
 .calendar-event:hover { border-color: currentColor; }
 
@@ -327,6 +337,7 @@
 .calendar-event.is-cancelada strong {
   text-decoration: line-through;
 }
+.calendar-event.is-inasistente strong { text-decoration: underline dotted; }
 
 .calendar-more-button {
   min-height: 24px;
@@ -409,6 +420,11 @@
 .appointment-day-item.is-atendida .appointment-day-copy strong,
 .appointment-day-item.is-reprogramada .appointment-day-copy strong,
 .appointment-day-item.is-cancelada .appointment-day-copy strong { text-decoration: line-through; }
+.appointment-day-item.is-inasistente {
+  border-style: dashed;
+  color: var(--warn);
+}
+.appointment-day-item.is-inasistente .appointment-day-copy strong { text-decoration: underline dotted; }
 
 .appointment-day-empty {
   padding: 0.8rem;
@@ -519,7 +535,7 @@
   .appointment-month-switcher { width: 100%; justify-content: space-between; }
   .appointment-month-switcher strong { min-width: 0; flex: 1; }
   .appointment-status-legend { padding: 0.55rem 0.7rem; gap: 0.3rem; }
-  .appointment-status-legend > span { padding: 0.18rem 0.38rem; font-size: 0.62rem; }
+  .appointment-status-legend > span { min-height: 28px; padding: 0.18rem 0.38rem; font-size: 0.62rem; }
   .calendar-feedback { align-items: stretch; flex-direction: column; }
   .calendar-skeleton-lines { width: 100%; }
   .appointment-calendar-table th { height: 30px; padding: 0.2rem 0; font-size: 0.58rem; }
@@ -546,7 +562,8 @@
   .appointment-day-item .appointment-status-badge { grid-column: 2; justify-self: start; }
   .appointment-detail-list { grid-template-columns: 1fr; }
   .appointment-detail-actions { align-items: stretch; flex-direction: column; }
-  .appointment-detail-actions button { width: 100%; }
+  .appointment-detail-actions button { width: 100%; min-height: 44px; }
+  .appointment-dialog input { min-height: 44px; font-size: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

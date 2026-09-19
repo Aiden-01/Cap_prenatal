@@ -17,6 +17,7 @@ const APPOINTMENTS_REPOSITORY_PATH = require.resolve('../src/repositories/citasP
 const AUDIT_PATH = require.resolve('../src/services/auditService');
 const PREGNANCIES_PATH = require.resolve('../src/utils/embarazos');
 const POOL_PATH = require.resolve('../src/db/pool');
+const MATERIALIZER_PATH = require.resolve('../src/services/citasInasistenciasService');
 
 const ACTOR = {
   usuario: {
@@ -79,7 +80,9 @@ async function withService({ repository = {}, appointments = {}, audit, pregnanc
     cacheModule(REPOSITORY_PATH, strictMock(repositoryWithTransaction, 'controlesRepository')),
     cacheModule(APPOINTMENTS_REPOSITORY_PATH, strictMock({
       existeRelacionConControl: async () => false,
+      listarProgramadasVencidas: async () => [],
       listarProgramadasVigentesPorEmbarazo: async () => [],
+      obtenerInasistentePorFecha: async () => [],
       obtenerUltimaPorControl: async () => null,
       ...appointments,
     }, 'citasRepository')),
@@ -109,13 +112,17 @@ async function withService({ repository = {}, appointments = {}, audit, pregnanc
     }),
   ];
   const previousService = require.cache[SERVICE_PATH];
+  const previousMaterializer = require.cache[MATERIALIZER_PATH];
   delete require.cache[SERVICE_PATH];
+  delete require.cache[MATERIALIZER_PATH];
 
   try {
     return await callback(require(SERVICE_PATH));
   } finally {
     delete require.cache[SERVICE_PATH];
+    delete require.cache[MATERIALIZER_PATH];
     if (previousService) require.cache[SERVICE_PATH] = previousService;
+    if (previousMaterializer) require.cache[MATERIALIZER_PATH] = previousMaterializer;
     for (const restoreModule of restore.reverse()) restoreModule();
   }
 }
@@ -369,7 +376,7 @@ test('el siguiente control cumple la unica cita vigente y puede crear la proxima
     id: 700,
     embarazo_id: 91,
     control_origen_id: 299,
-    fecha_programada: '2026-06-14',
+    fecha_programada: '2026-06-15',
     estado: 'programada',
     control_cumplimiento_id: null,
   };
@@ -525,7 +532,8 @@ test('fallo de cumplimiento o de nueva cita aborta la operacion antes de la audi
       },
       appointments: {
         listarProgramadasVigentesPorEmbarazo: async () => [{
-          id: 700, embarazo_id: 91, estado: 'programada', control_cumplimiento_id: null,
+          id: 700, embarazo_id: 91, fecha_programada: '2026-06-15',
+          estado: 'programada', control_cumplimiento_id: null,
         }],
         marcarAtendida: async () => {
           calls.push('cumplimiento');

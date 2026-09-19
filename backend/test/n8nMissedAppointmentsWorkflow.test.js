@@ -16,13 +16,14 @@ function runCode(name, payload) {
 
 function validPayload(overrides = {}) {
   return {
-    schema_version: 1,
+    schema_version: 2,
     generated_at: '2026-08-24T14:00:00.000Z',
     timezone: 'America/Guatemala',
     report_type: 'weekly_missed_appointments',
     range: { from: '2026-08-17', to: '2026-08-23' },
     cutoff_at: '2026-08-01T16:30:00.000Z',
     dispatch: { status: 'ready', token: 'a'.repeat(43) },
+    summary: { new: 1, previous_pending: 0, total: 1 },
     total: 1,
     appointments: [{
       date: '2026-08-19',
@@ -30,6 +31,7 @@ function validPayload(overrides = {}) {
       last_name: 'López',
       phone: '5555-0101',
       community: 'El Chal',
+      category: 'new',
     }],
     ...overrides,
   };
@@ -71,7 +73,7 @@ test('flujo prepara en backend, no envia con cero y confirma solo despues de Res
   assert.equal(prepare.parameters.retryOnFail, undefined);
   assert.equal(confirm.parameters.retryOnFail, undefined);
 
-  assert.deepEqual(workflow.connections['¿Hay inasistencias nuevas?'].main[1], []);
+  assert.deepEqual(workflow.connections['¿Hay seguimientos pendientes?'].main[1], []);
   assert.deepEqual(
     workflow.connections['Enviar seguimiento por Resend'].main[0],
     [{ node: 'Confirmar despacho en CAP', type: 'main', index: 0 }]
@@ -83,7 +85,7 @@ test('flujo prepara en backend, no envia con cero y confirma solo despues de Res
 test('validador acepta ready y conserva solo datos operativos permitidos', () => {
   const result = runCode('Validar contrato y reserva', validPayload());
   assert.deepEqual(Object.keys(result).sort(), [
-    'appointments', 'dispatch_token', 'range', 'should_send', 'total',
+    'appointments', 'dispatch_token', 'range', 'should_send', 'summary', 'total',
   ]);
   assert.equal(result.should_send, true);
   assert.equal(result.dispatch_token, 'a'.repeat(43));
@@ -93,6 +95,7 @@ test('validador acepta ready y conserva solo datos operativos permitidos', () =>
     last_name: 'López',
     phone: '5555-0101',
     community: 'El Chal',
+    category: 'new',
   });
 });
 
@@ -101,6 +104,7 @@ test('no_results y already_processed terminan sin correo', () => {
     const result = runCode('Validar contrato y reserva', validPayload({
       dispatch: { status },
       total: 0,
+      summary: { new: 0, previous_pending: 0, total: 0 },
       appointments: [],
     }));
     assert.equal(result.should_send, false);
@@ -124,6 +128,27 @@ test('validador rechaza campos extra, estado no permitido, conteo y ventana inva
   assert.throws(() => runCode('Validar contrato y reserva', validPayload({
     range: { from: '2026-08-18', to: '2026-08-24' },
   })), /CONTRACT_INVALID/);
+
+  assert.throws(() => runCode('Validar contrato y reserva', validPayload({
+    summary: { new: 0, previous_pending: 1, total: 1 },
+  })), /CONTRACT_INVALID/);
+
+  assert.throws(() => runCode('Validar contrato y reserva', validPayload({
+    appointments: [{ ...validPayload().appointments[0], category: 'unknown' }],
+  })), /CONTRACT_INVALID/);
+
+  assert.throws(() => runCode('Validar contrato y reserva', validPayload({
+    appointments: [{ ...validPayload().appointments[0], date: '2026-08-16' }],
+  })), /CONTRACT_INVALID/);
+
+  assert.throws(() => runCode('Validar contrato y reserva', validPayload({
+    summary: { new: 0, previous_pending: 1, total: 1 },
+    appointments: [{
+      ...validPayload().appointments[0],
+      category: 'previous_pending',
+      date: '2026-08-17',
+    }],
+  })), /CONTRACT_INVALID/);
 });
 
 test('HTML escapa valores e incluye solo fecha, nombre, apellido, telefono y comunidad', () => {
@@ -140,13 +165,15 @@ test('HTML escapa valores e incluye solo fecha, nombre, apellido, telefono y com
 
   assert.equal(
     built.subject,
-    'CAP Prenatal | Seguimiento semanal de inasistencias | 17-08-2026 al 23-08-2026'
+    'CAP Prenatal | Seguimiento de inasistencias | 17-08-2026 al 23-08-2026'
   );
   assert.match(built.html, /&lt;Ana&gt; López &amp; Hijos/);
   assert.match(built.html, /El &quot;Chal&quot;/);
   assert.match(built.html, /19-08-2026/);
   assert.doesNotMatch(built.subject + built.html, /2026-08-(?:17|19|23)/);
-  assert.match(built.html, /no contar con un control prenatal registrado posteriormente/);
+  assert.match(built.html, /Nuevas inasistencias/);
+  assert.doesNotMatch(built.html, /Pendientes de semanas anteriores/);
+  assert.match(built.html, /ya reprogramados o con un control posterior no se incluyen/);
   assert.match(built.html, /No responda a este correo/);
   assert.doesNotMatch(built.html, /<Ana>|López & Hijos|El "Chal"/);
   assert.doesNotMatch(
@@ -154,6 +181,27 @@ test('HTML escapa valores e incluye solo fecha, nombre, apellido, telefono y com
     /cui|expediente|direccion|vih|laboratorio|diagnostico|riesgo obstetrico|vacuna/
   );
   assert.equal(built.dispatch_token, 'a'.repeat(43));
+});
+
+test('HTML separa pendientes anteriores y omite la seccion sin registros', () => {
+  const payload = validPayload({
+    summary: { new: 0, previous_pending: 1, total: 1 },
+    appointments: [{
+      date: '2026-08-10',
+      first_name: 'Beatriz',
+      last_name: 'Pérez',
+      phone: '5555-0102',
+      community: 'Las Flores',
+      category: 'previous_pending',
+    }],
+  });
+  const built = runCode(
+    'Construir mensaje operativo',
+    runCode('Validar contrato y reserva', payload)
+  );
+  assert.match(built.html, /Pendientes de semanas anteriores/);
+  assert.doesNotMatch(built.html, /<h3[^>]*>Nuevas inasistencias/);
+  assert.match(built.html, /Pendientes anteriores:<\/strong> 1/);
 });
 
 test('JSON versionado no incluye secretos, credenciales ni destinatarios reales', () => {

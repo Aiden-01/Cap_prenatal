@@ -1,5 +1,6 @@
 const controlesRepository = require('../repositories/controlesPrenatalesRepository');
 const citasRepository = require('../repositories/citasPrenatalesRepository');
+const citasInasistenciasService = require('./citasInasistenciasService');
 const {
   requerirEmbarazoId,
   resolverEmbarazoParaLectura,
@@ -27,6 +28,11 @@ const CITA_REPROGRAMACION_REQUERIDA = Object.freeze({
   code: 'CITA_REPROGRAMACION_REQUERIDA',
 });
 const ESTADOS_MUTACION_CONTROL_PRENATAL = Object.freeze(['activo']);
+
+function fechaIso(value) {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value || '').slice(0, 10);
+}
 
 function validarEmbarazoParaMutarControl({ pacienteId, embarazoId, db, bloquear = false }) {
   return validarEmbarazoEditable({
@@ -299,15 +305,46 @@ async function crearControl({ pacienteId, embarazoId, body, req }) {
     if (before && modifiedFields.length === 0) return before;
     if (before) impedirCambioHistoricoDeCita(modifiedFields);
 
+    const programadaAntesDeMaterializar = before ? null : resolverCitaProgramadaInequivoca(
+      await citasRepository.listarProgramadasVigentesPorEmbarazo(
+        embarazoId, client, { bloquear: true }
+      )
+    );
+    let resultadoMaterializacion = { total_procesado: 0 };
+    if (!before && (!programadaAntesDeMaterializar
+      || fechaIso(programadaAntesDeMaterializar.fecha_programada) !== fechaIso(data.fecha))) {
+      resultadoMaterializacion = await citasInasistenciasService.materializarEnTransaccion({
+        db: client, embarazoId, req,
+      });
+    }
     const citaVigente = before
       ? null
-      : resolverCitaProgramadaInequivoca(
-        await citasRepository.listarProgramadasVigentesPorEmbarazo(
-          embarazoId,
-          client,
-          { bloquear: true }
-        )
+      : programadaAntesDeMaterializar
+        && fechaIso(programadaAntesDeMaterializar.fecha_programada) === fechaIso(data.fecha)
+        ? programadaAntesDeMaterializar
+        : resultadoMaterializacion.total_procesado === 0
+          ? programadaAntesDeMaterializar
+        : resolverCitaProgramadaInequivoca(
+          await citasRepository.listarProgramadasVigentesPorEmbarazo(
+            embarazoId, client, { bloquear: true }
+          )
+        );
+    const inasistenciasCoincidentes = before
+      || typeof citasRepository.obtenerInasistentePorFecha !== 'function'
+      ? []
+      : await citasRepository.obtenerInasistentePorFecha(
+        { embarazoId, fecha: data.fecha }, client, { bloquear: true }
       );
+    if (inasistenciasCoincidentes.length > 1) {
+      throw new HttpError(409, 'Existen varias inasistencias para la fecha clínica', {
+        code: 'CITAS_INASISTENTES_AMBIGUAS',
+      });
+    }
+    if (citaVigente
+      && fechaIso(citaVigente.fecha_programada) !== fechaIso(data.fecha)
+      && data.cita_siguiente) {
+      throw citaVigenteYaExiste();
+    }
 
     const control = await controlesRepository.upsert({
       data,
@@ -318,7 +355,8 @@ async function crearControl({ pacienteId, embarazoId, body, req }) {
       throw new HttpError(409, 'No fue posible guardar el control');
     }
 
-    if (!before && citaVigente) {
+    if (!before && citaVigente
+      && fechaIso(citaVigente.fecha_programada) === fechaIso(control.fecha)) {
       const citaAtendida = await citasRepository.marcarAtendida({
         citaId: citaVigente.id,
         embarazoId,
@@ -349,6 +387,16 @@ async function crearControl({ pacienteId, embarazoId, body, req }) {
         },
         metadata: { resultado: RESULTADO_EXITOSO, motivo_codigo: 'cita_atendida' },
       }, { db: client, obligatorio: true });
+    }
+
+    if (!before && inasistenciasCoincidentes[0]) {
+      await citasInasistenciasService.reconciliarAsistenciaTardia({
+        cita: inasistenciasCoincidentes[0],
+        control,
+        usuarioId: req.usuario.id,
+        req,
+        db: client,
+      });
     }
 
     if (!before && data.cita_siguiente) {

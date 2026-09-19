@@ -314,6 +314,16 @@ crear su proxima cita. `reportesRepository` y `automatizacionesRepository`
 leen la agenda operativa; `cita_siguiente` permanece solo como historia y
 compatibilidad de respuesta.
 
+`017_citas_inasistencias.sql` separa el estado historico `inasistente` de la
+necesidad operativa de seguimiento. Un barrido idempotente usa fecha de
+Guatemala, bloqueos de fila y un advisory lock para materializar citas
+vencidas; se ejecuta al iniciar el backend, cada hora y mediante un POST M2M
+privado. Los GET permanecen libres de escrituras. Un control solo cumple una
+cita cuando su fecha clinica coincide; una inasistencia ya persistida admite
+reconciliacion tardia solo con esa misma fecha y sin una cita de seguimiento
+derivada. `seguimiento_inasistencia_desde_id` distingue esa continuacion de la
+reprogramacion preventiva conservada en `reprogramada_desde_id`.
+
 Comunidades era el ultimo consumidor productivo del adaptador legacy detectado
 por el barrido. Sus escrituras usan ahora contexto administrativo privado,
 transaccion obligatoria y no-ops efectivos; nombres y coordenadas quedan como

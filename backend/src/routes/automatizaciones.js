@@ -39,6 +39,7 @@ function createAutomatizacionesRouter({
   router.post('/inasistencias/preparar', automationNotFound);
   router.post('/inasistencias/confirmar', automationNotFound);
   router.post('/inasistencias/resolver', automationNotFound);
+  router.post('/inasistencias/materializar', automationNotFound);
   router.post('/tdap/preparar', automationNotFound);
   router.get('/tdap/xlsx', automationNotFound);
   router.post('/tdap/confirmar', automationNotFound);
@@ -55,6 +56,7 @@ function createAutomatizacionesRouter({
     router.post('/v1/inasistencias/preparar', automationNotFound);
     router.post('/v1/inasistencias/confirmar', automationNotFound);
     router.post('/v1/inasistencias/resolver', automationNotFound);
+    router.post('/v1/inasistencias/materializar', automationNotFound);
     router.post('/v1/tdap/preparar', automationNotFound);
     router.get('/v1/tdap/xlsx', automationNotFound);
     router.post('/v1/tdap/confirmar', automationNotFound);
@@ -150,6 +152,15 @@ function createAutomatizacionesRouter({
     validateEmptyQuery,
     validateDispatchResolution,
     controllers.resolverInasistencias
+  );
+
+  router.post(
+    '/v1/inasistencias/materializar',
+    originMiddleware,
+    limiter,
+    authenticate,
+    validateEmptyQuery,
+    controllers.materializarInasistencias
   );
 
   router.post(

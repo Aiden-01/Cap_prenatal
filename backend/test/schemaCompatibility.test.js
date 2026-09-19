@@ -213,6 +213,7 @@ test('la lista requerida es explicita y cada checksum procede del archivo versio
     '014_citas_prenatales.sql',
     '015_automatizacion_despachos.sql',
     '016_riesgo_tiempo_horas_decimales.sql',
+    '017_citas_inasistencias.sql',
   ]);
   assert.equal(REQUIRED_STATE.every(({ checksum }) => /^[a-f0-9]{64}$/.test(checksum)), true);
 });

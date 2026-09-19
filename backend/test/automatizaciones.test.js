@@ -117,11 +117,12 @@ async function withServer(app, callback) {
 function automationApp({
   config = activeConfig(),
   service = serviceForRows(),
+  appointmentsService = { materializarGlobal: async () => ({ total_procesado: 0 }) },
   audit = async () => true,
   addHumanRoute = false,
 } = {}) {
   const app = express();
-  const controllers = createAutomatizacionesController({ service, audit });
+  const controllers = createAutomatizacionesController({ service, appointmentsService, audit });
   const router = createAutomatizacionesRouter({
     config,
     controllers,
@@ -132,6 +133,32 @@ function automationApp({
   app.use(errorHandler);
   return app;
 }
+
+test('POST privado materializa con M2M y devuelve solo conteos operativos', async () => {
+  let calls = 0;
+  const app = automationApp({
+    appointmentsService: {
+      materializarGlobal: async () => {
+        calls += 1;
+        return { total_procesado: 2, atendidas: 1, inasistentes: 1, omitido_por_bloqueo: false };
+      },
+    },
+  });
+  await withServer(app, async (baseUrl) => {
+    const denied = await fetch(`${baseUrl}/api/automatizaciones/v1/inasistencias/materializar`, {
+      method: 'POST', headers: automationHeaders({ key: null }),
+    });
+    assert.equal(denied.status, 401);
+    const response = await fetch(`${baseUrl}/api/automatizaciones/v1/inasistencias/materializar`, {
+      method: 'POST', headers: automationHeaders(),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      total_procesado: 2, atendidas: 1, inasistentes: 1, omitido_por_bloqueo: false,
+    });
+  });
+  assert.equal(calls, 1);
+});
 
 function automationHeaders({
   key = CURRENT_KEY,

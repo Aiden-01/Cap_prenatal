@@ -125,12 +125,31 @@ test('repositorio acepta el rango visual con meses adyacentes sin N+1', async ()
   assert.deepEqual(params, ['2026-07-26', '2026-09-05']);
 });
 
-test('contrato conserva varias citas del mismo dia y los cuatro estados', async () => {
+test('calendario expone seguimiento pendiente y fecha derivada sin mezclar reprogramacion', async () => {
+  let sql;
+  await withRepository({
+    async query(value) {
+      sql = value;
+      return { rows: [] };
+    },
+  }, (repository) => repository.listarCalendarioPorRango({
+    desde: '2026-08-01', hasta: '2026-08-31',
+  }));
+  assert.match(sql, /AS follow_up_pending/);
+  assert.match(sql, /AS follow_up_date/);
+  assert.match(sql, /seguimiento\.seguimiento_inasistencia_desde_id = cp\.id/);
+  assert.match(sql, /hija\.reprogramada_desde_id = cp\.id/);
+  assert.match(sql, /CASE WHEN cp\.estado = 'inasistente'/);
+  assert.match(sql, /control_posterior\.fecha > cp\.fecha_programada/);
+});
+
+test('contrato conserva varias citas del mismo dia y los cinco estados', async () => {
   const rows = [
-    { id: '1', date: '2026-08-25', status: 'programada' },
-    { id: '2', date: '2026-08-25', status: 'atendida' },
-    { id: '3', date: '2026-08-25', status: 'cancelada' },
-    { id: '4', date: '2026-08-25', status: 'reprogramada', rescheduled_to: '2026-09-02' },
+    { id: '1', date: '2026-08-25', status: 'programada', follow_up_pending: false, follow_up_date: null },
+    { id: '2', date: '2026-08-25', status: 'atendida', follow_up_pending: false, follow_up_date: null },
+    { id: '3', date: '2026-08-25', status: 'cancelada', follow_up_pending: false, follow_up_date: null },
+    { id: '4', date: '2026-08-25', status: 'reprogramada', rescheduled_to: '2026-09-02', follow_up_pending: false, follow_up_date: null },
+    { id: '5', date: '2026-08-25', status: 'inasistente', follow_up_pending: true, follow_up_date: null },
   ];
   await withService({
     listarCalendarioPorRango: async () => rows,

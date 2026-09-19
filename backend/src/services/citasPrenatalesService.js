@@ -1,4 +1,5 @@
 const citasRepository = require('../repositories/citasPrenatalesRepository');
+const citasInasistenciasService = require('./citasInasistenciasService');
 const {
   requerirEmbarazoId,
   resolverEmbarazoParaLectura,
@@ -19,6 +20,9 @@ const AUDIT_CONTEXT = Object.freeze({
   }),
   asignar: Object.freeze({
     categoria: 'clinica', entidad: 'cita_prenatal', evento: 'crear',
+  }),
+  seguimientoInasistencia: Object.freeze({
+    categoria: 'clinica', entidad: 'cita_prenatal', evento: 'crear_seguimiento_inasistencia',
   }),
 });
 
@@ -104,6 +108,10 @@ async function asignarCita({ pacienteId, embarazoId, fechaProgramada, req }) {
         bloquear: true,
       });
 
+      await citasInasistenciasService.materializarEnTransaccion({
+        db: client, embarazoId, req,
+      });
+
       const vigentes = await citasRepository.listarProgramadasVigentesPorEmbarazo(
         embarazoId,
         client,
@@ -128,7 +136,18 @@ async function asignarCita({ pacienteId, embarazoId, fechaProgramada, req }) {
         { bloquear: true }
       );
 
-      const cita = ultimaDelControl
+      const inasistenciaPendiente = typeof citasRepository.listarInasistenciasConSeguimiento === 'function'
+        ? (await citasRepository.listarInasistenciasConSeguimiento(embarazoId, client))
+          .find((item) => item.seguimiento_pendiente === true)
+        : null;
+
+      const cita = inasistenciaPendiente
+        ? await citasRepository.crearSeguimientoDeInasistencia({
+          citaAnterior: inasistenciaPendiente,
+          fechaProgramada: nuevaFecha,
+          usuarioId: req.usuario.id,
+        }, client)
+        : ultimaDelControl
         ? await citasRepository.crearProgramadaComoContinuacion({
           citaAnterior: ultimaDelControl,
           fechaProgramada: nuevaFecha,
@@ -158,12 +177,17 @@ async function asignarCita({ pacienteId, embarazoId, fechaProgramada, req }) {
             estado_cita: cita.estado,
             fecha_programada: fechaIso(cita.fecha_programada),
             control_origen_id: Number(control.id),
-            reprogramada_desde_id: ultimaDelControl ? Number(ultimaDelControl.id) : null,
+            reprogramada_desde_id: !inasistenciaPendiente && ultimaDelControl
+              ? Number(ultimaDelControl.id) : null,
+            seguimiento_inasistencia_desde_id: inasistenciaPendiente
+              ? Number(inasistenciaPendiente.id) : null,
           },
         },
         metadata: {
           resultado: RESULTADO_EXITOSO,
-          motivo_codigo: ultimaDelControl
+          motivo_codigo: inasistenciaPendiente
+            ? 'cita_asignada_como_seguimiento_inasistencia'
+            : ultimaDelControl
             ? 'cita_asignada_continuando_historial'
             : 'cita_asignada_desde_ultimo_control',
         },
@@ -190,6 +214,9 @@ async function reprogramarCita({ pacienteId, embarazoId, citaId, fechaProgramada
       db: client,
       bloquear: true,
     });
+    await citasInasistenciasService.materializarEnTransaccion({
+      db: client, embarazoId, req,
+    });
     const anterior = await citasRepository.obtenerPorIdYEmbarazo(
       citaId,
       embarazoId,
@@ -197,7 +224,7 @@ async function reprogramarCita({ pacienteId, embarazoId, citaId, fechaProgramada
       { bloquear: true }
     );
     if (!anterior) throw citaNoEncontrada();
-    if (anterior.estado !== 'programada' || anterior.control_cumplimiento_id) {
+    if (!['programada', 'inasistente'].includes(anterior.estado) || anterior.control_cumplimiento_id) {
       throw transicionInvalida(anterior, 'reprogramar');
     }
 
@@ -211,6 +238,48 @@ async function reprogramarCita({ pacienteId, embarazoId, citaId, fechaProgramada
       throw new HttpError(400, 'La nueva fecha no puede estar en el pasado', {
         code: 'CITA_FECHA_PASADA',
       });
+    }
+
+    if (anterior.estado === 'inasistente') {
+      const seguimiento = await citasRepository.obtenerEstadoSeguimientoInasistencia(
+        anterior.id,
+        embarazoId,
+        client
+      );
+      if (!seguimiento?.seguimiento_pendiente) {
+        throw new HttpError(409, 'Esta inasistencia ya no requiere una nueva cita de seguimiento', {
+          code: 'CITA_SEGUIMIENTO_YA_RESUELTO',
+        });
+      }
+      if (nuevaFecha <= fechaIso(anterior.fecha_programada)) {
+        throw new HttpError(400, 'La nueva cita debe ser posterior a la inasistencia', {
+          code: 'CITA_SEGUIMIENTO_FECHA_INVALIDA',
+        });
+      }
+      const nueva = await citasRepository.crearSeguimientoDeInasistencia({
+        citaAnterior: anterior,
+        fechaProgramada: nuevaFecha,
+        usuarioId: req.usuario.id,
+      }, client);
+      if (!nueva) {
+        throw new HttpError(409, 'No fue posible crear el seguimiento de la inasistencia', {
+          code: 'CITA_SEGUIMIENTO_NO_CREADO',
+        });
+      }
+      await registrarAuditoria(req, {
+        contexto: AUDIT_CONTEXT.seguimientoInasistencia,
+        accion: 'crear',
+        entidadId: nueva.id,
+        pacienteId,
+        embarazoId,
+        cambios: { nuevos: {
+          estado_cita: nueva.estado,
+          fecha_programada: fechaIso(nueva.fecha_programada),
+          cita_nueva_id: Number(nueva.id),
+        } },
+        metadata: { resultado: RESULTADO_EXITOSO, motivo_codigo: 'seguimiento_posterior_inasistencia' },
+      }, { db: client, obligatorio: true });
+      return { cita_anterior: anterior, cita_nueva: nueva };
     }
 
     const actualizada = await citasRepository.marcarReprogramada({
@@ -264,6 +333,9 @@ async function cancelarCita({ pacienteId, embarazoId, citaId, req }) {
       embarazoId,
       db: client,
       bloquear: true,
+    });
+    await citasInasistenciasService.materializarEnTransaccion({
+      db: client, embarazoId, req,
     });
     const anterior = await citasRepository.obtenerPorIdYEmbarazo(
       citaId,

@@ -1,10 +1,11 @@
-import { CalendarDays, Check, CornerUpRight, X } from "lucide-react";
+import { CalendarDays, Check, CornerUpRight, UserRoundX, X } from "lucide-react";
 
 const STATUS_ICONS = {
   programada: CalendarDays,
   atendida: Check,
   reprogramada: CornerUpRight,
   cancelada: X,
+  inasistente: UserRoundX,
 };
 
 export function AppointmentStatusIcon({ status, size = 15 }) {

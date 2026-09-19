@@ -38,6 +38,7 @@ const { csrfMiddleware } = require('./middleware/auth');
 const { errorHandler } = require('./middleware/errorHandler');
 const { AppError } = require('./utils/appError');
 const { createStrictTrustProxy } = require('./utils/proxyTrust');
+const { createCitasMaterializacionRunner } = require('./services/citasMaterializacionRunner');
 
 const app = express();
 app.set('trust proxy', createStrictTrustProxy(config.trustedProxyCidrs));
@@ -113,9 +114,11 @@ app.use(errorHandler);
 
 async function startServer() {
   await assertSchemaCompatible(pool);
-  return app.listen(config.port, () => {
+  const server = app.listen(config.port, () => {
     console.log(`Servidor iniciado en el puerto ${config.port} (${config.nodeEnv})`);
   });
+  createCitasMaterializacionRunner().iniciar();
+  return server;
 }
 
 if (require.main === module) {

@@ -53,6 +53,7 @@ test("multiples citas del mismo dia permanecen agrupadas sin perder estados", ()
     { id: "2", date: "2026-08-25", status: "atendida" },
     { id: "3", date: "2026-08-25", status: "cancelada" },
     { id: "4", date: "2026-08-25", status: "reprogramada" },
+    { id: "5", date: "2026-08-25", status: "inasistente" },
   ];
   assert.deepEqual(groupAppointmentsByDate(items).get("2026-08-25"), items);
 });
@@ -85,19 +86,21 @@ test("calendario conserva el mes durante loading y distingue error, retry y vaci
   assert.match(source, /aria-busy=\{loading\}/);
 });
 
-test("cuatro estados usan icono, texto accesible, leyenda y tratamiento terminal", async () => {
+test("cinco estados usan icono, texto accesible, leyenda y tratamiento terminal", async () => {
   const [calendar, statuses, css] = await Promise.all([
     read("src/components/AppointmentCalendar.jsx"),
     read("src/components/appointmentStatusMeta.js"),
     read("src/components/appointment-calendar.css"),
   ]);
-  for (const status of ["programada", "atendida", "cancelada", "reprogramada"]) {
+  for (const status of ["programada", "atendida", "cancelada", "reprogramada", "inasistente"]) {
     assert.match(statuses, new RegExp(`${status}:`));
     assert.match(css, new RegExp(`\\.is-${status}`));
   }
   assert.match(calendar, /appointment-status-legend/);
   assert.match(calendar, /AppointmentStatusIcon/);
   assert.match(css, /text-decoration: line-through/);
+  assert.match(statuses, /label: "No asistió"/);
+  assert.match(statuses, /accessible: "cita a la que no asistió"/);
 });
 
 test("citas minimizan contenido visible y ofrecen nombre accesible completo", async () => {
@@ -118,11 +121,15 @@ test("mas de tres citas usa +N mas y abre la lista completa del dia", async () =
   assert.match(source, /items\.map\(\(appointment\)/);
 });
 
-test("detalle permite expediente y solo programa acciones para cita modificable", async () => {
+test("detalle separa reprogramacion futura de seguimiento por inasistencia", async () => {
   const source = await read("src/components/AppointmentDetailDialog.jsx");
-  assert.match(source, /appointment\.status === "programada" && appointment\.editable && canManage/);
+  assert.match(source, /appointment\.date < todayInGuatemala\(\)/);
   assert.match(source, /Ver expediente/);
   assert.match(source, /Reprogramar/);
+  assert.match(source, /Asignar nueva cita/);
+  assert.match(source, /appointment\.follow_up_pending === true/);
+  assert.match(source, /Seguimiento resuelto/);
+  assert.match(source, /appointment\.follow_up_date/);
   assert.match(source, /Cancelar cita/);
   assert.match(source, /appointment\.status === "reprogramada" && appointment\.rescheduled_to/);
   assert.match(source, /Reprogramada para/);
@@ -137,6 +144,8 @@ test("reprogramar conserva original, agrega hija visible y cancelar conserva his
   assert.doesNotMatch(source, /filter\(.*appointment\.id/);
   assert.match(source, /Cita reprogramada correctamente/);
   assert.match(source, /Cita cancelada correctamente/);
+  assert.match(source, /Nueva cita asignada correctamente/);
+  assert.match(source, /setRetryToken\(\(value\) => value \+ 1\)/);
 });
 
 test("permisos separan lectura pacientes.ver de edicion controles.editar", async () => {
@@ -189,7 +198,7 @@ test("dark y light reutilizan tokens sin colores semanticos hardcodeados", async
 
 test("calendario no crea citas ni implementa drag and drop", async () => {
   const source = await read("src/components/AppointmentCalendar.jsx");
-  assert.doesNotMatch(source, /Nueva cita|Crear evento|Agregar cita|draggable|onDrag|onDrop/);
+  assert.doesNotMatch(source, />\s*Nueva cita\s*<|Crear evento|Agregar cita|draggable|onDrag|onDrop/);
 });
 
 test("dashboard incorpora la cola sin próxima cita con permisos existentes", async () => {
@@ -275,8 +284,9 @@ test("cola es responsive y usa tokens de tema", async () => {
 test("dialogo de CITAS-01B valida nueva fecha date-only y conserva historial", async () => {
   const source = await read("src/components/AppointmentActionDialog.jsx");
   assert.match(source, /type="date"/);
-  assert.match(source, /min=\{todayGuatemala\(\)\}/);
+  assert.match(source, /min=\{todayInGuatemala\(\)\}/);
   assert.match(source, /La nueva fecha debe ser diferente/);
   assert.match(source, /El registro permanecerá en el historial/);
   assert.match(source, /Confirmar nueva fecha/);
+  assert.match(source, /quedará registrada como ‘No asistió’/);
 });

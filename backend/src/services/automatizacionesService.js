@@ -162,7 +162,16 @@ function normalizeMissedAppointments(rows) {
     last_name: operationalText(row.primer_apellido, 80),
     phone: operationalText(row.telefono, 32),
     community: operationalText(row.comunidad, 120),
+    category: row.categoria === 'new' || row.categoria === 'previous_pending'
+      ? row.categoria
+      : (() => { throw new TypeError('Categoria semanal invalida'); })(),
   }));
+}
+
+function missedAppointmentsSummary(appointments) {
+  const summary = { new: 0, previous_pending: 0, total: appointments.length };
+  for (const appointment of appointments) summary[appointment.category] += 1;
+  return summary;
 }
 
 function dispatchResponse({
@@ -176,13 +185,14 @@ function dispatchResponse({
 }) {
   const dispatch = token ? { status, token } : { status };
   return {
-    schema_version: 1,
+    schema_version: 2,
     generated_at: generatedAt,
     timezone,
     report_type: 'weekly_missed_appointments',
     range: { from: period.desde, to: period.hasta },
     cutoff_at: cutoffAt,
     dispatch,
+    summary: missedAppointmentsSummary(appointments),
     total: appointments.length,
     appointments,
   };
@@ -610,7 +620,7 @@ function createAutomatizacionesService({
         : await repository.marcarDespachoEnviado({ despachoId: dispatch.id }, client);
       if (!sent) throw new TypeError('No se pudo confirmar el despacho');
       return {
-        schema_version: 1,
+        schema_version: 2,
         report_type: 'weekly_missed_appointments',
         dispatch: { status: 'sent', idempotent },
       };
@@ -650,7 +660,7 @@ function createAutomatizacionesService({
       }, client);
       if (!updated) throw new TypeError('No se pudo resolver el despacho');
       return {
-        schema_version: 1,
+        schema_version: 2,
         report_type: 'weekly_missed_appointments',
         range: { from: desde, to: hasta },
         dispatch: { status: estado },

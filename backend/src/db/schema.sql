@@ -1131,13 +1131,14 @@ CREATE TABLE IF NOT EXISTS citas_prenatales (
   control_origen_id        INTEGER NOT NULL,
   control_cumplimiento_id  INTEGER,
   reprogramada_desde_id    BIGINT,
+  seguimiento_inasistencia_desde_id BIGINT,
   registrado_por           INTEGER REFERENCES usuarios(id),
   updated_by               INTEGER REFERENCES usuarios(id),
   created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
   CONSTRAINT citas_prenatales_estado_check CHECK (
-    estado IN ('programada', 'atendida', 'cancelada', 'reprogramada')
+    estado IN ('programada', 'atendida', 'cancelada', 'reprogramada', 'inasistente')
   ),
   CONSTRAINT citas_prenatales_cumplimiento_estado_check CHECK (
     (estado = 'atendida' AND control_cumplimiento_id IS NOT NULL)
@@ -1148,6 +1149,12 @@ CREATE TABLE IF NOT EXISTS citas_prenatales (
   ),
   CONSTRAINT citas_prenatales_reprogramacion_no_circular_check CHECK (
     reprogramada_desde_id IS NULL OR reprogramada_desde_id <> id
+  ),
+  CONSTRAINT citas_prenatales_seguimiento_no_circular_check CHECK (
+    seguimiento_inasistencia_desde_id IS NULL OR seguimiento_inasistencia_desde_id <> id
+  ),
+  CONSTRAINT citas_prenatales_derivacion_exclusiva_check CHECK (
+    reprogramada_desde_id IS NULL OR seguimiento_inasistencia_desde_id IS NULL
   ),
   CONSTRAINT citas_prenatales_id_embarazo_key UNIQUE (id, embarazo_id),
   CONSTRAINT citas_prenatales_control_origen_embarazo_fkey
@@ -1161,12 +1168,17 @@ CREATE TABLE IF NOT EXISTS citas_prenatales (
   CONSTRAINT citas_prenatales_reprogramada_desde_embarazo_fkey
     FOREIGN KEY (reprogramada_desde_id, embarazo_id)
     REFERENCES citas_prenatales(id, embarazo_id)
+    ON DELETE NO ACTION DEFERRABLE INITIALLY DEFERRED,
+  CONSTRAINT citas_prenatales_seguimiento_embarazo_fkey
+    FOREIGN KEY (seguimiento_inasistencia_desde_id, embarazo_id)
+    REFERENCES citas_prenatales(id, embarazo_id)
     ON DELETE NO ACTION DEFERRABLE INITIALLY DEFERRED
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_citas_control_origen_raiz
   ON citas_prenatales(control_origen_id)
-  WHERE reprogramada_desde_id IS NULL;
+  WHERE reprogramada_desde_id IS NULL
+    AND seguimiento_inasistencia_desde_id IS NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_citas_control_cumplimiento
   ON citas_prenatales(control_cumplimiento_id)
@@ -1175,6 +1187,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_citas_control_cumplimiento
 CREATE UNIQUE INDEX IF NOT EXISTS ux_citas_reprogramada_desde
   ON citas_prenatales(reprogramada_desde_id)
   WHERE reprogramada_desde_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_citas_seguimiento_inasistencia_desde
+  ON citas_prenatales(seguimiento_inasistencia_desde_id)
+  WHERE seguimiento_inasistencia_desde_id IS NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_citas_programada_embarazo
   ON citas_prenatales(embarazo_id)

@@ -1,5 +1,21 @@
 const pool = require('../db/pool');
 
+function seguimientoPendienteSql(citaAlias = 'cp', embarazoAlias = 'e') {
+  return `(
+    ${citaAlias}.estado = 'inasistente'
+    AND ${embarazoAlias}.estado IN ('activo', 'puerperio')
+    AND NOT EXISTS (
+      SELECT 1 FROM citas_prenatales hija_seguimiento
+      WHERE hija_seguimiento.seguimiento_inasistencia_desde_id = ${citaAlias}.id
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM controles_prenatales control_posterior
+      WHERE control_posterior.embarazo_id = ${citaAlias}.embarazo_id
+        AND control_posterior.fecha > ${citaAlias}.fecha_programada
+    )
+  )`;
+}
+
 function fechaIso(value) {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   return String(value || '').slice(0, 10);
@@ -17,7 +33,8 @@ async function crearProgramadaDesdeControl({
        embarazo_id, control_origen_id, fecha_programada, estado,
        registrado_por, updated_by
      ) VALUES ($1, $2, $3, 'programada', $4, $4)
-     ON CONFLICT (control_origen_id) WHERE reprogramada_desde_id IS NULL DO NOTHING
+     ON CONFLICT (control_origen_id) WHERE reprogramada_desde_id IS NULL
+       AND seguimiento_inasistencia_desde_id IS NULL DO NOTHING
      RETURNING *`,
     params
   );
@@ -27,7 +44,8 @@ async function crearProgramadaDesdeControl({
      `SELECT *
      FROM citas_prenatales
      WHERE control_origen_id = $1
-       AND reprogramada_desde_id IS NULL`,
+       AND reprogramada_desde_id IS NULL
+       AND seguimiento_inasistencia_desde_id IS NULL`,
     [controlOrigenId]
   );
   const cita = existing.rows?.[0];
@@ -80,6 +98,11 @@ async function listarCalendarioPorRango({ desde, hasta }, db = pool) {
        TRIM(CONCAT_WS(' ', p.nombres, p.apellidos)) AS patient_name,
        NULLIF(BTRIM(COALESCE(com.nombre, p.comunidad, '')), '') AS community,
        TO_CHAR(hija.fecha_programada, 'YYYY-MM-DD') AS rescheduled_to,
+       CASE WHEN cp.estado = 'inasistente'
+         THEN TO_CHAR(seguimiento.fecha_programada, 'YYYY-MM-DD')
+         ELSE NULL
+       END AS follow_up_date,
+       ${seguimientoPendienteSql()} AS follow_up_pending,
        (
          cp.estado = 'programada'
          AND cp.control_cumplimiento_id IS NULL
@@ -92,9 +115,12 @@ async function listarCalendarioPorRango({ desde, hasta }, db = pool) {
        ON p.id = e.paciente_id
      LEFT JOIN comunidades com
        ON com.id = p.comunidad_id
-     LEFT JOIN citas_prenatales hija
+    LEFT JOIN citas_prenatales hija
        ON hija.reprogramada_desde_id = cp.id
       AND hija.embarazo_id = cp.embarazo_id
+    LEFT JOIN citas_prenatales seguimiento
+      ON seguimiento.seguimiento_inasistencia_desde_id = cp.id
+     AND seguimiento.embarazo_id = cp.embarazo_id
      WHERE cp.fecha_programada BETWEEN $1::date AND $2::date
      ORDER BY
        cp.fecha_programada ASC,
@@ -280,6 +306,137 @@ async function crearHijaReprogramada({ citaAnterior, fechaProgramada, usuarioId 
   return rows[0] || null;
 }
 
+async function crearSeguimientoDeInasistencia({ citaAnterior, fechaProgramada, usuarioId }, db = pool) {
+  const { rows = [] } = await db.query(
+    `INSERT INTO citas_prenatales (
+       embarazo_id, control_origen_id, fecha_programada, estado,
+       seguimiento_inasistencia_desde_id, registrado_por, updated_by
+     )
+     SELECT $1, $2, $3, 'programada', $4, $5, $5
+     WHERE $3::date > $6::date
+     RETURNING *`,
+    [
+      citaAnterior.embarazo_id,
+      citaAnterior.control_origen_id,
+      fechaProgramada,
+      citaAnterior.id,
+      usuarioId,
+      citaAnterior.fecha_programada,
+    ]
+  );
+  return rows[0] || null;
+}
+
+async function adquirirBloqueoMaterializacion(db = pool) {
+  const { rows = [] } = await db.query(
+    `SELECT pg_try_advisory_xact_lock(701202601)::boolean AS adquirido`
+  );
+  return rows[0]?.adquirido === true;
+}
+
+async function listarProgramadasVencidas({ fechaOperativa, embarazoId = null }, db = pool) {
+  const { rows = [] } = await db.query(
+    `SELECT *
+     FROM citas_prenatales
+     WHERE estado = 'programada'
+       AND control_cumplimiento_id IS NULL
+       AND fecha_programada < $1::date
+       AND ($2::integer IS NULL OR embarazo_id = $2)
+     ORDER BY fecha_programada ASC, id ASC
+     FOR UPDATE`,
+    [fechaOperativa, embarazoId]
+  );
+  return rows;
+}
+
+async function listarControlesCoincidentes(cita, db = pool) {
+  const { rows = [] } = await db.query(
+    `SELECT c.*
+     FROM controles_prenatales c
+     WHERE c.embarazo_id = $1
+       AND c.fecha = $2::date
+     ORDER BY c.id ASC
+     FOR UPDATE`,
+    [cita.embarazo_id, cita.fecha_programada]
+  );
+  return rows;
+}
+
+async function marcarInasistente({ citaId, embarazoId, usuarioId = null }, db = pool) {
+  const { rows = [] } = await db.query(
+    `UPDATE citas_prenatales
+     SET estado = 'inasistente', updated_by = COALESCE($3, updated_by), updated_at = NOW()
+     WHERE id = $1 AND embarazo_id = $2
+       AND estado = 'programada' AND control_cumplimiento_id IS NULL
+     RETURNING *`,
+    [citaId, embarazoId, usuarioId]
+  );
+  return rows[0] || null;
+}
+
+async function reconciliarAsistenciaTardia({ citaId, embarazoId, controlCumplimientoId, usuarioId }, db = pool) {
+  const { rows = [] } = await db.query(
+    `UPDATE citas_prenatales
+     SET estado = 'atendida', control_cumplimiento_id = $3,
+         updated_by = $4, updated_at = NOW()
+     WHERE id = $1 AND embarazo_id = $2
+       AND estado = 'inasistente' AND control_cumplimiento_id IS NULL
+     RETURNING *`,
+    [citaId, embarazoId, controlCumplimientoId, usuarioId]
+  );
+  return rows[0] || null;
+}
+
+async function existeSeguimientoDerivado(citaId, db = pool) {
+  const { rows = [] } = await db.query(
+    `SELECT EXISTS (
+       SELECT 1 FROM citas_prenatales
+       WHERE seguimiento_inasistencia_desde_id = $1
+     ) AS existe`,
+    [citaId]
+  );
+  return rows[0]?.existe === true;
+}
+
+async function obtenerInasistentePorFecha({ embarazoId, fecha }, db = pool, { bloquear = false } = {}) {
+  const { rows = [] } = await db.query(
+    `SELECT * FROM citas_prenatales
+     WHERE embarazo_id = $1 AND fecha_programada = $2::date AND estado = 'inasistente'
+     ORDER BY id ASC
+     LIMIT 2${bloquear ? '\n     FOR UPDATE' : ''}`,
+    [embarazoId, fecha]
+  );
+  return rows;
+}
+
+async function listarInasistenciasConSeguimiento(embarazoId, db = pool) {
+  const { rows = [] } = await db.query(
+    `SELECT cp.*,
+       ${seguimientoPendienteSql()} AS seguimiento_pendiente
+     FROM citas_prenatales cp
+     JOIN embarazos e ON e.id = cp.embarazo_id
+     WHERE cp.embarazo_id = $1 AND cp.estado = 'inasistente'
+     ORDER BY cp.fecha_programada DESC, cp.id DESC`,
+    [embarazoId]
+  );
+  return rows;
+}
+
+async function obtenerEstadoSeguimientoInasistencia(citaId, embarazoId, db = pool) {
+  const { rows = [] } = await db.query(
+    `SELECT ${seguimientoPendienteSql()} AS seguimiento_pendiente,
+       TO_CHAR(seguimiento.fecha_programada, 'YYYY-MM-DD') AS fecha_seguimiento
+     FROM citas_prenatales cp
+     JOIN embarazos e ON e.id = cp.embarazo_id
+     LEFT JOIN citas_prenatales seguimiento
+       ON seguimiento.seguimiento_inasistencia_desde_id = cp.id
+      AND seguimiento.embarazo_id = cp.embarazo_id
+     WHERE cp.id = $1 AND cp.embarazo_id = $2`,
+    [citaId, embarazoId]
+  );
+  return rows[0] || null;
+}
+
 async function marcarCancelada({ citaId, embarazoId, usuarioId }, db = pool) {
   const { rows = [] } = await db.query(
     `UPDATE citas_prenatales
@@ -329,19 +486,30 @@ async function enTransaccion(callback) {
 }
 
 module.exports = {
+  adquirirBloqueoMaterializacion,
   crearHijaReprogramada,
+  crearSeguimientoDeInasistencia,
   crearProgramadaComoContinuacion,
   crearProgramadaDesdeControl,
   enTransaccion,
   existeRelacionConControl,
+  existeSeguimientoDerivado,
   listarCalendarioPorRango,
+  listarControlesCoincidentes,
+  listarInasistenciasConSeguimiento,
   listarSinProximaCita,
+  listarProgramadasVencidas,
   listarProgramadasVigentesPorEmbarazo,
   marcarAtendida,
   marcarCancelada,
+  marcarInasistente,
   marcarReprogramada,
+  seguimientoPendienteSql,
+  obtenerInasistentePorFecha,
+  obtenerEstadoSeguimientoInasistencia,
   obtenerOriginadaPorControl,
   obtenerUltimoControlElegible,
   obtenerUltimaPorControl,
   obtenerPorIdYEmbarazo,
+  reconciliarAsistenciaTardia,
 };

@@ -31,6 +31,14 @@ function missedRows() {
     primer_apellido: 'López',
     telefono: '5555-0101',
     comunidad: 'El Chal',
+    categoria: 'new',
+  }, {
+    fecha_cita: '2026-08-10',
+    primer_nombre: 'Beatriz',
+    primer_apellido: 'Pérez',
+    telefono: '5555-0102',
+    comunidad: 'Las Flores',
+    categoria: 'previous_pending',
   }];
 }
 
@@ -141,11 +149,14 @@ async function withServer(app, callback) {
   }
 }
 
-function automationApp(service) {
+function automationApp(service, appointmentsService = {
+  materializarGlobal: async () => ({ total_procesado: 0 }),
+}) {
   const app = express();
   app.use(express.json({ limit: '32kb' }));
   const controllers = createAutomatizacionesController({
     service,
+    appointmentsService,
     audit: async () => true,
   });
   app.use('/api/automatizaciones', createAutomatizacionesRouter({
@@ -210,9 +221,11 @@ test('preview entrega contrato minimo, fecha operativa y corte confiable', async
 
   assert.deepEqual(Object.keys(result).sort(), [
     'appointments', 'cutoff_at', 'dispatch', 'generated_at', 'range',
-    'report_type', 'schema_version', 'timezone', 'total',
+    'report_type', 'schema_version', 'summary', 'timezone', 'total',
   ]);
-  assert.equal(result.total, 1);
+  assert.equal(result.schema_version, 2);
+  assert.equal(result.total, 2);
+  assert.deepEqual(result.summary, { new: 1, previous_pending: 1, total: 2 });
   assert.deepEqual(result.dispatch, { status: 'preview' });
   assert.deepEqual(result.appointments[0], {
     date: '2026-08-19',
@@ -220,12 +233,13 @@ test('preview entrega contrato minimo, fecha operativa y corte confiable', async
     last_name: 'López',
     phone: '5555-0101',
     community: 'El Chal',
+    category: 'new',
   });
   assert.equal(result.cutoff_at, CUTOVER.toISOString());
   assert.doesNotMatch(JSON.stringify(result), /cui|expediente|diagnostico|embarazo_id|paciente_id/i);
 });
 
-test('consulta SQL aplica periodo, corte, estado programada, sin cumplimiento y embarazo activo', async () => {
+test('consulta SQL usa inasistencia persistente y la semantica compartida de seguimiento', async () => {
   const calls = [];
   const repository = createAutomatizacionesRepository({
     async query(sql, params) {
@@ -246,11 +260,14 @@ test('consulta SQL aplica periodo, corte, estado programada, sin cumplimiento y 
     '2026-08-23',
     CUTOVER.toISOString(),
   ]);
-  assert.match(calls[0].sql, /cp\.fecha_programada BETWEEN \$1::date AND \$2::date/);
-  assert.match(calls[0].sql, /cp\.estado = 'programada'/);
-  assert.match(calls[0].sql, /cp\.control_cumplimiento_id IS NULL/);
+  assert.match(calls[0].sql, /cp\.fecha_programada <= \$2::date/);
+  assert.match(calls[0].sql, /cp\.estado = 'inasistente'/);
+  assert.match(calls[0].sql, /seguimiento_inasistencia_desde_id = cp\.id/);
+  assert.match(calls[0].sql, /control_posterior\.fecha > cp\.fecha_programada/);
+  assert.match(calls[0].sql, /THEN 'new'/);
+  assert.match(calls[0].sql, /THEN 'previous_pending'/);
   assert.match(calls[0].sql, /cp\.created_at >= \$3::timestamptz/);
-  assert.match(calls[0].sql, /e\.estado = 'activo'/);
+  assert.match(calls[0].sql, /e\.estado IN \('activo', 'puerperio'\)/);
   assert.doesNotMatch(calls[0].sql, /cita_siguiente/);
 });
 
@@ -355,7 +372,7 @@ test('rutas semanales exigen M2M, validan periodo y no aceptan campos extra', as
       { headers: headers() }
     );
     assert.equal(valid.status, 200);
-    assert.equal((await valid.json()).total, 1);
+    assert.equal((await valid.json()).total, 2);
   });
 });
 
@@ -395,6 +412,29 @@ test('resolver HTTP exige confirmacion literal y motivo coherente', async () => 
     assert.equal(valid.status, 200);
     assert.equal((await valid.json()).dispatch.status, 'reintento_autorizado');
   });
+});
+
+test('preparacion falla sin reservar ni enviar si falla la materializacion previa', async () => {
+  let prepared = 0;
+  const service = {
+    prepararDespachoInasistencias: async () => {
+      prepared += 1;
+      return {};
+    },
+  };
+  const app = automationApp(service, {
+    materializarGlobal: async () => { throw new Error('materializacion fallida'); },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(
+      `${baseUrl}/api/automatizaciones/v1/inasistencias/preparar`,
+      { method: 'POST', headers: headers() }
+    );
+    assert.equal(response.status, 500);
+    assert.equal((await response.json()).code, 'AUTOMATION_INTERNAL_ERROR');
+  });
+  assert.equal(prepared, 0);
 });
 
 test('entrypoint procesa JSON antes de entregar los POST de automatizacion al router', () => {
