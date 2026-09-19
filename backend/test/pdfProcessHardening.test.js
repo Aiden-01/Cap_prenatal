@@ -58,12 +58,14 @@ test('Docker termina como usuario node y los launchers no contienen flags insegu
   const dockerfile = fs.readFileSync(path.join(__dirname, '../Dockerfile'), 'utf8');
   const pdfController = fs.readFileSync(path.join(__dirname, '../src/controllers/pdfController.js'), 'utf8');
   const reportesPdf = fs.readFileSync(path.join(__dirname, '../src/services/reportesPdfService.js'), 'utf8');
+  const browserManager = fs.readFileSync(path.join(__dirname, '../src/services/puppeteerBrowserManager.js'), 'utf8');
 
   assert.match(dockerfile, /\r?\nUSER node\r?\n/);
   assert.doesNotMatch(dockerfile, /USER root/);
-  assert.doesNotMatch(`${pdfController}\n${reportesPdf}`, /--no-sandbox|--disable-setuid-sandbox/);
-  assert.match(pdfController, /buildPuppeteerLaunchOptions\(\)/);
-  assert.match(reportesPdf, /buildPuppeteerLaunchOptions\(\)/);
+  assert.doesNotMatch(`${pdfController}\n${reportesPdf}\n${browserManager}`, /--no-sandbox|--disable-setuid-sandbox/);
+  assert.match(browserManager, /launchOptionsFactory\(\)/);
+  assert.match(pdfController, /puppeteerBrowserManager/);
+  assert.match(reportesPdf, /puppeteerBrowserManager/);
 });
 
 test('proceso documental normal finaliza sin transformarse en timeout', async () => {

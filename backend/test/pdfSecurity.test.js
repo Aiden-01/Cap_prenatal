@@ -664,7 +664,7 @@ function controlFixture() {
   };
 }
 
-test('Chromium se cierra despues de generar control y antes de responder', async () => {
+test('Page se cierra despues de generar control y antes de responder', async () => {
   const events = [];
   let launchOptions;
   const browser = {
@@ -675,6 +675,7 @@ test('Chromium se cierra despues de generar control y antes de responder', async
         return Buffer.from('%PDF-control');
       },
       setContent: async () => events.push('setContent'),
+      close: async () => events.push('page-close'),
     }),
   };
   const controller = createPdfController({
@@ -693,21 +694,22 @@ test('Chromium se cierra despues de generar control y antes de responder', async
   await controller.pdfControl({ params: { pacienteId: 41, controlId: 17 }, query: { embarazo_id: 91 } }, responseStub());
   assert.equal(launchOptions.headless, 'new');
   assert.deepEqual(launchOptions.args, []);
-  assert.deepEqual(events, ['setContent', 'pdf', 'close', 'audit', 'send:control-17.pdf']);
+  assert.deepEqual(events, ['setContent', 'pdf', 'page-close', 'audit', 'send:control-17.pdf']);
 });
 
-test('Chromium se cierra si falla la generacion de control', async () => {
-  let closes = 0;
+test('Page se cierra si falla la generacion de control', async () => {
+  let pageCloses = 0;
   let audits = 0;
   const controller = createPdfController({
     fsApi: { readFileSync: () => '<p>{{nombre}}</p>' },
     pdfService: { obtenerControlConPaciente: async () => controlFixture() },
     puppeteerClient: {
       launch: async () => ({
-        close: async () => { closes += 1; },
+        close: async () => {},
         newPage: async () => ({
           pdf: async () => { throw new Error('chromium failure'); },
           setContent: async () => {},
+          close: async () => { pageCloses += 1; },
         }),
       }),
     },
@@ -718,7 +720,7 @@ test('Chromium se cierra si falla la generacion de control', async () => {
     controller.pdfControl({ params: { pacienteId: 41, controlId: 17 }, query: {} }, responseStub()),
     (error) => error.statusCode === 500 && error.code === 'PDF_GENERATION_ERROR'
   );
-  assert.equal(closes, 1);
+  assert.equal(pageCloses, 1);
   assert.equal(audits, 0);
 });
 

@@ -282,7 +282,7 @@ test('HTML y renderer PDF fijan oficio 13 x 8.5, tabla completa y encabezado rep
 
   let pdfOptions;
   let launchOptions;
-  let closed = false;
+  let pageClosed = false;
   const service = createReportesPdfService({
     puppeteerClient: {
       async launch(options) {
@@ -292,9 +292,10 @@ test('HTML y renderer PDF fijan oficio 13 x 8.5, tabla completa y encabezado rep
             return {
               async setContent() {},
               async pdf(options) { pdfOptions = options; return Buffer.from('%PDF-sintetico'); },
+              async close() { pageClosed = true; },
             };
           },
-          async close() { closed = true; },
+          async close() {},
         };
       },
     },
@@ -306,7 +307,7 @@ test('HTML y renderer PDF fijan oficio 13 x 8.5, tabla completa y encabezado rep
   assert.equal(pdfOptions.height, '8.5in');
   assert.equal(pdfOptions.preferCSSPageSize, true);
   assert.match(pdfOptions.footerTemplate, /pageNumber/);
-  assert.equal(closed, true);
+  assert.equal(pageClosed, true);
   assert.ok(Buffer.isBuffer(pdf));
 });
 
