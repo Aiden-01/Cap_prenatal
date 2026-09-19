@@ -6,6 +6,7 @@ const test = require('node:test');
 const {
   checksum,
   discoverMigrationFiles,
+  isApplicationSchemaInitialized,
   migrate,
 } = require('../src/db/migrate');
 const {
@@ -17,7 +18,7 @@ function legacyChecksum(sql) {
   return crypto.createHash('sha256').update(sql, 'utf8').digest('hex');
 }
 
-function createHarness({ query = null, closeError = null } = {}) {
+function createHarness({ query = null, closeError = null, schemaInitialized = false } = {}) {
   const calls = { query: [], end: 0 };
   const entries = { log: [], error: [] };
   const codes = [];
@@ -28,6 +29,9 @@ function createHarness({ query = null, closeError = null } = {}) {
     db: {
       async query(sql, params) {
         calls.query.push({ sql, params });
+        if (sql === 'SELECT to_regclass($1) AS application_schema') {
+          return { rows: [{ application_schema: schemaInitialized ? 'pacientes' : null }] };
+        }
         if (query) return query(sql, params);
         return { rows: [], rowCount: 0 };
       },
@@ -123,7 +127,7 @@ test('descubre migraciones versionadas en orden e incluye 007 a 016', () => {
   );
 });
 
-test('aplica schema y registra 007 en transacciones independientes', async () => {
+test('DB nueva aplica schema antes de registrar y ejecutar migraciones', async () => {
   const harness = createHarness();
   const result = await migrate({
     ...harness,
@@ -137,9 +141,14 @@ test('aplica schema y registra 007 en transacciones independientes', async () =>
   assert.equal(harness.calls.end, 1);
   assert.deepEqual(harness.codes, []);
   const querySql = harness.calls.query.map(({ sql }) => sql);
-  assert.deepEqual(querySql.slice(0, 3), ['BEGIN', 'SELECT schema_base;', 'COMMIT']);
-  assert.match(harness.calls.query[3].sql, /CREATE TABLE IF NOT EXISTS schema_migrations/);
-  assert.deepEqual(querySql.slice(4), [
+  assert.deepEqual(querySql.slice(0, 4), [
+    'SELECT to_regclass($1) AS application_schema',
+    'BEGIN',
+    'SELECT schema_base;',
+    'COMMIT',
+  ]);
+  assert.match(harness.calls.query[4].sql, /CREATE TABLE IF NOT EXISTS schema_migrations/);
+  assert.deepEqual(querySql.slice(5), [
     'BEGIN',
     'SELECT pg_advisory_xact_lock(hashtext($1))',
     'SELECT checksum FROM schema_migrations WHERE filename = $1',
@@ -150,6 +159,104 @@ test('aplica schema y registra 007 en transacciones independientes', async () =>
   const insert = harness.calls.query.find(({ sql }) => sql.startsWith('INSERT INTO schema_migrations'));
   assert.equal(insert.params[0], '007_auth_sessions.sql');
   assert.equal(insert.params[1].length, 64);
+});
+
+test('detecta el esquema de aplicación por una tabla núcleo, no por schema_migrations', async () => {
+  const queries = [];
+  const initialized = await isApplicationSchemaInitialized({
+    async query(sql, params) {
+      queries.push({ sql, params });
+      return { rows: [{ application_schema: 'pacientes' }] };
+    },
+  });
+
+  assert.equal(initialized, true);
+  assert.deepEqual(queries, [{
+    sql: 'SELECT to_regclass($1) AS application_schema',
+    params: ['public.pacientes'],
+  }]);
+});
+
+test('DB existente ejecuta migraciones antes de schema', async () => {
+  const harness = createHarness({ schemaInitialized: true });
+  const migrationSql = 'SELECT migration_017;';
+  const result = await migrate({
+    ...harness,
+    readSchema: () => 'SELECT schema_base;',
+    readDirectory: () => ['017_citas_inasistencias.sql'],
+    readMigration: () => migrationSql,
+  });
+
+  assert.equal(result.ok, true);
+  const sql = harness.calls.query.map((call) => call.sql);
+  assert.ok(sql.indexOf(migrationSql) < sql.indexOf('SELECT schema_base;'));
+  assert.match(sql[1], /CREATE TABLE IF NOT EXISTS schema_migrations/);
+  assert.deepEqual(sql.slice(-3), ['BEGIN', 'SELECT schema_base;', 'COMMIT']);
+});
+
+test('DB existente omite migración aplicada por checksum y luego aplica schema', async () => {
+  const migrationSql = 'SELECT migration_017;';
+  const harness = createHarness({
+    schemaInitialized: true,
+    query: async (sql) => sql.startsWith('SELECT checksum FROM schema_migrations')
+      ? { rows: [{ checksum: checksum(migrationSql) }] }
+      : { rows: [] },
+  });
+  const result = await migrate({
+    ...harness,
+    readSchema: () => 'SELECT schema_base;',
+    readDirectory: () => ['017_citas_inasistencias.sql'],
+    readMigration: () => migrationSql,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(harness.calls.query.some(({ sql }) => sql === migrationSql), false);
+  assert.equal(harness.calls.query.some(({ sql }) => sql === 'SELECT schema_base;'), true);
+});
+
+test('DB existente no ejecuta schema posterior si una migración falla', async () => {
+  const migrationError = new Error('017 falló');
+  const harness = createHarness({
+    schemaInitialized: true,
+    query: async (sql) => {
+      if (sql === 'SELECT migration_017;') throw migrationError;
+      return { rows: [] };
+    },
+  });
+  const result = await migrate({
+    ...harness,
+    readSchema: () => 'SELECT schema_base;',
+    readDirectory: () => ['017_citas_inasistencias.sql'],
+    readMigration: () => 'SELECT migration_017;',
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error, migrationError);
+  assert.equal(harness.calls.query.some(({ sql }) => sql === 'SELECT schema_base;'), false);
+});
+
+test('error de schema posterior conserva la migración confirmada y reporta fallo', async () => {
+  const schemaError = new Error('schema posterior falló');
+  const harness = createHarness({
+    schemaInitialized: true,
+    query: async (sql) => {
+      if (sql === 'SELECT schema_base;') throw schemaError;
+      return { rows: [] };
+    },
+  });
+  const result = await migrate({
+    ...harness,
+    readSchema: () => 'SELECT schema_base;',
+    readDirectory: () => ['017_citas_inasistencias.sql'],
+    readMigration: () => 'SELECT migration_017;',
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error, schemaError);
+  const sql = harness.calls.query.map((call) => call.sql);
+  const insertIndex = sql.findIndex((value) => value.startsWith('INSERT INTO schema_migrations'));
+  assert.equal(sql[insertIndex + 1], 'COMMIT');
+  assert.equal(sql.at(-1), 'ROLLBACK');
 });
 
 test('omite una migracion ya registrada con el mismo checksum', async () => {
@@ -276,7 +383,12 @@ test('un error SQL revierte, cierra el pool y marca codigo 1', async () => {
 
   assert.equal(result.ok, false);
   assert.equal(result.error, sqlError);
-  assert.deepEqual(harness.calls.query.map(({ sql }) => sql), ['BEGIN', 'SQL INVALIDO;', 'ROLLBACK']);
+  assert.deepEqual(harness.calls.query.map(({ sql }) => sql), [
+    'SELECT to_regclass($1) AS application_schema',
+    'BEGIN',
+    'SQL INVALIDO;',
+    'ROLLBACK',
+  ]);
   assert.equal(harness.calls.end, 1);
   assert.deepEqual(harness.codes, [1]);
 });

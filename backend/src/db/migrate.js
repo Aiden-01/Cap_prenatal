@@ -10,6 +10,7 @@ const DEFAULT_SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 const DEFAULT_MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 const MIGRATION_FILE_PATTERN = /^\d{3}_[a-z0-9_]+\.sql$/;
 const MIGRATIONS_LOCK_NAME = 'cap_prenatal_schema_migrations';
+const APPLICATION_SCHEMA_SENTINEL = 'public.pacientes';
 
 function discoverMigrationFiles({
   migrationsDir = DEFAULT_MIGRATIONS_DIR,
@@ -46,6 +47,14 @@ async function inTransaction(db, callback) {
 
 async function applySchema({ db, sql }) {
   await inTransaction(db, () => db.query(sql));
+}
+
+async function isApplicationSchemaInitialized(db) {
+  const { rows = [] } = await db.query(
+    'SELECT to_regclass($1) AS application_schema',
+    [APPLICATION_SCHEMA_SENTINEL]
+  );
+  return rows[0]?.application_schema !== null && rows[0]?.application_schema !== undefined;
 }
 
 async function ensureMigrationRegistry(db) {
@@ -100,9 +109,14 @@ async function migrate({
     const schemaSql = readSchema(schemaPath, 'utf8');
     const migrationFiles = discoverMigrationFiles({ migrationsDir, readDirectory });
     client = typeof db.connect === 'function' ? await db.connect() : db;
+    const schemaInitialized = await isApplicationSchemaInitialized(client);
 
-    await applySchema({ db: client, sql: schemaSql });
-    await ensureMigrationRegistry(client);
+    if (!schemaInitialized) {
+      await applySchema({ db: client, sql: schemaSql });
+      await ensureMigrationRegistry(client);
+    } else {
+      await ensureMigrationRegistry(client);
+    }
 
     let applied = 0;
     let skipped = 0;
@@ -116,6 +130,8 @@ async function migrate({
       if (wasApplied) applied += 1;
       else skipped += 1;
     }
+
+    if (schemaInitialized) await applySchema({ db: client, sql: schemaSql });
 
     logger.log(`Migracion completada: ${applied} aplicada(s), ${skipped} omitida(s)`);
   } catch (error) {
@@ -149,10 +165,12 @@ if (require.main === module) {
 module.exports = {
   DEFAULT_MIGRATIONS_DIR,
   DEFAULT_SCHEMA_PATH,
+  APPLICATION_SCHEMA_SENTINEL,
   MIGRATION_FILE_PATTERN,
   MIGRATIONS_LOCK_NAME,
   applyMigration,
   checksum,
   discoverMigrationFiles,
+  isApplicationSchemaInitialized,
   migrate,
 };

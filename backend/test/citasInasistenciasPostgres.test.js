@@ -55,7 +55,10 @@ async function installCurrent(url) {
 async function installPre017(url) {
   const db = new Client({ connectionString: url });
   await db.connect();
-  const oldSchema = execFileSync('git', ['show', 'HEAD:backend/src/db/schema.sql'], {
+  const oldSchema = execFileSync('git', [
+    'show',
+    '7f80554d85d79945502248efa7b122b6d1d54578^:backend/src/db/schema.sql',
+  ], {
     cwd: path.resolve(__dirname, '../..'), encoding: 'utf8',
   });
   await db.query(oldSchema);
