@@ -1,0 +1,164 @@
+{
+  "generatedAt": "2026-09-19T16:34:47.299Z",
+  "platform": "win32 x64",
+  "node": "v24.11.1",
+  "puppeteer": "24.43.1",
+  "executablePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "scenarios": [
+    {
+      "name": "cold-first",
+      "count": 1,
+      "totalMs": 4308.2648,
+      "adjustedTotalMs": 2373.2986,
+      "averageMs": 2373.2986,
+      "pdfBytes": [
+        190122
+      ],
+      "pdfHeadersValid": true,
+      "memoryBeforeMb": {
+        "rss": 53.68,
+        "heapUsed": 12.36,
+        "external": 2.38
+      },
+      "memoryAfterMb": {
+        "rss": 59.7,
+        "heapUsed": 12.33,
+        "external": 2.77
+      }
+    },
+    {
+      "name": "second-consecutive",
+      "count": 1,
+      "totalMs": 4077.2252,
+      "adjustedTotalMs": 2216.1621999999998,
+      "averageMs": 2216.1621999999998,
+      "pdfBytes": [
+        190122
+      ],
+      "pdfHeadersValid": true,
+      "memoryBeforeMb": {
+        "rss": 59.88,
+        "heapUsed": 12.35,
+        "external": 2.95
+      },
+      "memoryAfterMb": {
+        "rss": 60.48,
+        "heapUsed": 12.56,
+        "external": 2.97
+      }
+    },
+    {
+      "name": "five-sequential",
+      "count": 5,
+      "totalMs": 20313.4745,
+      "adjustedTotalMs": 10909.295399999999,
+      "averageMs": 2181.8590799999997,
+      "pdfBytes": [
+        190122,
+        190122,
+        190122,
+        190122,
+        190122
+      ],
+      "pdfHeadersValid": true,
+      "memoryBeforeMb": {
+        "rss": 60.63,
+        "heapUsed": 12.57,
+        "external": 3.15
+      },
+      "memoryAfterMb": {
+        "rss": 57.87,
+        "heapUsed": 15.05,
+        "external": 4.2
+      }
+    }
+  ],
+  "timingsMs": {
+    "launches": [
+      678.1185,
+      562.6386,
+      527.9493,
+      539.8847,
+      547.9775,
+      577.25,
+      531.8882
+    ],
+    "newPages": [
+      79.1444,
+      91.4536,
+      86.3941,
+      94.2823,
+      89.3872,
+      97.0294,
+      93.5122
+    ],
+    "setContent": [
+      970.1417,
+      968.9937,
+      983.495,
+      972.695,
+      971.2909,
+      970.4159,
+      957.3077
+    ],
+    "pdf": [
+      376.5601,
+      339.1805,
+      336.1817,
+      327.9779,
+      338.8908,
+      336.2225,
+      329.3395
+    ],
+    "closes": [
+      267.7844,
+      253.3711,
+      249.9367,
+      247.9833,
+      224.8311,
+      232.0401,
+      242.7842
+    ],
+    "browserProcessPeaks": [
+      9,
+      9,
+      9,
+      9,
+      9,
+      9,
+      9
+    ],
+    "browserRssPeaksMb": [
+      541.83,
+      539.29,
+      537.42,
+      540.17,
+      539.64,
+      530.84,
+      531.52
+    ],
+    "launchedPids": [
+      5544,
+      21500,
+      19876,
+      31272,
+      26524,
+      21440,
+      29176
+    ],
+    "observationOverheadMs": [
+      1934.9662,
+      1861.063,
+      1879.6506,
+      1870.7962,
+      1878.6441,
+      1883.242,
+      1891.8462
+    ]
+  },
+  "processObservation": {
+    "systemProcessCountBefore": 0,
+    "systemProcessCountAfter": 0,
+    "trackedChromiumProcessesAliveAfter": 0
+  }
+}

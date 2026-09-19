@@ -1,0 +1,130 @@
+{
+  "generatedAt": "2026-09-19T16:43:32.755Z",
+  "platform": "win32 x64",
+  "node": "v24.11.1",
+  "puppeteer": "24.43.1",
+  "executablePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "scenarios": [
+    {
+      "name": "cold-first",
+      "count": 1,
+      "totalMs": 2279.7948,
+      "adjustedTotalMs": 2279.7948,
+      "averageMs": 2279.7948,
+      "pdfBytes": [
+        190122
+      ],
+      "pdfHeadersValid": true,
+      "memoryBeforeMb": {
+        "rss": 53.37,
+        "heapUsed": 12.37,
+        "external": 2.38
+      },
+      "memoryAfterMb": {
+        "rss": 59.45,
+        "heapUsed": 14.32,
+        "external": 3.42
+      }
+    },
+    {
+      "name": "second-consecutive",
+      "count": 1,
+      "totalMs": 1639.4596,
+      "adjustedTotalMs": 1639.4596,
+      "averageMs": 1639.4596,
+      "pdfBytes": [
+        190122
+      ],
+      "pdfHeadersValid": true,
+      "memoryBeforeMb": {
+        "rss": 59.64,
+        "heapUsed": 14.34,
+        "external": 3.6
+      },
+      "memoryAfterMb": {
+        "rss": 60.81,
+        "heapUsed": 12.89,
+        "external": 3.42
+      }
+    },
+    {
+      "name": "five-sequential",
+      "count": 5,
+      "totalMs": 8016.1052,
+      "adjustedTotalMs": 8016.1052,
+      "averageMs": 1603.22104,
+      "pdfBytes": [
+        190122,
+        190122,
+        190122,
+        190122,
+        190122
+      ],
+      "pdfHeadersValid": true,
+      "memoryBeforeMb": {
+        "rss": 60.63,
+        "heapUsed": 12.82,
+        "external": 3.6
+      },
+      "memoryAfterMb": {
+        "rss": 54.13,
+        "heapUsed": 12.78,
+        "external": 4.13
+      }
+    }
+  ],
+  "timingsMs": {
+    "launches": [
+      618.8724
+    ],
+    "newPages": [
+      200.863,
+      180.8693,
+      180.5603,
+      179.5868,
+      183.8281,
+      177.1106,
+      181.951
+    ],
+    "setContent": [
+      1004.5671,
+      998.5816,
+      999.5053,
+      999.7554,
+      997.6691,
+      998.2403,
+      994.5172
+    ],
+    "pdf": [
+      381.5594,
+      413.753,
+      367.792,
+      388.6667,
+      384.7447,
+      365.5077,
+      349.6807
+    ],
+    "closes": [
+      244.6359
+    ],
+    "browserProcessPeaks": [
+      7
+    ],
+    "browserRssPeaksMb": [
+      440.32
+    ],
+    "launchedPids": [
+      22784
+    ],
+    "observationOverheadMs": [
+      1798.7955
+    ]
+  },
+  "processObservation": {
+    "systemProcessCountBefore": 0,
+    "persistentChromiumProcesses": 7,
+    "persistentChromiumRssMb": 440.35,
+    "systemProcessCountAfter": 0,
+    "trackedChromiumProcessesAliveAfter": 0
+  }
+}
