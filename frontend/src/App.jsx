@@ -4,19 +4,19 @@ import { useAuth } from "./hooks/useAuth";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import Pacientes from "./pages/Pacientes";
-import NuevaPaciente from "./pages/NuevaPaciente";
-import ExpedientePaciente from "./pages/ExpedientePaciente";
-import NuevoControl from "./pages/NuevoControl";
-import FichaRiesgo from "./pages/FichaRiesgo";
-import PlanPartoForm from "./pages/PlanPartoForm";
-import PuerperioForm from "./pages/PuerperioForm";
-import MorbilidadForm from "./pages/MorbilidadForm";
-import VacunaForm from "./pages/VacunaForm";
-import Reportes from "./pages/Reportes";
-import Usuarios from "./pages/Usuarios";
-import NotFoundPage from "./pages/NotFoundPage";
 
+const Pacientes = lazy(() => import("./pages/Pacientes"));
+const NuevaPaciente = lazy(() => import("./pages/NuevaPaciente"));
+const ExpedientePaciente = lazy(() => import("./pages/ExpedientePaciente"));
+const NuevoControl = lazy(() => import("./pages/NuevoControl"));
+const FichaRiesgo = lazy(() => import("./pages/FichaRiesgo"));
+const PlanPartoForm = lazy(() => import("./pages/PlanPartoForm"));
+const PuerperioForm = lazy(() => import("./pages/PuerperioForm"));
+const MorbilidadForm = lazy(() => import("./pages/MorbilidadForm"));
+const VacunaForm = lazy(() => import("./pages/VacunaForm"));
+const Reportes = lazy(() => import("./pages/Reportes"));
+const Usuarios = lazy(() => import("./pages/Usuarios"));
+const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const MapaRiesgo = lazy(() => import("./pages/MapaRiesgo"));
 const Comunidades = lazy(() => import("./pages/Comunidades"));
 
@@ -45,27 +45,27 @@ export default function App() {
         <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
           <Route index element={<Navigate to="/dashboard" />} />
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="pacientes" element={<Pacientes />} />
-          <Route path="pacientes/:id" element={<ExpedientePaciente />} />
-          <Route path="pacientes/:id/editar" element={<NuevaPaciente />} />
-          <Route path="pacientes/:id/controles/nuevo" element={<NuevoControl />} />
-          <Route path="pacientes/:id/controles/:controlId/editar" element={<NuevoControl />} />
-          <Route path="pacientes/:id/riesgo" element={<FichaRiesgo />} />
-          <Route path="pacientes/:id/plan-parto" element={<PlanPartoForm />} />
-          <Route path="pacientes/:id/puerperio/nuevo" element={<PuerperioForm />} />
-          <Route path="pacientes/:id/puerperio/:puerperioId/editar" element={<PuerperioForm />} />
-          <Route path="pacientes/:id/morbilidad/nuevo" element={<MorbilidadForm />} />
-          <Route path="pacientes/:id/morbilidad/:morbilidadId/editar" element={<MorbilidadForm />} />
-          <Route path="pacientes/:id/vacunas/nuevo" element={<VacunaForm />} />
-          <Route path="pacientes/:id/vacunas/:vacunaId/editar" element={<VacunaForm />} />
-          <Route path="nuevo" element={<NuevaPaciente />} />
-          <Route path="reportes" element={<Reportes />} />
+          <Route path="pacientes" element={<LazyPage><Pacientes /></LazyPage>} />
+          <Route path="pacientes/:id" element={<LazyPage><ExpedientePaciente /></LazyPage>} />
+          <Route path="pacientes/:id/editar" element={<LazyPage><NuevaPaciente /></LazyPage>} />
+          <Route path="pacientes/:id/controles/nuevo" element={<LazyPage><NuevoControl /></LazyPage>} />
+          <Route path="pacientes/:id/controles/:controlId/editar" element={<LazyPage><NuevoControl /></LazyPage>} />
+          <Route path="pacientes/:id/riesgo" element={<LazyPage><FichaRiesgo /></LazyPage>} />
+          <Route path="pacientes/:id/plan-parto" element={<LazyPage><PlanPartoForm /></LazyPage>} />
+          <Route path="pacientes/:id/puerperio/nuevo" element={<LazyPage><PuerperioForm /></LazyPage>} />
+          <Route path="pacientes/:id/puerperio/:puerperioId/editar" element={<LazyPage><PuerperioForm /></LazyPage>} />
+          <Route path="pacientes/:id/morbilidad/nuevo" element={<LazyPage><MorbilidadForm /></LazyPage>} />
+          <Route path="pacientes/:id/morbilidad/:morbilidadId/editar" element={<LazyPage><MorbilidadForm /></LazyPage>} />
+          <Route path="pacientes/:id/vacunas/nuevo" element={<LazyPage><VacunaForm /></LazyPage>} />
+          <Route path="pacientes/:id/vacunas/:vacunaId/editar" element={<LazyPage><VacunaForm /></LazyPage>} />
+          <Route path="nuevo" element={<LazyPage><NuevaPaciente /></LazyPage>} />
+          <Route path="reportes" element={<LazyPage><Reportes /></LazyPage>} />
           <Route path="mapa-riesgo" element={<LazyPage><MapaRiesgo /></LazyPage>} />
           <Route path="comunidades" element={<PrivateRoute directorOnly><LazyPage><Comunidades /></LazyPage></PrivateRoute>} />
-          <Route path="usuarios" element={<PrivateRoute adminOnly><Usuarios /></PrivateRoute>} />
+          <Route path="usuarios" element={<PrivateRoute adminOnly><LazyPage><Usuarios /></LazyPage></PrivateRoute>} />
         </Route>
-        <Route path="/404" element={<NotFoundPage />} />
-        <Route path="*" element={<NotFoundPage />} />
+        <Route path="/404" element={<LazyPage><NotFoundPage /></LazyPage>} />
+        <Route path="*" element={<LazyPage><NotFoundPage /></LazyPage>} />
       </Routes>
     </BrowserRouter>
   );

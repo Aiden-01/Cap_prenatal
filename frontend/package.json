@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "analyze:bundle": "node scripts/analyzeBundle.js",
     "lint": "eslint .",
     "test": "node --test test/*.test.js && vitest run test-dom",
     "test:appointments": "node --test test/appointmentsDashboard.test.js && vitest run test-dom/appointmentsDashboard.test.jsx",
