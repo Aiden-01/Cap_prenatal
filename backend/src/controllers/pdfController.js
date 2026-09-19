@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const puppeteer = require('puppeteer');
 const ExcelJS = require('exceljs');
 const { PDFDocument } = require('pdf-lib');
 const pdfService = require('../services/pdfService');
@@ -12,19 +11,17 @@ const { generarFichaClinicaPrenatalPdf } = require('../services/fichaClinicaPren
 const { renderRiskPdf } = require('../services/riskPdfRenderer');
 const { sendPdfResponse } = require('../utils/pdfResponse');
 const { randomTempBase, withPdfTempDir } = require('../utils/pdfTemp');
-const { buildPuppeteerLaunchOptions } = require('../utils/puppeteerLaunch');
+const {
+  createPuppeteerBrowserManager,
+  puppeteerBrowserManager,
+} = require('../services/puppeteerBrowserManager');
 const { runDocumentProcess, terminateProcessByPid } = require('../utils/documentProcess');
 
 const TEXT_FORMAT_CELLS = new Set(['T8', 'V8', 'AE8:AN8', 'F61', 'G19:J19', 'P19:S19', 'Q19:T19', 'AK19:AN19']);
 const CENTER_FORMAT_RE = /^(N6|O6|P6|Q6|S6|T6|U6|V6|Y6|Z6|AA6|AB6|AA7:AB7|AA13:AB13|AE8:AN8|K18|X18|X19|E20|K20|Q20|X20|F21|M21)$/;
 
-async function renderControlPdf(html, puppeteerClient) {
-  let browser = null;
-
-  try {
-    browser = await puppeteerClient.launch(buildPuppeteerLaunchOptions());
-
-    const page = await browser.newPage();
+async function renderControlPdf(html, browserManager) {
+  return browserManager.withPage(async (page) => {
     await page.setContent(html, { waitUntil: 'networkidle0' });
     return await page.pdf({
       format: 'A4',
@@ -36,9 +33,7 @@ async function renderControlPdf(html, puppeteerClient) {
         left: '0mm',
       },
     });
-  } finally {
-    if (browser) await browser.close();
-  }
+  });
 }
 
 async function pdfControlHandler(req, res, dependencies) {
@@ -83,7 +78,7 @@ async function pdfControlHandler(req, res, dependencies) {
       .replace('{{personal}}', esc(c.personal_atendio || ''));
 
     dependencies.consumePdfQuota(req);
-    const pdf = await renderControlPdf(html, dependencies.puppeteerClient);
+    const pdf = await renderControlPdf(html, dependencies.browserManager);
 
     await dependencies.registrarEventoPrivado(req, {
       contexto: {
@@ -1366,14 +1361,18 @@ async function pdfCombinadoHandler(req, res, dependencies) {
 }
 
 function createPdfController(overrides = {}) {
+  const browserManager = overrides.browserManager
+    || (overrides.puppeteerClient
+      ? createPuppeteerBrowserManager({ puppeteerClient: overrides.puppeteerClient })
+      : puppeteerBrowserManager);
   const dependencies = {
+    browserManager,
     combinePdfBuffers,
     consumePdfQuota,
     exportExcelTemplateToPdf,
     fsApi: fs,
     generarFichaClinicaPrenatalPdf,
     pdfService,
-    puppeteerClient: puppeteer,
     registrarEventoPrivado,
     renderRiskPdf,
     sendPdfResponse,

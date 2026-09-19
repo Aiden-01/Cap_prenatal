@@ -1,5 +1,7 @@
-const puppeteer = require('puppeteer');
-const { buildPuppeteerLaunchOptions } = require('../utils/puppeteerLaunch');
+const {
+  createPuppeteerBrowserManager,
+  puppeteerBrowserManager,
+} = require('./puppeteerBrowserManager');
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -100,12 +102,14 @@ function buildCensoPrimerControlHtml({ rows, desde, hasta, generadoEn }) {
   </html>`;
 }
 
-function createReportesPdfService({ puppeteerClient = puppeteer } = {}) {
+function createReportesPdfService(options = {}) {
+  const browserManager = options.browserManager
+    || (options.puppeteerClient
+      ? createPuppeteerBrowserManager({ puppeteerClient: options.puppeteerClient })
+      : puppeteerBrowserManager);
+
   async function renderHtmlPdf(html) {
-    let browser = null;
-    try {
-      browser = await puppeteerClient.launch(buildPuppeteerLaunchOptions());
-      const page = await browser.newPage();
+    return browserManager.withPage(async (page) => {
       await page.setContent(html, { waitUntil: 'networkidle0' });
       return await page.pdf({
         format: 'A4', landscape: true, preferCSSPageSize: true, printBackground: true,
@@ -113,9 +117,7 @@ function createReportesPdfService({ puppeteerClient = puppeteer } = {}) {
         footerTemplate: '<div style="width:100%;font:7pt Arial;color:#5f7185;text-align:center">Pagina <span class="pageNumber"></span> de <span class="totalPages"></span></div>',
         margin: { top: '12mm', right: '8mm', bottom: '14mm', left: '8mm' },
       });
-    } finally {
-      if (browser) await browser.close();
-    }
+    });
   }
 
   function buildReportHtml({ title, columns, rows, filters, generadoEn }) {
@@ -145,10 +147,7 @@ function createReportesPdfService({ puppeteerClient = puppeteer } = {}) {
   }
 
   async function renderCensoPrimerControlPdf(data) {
-    let browser = null;
-    try {
-      browser = await puppeteerClient.launch(buildPuppeteerLaunchOptions());
-      const page = await browser.newPage();
+    return browserManager.withPage(async (page) => {
       await page.setContent(buildCensoPrimerControlHtml(data), { waitUntil: 'networkidle0' });
       return await page.pdf({
         width: '13in',
@@ -163,9 +162,7 @@ function createReportesPdfService({ puppeteerClient = puppeteer } = {}) {
           </div>`,
         margin: { top: '0in', right: '0in', bottom: '0in', left: '0in' },
       });
-    } finally {
-      if (browser) await browser.close();
-    }
+    });
   }
 
   return { buildReportHtml, renderCensoPrimerControlPdf, renderReportPdf };

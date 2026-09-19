@@ -39,6 +39,7 @@ const { errorHandler } = require('./middleware/errorHandler');
 const { AppError } = require('./utils/appError');
 const { createStrictTrustProxy } = require('./utils/proxyTrust');
 const { createCitasMaterializacionRunner } = require('./services/citasMaterializacionRunner');
+const { puppeteerBrowserManager } = require('./services/puppeteerBrowserManager');
 
 const app = express();
 app.set('trust proxy', createStrictTrustProxy(config.trustedProxyCidrs));
@@ -121,12 +122,39 @@ async function startServer() {
   return server;
 }
 
+async function closeServer(server) {
+  await new Promise((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
+}
+
+function installShutdownHandlers(server) {
+  let shutdownPromise = null;
+  const shutdown = () => {
+    if (!shutdownPromise) {
+      shutdownPromise = Promise.allSettled([
+        closeServer(server),
+        puppeteerBrowserManager.close(),
+        pool.end(),
+      ]).then((results) => {
+        if (results.some((result) => result.status === 'rejected')) process.exitCode = 1;
+      });
+    }
+    return shutdownPromise;
+  };
+  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', shutdown);
+  return shutdown;
+}
+
 if (require.main === module) {
-  startServer().catch(async (error) => {
+  startServer().then((server) => {
+    installShutdownHandlers(server);
+  }).catch(async (error) => {
     console.error('No se pudo iniciar el servidor:', error.message);
     process.exitCode = 1;
     try {
-      await pool.end();
+      await Promise.allSettled([pool.end(), puppeteerBrowserManager.close()]);
     } catch (closeError) {
       console.error('No se pudo cerrar PostgreSQL:', closeError.message);
     }
@@ -135,5 +163,6 @@ if (require.main === module) {
 
 module.exports = {
   app,
+  installShutdownHandlers,
   startServer,
 };
