@@ -86,3 +86,72 @@ test('ayuda por campo conserva una guía activa', () => {
   assert.equal(response.intent, 'ayuda_campo');
   assert.equal(response.conversation.activeGuide, 'control_prenatal');
 });
+
+test('preguntas genéricas resuelven varios campos solo desde focusedField compatible', () => {
+  const cases = [
+    ['¿Qué pongo aquí?', 'acompanante', 'general', /Nombre del acompañante/],
+    ['¿Qué va aquí?', 'cita_siguiente', 'general', /Cita siguiente/],
+    ['¿Qué significa este campo?', 'numero_control', 'general', /No\. Control/],
+    ['No entiendo este recuadro', 'hematologia', 'laboratorio', /Hematología/],
+    ['¿Para qué sirve este campo?', 'vih', 'laboratorio', /VIH/],
+    ['No entiendo este campo', 'semanas_gestacion', 'general', /Semanas de gestación/],
+    ['¿Qué debo escribir aquí?', 'acompanante', 'general', /acompañante/],
+    ['¿Qué dato va aquí?', 'vih', 'laboratorio', /VIH/],
+  ];
+  for (const [question, focusedField, tab, expected] of cases) {
+    const response = answerQuestion(question, { ...control, focusedField, tab });
+    assert.equal(response.intent, 'ayuda_campo_contextual', question);
+    assert.match(response.answer, expected);
+  }
+});
+
+test('sin foco o con contexto parcial pide el nombre del campo sin inventar', () => {
+  for (const context of [undefined, { ...control, focusedField: null }, { ...control, focusedField: undefined }]) {
+    const response = answerQuestion('¿Qué pongo aquí?', context);
+    assert.equal(response.intent, 'ayuda_campo_sin_foco');
+    assert.match(response.answer, /Dime el nombre/);
+    assert.doesNotMatch(response.answer, /resultado registrado para VIH/);
+  }
+  const partial = answerQuestion('¿Qué va aquí?', { ...control, tab: 'laboratorio', focusedField: null });
+  assert.match(partial.answer, /Control prenatal → Laboratorio/);
+});
+
+test('campo incompatible o foco obsoleto nunca produce la respuesta del campo anterior', async () => {
+  const { buildChatbotContext } = await frontend('chatbotContext.js');
+  const { currentControlField, captureControlField } = await frontend('chatbotFocusedField.js');
+  const focus = captureControlField('vih', 'laboratorio', 'embarazo-1');
+  assert.equal(currentControlField(focus, 'general', 'embarazo-1'), null);
+  assert.equal(currentControlField(focus, 'laboratorio', 'embarazo-2'), null);
+  for (const stale of [
+    { ...control, tab: 'general' },
+    { ...control, section: 'expediente' },
+    { ...control, route: '/pacientes/:id/expediente', form: null },
+  ]) {
+    const answer = answerQuestion('¿Qué pongo aquí?', stale);
+    assert.equal(answer.intent, 'ayuda_campo_sin_foco');
+    assert.doesNotMatch(answer.answer, /resultado registrado para VIH/);
+  }
+  const base = { usuario: { permisos: ['controles.crear'] }, pregnancyStatus: 'activo' };
+  const general = buildChatbotContext({ ...base, pathname: '/pacientes/123/controles/nuevo', screenTab: 'general', focusedField: currentControlField(focus, 'general', 'embarazo-1') });
+  const elsewhere = buildChatbotContext({ ...base, pathname: '/dashboard', screenTab: 'laboratorio', focusedField: currentControlField(focus, 'laboratorio', 'embarazo-2') });
+  assert.equal(answerQuestion('¿Qué pongo aquí?', general).intent, 'ayuda_campo_sin_foco');
+  assert.equal(answerQuestion('¿Qué pongo aquí?', elsewhere).intent, 'ayuda_campo_sin_foco');
+});
+
+test('guía activa conserva paso tras pregunta contextual con y sin campo', () => {
+  const state = { lastIntent: 'control_prenatal', activeGuide: 'control_prenatal', currentStep: 1, totalSteps: 6 };
+  for (const context of [control, { ...control, focusedField: null }]) {
+    const response = answerQuestion('¿Qué pongo aquí?', context, state);
+    assert.equal(response.conversation.activeGuide, 'control_prenatal');
+    assert.equal(response.conversation.currentStep, 1);
+    assert.doesNotMatch(response.answer, /cerramos? la guía/i);
+  }
+});
+
+test('prioridades conservan guarda clínica, ayuda explícita y orientación operacional', () => {
+  assert.equal(answerQuestion('¿La paciente tiene VIH?', control).intent, 'solicitud_dato_clinico');
+  assert.equal(answerQuestion('¿Dónde registro VIH?', control).intent, 'laboratorio');
+  assert.equal(answerQuestion('¿Qué significa cita siguiente?', control).intent, 'ayuda_campo');
+  assert.equal(answerQuestion('Hola', control).intent, 'saludo');
+  assert.equal(answerQuestion('Gracias', control).intent, 'agradecimiento');
+});

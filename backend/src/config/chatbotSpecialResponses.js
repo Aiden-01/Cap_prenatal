@@ -43,6 +43,7 @@ const SPECIAL_RESPONSES = {
   vihPermission: ' El acceso a resultados de VIH depende del permiso controles.ver_vih; no puedo afirmar si tu cuenta lo tiene.',
   clinicalAdvice: 'Puedo orientarte sobre cómo usar el sistema, pero no puedo indicar medicamentos, dosis, diagnósticos o tratamientos ni clasificar la gravedad. Consulta al profesional responsable y los protocolos vigentes del MSPAS para decidir la conducta.',
   fallback: 'Eso no lo manejo bien todavía, y prefiero no inventarte algo. Puedes decirme en qué pantalla estás y qué campo o botón te dio duda. Si es algo de permisos o configuración, revísalo con el administrador del sistema.',
+  fieldHelpMissing: 'No puedo saber qué campo estás señalando todavía. Dime el nombre que aparece sobre el campo y te explico para qué sirve.',
   operationalClarification: 'Entiendo que no quieres eliminar el registro. ¿Qué necesitas editar: los datos de la paciente, un control prenatal, una vacuna, una atención de puerperio, una morbilidad, la ficha de riesgo o el plan de parto?',
   laboratoryView: 'Para ver los laboratorios guardados:\n1. Abre el expediente de la paciente.\n2. Entra en la pestaña "Laboratorios".\n3. Selecciona el control que deseas revisar para ver sus resultados por grupo de estudio.\n\nLos resultados se capturan al crear o editar un control prenatal, pero se consultan desde esta pestaña del expediente. La visibilidad de VIH depende del permiso correspondiente de la cuenta.',
 };

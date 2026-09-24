@@ -7,7 +7,7 @@ const {
   CHATBOT_GUIDE_IDS,
   chatbotGuides,
 } = require('../config/chatbotGuides');
-const { findExplicitFieldHelp } = require('./chatbotFieldHelpService');
+const { findExplicitFieldHelp, findGenericFieldHelp } = require('./chatbotFieldHelpService');
 const {
   CLINICAL_DISCLAIMER,
   CONTEXT_RESPONSES,
@@ -450,6 +450,9 @@ function answerQuestionWithoutConversation(message, context) {
   const fieldHelp = findExplicitFieldHelp(text);
   if (fieldHelp) return fieldHelp;
 
+  const genericFieldHelp = findGenericFieldHelp(text, context);
+  if (genericFieldHelp) return genericFieldHelp;
+
   const contextualEditResponse = buildContextualEditResponse(text, context);
   if (contextualEditResponse) return contextualEditResponse;
 
@@ -776,7 +779,7 @@ function answerQuestion(message, context, conversation) {
     const guide = chatbotGuides[state.activeGuide];
     const preservesGuide = !result.recognized
       || guide.relatedIntents.includes(result.intent)
-      || ['saludo', 'agradecimiento', 'despedida', 'solicitud_dato_clinico', 'solicitud_consejo_clinico', 'ayuda_campo']
+      || ['saludo', 'agradecimiento', 'despedida', 'solicitud_dato_clinico', 'solicitud_consejo_clinico', 'ayuda_campo', 'ayuda_campo_contextual', 'ayuda_campo_sin_foco']
         .includes(result.intent);
 
     if (preservesGuide) return preserveActiveGuide(result, state);
