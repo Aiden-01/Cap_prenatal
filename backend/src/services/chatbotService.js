@@ -166,6 +166,7 @@ function findOperationalSafetyException(message) {
   const treatmentRegistration = /^(?:donde|en donde|como) (?:registro|registrar|escribo|ingreso|anoto|documento) (?:el |un )?(?:medicamento|tratamiento)(?: indicado)?(?: en el sistema)?$/;
 
   if (treatmentRegistration.test(normalized)) return 'morbilidad';
+  if (/^donde (?:escribo|documento|registro) la impresion clinica$/.test(normalized)) return 'morbilidad';
   return null;
 }
 
@@ -195,6 +196,9 @@ function findOperationalPriority(message) {
   const normalized = withoutSocialLeadIn(message);
 
   if (normalized === 'como imprimo el plan de parto') return { intent: 'imprimir_plan_parto' };
+  if (/^(?:(?:como|donde) (?:busco|encuentro)|quiero buscar) una paciente$/.test(normalized)) {
+    return { intent: 'buscar_paciente' };
+  }
 
   const negatedRequest = findNegatedOperationalRequest(normalized);
   if (negatedRequest) return negatedRequest;
@@ -213,8 +217,8 @@ function getClinicalDataRequest(message) {
   const patterns = [
     /^(?:esta|la) paciente tiene vih$/,
     /^(?:(?:esta|la) paciente(?: [a-z]+){1,3}|[a-z]+(?: [a-z]+){0,2}) tiene vih$/,
+    /^(?:(?:quiero|necesito) saber si|me puedes decir si|dime si) (?:(?:esta|la) paciente(?: [a-z]+){0,3}|[a-z]+(?: [a-z]+){0,2}) tiene vih$/,
     /^(?:cual es el|que) resultado de (?:vih|hemoglobina) (?:de|tiene) (?:(?:esta|la) paciente(?: [a-z]+){0,3}|[a-z]+(?: [a-z]+){0,2})$/,
-    /^quiero saber si (?:esta|la) paciente tiene vih$/,
     /^quiero saber (?:el )?resultado (?:de )?vih de (?:esta|la) paciente$/,
     /^(?:cual|que) es (?:el )?resultado (?:de )?vih(?: de (?:esta|la) paciente)?$/,
     /^(?:cual|que) es su diagnostico$/,
@@ -231,6 +235,10 @@ function getClinicalDataRequest(message) {
 function isClinicalAdviceRequest(message) {
   const normalized = withoutSocialLeadIn(message);
   return [
+    /^debo aplicar (?:esta|la|una) vacuna$/,
+    /^que diagnostico (?:pongo aqui|debo poner)$/,
+    /^debo marcar este factor(?: de riesgo)?$/,
+    /^que tratamiento (?:deberia|debo) poner(?: aqui)?$/,
     /^que medicamento (?:debo darle|le doy|puedo darle|debo usar|recomiendas)$/,
     /^recomiendame (?:un )?medicamento$/,
     /^que tratamiento (?:le pongo|le doy|debo darle|debo usar|puedo darle|recomiendas)$/,
@@ -238,7 +246,6 @@ function isClinicalAdviceRequest(message) {
     /^que dosis (?:debo|puedo) (?:usar|dar|darle|indicar)$/,
     /^que hago si (?:la paciente )?tiene presion alta$/,
     /^es peligroso (?:este|ese) resultado$/,
-    /^debo marcar este factor$/,
     /^(?:debe|deberia) ser referida(?: la paciente)?$/,
   ].some((pattern) => pattern.test(normalized));
 }

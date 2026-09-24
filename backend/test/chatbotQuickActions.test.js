@@ -506,7 +506,7 @@ test('utilidad frontend valida, limita y resuelve solo targets conocidos', async
     resolveQuickActionTarget(
       { type: 'navigate', target: 'expediente_actual' },
       { pathname: '/pacientes/42', search: '?embarazo_id=9' },
-      { hasPatientContext: true }
+      { hasPatientContext: true, module: 'expediente', route: '/pacientes/:id/expediente' }
     ),
     '/pacientes/42?embarazo_id=9'
   );

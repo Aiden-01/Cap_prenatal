@@ -1,3 +1,5 @@
+import { normalizeChatbotLocation } from "./chatbotContext.js";
+
 export const QUICK_ACTION_ROUTES = Object.freeze({
   dashboard: "/dashboard",
   pacientes: "/pacientes",
@@ -82,8 +84,15 @@ export function visibleQuickActions(message, currentContextKey, activeGuide) {
 export function resolveQuickActionTarget(action, location, context) {
   if (action?.type !== "navigate") return null;
   if (action.target === "expediente_actual") {
-    if (!context?.hasPatientContext) return null;
-    return `${location?.pathname || ""}${location?.search || ""}` || null;
+    if (!context?.hasPatientContext || context.module !== "expediente") return null;
+    const pathname = location?.pathname || "";
+    if (normalizeChatbotLocation(pathname).route !== context.route) return null;
+    const patientId = pathname.match(/^\/pacientes\/([1-9]\d*)(?:\/|$)/)?.[1];
+    if (!patientId) return null;
+    const pregnancyId = new URLSearchParams(location?.search || "").get("embarazo_id");
+    const selectedPregnancy = pregnancyId && /^[1-9]\d*$/.test(pregnancyId)
+      ? `?embarazo_id=${pregnancyId}` : "";
+    return `/pacientes/${patientId}${selectedPregnancy}`;
   }
   return QUICK_ACTION_ROUTES[action.target] || null;
 }

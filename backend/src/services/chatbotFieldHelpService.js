@@ -45,10 +45,13 @@ function findExplicitFieldHelp(message, context) {
   const requested = match[1];
   // La consulta operacional existente de VIH conserva su intención laboratorio.
   if (question.startsWith('donde registro ') && requested === 'vih') return null;
+  const planAlias = { fur: 'plan_parto_fur', fpp: 'plan_parto_fecha_probable_parto' }[requested];
+  const planField = planAlias && chatbotFieldHelp.find((field) => field.id === planAlias
+    && fieldMatchesContext(field, context));
   const matches = chatbotFieldHelp.filter((field) => [field.id, field.label, ...field.aliases]
     .some((name) => normalizeFieldQuestion(name) === requested));
   const contextual = matches.filter((field) => fieldMatchesContext(field, context));
-  const field = contextual.length === 1 ? contextual[0] : matches.length === 1 ? matches[0] : null;
+  const field = planField || (contextual.length === 1 ? contextual[0] : matches.length === 1 ? matches[0] : null);
   if (!field && matches.length > 1 && /^(?:que significa|que es) /.test(question)
     && matches.every(({ help }) => help === matches[0].help)) {
     return {
