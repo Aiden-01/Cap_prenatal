@@ -235,6 +235,10 @@ for (const [input, intent] of [
 
 const CLINICAL_DATA_CASES = [
   '¿Esta paciente tiene VIH?',
+  '¿La paciente Susan tiene VIH?',
+  '¿Susan tiene VIH?',
+  '¿Cuál es el resultado de VIH de Susan?',
+  '¿Qué resultado de hemoglobina tiene María?',
   'Quiero saber el resultado de VIH de esta paciente.',
   '¿Cuál es su diagnóstico?',
   'Dime los laboratorios de esta paciente.',
@@ -282,6 +286,8 @@ for (const input of CLINICAL_ADVICE_CASES) {
 }
 
 for (const [input, intent] of [
+  ['¿Dónde registro VIH?', 'laboratorio'],
+  ['¿Cómo ingreso hemoglobina?', 'laboratorio'],
   ['¿Dónde ingreso VIH?', 'laboratorio'],
   ['¿Dónde ingreso el resultado de VIH?', 'laboratorio'],
   ['¿Dónde registro el medicamento indicado?', 'morbilidad'],

@@ -369,6 +369,15 @@ test('guardas clinicas mantienen prioridad y no pierden la guia', () => {
   assert.deepEqual(result.conversation, state);
 });
 
+test('solicitud de dato clínico con texto intermedio conserva la guía activa', () => {
+  const state = activeConversation('control_prenatal', 3);
+  const result = answerQuestion('¿La paciente Susan tiene VIH?', context(), state);
+
+  assert.equal(result.intent, 'solicitud_dato_clinico');
+  assert.match(result.answer, /No consulto ni revelo expedientes o resultados clínicos/);
+  assert.deepEqual(result.conversation, state);
+});
+
 test('cliente sin conversation conserva contrato anterior', () => {
   const result = answerQuestion('¿Cómo agrego un control prenatal?', context());
   assert.equal(Object.hasOwn(result, 'conversation'), false);

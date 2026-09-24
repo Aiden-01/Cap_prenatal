@@ -209,6 +209,8 @@ function getClinicalDataRequest(message) {
   const normalized = withoutSocialLeadIn(message);
   const patterns = [
     /^(?:esta|la) paciente tiene vih$/,
+    /^(?:(?:esta|la) paciente(?: [a-z]+){1,3}|[a-z]+(?: [a-z]+){0,2}) tiene vih$/,
+    /^(?:cual es el|que) resultado de (?:vih|hemoglobina) (?:de|tiene) (?:(?:esta|la) paciente(?: [a-z]+){0,3}|[a-z]+(?: [a-z]+){0,2})$/,
     /^quiero saber si (?:esta|la) paciente tiene vih$/,
     /^quiero saber (?:el )?resultado (?:de )?vih de (?:esta|la) paciente$/,
     /^(?:cual|que) es (?:el )?resultado (?:de )?vih(?: de (?:esta|la) paciente)?$/,
