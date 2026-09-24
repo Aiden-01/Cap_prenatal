@@ -382,6 +382,22 @@ negativas que demuestren que la regla no se aplica fuera de su contexto.
 
 ## Limitaciones actuales
 
+Nota de verificacion posterior al alcance de Sprint 4B.3E (sin cambiar sus
+hallazgos): el codigo de `citasInasistenciasService.js` audita las
+materializaciones de asistencia/inasistencia y su reconciliacion mediante
+`registrarEventoPrivado`, con auditoria obligatoria en la transaccion. El
+controlador de automatizaciones registra de forma informativa consultas de
+censo, inasistencias semanales, seguimiento Tdap y calidad de datos, ademas
+de proximas citas. Estas incorporaciones no implican que se hayan saneado
+filas historicas ni que el contenido de correos, XLSX o PDF quede auditado.
+
+El manejador general de errores (`middleware/errorHandler.js`) registra
+`err.message`; para errores no clasificados como automatizacion, en entornos
+no productivos tambien puede registrar la traza. No hay saneamiento explicito
+de ese mensaje en ese punto, por lo que no debe presentarse como un control
+general que impide toda exposicion de datos sensibles en logs. Los eventos
+privados de auditoria siguen pasando por el saneador antes del repositorio.
+
 - No quedan productores productivos usando el camino legado. La definicion
   central se conserva por compatibilidad y una prueba impide reintroducirla.
 - El CRUD independiente de referencias fue retirado. La funcion clinica real

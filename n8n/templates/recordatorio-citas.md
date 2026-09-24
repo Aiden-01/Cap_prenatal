@@ -4,6 +4,11 @@ Referencia documental para el nodo `Construir detalle operativo` de
 `recordatorio-citas-resend-v1.json`. No contiene un destinatario ni datos
 reales.
 
+La consulta M2M `/api/automatizaciones/v1/proximas-citas` toma citas de
+`citas_prenatales` con estado `programada`, sin control de cumplimiento y con
+embarazo activo, dentro de la ventana configurada. No calcula el recordatorio
+a partir de `cita_siguiente` del último control prenatal.
+
 ## Datos admitidos
 
 Por cada cita:
@@ -60,6 +65,12 @@ campos y escapa cada valor antes de construir filas.
 ## Reglas
 
 - Un solo correo por ejecución, no uno por paciente.
+- El recordatorio corresponde a citas `programada`; los demás estados del
+  modelo son `atendida`, `cancelada`, `reprogramada` e `inasistente` y no
+  ingresan en esta consulta.
+- El seguimiento de citas `inasistente` se prepara y envía por el workflow
+  semanal `seguimiento-inasistencias-resend-v1.json`, con endpoints M2M propios;
+  esta plantilla no describe ese correo ni su confirmación de despacho.
 - Si `total=0`, no crear ni enviar mensaje.
 - Rechazar el contrato si `appointments.length !== total`.
 - Escapar `&`, `<`, `>`, comillas y apóstrofes.

@@ -13,6 +13,15 @@ siempre fue privado.
 
 ## Procedimiento coordinado
 
+Antes de cambiar nada, inventariar el entorno y conservar un respaldo cifrado
+y verificable de PostgreSQL y de los datos de n8n junto con su clave de cifrado
+vigente. Preparar una ventana de mantenimiento, prueba sintética y reversión.
+Los secretos actuales son `JWT_SECRET`, la contraseña PostgreSQL (`DB_PASSWORD`
+o la incorporada en `DATABASE_URL`; `POSTGRES_PASSWORD` en Compose), la clave
+M2M de n8n cuyo SHA-256 se configura como `N8N_API_KEY_HASH_CURRENT`/`NEXT`,
+la API key de Resend guardada como credencial de n8n y `N8N_ENCRYPTION_KEY`.
+Los parámetros `SESSION_*` son tiempos de sesión, no secretos.
+
 1. Generar un `JWT_SECRET` nuevo a partir de por lo menos 32 bytes aleatorios.
    `openssl rand -base64 48` y el comando Node documentado en `.env.example` son
    opciones locales; el resultado no debe copiarse a chats, tickets ni Git.
@@ -23,13 +32,34 @@ siempre fue privado.
 4. Reiniciar los servicios que consumen las variables y confirmar que arrancan con
    la validacion centralizada.
 5. Confirmar que los JWT emitidos antes de la rotacion ya no son aceptados. Cambiar
-   `JWT_SECRET` invalida todos los tokens existentes y obliga a iniciar sesion de
-   nuevo.
-6. Rotar los secretos de automatizacion cuando corresponda y actualizar ambos
-   extremos de la integracion en la misma ventana.
-7. Revisar y revocar copias en CI, variables de servidores, clones, artefactos,
+   `JWT_SECRET` invalida los tokens de acceso existentes. Las sesiones también
+   guardan tokens de renovación con hash en PostgreSQL: revocar las sesiones
+   activas para forzar un inicio de sesión nuevo y verificar acceso y renovación.
+6. Para M2M, generar una clave nueva, configurar primero su hash SHA-256 en
+   `N8N_API_KEY_HASH_NEXT` y reiniciar el backend. Cambiar la credencial que n8n
+   envía en `X-CAP-Automation-Key`, probar con datos sintéticos, promover el hash
+   nuevo a `CURRENT`, vaciar `NEXT`, reiniciar y revocar la clave anterior.
+   Conservar `N8N_ALLOWED_CIDRS` y verificar que la integración siga habilitada.
+7. Para Resend, crear una API key nueva, actualizar la credencial `Resend API`
+   usada por los nodos y por el HTTP Request de Tdap, probar un único envío
+   sintético y revocar la key anterior. Revisar eventos antes de reintentar un
+   envío cuya aceptación sea incierta para evitar duplicados.
+8. No sustituir `N8N_ENCRYPTION_KEY` directamente en una instancia con
+   credenciales cifradas: la clave nueva no podrá descifrar las existentes.
+   Respaldar clave y datos, planear migración o recreación de credenciales,
+   verificar todos los workflows y conservar una vía de reversión segura.
+   Cambiarla exige reiniciar n8n.
+9. Revisar y revocar copias en CI, variables de servidores, clones, artefactos,
    respaldos, registros y equipos de desarrollo.
-8. Coordinar posteriormente la limpieza del historial Git con todo el equipo.
+10. Coordinar posteriormente la limpieza del historial Git con todo el equipo.
+
+`JWT_SECRET`, la configuración PostgreSQL y los hashes M2M son leídos por el
+backend al iniciar; reiniciarlo tras cada cambio. La contraseña del servidor
+PostgreSQL y la del cliente deben coincidir durante la transición; reiniciar
+los consumidores y verificar conexiones nuevas. En Compose, cambiar solo
+`POSTGRES_PASSWORD` no actualiza automáticamente la contraseña de una base ya
+inicializada. La credencial Resend se actualiza en n8n y no requiere reiniciar
+Express; `N8N_ENCRYPTION_KEY` sí requiere reiniciar n8n.
 
 ## Limpieza futura del historial
 
@@ -49,6 +79,5 @@ la cuenta inicial, se defina
 sustituye una revision operativa. Una cuenta existente no recibe una contrasena
 nueva durante el seed.
 
-El cambio obligatorio de contrasena en primer acceso sigue pendiente porque el
-esquema actual no contiene esa bandera; se implementara con sesiones y politica de
-contrasenas en un sprint posterior.
+Verificar el estado actual de las políticas de acceso en el código antes de
+aplicar el seed; no usarlo como mecanismo de rotación de contraseñas existentes.

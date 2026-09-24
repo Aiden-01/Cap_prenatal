@@ -1,7 +1,8 @@
 # Resend en CAP Prenatal
 
 Guía para instalar el nodo, verificar el dominio, crear la credencial y probar
-correo sin exponer secretos o datos clínicos. La operación general de n8n está
+correo sin exponer secretos o datos clínicos. El recorrido actual es CAP Prenatal
+→ Express (API de automatizaciones) → n8n → Resend. La operación general de n8n está
 en [`N8N_OPERACION.md`](N8N_OPERACION.md).
 
 ## Estado conocido
@@ -9,8 +10,10 @@ en [`N8N_OPERACION.md`](N8N_OPERACION.md).
 Evidencia local observada el 24 de agosto de 2026:
 
 - paquete `n8n-nodes-resend@2.8.0` instalado;
-- los workflows Resend locales usan `n8n-nodes-resend.resend`;
-- todos los nodos Resend tienen una credencial asignada;
+- cinco workflows de correo versionados usan `n8n-nodes-resend.resend`; Tdap
+  envía mediante HTTP Request a la API de Resend;
+- los nodos Resend usan una credencial; Tdap usa la credencial predefinida
+  `Resend API` en HTTP Request;
 - los remitentes locales pertenecen a `notificaciones.hercor-nexus.com`;
 - existe un destinatario configurado, omitido aquí por privacidad;
 - los workflows están inactivos/sin publicar;
@@ -94,7 +97,8 @@ Antes de enviar:
 3. en n8n abrir **Credentials > Add credential > Resend API**;
 4. pegar la key en la credencial, no en el nodo;
 5. usar un nombre operativo sin incluir el token;
-6. asignar la credencial a los siete nodos Resend actuales;
+6. asignar la credencial a los siete nodos Resend versionados y al HTTP Request
+   de envío Tdap; comprobar las referencias en cada instancia antes de activar;
 7. guardar y eliminar cualquier copia temporal del portapapeles/notas.
 
 La credencial queda cifrada por n8n con `N8N_ENCRYPTION_KEY`. No exportar la
@@ -151,8 +155,8 @@ no hubo entrega.
 
 ### Seguimiento oportuno Tdap de El Chal
 
-- **Resource:** Email.
-- **Operation:** Send.
+- **Transporte:** HTTP Request `POST https://api.resend.com/emails`, con
+  autenticación predefinida `Resend API`; no usa el nodo comunitario Resend.
 - **From:** `CAP Prenatal <citas@notificaciones.hercor-nexus.com>` en la
   instancia autorizada; el JSON versionado usa `.invalid`.
 - **To:** un destinatario institucional autorizado, omitido de Git.
