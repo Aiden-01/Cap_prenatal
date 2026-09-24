@@ -48,9 +48,14 @@ const exportReportQuerySchema = z.object({
   columnas: z.string().min(1).max(500).regex(/^[a-z_,]+$/, 'Columnas invalidas'),
 }).strict('Parametro no permitido');
 
+const exportPrimerControlQuerySchema = periodoReportesQuerySchema.safeExtend({
+  columnas: exportReportQuerySchema.shape.columnas,
+});
+
 module.exports = {
   MAX_REPORT_DAYS,
   isRealIsoDate,
   periodoReportesQuerySchema,
   exportReportQuerySchema,
+  exportPrimerControlQuerySchema,
 };

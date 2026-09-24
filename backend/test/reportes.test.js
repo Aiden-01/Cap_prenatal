@@ -22,6 +22,7 @@ const {
 const {
   MAX_REPORT_DAYS,
   periodoReportesQuerySchema,
+  exportPrimerControlQuerySchema,
 } = require('../src/validations/reportes.schemas');
 const { AppError } = require('../src/utils/appError');
 
@@ -107,6 +108,27 @@ test('schema acepta un periodo inclusivo de hasta 366 dias', () => {
   const result = periodoReportesQuerySchema.safeParse({ desde: '2024-01-01', hasta: '2024-12-31' });
   assert.equal(MAX_REPORT_DAYS, 366);
   assert.equal(result.success, true);
+});
+
+test('primer control exige columnas solo al exportar', async () => {
+  assert.equal(periodoReportesQuerySchema.safeParse(PERIODO).success, true);
+  assert.equal(exportPrimerControlQuerySchema.safeParse({ ...PERIODO, columnas: 'nombre' }).success, true);
+  assert.equal(exportPrimerControlQuerySchema.safeParse(PERIODO).success, false);
+  assert.equal(exportPrimerControlQuerySchema.safeParse({ ...PERIODO, columnas: '' }).success, false);
+  let calls = 0;
+  await withServer(reportRouteApp({ controllers: routeControllers(() => { calls += 1; }) }), async (baseUrl) => {
+    const headers = { Authorization: 'Bearer test', 'X-Permissions': 'reportes.exportar' };
+    for (const format of ['excel', 'pdf']) {
+      for (const suffix of ['', '&columnas=']) {
+        const response = await fetch(`${baseUrl}/api/reportes/censo/primer-control/${format}?desde=${PERIODO.desde}&hasta=${PERIODO.hasta}${suffix}`, { headers });
+        assert.equal(response.status, 400);
+        assert.equal((await response.json()).code, 'VALIDATION_ERROR');
+      }
+      const valid = await fetch(`${baseUrl}/api/reportes/censo/primer-control/${format}?desde=${PERIODO.desde}&hasta=${PERIODO.hasta}&columnas=nombre`, { headers });
+      assert.equal(valid.status, 204);
+    }
+  });
+  assert.equal(calls, 2);
 });
 
 test('schema rechaza fechas ausentes, formato invalido y fechas inexistentes', () => {
@@ -325,7 +347,7 @@ test('rutas exigen autenticacion, reportes.ver para consulta y reportes.exportar
       assert.equal((await fetch(`${baseUrl}/api/reportes/censo/primer-control/${format}${query}`, {
         headers: { Authorization: 'Bearer test', 'X-Permissions': 'reportes.ver' },
       })).status, 403);
-      assert.equal((await fetch(`${baseUrl}/api/reportes/censo/primer-control/${format}${query}`, {
+      assert.equal((await fetch(`${baseUrl}/api/reportes/censo/primer-control/${format}${query}&columnas=nombre`, {
         headers: { Authorization: 'Bearer test', 'X-Permissions': 'reportes.exportar' },
       })).status, 204);
     }
@@ -498,4 +520,14 @@ test('exportacion rechaza columnas ausentes o no permitidas', async () => {
   });
   await assert.rejects(() => nonEmpty.exportReport('activos', 'excel', { columnas: '' }), (error) => error.code === 'INVALID_REPORT_COLUMNS');
   await assert.rejects(() => nonEmpty.exportReport('activos', 'excel', { columnas: 'secreto' }), (error) => error.code === 'INVALID_REPORT_COLUMNS');
+  const primerControl = createReportesService({
+    repository: { obtenerRowsCensoPrimerControl: async () => [paciente()] },
+    pdfService: {},
+  });
+  for (const columnas of [undefined, '', 'secreto']) {
+    await assert.rejects(
+      () => primerControl.exportReport('primer_control', 'excel', { ...PERIODO, columnas }),
+      (error) => error.code === 'INVALID_REPORT_COLUMNS'
+    );
+  }
 });

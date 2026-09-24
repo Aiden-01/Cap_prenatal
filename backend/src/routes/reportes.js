@@ -3,7 +3,7 @@ const defaultControllers = require('../controllers/reportesController');
 const { authMiddleware } = require('../middleware/auth');
 const { cargarPermisos, verificarPermiso } = require('../middleware/permisos');
 const { validateQuery } = require('../middleware/validate');
-const { periodoReportesQuerySchema, exportReportQuerySchema } = require('../validations/reportes.schemas');
+const { periodoReportesQuerySchema, exportReportQuerySchema, exportPrimerControlQuerySchema } = require('../validations/reportes.schemas');
 
 function createReportesRouter({
   controllers = defaultControllers,
@@ -24,11 +24,11 @@ function createReportesRouter({
     controllers.censoMensualPrimerControl);
   router.get('/censo/primer-control/excel',
     checkPermission('reportes.exportar'),
-    validateQuery(periodoReportesQuerySchema),
+    validateQuery(exportPrimerControlQuerySchema),
     exportHandler('exportarPrimerControlExcel', 'exportarCensoPrimerControlExcel', 'censoMensualPrimerControl'));
   router.get('/censo/primer-control/pdf',
     checkPermission('reportes.exportar'),
-    validateQuery(periodoReportesQuerySchema),
+    validateQuery(exportPrimerControlQuerySchema),
     exportHandler('exportarPrimerControlPdf', 'exportarCensoPrimerControlPdf', 'censoMensualPrimerControl'));
 
   router.get('/censo', checkPermission('reportes.ver'), controllers.censoMensual);
