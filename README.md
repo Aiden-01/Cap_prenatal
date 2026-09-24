@@ -2,7 +2,7 @@
 
 Aplicacion web fullstack para la gestion digital de expedientes clinicos prenatales del Centro de Atencion Permanente (CAP) El Chal, Peten, Guatemala.
 
-El sistema permite registrar pacientes, embarazos, controles prenatales, riesgo obstetrico, laboratorios, vacunas, plan de parto, puerperio, morbilidad, reportes y documentos PDF alineados a formatos institucionales del MSPAS/CAP.
+El sistema permite registrar pacientes, embarazos, controles prenatales, citas e inasistencias, riesgo obstetrico, laboratorios, vacunas, plan de parto, puerperio, morbilidad y reportes. Genera documentos clinicos PDF alineados a formatos institucionales del MSPAS/CAP y exporta reportes a Excel y PDF.
 
 ## Contexto
 
@@ -127,10 +127,13 @@ Backend:
 | --- | --- |
 | `npm run dev` | Servidor Express con nodemon. |
 | `npm start` | Servidor Express sin recarga automatica. |
-| `npm run db:migrate` | Aplica `schema.sql` y las migraciones versionadas pendientes, incluidas las migraciones estructurales `008` a `015`. |
+| `npm run db:migrate` | Aplica `schema.sql` y las migraciones versionadas pendientes; el backend exige `008` a `017`. |
 | `npm run db:seed` | Inicializa catalogos y, si no existe, una cuenta director configurada por entorno. |
 | `npm run db:seed-demo-patients` | Crea pacientes demo. |
 | `npm run test:embarazo-activo` | Validacion manual del flujo de embarazo activo. |
+| `npm test` | Ejecuta las pruebas automatizadas del backend. |
+| `npm run test:automatizaciones` | Pruebas de los contratos de automatizacion. |
+| `npm run test:migrate` | Pruebas del ejecutor de migraciones. |
 
 Frontend:
 
@@ -139,6 +142,8 @@ Frontend:
 | `npm run dev` | Servidor Vite. |
 | `npm run build` | Build de produccion. |
 | `npm run lint` | ESLint. |
+| `npm test` | Ejecuta las pruebas del frontend. |
+| `npm run test:appointments` | Pruebas del calendario y flujo de citas. |
 | `npm run preview` | Sirve el build localmente. |
 
 ## Estructura del proyecto
@@ -181,6 +186,7 @@ cap_prenatal/
 - Pacientes y expediente clinico.
 - Historial de embarazos por paciente.
 - Controles prenatales.
+- Citas prenatales, calendario e inasistencias con seguimiento.
 - Ficha de riesgo obstetrico.
 - Laboratorio.
 - Vacunas.
@@ -188,8 +194,8 @@ cap_prenatal/
 - Puerperio.
 - Morbilidad.
 - Mapa de riesgo.
-- Reportes y exportacion Excel.
-- PDF institucional MSPAS/CAP.
+- Reportes y exportacion Excel/PDF.
+- Impresion de documentos clinicos PDF institucionales MSPAS/CAP.
 - Chatbot de ayuda operativa.
 - Automatizaciones para n8n.
 
@@ -249,7 +255,7 @@ las migraciones versionadas pendientes. La migracion
 `008_retirar_referencias_efectuadas.sql` toma un bloqueo exclusivo, muestra solo
 el conteo agregado y aborta sin borrar datos si encuentra una o mas filas. El
 codigo actual no abre el puerto hasta confirmar por nombre y checksum las
-migraciones `008` a `015` en `schema_migrations`. La validacion de arranque es
+migraciones `008` a `017` en `schema_migrations`. La validacion de arranque es
 de solo lectura: nunca ejecuta migraciones automaticamente y, ante pendientes,
 indica usar `npm run db:migrate`. Cada entorno mantiene su propia base; no se
 copian bases entre PCs. Estado operativo registrado para este cierre: la
@@ -272,8 +278,9 @@ y el dashboard presenta un calendario mensual, con semana iniciada en domingo,
 navegacion por meses y consulta unica por el rango visible. Desde ese calendario
 se puede abrir el expediente y, con `controles.editar`, reprogramar o cancelar
 cualquier cita `programada` sin alterar el control de origen. Las citas
-`atendida`, `cancelada` y `reprogramada` permanecen visibles como historial; el
-cumplimiento sigue ocurriendo exclusivamente al registrar un control nuevo.
+`atendida`, `cancelada`, `reprogramada` e `inasistente` permanecen visibles como
+historial. Las citas vencidas con control de la misma fecha quedan `atendida`;
+sin control coincidente quedan `inasistente`.
 
 Si el ultimo control valido fue guardado por error sin proxima cita, su edicion
 puede completar `cita_siguiente: NULL -> fecha`. La misma transaccion verifica
@@ -283,14 +290,15 @@ otra cita programada del embarazo, y crea la fila correspondiente en
 solo deja de estar vigente mediante Cancelar cita.
 
 El calendario no crea citas ni usa `controles_prenatales.cita_siguiente` como
-agenda. Muestra fechas internas `YYYY-MM-DD` como `DD-MM-YYYY` sin conversiones
+agenda. Una inasistencia pendiente puede originar una nueva cita de seguimiento
+posterior sin cambiar su estado historico. Muestra fechas internas `YYYY-MM-DD`
+como `DD-MM-YYYY` sin conversiones
 de zona horaria, distingue los estados por icono y texto, funciona con teclado,
 modo claro/oscuro y adapta la cuadrícula a una lista del dia en movil. La lectura
 requiere `pacientes.ver`; las mutaciones conservan `controles.editar` y las
 validaciones contra IDOR de CITAS-01B. No existe backfill: periodos anteriores
 al corte de activacion pueden no contener citas estructuradas. El recordatorio
-n8n conserva sin cambios su contrato M2M y consulta solo citas `programada` sin
-cumplimiento.
+n8n consulta solo citas `programada` sin cumplimiento para recordatorios.
 
 La migracion `015_automatizacion_despachos.sql` agrega idempotencia persistente
 para el seguimiento semanal de inasistencias. No almacena datos de pacientes o
@@ -298,6 +306,35 @@ correo: conserva únicamente tipo, semana, estado, hash de token, conteo e
 intentos. El workflow versionado se ejecuta conceptualmente cada lunes a las
 08:00 sobre la semana anterior, pero permanece desactivado hasta autorización
 operativa.
+
+Las migraciones `016_riesgo_tiempo_horas_decimales.sql` y
+`017_citas_inasistencias.sql` incorporan, respectivamente, horas decimales en la
+ficha de riesgo y el estado `inasistente` con la relacion de seguimiento. El
+backend materializa citas vencidas al iniciar y periodicamente, y tambien al
+operar sobre citas. La validacion de arranque no ejecuta migraciones.
+
+## Reportes e impresion
+
+La vista de reportes ofrece censo de primer control, censo de embarazos
+activos, proximas a parir, pacientes sin control reciente, pacientes con riesgo
+y resumen por comunidades. Los seis reportes tienen exportacion Excel (`.xlsx`)
+y PDF. La consulta requiere `reportes.ver` y la exportacion,
+`reportes.exportar`. En la interfaz, la descarga se habilita tras generar un
+reporte con registros.
+
+Desde el expediente se pueden generar PDF del formulario MSPAS, ficha de
+riesgo, plan de parto, control y documentos combinados para impresion. Estas
+rutas requieren `pacientes.ver`.
+
+## Automatizaciones
+
+La integracion opcional con n8n incluye recordatorios de citas, censos de
+primer control, seguimiento semanal de inasistencias, seguimiento Tdap y
+vigilancia de calidad de datos. Los workflows JSON versionados se importan
+desactivados. El backend ofrece contratos M2M bajo
+`/api/automatizaciones/v1` cuando la integracion esta habilitada. El
+seguimiento de inasistencias consulta citas con estado `inasistente`.
+Consultar `docs/N8N.md` y `n8n/README.md` antes de activarlos.
 
 ## Docker
 

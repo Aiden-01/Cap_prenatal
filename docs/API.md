@@ -166,9 +166,13 @@ Base: `/pacientes/:pacienteId/controles`
 | `PUT` | `/:id` | `controles.editar` | Actualiza control. |
 | `DELETE` | `/:id` | `controles.editar` | Elimina control. |
 
-Al crear un control nuevo, el backend cumple la unica cita `programada` vigente
-del mismo embarazo y, si existe `cita_siguiente`, crea despues la proxima cita.
-El control, ambas operaciones y sus auditorias comparten transaccion.
+Al crear un control nuevo, el backend cumple la cita `programada` vigente del
+mismo embarazo y, si existe `cita_siguiente`, crea despues la proxima cita.
+Si se registra posteriormente un control con la misma fecha que una
+`inasistente`, puede reconciliarla como `atendida` si aun no existe un
+seguimiento derivado. El control, las operaciones de cita y sus auditorias
+comparten transaccion; un seguimiento ya derivado responde
+`409 CITA_INASISTENCIA_CON_SEGUIMIENTO_DERIVADO`.
 
 `PUT /:id` admite excepcionalmente `cita_siguiente: null -> YYYY-MM-DD` para
 corregir una cita omitida. El control debe ser el ultimo del embarazo, no puede
@@ -190,6 +194,7 @@ Base: `/citas`
 | Metodo | Ruta | Permiso | Descripcion |
 | --- | --- | --- | --- |
 | `GET` | `/calendario?from=YYYY-MM-DD&to=YYYY-MM-DD` | `pacientes.ver` | Lista las citas estructuradas incluidas en el rango visible del calendario. |
+| `GET` | `/sin-proxima` | `pacientes.ver` | Devuelve `{ items }` con embarazos activos que tienen control pero no cita programada vigente; no acepta query. |
 
 `from` y `to` son fechas ISO date-only obligatorias, inclusivas y con un maximo
 de 62 dias. El rango puede incluir dias adyacentes al mes para completar las
@@ -214,6 +219,8 @@ Respuesta:
       "patient_name": "Maria Lopez",
       "community": "Las Flores",
       "rescheduled_to": null,
+      "follow_up_date": null,
+      "follow_up_pending": false,
       "editable": true
     }
   ]
@@ -223,8 +230,12 @@ Respuesta:
 Los IDs permiten reutilizar las operaciones anidadas, pero no se muestran en la
 interfaz. `editable` describe si la cita y el embarazo admiten una mutacion; el
 frontend exige ademas `controles.editar`. El contrato minimiza datos a nombre y
-comunidad, devuelve los cuatro estados y consulta directamente
+comunidad, devuelve los cinco estados (`programada`, `atendida`, `cancelada`,
+`reprogramada`, `inasistente`) y consulta directamente
 `citas_prenatales`, nunca `controles_prenatales.cita_siguiente`.
+`follow_up_date` indica la fecha de la cita derivada de una inasistencia;
+`follow_up_pending` indica si aun requiere seguimiento. `editable` solo aplica
+a citas programadas sin cumplimiento en embarazos abiertos.
 
 ### Operaciones de una cita
 
@@ -236,12 +247,27 @@ embarazo y cita correspondan entre si.
 | Metodo | Ruta | Permiso | Descripcion |
 | --- | --- | --- | --- |
 | `GET` | `/vigente?embarazo_id=:id` | `pacientes.ver` | Devuelve `{ cita }`, con cero o una programada vigente; inconsistencias multiples responden `409`. |
-| `PATCH` | `/:id/reprogramar?embarazo_id=:id` | `controles.editar` | Recibe `{ "fecha_programada": "YYYY-MM-DD" }`, conserva la original como `reprogramada` y crea la hija. |
+| `POST` | `/asignar?embarazo_id=:id` | `controles.editar` | Recibe `{ "fecha_programada": "YYYY-MM-DD" }`; crea una cita desde el ultimo control o como seguimiento de una inasistencia pendiente. Responde `201` con `{ cita, idempotente: false }`. |
+| `PATCH` | `/:id/reprogramar?embarazo_id=:id` | `controles.editar` | Recibe `{ "fecha_programada": "YYYY-MM-DD" }`; una programada pasa a `reprogramada` y crea su hija. Una `inasistente` pendiente conserva su estado y crea una cita de seguimiento. Devuelve `{ cita_anterior, cita_nueva }`. |
 | `PATCH` | `/:id/cancelar?embarazo_id=:id` | `controles.editar` | Conserva la fila como `cancelada`; repetir sobre la misma cancelada es idempotente. |
 
-La reprogramacion rechaza fecha pasada o sin cambio. Citas atendidas,
-canceladas o ya reprogramadas son terminales. Las respuestas no permiten usar
-un ID perteneciente a otro embarazo o paciente.
+La fecha nueva no puede estar en el pasado ni ser igual a la original. Para
+seguir una `inasistente` debe ser posterior a la fecha incumplida y la
+inasistencia debe seguir pendiente. `atendida`, `cancelada` y `reprogramada`
+no admiten reprogramacion; cancelar solo admite `programada` o una `cancelada`
+ya cancelada, en cuyo caso devuelve `{ cita, idempotente: true }`. Las rutas
+validan que paciente, embarazo y cita correspondan entre si. El backend
+materializa las citas vencidas antes de las mutaciones: un control de la misma
+fecha las deja `atendida` y su ausencia las deja `inasistente`. Un control
+registrado despues para la misma fecha puede reconciliar una inasistencia,
+salvo que ya tenga una cita de seguimiento derivada.
+
+Errores relevantes: `400 CITA_FECHA_PASADA`, `400 CITA_FECHA_SIN_CAMBIO`,
+`400 CITA_SEGUIMIENTO_FECHA_INVALIDA`; `404 CITA_NOT_FOUND`;
+`409 CITA_TRANSICION_INVALIDA`, `409 CITA_PROGRAMADA_VIGENTE`,
+`409 CITA_REQUIERE_CONTROL_ORIGEN`, `409 CITA_SEGUIMIENTO_YA_RESUELTO` y
+`409 CITA_SEGUIMIENTO_NO_CREADO`. Las validaciones de query, body y parametros
+responden `400`; la falta de permiso responde `403`.
 
 PDF de control prenatal:
 
@@ -371,6 +397,7 @@ Base: `/pacientes/:pacienteId`
 | `GET` | `/mspas/pdf` | `pacientes.ver` | Ficha MSPAS prenatal completa. |
 | `GET` | `/riesgo/pdf` | `pacientes.ver` | Ficha de riesgo obstetrico. |
 | `GET` | `/plan-parto/pdf` | `pacientes.ver` | Plan de parto. |
+| `GET` | `/documentos/pdf` | `pacientes.ver` | PDF combinado de documentos clinicos. |
 | `GET` | `/:controlId/pdf` | `pacientes.ver` | Control prenatal individual. |
 
 Todos aceptan `embarazo_id`. Antes de iniciar `pdf-lib`, Chromium, Excel o
@@ -402,10 +429,19 @@ Base: `/reportes`
 | `GET` | `/censo/primer-control/pdf?desde=...&hasta=...` | `reportes.exportar` | PDF oficio horizontal del censo principal. |
 | `GET` | `/censo` | `reportes.ver` | Fotografia actual de embarazos con `estado = activo`; no reconstruye cortes historicos. |
 | `GET` | `/censo/excel` | `reportes.exportar` | Excel del censo actual de embarazos activos. |
+| `GET` | `/censo/pdf` | `reportes.exportar` | PDF del censo actual de embarazos activos. |
 | `GET` | `/proximas-a-parir` | `reportes.ver` | Embarazos activos con FPP en los proximos 30 dias. |
+| `GET` | `/proximas-a-parir/excel` | `reportes.exportar` | Excel de proximas a parir. |
+| `GET` | `/proximas-a-parir/pdf` | `reportes.exportar` | PDF de proximas a parir. |
 | `GET` | `/sin-control-reciente` | `reportes.ver` | Embarazos activos sin controles o con mas de 28 dias desde el ultimo. |
+| `GET` | `/sin-control-reciente/excel` | `reportes.exportar` | Excel de pacientes sin control reciente. |
+| `GET` | `/sin-control-reciente/pdf` | `reportes.exportar` | PDF de pacientes sin control reciente. |
 | `GET` | `/pacientes-riesgo` | `reportes.ver` | Embarazos activos cuya ficha obstetrica tiene `tiene_riesgo = true`. |
+| `GET` | `/pacientes-riesgo/excel` | `reportes.exportar` | Excel de pacientes con riesgo. |
+| `GET` | `/pacientes-riesgo/pdf` | `reportes.exportar` | PDF de pacientes con riesgo. |
 | `GET` | `/resumen-comunidades` | `reportes.ver` | Totales de embarazos activos, riesgo, FPP proxima y falta de control por comunidad. |
+| `GET` | `/resumen-comunidades/excel` | `reportes.exportar` | Excel de resumen por comunidades. |
+| `GET` | `/resumen-comunidades/pdf` | `reportes.exportar` | PDF de resumen por comunidades. |
 | `GET` | `/estadisticas` | `reportes.ver` | Dashboard: embarazos activos, pacientes historicas, riesgo, controles del mes y citas. |
 
 `desde` y `hasta` son obligatorios solo en el censo por primer control y sus
@@ -413,6 +449,15 @@ exportaciones. Deben ser fechas reales con formato estricto `YYYY-MM-DD`, no se
 aceptan valores repetidos, `desde` no puede superar `hasta` y el periodo
 inclusivo maximo es de 366 dias. La zona horaria operativa es
 `America/Guatemala`.
+
+Las seis exportaciones necesitan al menos una `columnas`, como lista de claves
+separadas por comas segun las columnas del reporte. La validacion de query de
+primer control permite omitirla, pero el servicio responde
+`400 INVALID_REPORT_COLUMNS` si falta. Las otras cinco la exigen en la query.
+No aceptan otros parametros. Un nombre de columna desconocido tambien responde
+`400 INVALID_REPORT_COLUMNS`; un reporte sin
+registros responde `409 EMPTY_REPORT`. Las fechas o consultas invalidas
+responden `400` y la ausencia de `reportes.exportar`, `403`.
 
 La captacion se determina exclusivamente con la fecha del control numero 1. Si
 existieran duplicados historicos se elige primero por fecha y luego por ID, sin
@@ -469,8 +514,9 @@ X-CAP-Automation-Key: <API_KEY_ALEATORIA>
 | `GET` | `/v1/proximas-citas?offset_days=1&window_days=1` | Citas por fecha con un nombre, un apellido, telefono y comunidad. |
 | `GET` | `/v1/censo-primer-control?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` | Conteo de primeros controles del periodo. |
 | `GET` | `/v1/censo-primer-control/excel?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` | Excel nominal del mismo periodo para adjunto institucional. |
-| `GET` | `/v1/inasistencias?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` | Vista previa de una semana calendario anterior completa. |
+| `GET` | `/v1/inasistencias?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` | Vista previa de la semana anterior completa y de inasistencias previas aun pendientes. |
 | `POST` | `/v1/inasistencias/preparar` | Calcula y reserva idempotentemente la semana lunes-domingo anterior. |
+| `POST` | `/v1/inasistencias/materializar` | Materializa citas vencidas como `atendida` o `inasistente`; no acepta query y no usa filtros del body. |
 | `POST` | `/v1/inasistencias/confirmar` | Confirma mediante token efímero que Resend aceptó el despacho. |
 | `POST` | `/v1/inasistencias/resolver` | Resolución técnica manual de una reserva ambigua. |
 | `POST` | `/v1/tdap/preparar` | Deriva y reserva el seguimiento semanal Tdap de El Chal. |
@@ -504,19 +550,26 @@ completo y anterior al día actual en `America/Guatemala`. El backend incluye
 solo `citas_prenatales` con:
 
 ```text
-fecha_programada BETWEEN desde AND hasta
-estado = programada
+fecha_programada <= hasta
+estado = inasistente
 control_cumplimiento_id IS NULL
-embarazo.estado = activo
+embarazo.estado IN (activo, puerperio)
+sin cita de seguimiento derivada ni control posterior a la fecha programada
 created_at >= schema_migrations.applied_at de 014_citas_prenatales.sql
 ```
 
-No consulta `cita_siguiente`. Atendidas, canceladas, reprogramadas, citas fuera
-de ventana, previas al corte o de embarazos no activos quedan excluidas.
+No consulta `cita_siguiente`. Incluye inasistencias nuevas del periodo (`new`)
+y anteriores aun pendientes (`previous_pending`). Atendidas, canceladas,
+reprogramadas, posteriores al periodo, previas al corte o de embarazos cerrados
+quedan excluidas. `POST /v1/inasistencias/preparar` materializa primero las
+citas vencidas; el endpoint `materializar` devuelve el total procesado y los
+conteos de atendidas e inasistentes.
 
-La respuesta de vista previa y preparación usa `schema_version=1`, zona, tipo,
-rango, `cutoff_at`, estado de despacho, total y `appointments`. Cada elemento
-contiene exactamente `date`, `first_name`, `last_name`, `phone` y `community`.
+La respuesta de vista previa y preparación usa `schema_version=2`, zona, tipo,
+rango, `cutoff_at`, estado de despacho, `summary` (`new`, `previous_pending`,
+`total`), total y `appointments`. Cada elemento contiene exactamente `date`,
+`first_name`, `last_name`, `phone`, `community` y `category` (`new` o
+`previous_pending`).
 No devuelve IDs ni información clínica.
 
 Estados de preparación:

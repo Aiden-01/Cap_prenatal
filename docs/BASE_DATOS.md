@@ -47,7 +47,7 @@ como maximo la cuenta director indicada y no cambia su contrasena si ya existe.
 En produccion exige una confirmacion adicional documentada en
 `docs/ROTACION_SECRETOS.md`.
 
-## Estado final y compatibilidad de migraciones 008 a 015
+## Estado final y compatibilidad de migraciones 008 a 017
 
 `schema.sql` declara 19 tablas publicas: 17 operativas y dos tablas técnicas,
 `schema_migrations` y `automatizacion_despachos`. El conteo se valida tanto analizando las sentencias
@@ -60,7 +60,7 @@ el conteo agregado y aborta toda la transaccion cuando el conteo es mayor que
 cero. Solo una tabla vacia se retira, sin `CASCADE`; una dependencia inesperada
 tambien provoca rollback.
 
-El codigo actual comprueba al arrancar que las migraciones `008` a `015` esten
+El codigo actual comprueba al arrancar que las migraciones `008` a `017` esten
 registradas con el checksum de sus archivos versionados. La comprobacion solo
 ejecuta `SELECT`: no crea ni altera tablas, no modifica datos y no aplica
 migraciones automaticamente. El runner solo registra 008 despues de retirar o
@@ -69,7 +69,7 @@ comprobar ausente la tabla obsoleta. Orden operativo obligatorio:
 1. detener el backend anterior;
 2. verificar backup y conteo de forma autorizada;
 3. ejecutar `npm run db:migrate`;
-4. confirmar 008 a 015 y el conteo final;
+4. confirmar 008 a 017 y el conteo final;
 5. desplegar/iniciar el backend nuevo.
 
 Cada entorno mantiene su propia base y ejecuta `npm run db:migrate` de forma
@@ -86,8 +86,19 @@ nunca una base real.
 La observación local de solo lectura más reciente encontró 014 registrada con
 el checksum versionado y `applied_at` del 24 de agosto de 2026, 21:43:36 en
 `America/Guatemala`. Esta sesión no ejecutó esa migración y no atribuye quién o
-qué proceso la aplicó. `015_automatizacion_despachos.sql` sigue pendiente en la
-base local configurada; se validó únicamente en PostgreSQL temporal aislado.
+qué proceso la aplicó. En aquella observacion,
+`015_automatizacion_despachos.sql` seguia pendiente en la base local
+configurada; eso no determina el estado actual de ninguna base.
+
+`016_riesgo_tiempo_horas_decimales.sql` cambia
+`fichas_riesgo_obstetrico.tiempo_horas` a `NUMERIC(4,2)` para conservar
+fracciones de hora; el rango funcional de 0 a 72 horas se valida en la API.
+`017_citas_inasistencias.sql` agrega el estado `inasistente`, la relacion de
+seguimiento y sus restricciones e indices. Antes de reclasificar citas vencidas
+ya estructuradas, comprueba que no existan controles coincidentes ambiguos ni
+controles ya asignados a otra cita. En la misma migracion marca `atendida` la
+cita vencida con control de la misma fecha, e `inasistente` la vencida sin ese
+control. No reconstruye citas desde `controles_prenatales.cita_siguiente`.
 
 El historial Git muestra que el proyecto inicial aplicaba directamente
 `schema.sql` y no tenia archivos incrementales. La primera migracion versionada
@@ -130,7 +141,7 @@ controles_puerperio
 | `pacientes` | Datos generales, antecedentes, datos obstetricos base y campos institucionales. |
 | `embarazos` | Historial de embarazos por paciente. |
 | `controles_prenatales` | Consultas prenatales por embarazo y modelo canonico de sus resultados de laboratorio. |
-| `citas_prenatales` | Agenda trazable originada por controles, preparada para cumplimiento y reprogramacion. |
+| `citas_prenatales` | Agenda trazable originada por controles, con cumplimiento, inasistencia, reprogramacion y seguimiento. |
 | `fichas_riesgo_obstetrico` | Evaluacion de riesgo obstetrico por embarazo. |
 | `planes_parto` | Plan de parto por embarazo. |
 | `vacunas_paciente` | Vacunas asociadas a paciente/embarazo. |
@@ -176,7 +187,7 @@ Reglas:
 | Modulo | Relacion esperada |
 | --- | --- |
 | Controles prenatales | Muchos por embarazo. |
-| Citas prenatales | Muchas por embarazo; una por control de origen. |
+| Citas prenatales | Muchas por embarazo; una cita raiz por control de origen, con posibles citas derivadas. |
 | Riesgo obstetrico | Uno por embarazo. |
 | Plan de parto | Uno por embarazo. |
 | Vacunas | Muchas por embarazo. |
@@ -204,9 +215,13 @@ Restricciones importantes que el backend traduce a mensajes claros:
 - Ficha de riesgo unica por embarazo.
 - Plan de parto unico por embarazo.
 - Numero de control unico por embarazo.
-- Una cita unica por control de origen y un control de cumplimiento usado como
-  maximo por una cita.
-- Origen, cumplimiento y cita reprogramada deben pertenecer al mismo embarazo.
+- Una cita raiz unica por control de origen y un control de cumplimiento usado
+  como maximo por una cita.
+- Una sola cita `programada` sin cumplimiento por embarazo; como maximo una hija
+  por reprogramacion y una cita de seguimiento por inasistencia.
+- Origen, cumplimiento, cita reprogramada y seguimiento deben pertenecer al
+  mismo embarazo. Una cita no puede derivar simultaneamente de reprogramacion
+  e inasistencia ni apuntar a si misma.
 - Numero de atencion puerperio unico por embarazo.
 - Posicion TD unica por paciente mediante `ux_vacunas_td_paciente_posicion`.
 - Posicion SR/SPR unica por paciente mediante `ux_vacunas_spr_sr_paciente_posicion`.
@@ -251,23 +266,30 @@ checksum una sola vez y revierte el archivo completo ante error.
 `controles_prenatales.cita_siguiente`. El registro conserva:
 
 - `embarazo_id` y `fecha_programada`;
-- `estado`: `programada`, `atendida`, `cancelada` o `reprogramada`;
+- `estado`: `programada`, `atendida`, `cancelada`, `reprogramada` o
+  `inasistente`;
 - `control_origen_id`, inmutable y compartido por la raiz y sus hijas como
   origen historico de la cadena;
 - `control_cumplimiento_id`, opcional y unico, obligatorio solo para
   `atendida`;
 - `reprogramada_desde_id`, relacion uno a uno hacia la cita anterior;
+- `seguimiento_inasistencia_desde_id`, relacion opcional uno a uno hacia la
+  inasistencia que origino una cita de seguimiento;
 - `registrado_por`, `updated_by`, `created_at` y `updated_at`.
 
 Las FKs compuestas de `control_origen_id` o `control_cumplimiento_id` junto a
 `embarazo_id` impiden asociar controles de otro embarazo. La autorrelacion
-equivalente impide cruzar una reprogramacion entre embarazos. Los checks evitan
-autocumplimiento, autorreprogramacion y estados incompatibles con el control
-cumplidor. Las unicas transiciones operativas son
-`programada -> atendida|cancelada|reprogramada`; los estados terminales no
-regresan. Reprogramar conserva la fila original, la marca `reprogramada` y crea
-una hija `programada` con el mismo `control_origen_id` y
-`reprogramada_desde_id` apuntando a la anterior.
+equivalente impide cruzar reprogramaciones o seguimientos entre embarazos. Los
+checks evitan autocumplimiento, autorreprogramacion, seguimiento hacia si
+misma, ambas derivaciones en una fila y estados incompatibles con el control
+cumplidor. Una `programada` puede pasar a `atendida`, `cancelada`,
+`reprogramada` o `inasistente`. Reprogramar una `programada` conserva la fila
+original como `reprogramada` y crea una hija `programada` con el mismo
+`control_origen_id`. Una `inasistente` pendiente conserva su estado historico
+cuando se crea una nueva cita `programada` con
+`seguimiento_inasistencia_desde_id` apuntando a ella. Un control registrado
+posteriormente con la misma fecha puede reconciliar una `inasistente` como
+`atendida` si aun no existe seguimiento derivado.
 
 Al crear un control nuevo, el servicio conserva la captura existente. Si existe
 una unica cita `programada` del embarazo, el nuevo control la marca `atendida`
@@ -278,8 +300,10 @@ juntos. Mas de una cita vigente produce `409 CITAS_VIGENTES_AMBIGUAS` antes de
 escribir.
 
 La raiz conserva unicidad parcial por `control_origen_id WHERE
-reprogramada_desde_id IS NULL`; las hijas pueden reutilizar el origen. Otro
-indice unico parcial impide dos hijas desde la misma cita, y
+reprogramada_desde_id IS NULL AND seguimiento_inasistencia_desde_id IS NULL`;
+las hijas pueden reutilizar el origen. Indices unicos parciales impiden dos
+hijas de reprogramacion desde la misma cita o dos seguimientos desde la misma
+inasistencia, y
 `ux_citas_programada_embarazo` garantiza una unica cita `programada` sin
 cumplimiento por embarazo. La lectura idempotente de la raiz evita duplicados
 ante reintentos.
@@ -311,8 +335,9 @@ reconstruyen ni entran automaticamente al futuro seguimiento.
 
 El calendario mensual del Dashboard lee directamente `citas_prenatales` por un
 rango inclusivo de hasta 62 dias. La consulta unica admite el rango visual de
-seis semanas, incluye `programada`, `atendida`, `cancelada` y `reprogramada`, y
-relaciona opcionalmente la hija para mostrar su nueva fecha. Ordena por fecha y
+seis semanas, incluye `programada`, `atendida`, `cancelada`, `reprogramada` e
+`inasistente`, y relaciona opcionalmente la hija reprogramada o de seguimiento
+para mostrar la nueva fecha. Ordena por fecha y
 paciente, minimiza la salida a nombre y comunidad y no depende de
 `controles_prenatales.cita_siguiente`. Los indices existentes de fecha y
 relaciones cubren este acceso; CITAS-02 no agrega migracion ni indice.
@@ -324,11 +349,11 @@ modifica al reprogramar o cancelar: es historia, no la agenda vigente. No hay
 backfill, por lo que un periodo anterior al corte confiable puede no mostrar
 citas aunque existan proximas fechas en controles historicos.
 
-N8N-OPS-01A consulta la semana calendario anterior y considera solo citas
-vencidas que sigan `programada`, sin cumplimiento, en embarazo activo y creadas
-desde el corte confiable de 014. Atendidas, canceladas y fechas originales
-marcadas `reprogramada` quedan excluidas. El workflow está implementado e
-inactivo.
+El seguimiento semanal de inasistencias consulta citas `inasistente` sin
+cumplimiento ni seguimiento derivado, en embarazo `activo` o `puerperio`,
+creadas desde el corte confiable de 014 y con fecha hasta el domingo anterior.
+Incluye las nuevas de esa semana y las anteriores que sigan pendientes; excluye
+las que tengan un control posterior. El workflow versionado permanece inactivo.
 
 `015_automatizacion_despachos.sql` agrega una tabla exclusivamente técnica con
 unicidad por `tipo + periodo_desde + periodo_hasta`. Sus estados son
@@ -338,25 +363,29 @@ no guarda citas, pacientes, destinatarios, API keys ni contenido del correo.
 Una reserva sobrevive a un timeout ambiguo y bloquea otro envío hasta una
 resolución manual explícita.
 
-Los indices operativos cubren fecha programada, una unica cita vigente por
-embarazo, origen raiz, cumplimiento y no ramificacion. No se crea un indice
+Los indices operativos cubren fecha programada de citas aun `programada` sin
+cumplimiento (`idx_citas_programadas_fecha`), una unica cita vigente por
+embarazo (`ux_citas_programada_embarazo`), origen raiz
+(`ux_citas_control_origen_raiz`), cumplimiento
+(`ux_citas_control_cumplimiento`), una hija por reprogramacion
+(`ux_citas_reprogramada_desde`) y una por inasistencia
+(`ux_citas_seguimiento_inasistencia_desde`). No se crea un indice
 aislado de `estado`, por su baja selectividad; los predicados parciales cubren
 las consultas reales.
 
 En CITAS-01B la migracion 014 pasó en PostgreSQL temporal aislado, incluido
 checksum y `schemaCompatibility`. La base local de Casa ahora la registra, pero
-esta sesión solo verificó ese hecho y no la aplicó. La migración 015 y el
-backend que la exige deben desplegarse juntos siguiendo el orden operativo de
-esta guía antes de publicar el workflow semanal.
+aquella sesión solo verificó ese hecho y no la aplicó. Las migraciones `015` a
+`017` y el backend que las exige deben desplegarse siguiendo el orden operativo
+de esta guia antes de publicar el workflow semanal. Esta documentacion no
+verifica el estado de una base real actual.
 
 El indice parcial existente `ux_embarazo_activo_paciente` cubre unicamente
 `WHERE estado = 'activo'`; no impide por si solo combinaciones con `puerperio`
-si un escritor omite el bloqueo transaccional. Un indice parcial futuro sobre
-`WHERE estado IN ('activo', 'puerperio')` seria compatible con el modelo, pero
-antes requeriria comprobar datos existentes por paciente —incluidos pares
-activo/puerperio o multiples puerperios— y coordinar todos los escritores. No
-se crea una migracion en este cierre; queda documentado el riesgo para accesos
-directos o flujos que no bloqueen la fila de paciente.
+si un escritor omite el bloqueo transaccional. Por ello la proteccion frente a
+un embarazo `puerperio` concurrente depende del flujo de escritura que bloquea
+la fila de paciente; los accesos directos que omitan ese bloqueo conservan ese
+riesgo.
 
 ## Auditoria
 

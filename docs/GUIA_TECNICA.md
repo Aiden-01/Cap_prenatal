@@ -712,6 +712,17 @@ Comportamiento:
 | `/reportes` | `Reportes.jsx` | Reportes |
 | `/mapa-riesgo` | `MapaRiesgo.jsx` | Mapa de riesgo |
 | `/usuarios` | `Usuarios.jsx` | Administracion, solo director |
+| `/comunidades` | `Comunidades.jsx` | Administracion de comunidades, solo director |
+| `/404` y rutas desconocidas | `NotFoundPage.jsx` | Pagina de error con regreso e inicio |
+
+`App.jsx` carga con `React.lazy` y `Suspense` las vistas de pacientes,
+expediente, formularios clinicos, reportes, mapa, comunidades, usuarios y 404.
+Login y Dashboard permanecen en el paquete inicial. La ruta comodin muestra
+la pagina 404; las rutas privadas conservan sus guardas de sesion y rol.
+
+La interfaz adapta formularios, tablas, calendario y selector de impresion a
+pantallas estrechas. Las acciones de formularios clinicos permanecen visibles
+mediante una barra `sticky` inferior, con espacio para el area segura movil.
 
 ## Flujo de expediente y embarazo
 
@@ -947,7 +958,7 @@ migracion `008_retirar_referencias_efectuadas.sql` usa timeouts locales,
 bloqueo `ACCESS EXCLUSIVE` y conteo agregado. Aborta sin borrar datos si hay
 filas; si la tabla esta vacia la elimina sin `CASCADE`; si esta ausente finaliza
 de forma segura. Antes de abrir el puerto, el backend comprueba por nombre y
-checksum que las migraciones `008` a `015` esten registradas. La comprobacion
+checksum que las migraciones `008` a `017` esten registradas. La comprobacion
 es de solo lectura y no ejecuta DDL, DML ni migraciones automaticas. Cada entorno
 mantiene su propia base y aplica pendientes con `npm run db:migrate`; no se
 copian bases entre PCs.
@@ -956,7 +967,8 @@ CITAS-01A agrega `citas_prenatales` mediante la migracion 014, sin reconstruir
 historicos. Un control nuevo con `cita_siguiente` crea una cita `programada` en
 la misma transaccion. La tabla deja preparadas relaciones de origen,
 cumplimiento y reprogramacion dentro del mismo embarazo. CITAS-01B implementa
-las transiciones `programada -> atendida|cancelada|reprogramada`. Reprogramar
+las transiciones de atencion, cancelacion y reprogramacion; la migracion 017
+agrega `programada -> inasistente` y el seguimiento posterior. Reprogramar
 marca la cita original y crea una hija con el mismo origen; cancelar conserva
 el registro; un control nuevo cumple la unica cita vigente sin exigir igualdad
 de fechas. Todo usa bloqueo de embarazo/cita, escritura condicional, auditoria
@@ -970,8 +982,9 @@ la cita con el mismo embarazo y origen, y audita ambos cambios. Cualquier fallo
 revierte todo. Cambiar una fecha existente exige Reprogramar cita y retirarla
 exige Cancelar cita; nunca se reescribe el historial desde el formulario.
 
-La raiz es unica por control de origen, cada cita admite como maximo una hija y
-un indice parcial garantiza una sola cita `programada` por embarazo. Los
+La raiz es unica por control de origen; cada cita admite como maximo una hija
+por reprogramacion y cada inasistencia una cita de seguimiento. Un
+indice parcial garantiza una sola cita `programada` por embarazo. Los
 endpoints anidados bajo `/pacientes/:pacienteId/citas` validan tambien
 `embarazo_id`, evitando IDOR. Lectura requiere `pacientes.ver`; reprogramar y
 cancelar requieren `controles.editar`.
@@ -979,10 +992,9 @@ cancelar requieren `controles.editar`.
 CITAS-02 reemplaza la tabla limitada a siete dias por un calendario mensual en
 el Dashboard. `GET /api/citas/calendario` requiere `pacientes.ver`, recibe un
 rango inclusivo `from`/`to` de hasta 62 dias y consulta directamente
-`citas_prenatales` en una sola lectura. Incluye los cuatro estados, nombre y
-comunidad minimizados y la fecha de una hija cuando la original fue
-reprogramada. El endpoint M2M de recordatorio conserva su ruta y contrato, por
-lo que los workflows n8n no se modifican.
+`citas_prenatales` en una sola lectura. Incluye los cinco estados, nombre y
+comunidad minimizados y la fecha de una hija reprogramada o de seguimiento.
+El endpoint M2M de recordatorio conserva su ruta y contrato.
 
 El frontend implementa la cuadrícula de seis semanas sin dependencia nueva. La
 semana comienza en domingo; `appointmentCalendar.js` valida y separa
@@ -1006,10 +1018,14 @@ No hay backfill de `controles_prenatales.cita_siguiente`. Antes del corte de
 activacion de la migracion 014 y su backend puede existir un mes correctamente
 vacio aunque los controles historicos conserven una proxima fecha.
 
-N8N-OPS-01A sigue pendiente. El modelo ya permite que una consulta futura de la
-semana calendario anterior seleccione exclusivamente citas vencidas que aun
-esten `programada` y sin `control_cumplimiento_id`; atendidas, canceladas y
-originales reprogramadas quedan fuera sin heuristicas.
+El backend materializa citas vencidas al iniciar, periodicamente y antes de
+operaciones de citas: un control de la misma fecha deja la cita `atendida` y su
+ausencia la deja `inasistente`. La inasistencia conserva su estado al crear una
+cita posterior de seguimiento; puede reconciliarse con un control tardio de la
+misma fecha mientras no tenga seguimiento derivado. El flujo semanal de n8n
+consulta inasistencias nuevas y anteriores aun pendientes, sin reconstruir
+citas desde controles historicos. Contratos y restricciones: `docs/API.md` y
+`docs/BASE_DATOS.md`.
 
 ## PDF y reportes
 
@@ -1031,9 +1047,11 @@ La clasificacion nominal conserva el semaforo vigente: ficha positiva = alto,
 sin ficha positiva y edad menor de 20 o mayor de 35 = medio, resto = bajo. El
 listado especifico de riesgo solo incluye ficha positiva.
 
-La consulta requiere `reportes.ver`. Excel y PDF requieren
-`reportes.exportar`; el frontend no ofrece descargas sin ese permiso. Ambos
-formatos del censo principal usan oficio/folio 8.5 x 13, horizontal, una pagina
+Los seis reportes se pueden exportar a Excel y PDF con seleccion de columnas.
+La consulta requiere `reportes.ver`. Las descargas requieren
+`reportes.exportar`; el frontend solo las habilita tras generar un reporte con
+registros. Rutas y parametros: `docs/API.md`. Ambos formatos del censo
+principal usan oficio/folio 8.5 x 13, horizontal, una pagina
 de ancho y crecimiento vertical ilimitado. El Excel configura `paperSize: 14`,
 `fitToWidth: 1` y `fitToHeight: 0`; el PDF usa `@page { size: 13in 8.5in; }`,
 cabecera de tabla repetible, pagina numerada y respuesta privada `no-store`.
@@ -1048,10 +1066,15 @@ PDF institucionales:
 - Ficha de riesgo obstetrico.
 - Plan de parto.
 - Control prenatal individual.
+- Documento combinado de expediente, plan de parto y ficha de riesgo.
 
-Las cuatro rutas conservan sus URLs `GET`, pero requieren sesion valida y el
-permiso `pacientes.ver`. Ese permiso autoriza consultar pacientes e imprimir
-el formato oficial completo. No se exige `controles.ver_vih`: el resultado de
+El expediente centraliza la impresion en `PrintDocumentsModal`: permite elegir
+uno o varios documentos individuales, o generar un unico PDF combinado en el
+orden indicado. El combinado solo se habilita cuando los tres documentos
+estan disponibles; el control individual conserva su propia ruta. Las rutas
+requieren sesion valida y el permiso `pacientes.ver`. Ese permiso autoriza
+consultar pacientes e imprimir el formato oficial completo. No se exige
+`controles.ver_vih`: el resultado de
 VIH permanece en el documento por politica clinica confirmada por el CAP.
 
 La autorizacion, la existencia de la paciente y la pertenencia de
@@ -1087,6 +1110,12 @@ La generacion usa una mezcla de:
 - `pdf-lib`.
 - Puppeteer.
 - Excel/LibreOffice para ciertos flujos de formatos.
+
+Los PDF basados en HTML comparten un gestor de Chromium que reutiliza el
+navegador entre generaciones y crea paginas o contextos aislados por trabajo.
+El gestor cierra Chromium al apagar el backend. Los reportes PDF se generan en
+el backend con el mismo gestor; las exportaciones Excel usan ExcelJS. El
+frontend descarga blobs PDF y comprueba su tipo antes de guardar el archivo.
 
 En Docker/Linux se recomienda:
 
@@ -1129,8 +1158,9 @@ El backend conserva solamente hashes SHA-256 CURRENT/NEXT. JWT, cookies, CSRF,
 `Authorization`, parametros desconocidos y credenciales en query string no
 autentican la ruta. En desarrollo o deshabilitada responde `404`.
 
-La consulta de citas usa el ultimo control determinista por embarazo activo y
-expone solo fecha, primer nombre, primer apellido, telefono y comunidad. No
+La consulta de citas usa `citas_prenatales` programadas sin cumplimiento en
+embarazos activos y expone solo fecha, primer nombre, primer apellido, telefono
+y comunidad. No
 incluye IDs, CUI, expediente, direccion, riesgo, diagnostico u otros datos
 clinicos. El resumen del censo solo expone rango y total; el XLSX nominal se
 genera en memoria únicamente para adjuntarlo cuando hay registros. El endpoint
@@ -1152,7 +1182,7 @@ una `N8N_ENCRYPTION_KEY` estable; el script local lee solo `n8n/.env` y liga el
 editor a loopback. Produccion requiere acceso administrativo privado/HTTPS,
 backups restaurables, egress limitado y gestor de secretos.
 
-Los cuatro workflows Resend versionados permanecen inactivos y sin credenciales:
+Los seis workflows Resend versionados permanecen inactivos y sin credenciales:
 
 - recordatorio diario a las 08:00: sin citas termina sin correo; con citas
   envía un único HTML con el detalle operativo mínimo;
@@ -1161,6 +1191,10 @@ Los cuatro workflows Resend versionados permanecen inactivos y sin credenciales:
 - seguimiento de inasistencias cada lunes a las 08:00: CAP Prenatal calcula y
   reserva la semana anterior; `total=0` o período ya procesado termina sin
   correo, y Resend se confirma en backend para impedir duplicados.
+- seguimiento Tdap cada lunes a las 08:00: prepara oportunidades y pendientes
+  de El Chal en un XLSX de dos hojas;
+- watchdog de calidad de datos cada lunes a las 09:00: resume invariantes
+  objetivas por categoria sin detalle nominal.
 
 Los censos envían un aviso sin archivo cuando `total=0`; cuando hay datos
 descargan `binary.data` y adjuntan el XLSX mediante Resend. Todos validan el
@@ -1281,7 +1315,7 @@ PostgreSQL.
 Antes del despliegue, `npm run db:migrate` desde `backend` aplica el schema base y
 las migraciones versionadas pendientes en orden. Cada archivo queda registrado
 por nombre y checksum en `schema_migrations`; `007_auth_sessions.sql` y las
-migraciones estructurales `008` a `015` forman parte de este flujo y no deben
+migraciones estructurales `008` a `017` forman parte de este flujo y no deben
 ejecutarse manualmente por separado. 008 requiere backup, verificacion de
 conteo y despliegue del backend nuevo solo despues de completarse.
 

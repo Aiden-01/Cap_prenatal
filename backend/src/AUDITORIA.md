@@ -2,9 +2,9 @@
 
 Desde Sprint 4B.3E todos los productores productivos usan el camino privado:
 
-- `registrarEventoPrivado`: obligatorio para autenticacion, usuarios,
+- `registrarEventoPrivado`: camino usado por autenticacion, usuarios,
   passwords, roles, permisos, sesiones, PDF, exportaciones/reportes,
-  automatizaciones, pacientes,
+  automatizaciones, citas prenatales, pacientes,
   embarazos, controles prenatales/laboratorios embebidos, riesgo obstetrico,
   vacunas, morbilidad, plan de parto, puerperio y comunidades.
   Requiere
@@ -40,7 +40,7 @@ El procedimiento operativo esta en
 
 Los eventos informativos siguen siendo best effort. Los cambios de password,
 rol, estado del usuario, permisos, eliminacion de usuario y todas las escrituras
-de paciente, embarazo, control prenatal, riesgo, vacuna, morbilidad, plan de
+de paciente, embarazo, control prenatal, cita prenatal, riesgo, vacuna, morbilidad, plan de
 parto, puerperio o comunidad migradas usan la misma conexion que
 la operacion principal
 y `obligatorio: true`; una falla de auditoria provoca rollback. Una solicitud de
@@ -89,13 +89,18 @@ La auditoria debe responder:
 - `generar_pdf`
 - `exportar`
 
-## Eventos que deben auditarse
+## Eventos registrados en el codigo actual
 
 - Crear paciente.
 - Actualizar paciente.
 - Crear embarazo inicial o nuevo embarazo.
 - Cerrar embarazo o pasarlo a puerperio.
 - Crear, actualizar o eliminar controles prenatales.
+- Asignar una cita; atenderla al registrar un control; reprogramarla o
+  cancelarla. Una cancelacion repetida sin cambio no crea otro evento.
+- Materializar una cita vencida como `atendida` o `inasistente`; reconciliar
+  una inasistencia con un control de la misma fecha; crear una cita posterior
+  de seguimiento.
 - Crear, actualizar o eliminar ficha de riesgo.
 - Crear o actualizar plan de parto mediante su upsert existente. No existe
   eliminacion HTTP para esta entidad.
@@ -105,14 +110,42 @@ La auditoria debe responder:
 - Login fallido.
 - Intento de login con usuario inactivo.
 - Logout.
+- Cierre de todas las sesiones y revocaciones de sesion.
+- Cambios y reinicios de contrasena, cambios de rol/permisos y operaciones de
+  usuario que producen un delta real.
 - Generacion exitosa de PDF.
 - Exportacion de reportes.
-- Consulta autorizada del resumen agregado de proximas citas.
+- Consultas y despachos M2M de automatizaciones, segun los eventos concretos
+  descritos abajo.
 
 La creacion explicita de un embarazo registra sus eventos con la misma
 conexion y transaccion que la insercion. Si esa auditoria obligatoria falla,
 se revierte la creacion para no dejar un embarazo sin trazabilidad. La consulta
 GET del expediente no registra un evento de creacion ni modifica datos.
+
+### Citas prenatales e inasistencias
+
+Los eventos privados de `cita_prenatal` verificados en los servicios son:
+
+| `contexto.evento` | `accion` | Momento |
+| --- | --- | --- |
+| `crear` | `crear` | Asignacion desde el expediente o correccion de `cita_siguiente` en el ultimo control. |
+| `atender` | `actualizar` | Un control nuevo atiende la cita programada de la misma fecha. |
+| `reprogramar` | `actualizar` | La cita original pasa a `reprogramada` y se crea su hija. |
+| `cancelar` | `actualizar` | La cita programada pasa a `cancelada`. |
+| `materializar_asistencia` | `actualizar` | Una cita vencida con control coincidente pasa a `atendida`. |
+| `materializar_inasistencia` | `actualizar` | Una cita vencida sin control coincidente pasa a `inasistente`. |
+| `reconciliar_asistencia_tardia` | `actualizar` | Un control tardio de la misma fecha atiende una inasistencia sin seguimiento derivado. |
+| `crear_seguimiento_inasistencia` | `crear` | Se crea una cita posterior desde una inasistencia pendiente. |
+
+Estas escrituras usan `obligatorio: true` y la misma transaccion de la
+operacion. El payload conserva solo estados controlados, fecha programada,
+IDs internos de control o cita relacionados y codigos de motivo permitidos.
+La materializacion automatica puede no tener usuario humano; no inventa uno.
+Cuando un control nuevo crea su siguiente cita, el servicio registra el evento
+del control, pero no emite un segundo evento `cita_prenatal/crear`. La
+correccion posterior de `cita_siguiente` en el ultimo control si registra el
+evento de cita ademas del evento del control.
 
 ## Datos que no deben auditarse
 
@@ -149,11 +182,38 @@ API key, hash, SQL ni respuesta nominal. Este evento es best effort: su fallo
 no convierte una consulta valida en error. Los intentos no autenticados no
 crean una fila de auditoria.
 
+Los controladores M2M tambien intentan eventos informativos de consulta de
+censo de primer control y descarga de su Excel; inasistencias semanales
+(`consultar`, `preparar`, `confirmar`, `resolver`); seguimiento Tdap
+(`preparar`, `consultar` al descargar XLSX, `confirmar`, `resolver`); y calidad
+de datos semanal (`preparar`, `confirmar`, `resolver`). Los mismos manejadores
+intentan un evento con motivo controlado ante fallos internos. Usan
+`bestEffortAudit` sin datos nominales ni credenciales. La ruta M2M
+`inasistencias/materializar` no emite un evento informativo de despacho;
+las transiciones de cada cita procesada se auditan obligatoriamente en el
+servicio clinico.
+
 No copiar snapshots clinicos completos si no son necesarios para trazabilidad.
 Las exportaciones del censo de primer control registran `censo_primer_control`,
 formato `xlsx` o `pdf`, `desde`, `hasta` y cantidad de filas. No registran
 nombres, CUI, query completa, filtros libres, el archivo, binarios ni la tabla
 nominal.
+
+Las rutas actuales de los seis reportes generan `reportes/exportacion_reporte`
+con accion `exportar`, tipo de reporte, formato `xlsx` o `pdf`, cantidad de
+filas y, para primer control, fechas validadas. Los controladores conservan
+tambien los eventos `reportes/exportacion_censo` en sus manejadores de censo.
+Las consultas JSON de reportes no llaman al registrador. La auditoria de
+exportacion es informativa: no usa `obligatorio: true`.
+
+Los PDF clinicos individuales de control, ficha MSPAS, riesgo y plan de parto,
+asi como el PDF combinado, generan `documentos/pdf_clinico_generado` con accion
+`generar_pdf`. `tipo_documento` distingue `control_prenatal`,
+`ficha_mspas_prenatal`, `riesgo_obstetrico`, `plan_parto` y
+`expediente_completo`. Se conserva metadata minima e IDs internos; las
+descargas de Excel de reportes se auditan como exportacion, no como PDF clinico.
+El evento PDF se intenta despues de generar el binario y antes de responder;
+es informativo y no guarda el archivo.
 
 ## Eventos privados y payload
 
@@ -180,6 +240,10 @@ nominal.
   actualizacion solo nombres con delta real. Laboratorios, incluido VIH, nunca
   conservan resultados, numeros, fechas ni valores positivo/negativo. El permiso
   `controles.ver_vih` no altera esta politica de auditoria.
+- Cita prenatal: conserva transiciones de `estado_cita`, fecha programada,
+  identificadores internos de cumplimiento o de cita nueva y codigos de
+  motivo permitidos. No guarda nombre, telefono, comunidad ni otros datos
+  clinicos de la paciente.
 - Riesgo obstetrico: los criterios persistidos se reducen al nombre
   `factores_riesgo`; el resultado generado se reduce a `tiene_riesgo`. No se
   conservan criterios concretos, booleanos, observaciones, antecedentes ni texto.
@@ -224,8 +288,9 @@ proteccion de usuarios conserva ese nombre dentro de `auditoria_eventos`, pero
 ya no consulta la tabla clinica eliminada. Por ello un usuario relacionado con
 un evento historico sigue sin poder eliminarse.
 
-La migracion 008 no modifica `auditoria_eventos`. A fecha de Sprint 6B-R1 no se
-ha aplicado en PC1 ni PC2.
+La migracion 008 no modifica `auditoria_eventos`. La nota historica de
+Sprint 6B-R1 sobre su aplicacion en equipos ya no describe el estado actual de
+las bases y no debe usarse como verificacion operativa.
 
 ## Criterio funcional para PDF institucional
 
