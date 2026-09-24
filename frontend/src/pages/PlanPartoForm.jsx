@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Baby,
   CalendarDays,
@@ -25,6 +25,8 @@ import { useGlobalToast } from "../context/ToastContext";
 import { getGuatemalaDateInputValue } from "../utils/guatemalaTime";
 import { calculateGestationalWeeks } from "../utils/gestationalAge";
 import { useFieldErrors } from "../hooks/useFieldErrors";
+import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
+import { birthPlanFieldId, captureFormField } from "../utils/chatbotFocusedField";
 import "./clinical-secondary-workflows.css";
 
 const FormErrorContext = createContext({
@@ -64,6 +66,7 @@ function Input({ label, name, form, set, type = "text", placeholder = "", hint, 
         id={inputId}
         className={inputClass(name)}
         name={name}
+        data-chatbot-field={birthPlanFieldId(name)}
         type={type}
         placeholder={placeholder}
         value={form[name] ?? ""}
@@ -89,6 +92,7 @@ function Select({ label, name, form, set, options }) {
         id={inputId}
         className={inputClass(name)}
         name={name}
+        data-chatbot-field={birthPlanFieldId(name)}
         value={form[name] ?? ""}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `${inputId}-error` : undefined}
@@ -110,6 +114,7 @@ function Toggle({ label, name, form, set }) {
   return (
     <button
       type="button"
+      data-chatbot-field={birthPlanFieldId(name)}
       aria-pressed={val}
       onClick={() => set(name, !val)}
       className={`toggle-control ${val ? "is-on" : ""}`}
@@ -377,8 +382,11 @@ const FIELD_LABELS = {
 
 export default function PlanPartoForm() {
   const { id } = useParams();
+  const location = useLocation();
+  const { setFocusedField } = useChatbotScreenContext();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  useEffect(() => () => setFocusedField(null), [location.key, setFocusedField]);
   const embarazoId = searchParams.get("embarazo_id") || "";
   const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=plan`;
   const toast = useGlobalToast();
@@ -506,7 +514,10 @@ export default function PlanPartoForm() {
       {loadingData ? (
         <ClinicalLoadingSkeleton label="Cargando plan de parto" />
       ) : (
-        <form onSubmit={handleSubmit} className="secondary-workflow-form">
+        <form onSubmit={handleSubmit} className="secondary-workflow-form" onFocusCapture={(event) => {
+          const selected = captureFormField(event.target.dataset.chatbotField, "plan_parto", location.key);
+          if (selected) setFocusedField(selected);
+        }}>
           <FormErrorContext.Provider value={fieldErrors}>
             {fieldErrors.summary.length > 0 && (
               <ClinicalNotice variant="error" title="Revisa estos datos" className="secondary-workflow-notice">

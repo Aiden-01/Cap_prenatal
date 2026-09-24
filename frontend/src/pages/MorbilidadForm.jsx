@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { CalendarClock, ClipboardCheck, FileText, Save, Stethoscope } from "lucide-react";
 import api from "../api/axios";
 import {
@@ -11,6 +11,8 @@ import {
 import { useGlobalToast } from "../context/ToastContext";
 import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
 import { useFieldErrors } from "../hooks/useFieldErrors";
+import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
+import { captureFormField, morbidityFieldId } from "../utils/chatbotFocusedField";
 import "./clinical-tertiary-workflows.css";
 
 const INIT = {
@@ -56,8 +58,11 @@ function Field({ label, children, error, htmlFor, className = "" }) {
 
 export default function MorbilidadForm() {
   const { id, morbilidadId } = useParams();
+  const location = useLocation();
+  const { setFocusedField } = useChatbotScreenContext();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  useEffect(() => () => setFocusedField(null), [location.key, setFocusedField]);
   const embarazoId = searchParams.get("embarazo_id") || "";
   const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=morbilidad`;
   const toast = useGlobalToast();
@@ -123,7 +128,11 @@ export default function MorbilidadForm() {
       icon={FileText}
       onBack={() => navigate(expedientePath)}
     >
-      <form className="tertiary-workflow-form morbidity-workflow-form" onSubmit={submit}>
+      <form className="tertiary-workflow-form morbidity-workflow-form" onSubmit={submit} onFocusCapture={(event) => {
+        const selected = captureFormField(event.target.dataset.chatbotField,
+          morbilidadId ? "editar_morbilidad" : "nueva_morbilidad", location.key);
+        if (selected) setFocusedField(selected);
+      }}>
         {fieldErrors.summary.length > 0 && (
           <ClinicalNotice variant="error" title="Revisa estos datos" className="tertiary-workflow-notice">
             {fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" | ")}
@@ -139,25 +148,25 @@ export default function MorbilidadForm() {
           >
             <div className="morbidity-identity-grid">
               <Field label="Fecha" htmlFor="morbilidad-fecha" error={fieldErrors.fieldError("fecha")}>
-                <input id="morbilidad-fecha" name="fecha" className={fieldErrors.inputClass("fecha")} type="date" value={form.fecha}
+                <input id="morbilidad-fecha" name="fecha" data-chatbot-field={morbidityFieldId("fecha")} className={fieldErrors.inputClass("fecha")} type="date" value={form.fecha}
                   aria-invalid={Boolean(fieldErrors.fieldError("fecha"))}
                   aria-describedby={fieldErrors.fieldError("fecha") ? "morbilidad-fecha-error" : undefined}
                   onChange={(e) => set("fecha", e.target.value)} />
               </Field>
               <Field label="Hora" htmlFor="morbilidad-hora" error={fieldErrors.fieldError("hora")}>
-                <input id="morbilidad-hora" name="hora" className={fieldErrors.inputClass("hora")} type="time" value={form.hora ?? ""}
+                <input id="morbilidad-hora" name="hora" data-chatbot-field={morbidityFieldId("hora")} className={fieldErrors.inputClass("hora")} type="time" value={form.hora ?? ""}
                   aria-invalid={Boolean(fieldErrors.fieldError("hora"))}
                   aria-describedby={fieldErrors.fieldError("hora") ? "morbilidad-hora-error" : undefined}
                   onChange={(e) => set("hora", e.target.value)} />
               </Field>
               <Field label="Motivo de consulta" htmlFor="morbilidad-motivo_consulta" error={fieldErrors.fieldError("motivo_consulta")} className="is-wide">
-                <input id="morbilidad-motivo_consulta" name="motivo_consulta" className={fieldErrors.inputClass("motivo_consulta")} value={form.motivo_consulta ?? ""}
+                <input id="morbilidad-motivo_consulta" name="motivo_consulta" data-chatbot-field={morbidityFieldId("motivo_consulta")} className={fieldErrors.inputClass("motivo_consulta")} value={form.motivo_consulta ?? ""}
                   aria-invalid={Boolean(fieldErrors.fieldError("motivo_consulta"))}
                   aria-describedby={fieldErrors.fieldError("motivo_consulta") ? "morbilidad-motivo_consulta-error" : undefined}
                   onChange={(e) => set("motivo_consulta", e.target.value)} />
               </Field>
               <Field label="Nombre / cargo atiende" htmlFor="morbilidad-nombre_cargo_atiende" error={fieldErrors.fieldError("nombre_cargo_atiende")} className="is-wide">
-                <input id="morbilidad-nombre_cargo_atiende" name="nombre_cargo_atiende" className={fieldErrors.inputClass("nombre_cargo_atiende")} value={form.nombre_cargo_atiende ?? ""}
+                <input id="morbilidad-nombre_cargo_atiende" name="nombre_cargo_atiende" data-chatbot-field={morbidityFieldId("nombre_cargo_atiende")} className={fieldErrors.inputClass("nombre_cargo_atiende")} value={form.nombre_cargo_atiende ?? ""}
                   aria-invalid={Boolean(fieldErrors.fieldError("nombre_cargo_atiende"))}
                   aria-describedby={fieldErrors.fieldError("nombre_cargo_atiende") ? "morbilidad-nombre_cargo_atiende-error" : undefined}
                   onChange={(e) => set("nombre_cargo_atiende", e.target.value)} />
@@ -180,7 +189,7 @@ export default function MorbilidadForm() {
                 ["impresion_clinica", "Impresión clínica"],
               ].map(([name, label]) => (
                 <Field key={name} label={label} htmlFor={`morbilidad-${name}`} error={fieldErrors.fieldError(name)}>
-                  <textarea id={`morbilidad-${name}`} name={name} className={fieldErrors.inputClass(name)} rows={3} value={form[name] ?? ""}
+                  <textarea id={`morbilidad-${name}`} name={name} data-chatbot-field={morbidityFieldId(name)} className={fieldErrors.inputClass(name)} rows={3} value={form[name] ?? ""}
                     aria-invalid={Boolean(fieldErrors.fieldError(name))}
                     aria-describedby={fieldErrors.fieldError(name) ? `morbilidad-${name}-error` : undefined}
                     onChange={(e) => set(name, e.target.value)} />
@@ -197,7 +206,7 @@ export default function MorbilidadForm() {
             aside={<span className="tertiary-section-index">03</span>}
           >
             <Field label="Tratamiento / Referencia" htmlFor="morbilidad-tratamiento_referencia" error={fieldErrors.fieldError("tratamiento_referencia")}>
-              <textarea id="morbilidad-tratamiento_referencia" name="tratamiento_referencia" className={fieldErrors.inputClass("tratamiento_referencia")} rows={4} value={form.tratamiento_referencia ?? ""}
+              <textarea id="morbilidad-tratamiento_referencia" name="tratamiento_referencia" data-chatbot-field={morbidityFieldId("tratamiento_referencia")} className={fieldErrors.inputClass("tratamiento_referencia")} rows={4} value={form.tratamiento_referencia ?? ""}
                 aria-invalid={Boolean(fieldErrors.fieldError("tratamiento_referencia"))}
                 aria-describedby={fieldErrors.fieldError("tratamiento_referencia") ? "morbilidad-tratamiento_referencia-error" : undefined}
                 onChange={(e) => set("tratamiento_referencia", e.target.value)} />

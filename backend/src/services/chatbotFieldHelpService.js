@@ -14,6 +14,7 @@ const TAB_LABELS = Object.freeze({
 const FORM_SECTION_LABELS = Object.freeze({
   expediente: 'Paciente', ficha_riesgo: 'Ficha de riesgo',
   vacunas: 'Vacunas', puerperio: 'Puerperio',
+  morbilidad: 'Morbilidad', plan_parto: 'Plan de parto',
 });
 
 function normalizeFieldQuestion(value) {
@@ -32,6 +33,13 @@ function fieldMatchesContext(field, context) {
 
 function findExplicitFieldHelp(message, context) {
   const question = normalizeFieldQuestion(message);
+  if (question === 'que datos vienen precargados' && context?.section === 'plan_parto'
+    && fieldMatchesContext({ forms: ['plan_parto'] }, context)) {
+    return {
+      recognized: true, intent: 'ayuda_campo', title: 'Datos precargados del plan de parto',
+      answer: 'Al abrir un plan nuevo, el formulario propone datos de identificación, residencia y contacto desde el expediente; antecedentes obstétricos desde la paciente, el embarazo y la ficha de riesgo; y algunos signos y responsables desde controles previos. Puedes revisar y editar esos campos. La edad gestacional por UR se calcula con FUR y la fecha del plan y se muestra en solo lectura. La FPP puede venir precargada, pero este formulario no la recalcula al cambiar FUR.',
+    };
+  }
   const match = question.match(/^(?:que significa|que es|que va en|donde registro|donde se registra|como lleno) (?:el campo |la |el )?(.+)$/);
   if (!match) return null;
   const requested = match[1];
@@ -81,6 +89,8 @@ function findGenericFieldHelp(message, context) {
       : matchingRoute && context.section === 'ficha_riesgo' ? 'Veo que estás en la Ficha de riesgo. '
         : matchingRoute && context.section === 'vacunas' ? 'Veo que estás en Vacunas. '
           : matchingRoute && context.section === 'puerperio' ? 'Veo que estás en Puerperio. '
+            : matchingRoute && context.section === 'morbilidad' ? 'Veo que estás en Morbilidad. '
+              : matchingRoute && context.section === 'plan_parto' ? 'Veo que estás en Plan de parto. '
         : matchingRoute && ['nueva_paciente', 'editar_paciente'].includes(context.form)
           ? 'Veo que estás en el formulario de paciente. ' : '';
   return {

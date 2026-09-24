@@ -194,6 +194,8 @@ function findNegatedOperationalRequest(message) {
 function findOperationalPriority(message) {
   const normalized = withoutSocialLeadIn(message);
 
+  if (normalized === 'como imprimo el plan de parto') return { intent: 'imprimir_plan_parto' };
+
   const negatedRequest = findNegatedOperationalRequest(normalized);
   if (negatedRequest) return negatedRequest;
 
