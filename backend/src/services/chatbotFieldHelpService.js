@@ -11,6 +11,10 @@ const TAB_LABELS = Object.freeze({
   general: 'General', laboratorio: 'Laboratorio',
   suplementacion: 'Suplementación', orientaciones: 'Orientaciones',
 });
+const FORM_SECTION_LABELS = Object.freeze({
+  expediente: 'Paciente', ficha_riesgo: 'Ficha de riesgo',
+  vacunas: 'Vacunas', puerperio: 'Puerperio',
+});
 
 function normalizeFieldQuestion(value) {
   return String(value || '').toLowerCase().normalize('NFD')
@@ -68,13 +72,15 @@ function findGenericFieldHelp(message, context) {
       recognized: true,
       intent: 'ayuda_campo_contextual',
       title: field.label,
-      answer: `Estás en ${field.forms ? field.section === 'ficha_riesgo' ? 'Ficha de riesgo' : 'Paciente' : `Control prenatal → ${tabLabel}`} → ${field.label}.\n\n${field.help}\n\n${field.expected}\n\n${field.operationalNote}`,
+      answer: `Estás en ${field.forms ? FORM_SECTION_LABELS[field.section] : `Control prenatal → ${tabLabel}`} → ${field.label}.\n\n${field.help}\n\n${field.expected}\n\n${field.operationalNote}`,
     };
   }
 
   const location = tabLabel ? `Veo que estás en Control prenatal → ${tabLabel}. `
     : isControlForm ? 'Veo que estás en Control prenatal. '
       : matchingRoute && context.section === 'ficha_riesgo' ? 'Veo que estás en la Ficha de riesgo. '
+        : matchingRoute && context.section === 'vacunas' ? 'Veo que estás en Vacunas. '
+          : matchingRoute && context.section === 'puerperio' ? 'Veo que estás en Puerperio. '
         : matchingRoute && ['nueva_paciente', 'editar_paciente'].includes(context.form)
           ? 'Veo que estás en el formulario de paciente. ' : '';
   return {

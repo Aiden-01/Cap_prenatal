@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AlertTriangle, Save, Syringe } from "lucide-react";
 import api from "../api/axios";
 import {
@@ -22,6 +22,8 @@ import {
 import { useGlobalToast } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
 import { useFieldErrors } from "../hooks/useFieldErrors";
+import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
+import { captureFormField, vaccineFieldId } from "../utils/chatbotFocusedField";
 import { calculateGestationalAge } from "../utils/gestationalAge";
 import { getGuatemalaDateInputValue } from "../utils/guatemalaTime";
 import {
@@ -98,8 +100,11 @@ function focusVaccineField(field) {
 
 export default function VacunaForm() {
   const { id, vacunaId } = useParams();
+  const location = useLocation();
+  const { setFocusedField } = useChatbotScreenContext();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  useEffect(() => () => setFocusedField(null), [location.key, setFocusedField]);
   const embarazoId = searchParams.get("embarazo_id") || "";
   const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=vacunas`;
   const toast = useGlobalToast();
@@ -377,7 +382,11 @@ export default function VacunaForm() {
       {loadError ? <ClinicalNotice variant="error">{loadError}</ClinicalNotice> : null}
       {!canWrite ? <ClinicalNotice variant="restriction">No tienes permiso para {editando ? "editar" : "registrar"} vacunas.</ClinicalNotice> : null}
 
-      <form className="vaccine-flow tertiary-workflow-form vaccine-workflow-form" onSubmit={submit} noValidate>
+      <form className="vaccine-flow tertiary-workflow-form vaccine-workflow-form" onSubmit={submit} noValidate onFocusCapture={(event) => {
+        const selected = captureFormField(event.target.dataset.chatbotField,
+          vacunaId ? "editar_vacuna" : "nueva_vacuna", location.key);
+        if (selected) setFocusedField(selected);
+      }}>
         <ClinicalSection
           className="vaccine-flow-section vaccine-stage-section"
           title="Selecciona la vacuna"
@@ -385,6 +394,7 @@ export default function VacunaForm() {
           aside={<span className="tertiary-section-index">Paso 1</span>}
         >
           <VaccineSelector
+            chatbotField={vaccineFieldId("tipo_vacuna")}
             selected={form.tipo_vacuna}
             onSelect={selectVaccine}
             disabled={loading || readOnly}
@@ -407,6 +417,7 @@ export default function VacunaForm() {
               {!isInfluenza ? (
                 <>
                   <DoseSelector
+                    chatbotField={vaccineFieldId("numero_dosis")}
                     definition={selectedDefinition}
                     selected={selectedDose}
                     suggestedDose={selectableStatus?.nextDose}
@@ -423,6 +434,7 @@ export default function VacunaForm() {
 
               <div className="vaccine-form-divider" />
               <MomentSelector
+                chatbotField={vaccineFieldId("momento")}
                 selected={form.momento}
                 onSelect={selectMoment}
                 disabled={loading || readOnly}
@@ -433,7 +445,7 @@ export default function VacunaForm() {
 
               <div className="vaccine-date-row">
                 <Field id="vaccine-application-date" label="Fecha de aplicación" error={dateError} hint="Fecha clínica sin hora. No puede ser futura.">
-                  <input id="vaccine-application-date" name="fecha_dosis" className={fieldErrors.inputClass("fecha_dosis")} type="date" max={today} required value={form.fecha_dosis}
+                  <input id="vaccine-application-date" name="fecha_dosis" data-chatbot-field={vaccineFieldId("fecha_dosis")} className={fieldErrors.inputClass("fecha_dosis")} type="date" max={today} required value={form.fecha_dosis}
                     aria-invalid={Boolean(dateError)}
                     aria-describedby={["vaccine-application-date-hint", dateError ? "vaccine-application-date-error" : ""].filter(Boolean).join(" ")}
                     disabled={loading || readOnly} onChange={(event) => setApplicationDate(event.target.value)} />

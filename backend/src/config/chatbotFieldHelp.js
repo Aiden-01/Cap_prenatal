@@ -8,6 +8,16 @@ function riskField(id, label, aliases, help, expected, operationalNote) {
     forms: ['ficha_riesgo'], help, expected, operationalNote };
 }
 
+function vaccineField(id, label, aliases, help, expected, operationalNote) {
+  return { id: `vacuna_${id}`, label, aliases, section: 'vacunas', tabs: [],
+    forms: ['nueva_vacuna', 'editar_vacuna'], help, expected, operationalNote };
+}
+
+function puerperiumField(id, label, aliases, help, expected, operationalNote) {
+  return { id: `puerperio_${id}`, label, aliases, section: 'puerperio', tabs: [],
+    forms: ['nuevo_puerperio', 'editar_puerperio'], help, expected, operationalNote };
+}
+
 const chatbotFieldHelp = Object.freeze([
   {
     id: 'numero_control', label: 'No. Control', aliases: ['numero de control', 'número de control'],
@@ -125,6 +135,50 @@ const chatbotFieldHelp = Object.freeze([
   riskField('distancia_servicio_km', 'Distancia al servicio', ['distancia al servicio'],
     'Registra la distancia al servicio de salud.', 'Es un número de kilómetros entre 0 y 500; admite decimales.',
     'Está en Información general.'),
+  vaccineField('tipo_vacuna', 'Tipo de vacuna', ['vacuna', 'tipo de vacuna'],
+    'Identifica la vacuna que se documenta.', 'El selector ofrece TD, Tdap, Influenza y SR/SPR.',
+    'TD muestra 3 dosis y 2 refuerzos; Tdap una aplicación por embarazo; Influenza se registra como aplicación simple por temporada; SR/SPR muestra 2 dosis. El sistema verifica las reglas al guardar.'),
+  vaccineField('numero_dosis', 'Posición de dosis', ['posicion dosis', 'posición/dosis', 'numero de dosis', 'número de dosis'],
+    'Ubica la aplicación dentro del esquema de la vacuna seleccionada.',
+    'TD ofrece Dosis 1, 2 y 3 y Refuerzos 1 y 2; Tdap una posición; SR/SPR Dosis 1 y 2.',
+    'No aparece para Influenza, que usa el valor interno 1. Las posiciones ya registradas pueden estar deshabilitadas; verifica el carné o antecedente.'),
+  vaccineField('momento', 'Momento de aplicación', ['momento', 'momento de vacuna'],
+    'Indica cuándo ocurrió la aplicación respecto del embarazo.',
+    'Selecciona Previo al embarazo, Durante el embarazo o Postparto/aborto, según el antecedente documentado.',
+    'Está en Documenta la aplicación; el sistema compara el momento con las fechas disponibles.'),
+  vaccineField('fecha_dosis', 'Fecha de aplicación', ['fecha de vacuna', 'fecha dosis'],
+    'Registra la fecha clínica de la aplicación.', 'Selecciona una fecha sin hora; es obligatoria y no puede ser futura.',
+    'Está en Documenta la aplicación. Los registros de embarazo cerrado permanecen en solo lectura.'),
+  puerperiumField('numero_atencion', 'No. atención', ['numero de atencion', 'número de atención'],
+    'Identifica si se documenta la primera o segunda atención de puerperio.', 'Es un número entero: 1 o 2.',
+    'Está en Parto y resultado. La segunda atención puede heredar datos del parto de la primera.'),
+  puerperiumField('fecha', 'Fecha', ['fecha de puerperio'],
+    'Fecha de la atención de puerperio.', 'Selecciona una fecha; es obligatoria.',
+    'Está en Parto y resultado. En una segunda atención nueva, cambiarla recalcula los días después del parto.'),
+  puerperiumField('dias_despues_parto', 'Días después del parto', ['dias despues del parto', 'dias postparto'],
+    'Registra los días transcurridos después del parto.', 'Es un número entero entre 0 y 60.',
+    'Está en Parto y resultado. En la segunda atención nueva puede calcularse desde la fecha y la primera atención.'),
+  puerperiumField('lugar_atencion_parto', 'Lugar del parto', ['lugar de atencion del parto'],
+    'Consigna el lugar del parto documentado.', 'Es un campo de texto.',
+    'Está en Parto y resultado; en la segunda atención nueva puede heredarse de la primera.'),
+  puerperiumField('quien_atendio_parto', 'Quién atendió parto', ['quien atendio el parto', 'personal del parto'],
+    'Identifica a quien atendió el parto.', 'Es un campo de texto.',
+    'Está en Parto y resultado; en la segunda atención nueva puede heredarse de la primera.'),
+  puerperiumField('tipo_parto', 'Tipo de parto', ['tipo de parto'],
+    'Registra el tipo de parto documentado.', 'Selecciona Vaginal o Cesárea.',
+    'Está en Parto y resultado; en la segunda atención nueva puede heredarse de la primera.'),
+  puerperiumField('recien_nacido_vivo', 'Recién nacido vivo', ['rn vivo', 'recien nacido vivo'],
+    'Registra la casilla de recién nacido vivo según el dato documentado.', 'Es una casilla de sí/no.',
+    'Está en Parto y resultado; Lía no determina su valor.'),
+  puerperiumField('tuvo_apego_inmediato', 'Apego inmediato', ['apego inmediato'],
+    'Registra la casilla de apego inmediato.', 'Es una casilla de sí/no.',
+    'Está en Parto y resultado de la primera atención; no se muestra en la segunda.'),
+  puerperiumField('lactancia_materna_exclusiva', 'Lactancia materna exclusiva', ['lactancia exclusiva'],
+    'Registra la casilla de lactancia materna exclusiva.', 'Es una casilla de sí/no.',
+    'Está en Puerperio inmediato; Lía no determina su valor.'),
+  puerperiumField('nombre_cargo_atiende', 'Nombre/cargo atiende', ['personal que atiende', 'nombre y cargo de quien atiende'],
+    'Identifica al personal responsable de esta atención de puerperio.', 'Es un campo de texto.',
+    'Está en Seguimiento y observaciones.'),
 ]);
 
 const CHATBOT_FIELD_IDS = Object.freeze(chatbotFieldHelp.map(({ id }) => id));

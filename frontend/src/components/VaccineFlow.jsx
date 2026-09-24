@@ -36,7 +36,7 @@ function handleRadioNavigation(event) {
   radios[nextIndex].click();
 }
 
-export function VaccineSelector({ selected, onSelect, disabled, invalid = false, describedBy }) {
+export function VaccineSelector({ selected, onSelect, disabled, invalid = false, describedBy, chatbotField }) {
   return (
     <div className="vaccine-choice-grid" role="radiogroup" aria-label="Tipo de vacuna" aria-invalid={invalid} aria-describedby={describedBy}>
       {VACCINE_CATALOG.map((vaccine, index) => {
@@ -50,6 +50,7 @@ export function VaccineSelector({ selected, onSelect, disabled, invalid = false,
             className={`vaccine-choice ${active ? "is-selected" : ""}`}
             key={vaccine.value}
             disabled={disabled}
+            data-chatbot-field={chatbotField}
             onClick={() => onSelect(vaccine.value)}
             onKeyDown={handleRadioNavigation}
           >
@@ -66,7 +67,7 @@ export function VaccineSelector({ selected, onSelect, disabled, invalid = false,
   );
 }
 
-export function DoseSelector({ definition, selected, suggestedDose, unavailablePositions, onSelect, disabled, invalid = false, describedBy }) {
+export function DoseSelector({ definition, selected, suggestedDose, unavailablePositions, onSelect, disabled, invalid = false, describedBy, chatbotField }) {
   if (!definition) return null;
   const firstAvailablePosition = definition.sequence.findIndex((_, index) => !unavailablePositions.has(index + 1)) + 1;
   return (
@@ -86,6 +87,7 @@ export function DoseSelector({ definition, selected, suggestedDose, unavailableP
               tabIndex={active || (!selected && position === firstAvailablePosition) ? 0 : -1}
               className={`vaccine-dose-choice ${active ? "is-selected" : ""}`}
               disabled={disabled || unavailable}
+              data-chatbot-field={chatbotField}
               key={label}
               onClick={() => onSelect(position)}
               onKeyDown={handleRadioNavigation}
@@ -101,7 +103,7 @@ export function DoseSelector({ definition, selected, suggestedDose, unavailableP
   );
 }
 
-export function MomentSelector({ selected, onSelect, disabled, invalid = false, describedBy }) {
+export function MomentSelector({ selected, onSelect, disabled, invalid = false, describedBy, chatbotField }) {
   return (
     <div>
       <p className="vaccine-selector-instruction">Selecciona el momento oficial que consta en el antecedente.</p>
@@ -116,6 +118,7 @@ export function MomentSelector({ selected, onSelect, disabled, invalid = false, 
               tabIndex={active || (!selected && index === 0) ? 0 : -1}
               className={`vaccine-moment-choice ${active ? "is-selected" : ""}`}
               disabled={disabled}
+              data-chatbot-field={chatbotField}
               key={option.value}
               onClick={() => onSelect(option.value)}
               onKeyDown={handleRadioNavigation}

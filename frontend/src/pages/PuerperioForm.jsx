@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Baby, ClipboardCheck, HeartPulse, MessageSquareText, Save } from "lucide-react";
 import api from "../api/axios";
 import {
@@ -12,6 +12,8 @@ import { useGlobalToast } from "../context/ToastContext";
 import { getGuatemalaDateInputValue, getGuatemalaTimeInputValue } from "../utils/guatemalaTime";
 import { getErrorMessage } from "../utils/errorMessage";
 import { useFieldErrors } from "../hooks/useFieldErrors";
+import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
+import { captureFormField, puerperiumFieldId } from "../utils/chatbotFocusedField";
 import "./clinical-tertiary-workflows.css";
 
 const INIT = {
@@ -125,7 +127,7 @@ function Input({ label, name, form, set, type = "text", errors = {}, inputClass,
   const error = errors[name];
   return (
     <Field label={label} error={error} htmlFor={inputId}>
-      <input id={inputId} name={name} className={inputClass ? inputClass(name) : "input-field"} type={type} value={form[name] ?? ""}
+      <input id={inputId} name={name} data-chatbot-field={puerperiumFieldId(name)} className={inputClass ? inputClass(name) : "input-field"} type={type} value={form[name] ?? ""}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `${inputId}-error` : undefined}
         onChange={(e) => set(name, type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
@@ -140,7 +142,7 @@ function Toggle({ label, name, form, set }) {
   const inputId = `puerperio-${name}`;
   return (
     <label className="tertiary-toggle" htmlFor={inputId}>
-      <input id={inputId} type="checkbox" checked={Boolean(form[name])} onChange={(e) => set(name, e.target.checked)} />
+      <input id={inputId} type="checkbox" data-chatbot-field={puerperiumFieldId(name)} checked={Boolean(form[name])} onChange={(e) => set(name, e.target.checked)} />
       <span>{label}</span>
     </label>
   );
@@ -148,8 +150,11 @@ function Toggle({ label, name, form, set }) {
 
 export default function PuerperioForm() {
   const { id, puerperioId } = useParams();
+  const location = useLocation();
+  const { setFocusedField } = useChatbotScreenContext();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  useEffect(() => () => setFocusedField(null), [location.key, setFocusedField]);
   const embarazoId = searchParams.get("embarazo_id") || "";
   const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=puerperio`;
   const toast = useGlobalToast();
@@ -241,7 +246,11 @@ export default function PuerperioForm() {
       icon={Baby}
       onBack={() => navigate(expedientePath)}
     >
-      <form className="tertiary-workflow-form" onSubmit={submit}>
+      <form className="tertiary-workflow-form" onSubmit={submit} onFocusCapture={(event) => {
+        const selected = captureFormField(event.target.dataset.chatbotField,
+          puerperioId ? "editar_puerperio" : "nuevo_puerperio", location.key);
+        if (selected) setFocusedField(selected);
+      }}>
         {fieldErrors.summary.length > 0 && (
           <ClinicalNotice variant="error" title="Revisa estos datos" className="tertiary-workflow-notice">
             {fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" | ")}
@@ -263,7 +272,7 @@ export default function PuerperioForm() {
               <Input label="Lugar del parto" name="lugar_atencion_parto" {...p} />
               <Input label="Quién atendió parto" name="quien_atendio_parto" {...p} />
               <Field label="Tipo de parto" htmlFor="puerperio-tipo_parto" error={fieldErrors.fieldError("tipo_parto")}>
-                <select id="puerperio-tipo_parto" name="tipo_parto" className={fieldErrors.inputClass("tipo_parto")} value={form.tipo_parto}
+                <select id="puerperio-tipo_parto" name="tipo_parto" data-chatbot-field={puerperiumFieldId("tipo_parto")} className={fieldErrors.inputClass("tipo_parto")} value={form.tipo_parto}
                   aria-invalid={Boolean(fieldErrors.fieldError("tipo_parto"))}
                   aria-describedby={fieldErrors.fieldError("tipo_parto") ? "puerperio-tipo_parto-error" : undefined}
                   onChange={(e) => set("tipo_parto", e.target.value)}>
