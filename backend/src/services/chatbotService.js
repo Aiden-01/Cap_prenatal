@@ -236,6 +236,7 @@ function isClinicalAdviceRequest(message) {
     /^que dosis (?:debo|puedo) (?:usar|dar|darle|indicar)$/,
     /^que hago si (?:la paciente )?tiene presion alta$/,
     /^es peligroso (?:este|ese) resultado$/,
+    /^debo marcar este factor$/,
     /^(?:debe|deberia) ser referida(?: la paciente)?$/,
   ].some((pattern) => pattern.test(normalized));
 }
@@ -447,7 +448,7 @@ function answerQuestionWithoutConversation(message, context) {
     };
   }
 
-  const fieldHelp = findExplicitFieldHelp(text);
+  const fieldHelp = findExplicitFieldHelp(text, context);
   if (fieldHelp) return fieldHelp;
 
   const genericFieldHelp = findGenericFieldHelp(text, context);

@@ -13,7 +13,7 @@ import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
 import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
 import { buildChatbotContext } from "../utils/chatbotContext";
-import { currentControlField } from "../utils/chatbotFocusedField";
+import { currentControlField, currentFormField } from "../utils/chatbotFocusedField";
 import {
   conversationForIdentity,
   createConversationMemory,
@@ -84,7 +84,8 @@ export default function ChatbotWidget() {
     usuario,
     pregnancyStatus,
     screenTab: screenTab?.navigationKey === location.key ? screenTab.tab : null,
-    focusedField: currentControlField(focusedField, screenTab?.navigationKey === location.key ? screenTab.tab : null, location.key),
+    focusedField: currentControlField(focusedField, screenTab?.navigationKey === location.key ? screenTab.tab : null, location.key)
+      || currentFormField(focusedField, location.key),
   }), [location.pathname, location.search, location.key, pregnancyStatus, screenTab, focusedField, usuario]);
   const safeConversation = conversationForIdentity(conversationMemory, identityKey);
   const currentContextKey = chatbotContextKey(safeContext);

@@ -59,8 +59,11 @@ const chatbotContextSchema = z.object({
   }
   if (context.focusedField) {
     const field = chatbotFieldHelp.find(({ id }) => id === context.focusedField);
-    if (operational.section !== field.section || context.section !== field.section
-      || !field.tabs.includes(context.tab) || !['nuevo_control', 'editar_control'].includes(context.form)) {
+    const compatible = field.forms
+      ? operational.section === context.section && operational.form === context.form && field.forms.includes(context.form)
+      : operational.section === field.section && context.section === field.section
+        && field.tabs.includes(context.tab) && ['nuevo_control', 'editar_control'].includes(context.form);
+    if (!compatible) {
       refinement.addIssue({ code: 'custom', path: ['focusedField'], message: 'El campo enfocado no corresponde a la sección, pestaña y formulario' });
     }
   }

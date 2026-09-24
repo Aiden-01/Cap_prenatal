@@ -1,5 +1,5 @@
 ﻿import { useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useMemo } from "react";
 import { createContext, useContext } from "react";
 import { useEffect } from "react";
@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { getErrorMessage } from "../utils/errorMessage";
 import { useFieldErrors } from "../hooks/useFieldErrors";
+import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
+import { captureFormField, patientFieldId } from "../utils/chatbotFocusedField";
 
 const FormErrorContext = createContext({
   fieldError: () => "",
@@ -234,6 +236,7 @@ function Input({ label, name, type = "text", required, form, set, inputRef, ...r
         className={inputClass(name)}
         name={name}
         type={type}
+        data-chatbot-field={patientFieldId(name)}
         ref={inputRef}
         value={form[name] ?? ""}
         onChange={(e) => set(name, type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
@@ -251,6 +254,7 @@ function Select({ label, name, options, required, form, set, disabled = false, h
         className={`${inputClass(name)} ${disabled ? "community-locked-field" : ""}`}
         name={name}
         value={form[name] ?? ""}
+        data-chatbot-field={patientFieldId(name)}
         onChange={(e) => set(name, e.target.value)}
         disabled={disabled}
       >
@@ -352,6 +356,7 @@ function ComunidadField({
           className={inputClass("comunidad")}
           name="comunidad"
           value={form.comunidad ?? ""}
+          data-chatbot-field={patientFieldId("comunidad")}
           onChange={(e) => set("comunidad", e.target.value)}
         />
         {municipioElChal && (
@@ -379,6 +384,7 @@ function ComunidadField({
           className={inputClass("comunidad")}
           name="comunidad"
           value={form.comunidad ?? ""}
+          data-chatbot-field={patientFieldId("comunidad")}
           onChange={(e) => {
             set("comunidad", e.target.value);
             setDropdownOpen(true);
@@ -600,6 +606,8 @@ const INIT = {
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────
 export default function NuevaPaciente() {
   const { id } = useParams();
+  const location = useLocation();
+  const { setFocusedField } = useChatbotScreenContext();
   const [step, setStep]       = useState(0);
   const [form, setForm]       = useState(INIT);
   const [cuiError, setCuiError] = useState("");
@@ -612,6 +620,8 @@ export default function NuevaPaciente() {
   const navigate              = useNavigate();
   const toast                 = useGlobalToast();
   const editando              = Boolean(id);
+  const chatbotForm = editando ? "editar_paciente" : "nueva_paciente";
+  useEffect(() => () => setFocusedField(null), [step, location.key, setFocusedField]);
   const fieldErrors           = useFieldErrors(FIELD_LABELS, inferPacienteFieldErrors);
 
   const set = (k, v) => {
@@ -954,7 +964,10 @@ export default function NuevaPaciente() {
       </div>
 
       {/* FORM CARD */}
-      <div className="card clinical-form-card">
+      <div className="card clinical-form-card" onFocusCapture={(event) => {
+        const selected = captureFormField(event.target.dataset.chatbotField, chatbotForm, location.key);
+        if (selected) setFocusedField(selected);
+      }}>
         <FormErrorContext.Provider value={fieldErrors}>
         <div key={step} className="clinical-stage-intro">
           <div className="clinical-stage-icon" aria-hidden="true">
@@ -1040,6 +1053,7 @@ export default function NuevaPaciente() {
                   <input
                     className="input-field"
                     type="date"
+                    data-chatbot-field={patientFieldId("fecha_nacimiento")}
                     value={form.fecha_nacimiento}
                     onChange={(e) => handleFechaNacimiento(e.target.value)}
                   />
@@ -1173,6 +1187,7 @@ export default function NuevaPaciente() {
               <div className="form-section-body col-2">
                 <Field label="FUR (Fecha Última Regla)" required name="fur">
                   <input className={fieldErrors.inputClass("fur")} name="fur" type="date" value={form.fur}
+                    data-chatbot-field={patientFieldId("fur")}
                     onChange={(e) => handleFUR(e.target.value)} />
                 </Field>
                 <Input label="FPP (Fecha Probable de Parto)" name="fpp" type="date" form={form} set={set} />

@@ -19,17 +19,32 @@ function normalizeFieldQuestion(value) {
     .replace(/\s+/g, ' ').trim();
 }
 
-function findExplicitFieldHelp(message) {
+function fieldMatchesContext(field, context) {
+  const route = CHATBOT_ROUTE_OPERATIONAL_CONTEXT[context?.route];
+  if (!route || route.form !== context?.form || route.section !== context?.section) return false;
+  if (field.forms) return field.forms.includes(context.form);
+  return field.section === context.section && field.tabs.includes(context.tab);
+}
+
+function findExplicitFieldHelp(message, context) {
   const question = normalizeFieldQuestion(message);
-  const match = question.match(/^(?:que significa|que va en|donde registro|donde se registra|como lleno) (?:el campo |la |el )?(.+)$/);
+  const match = question.match(/^(?:que significa|que es|que va en|donde registro|donde se registra|como lleno) (?:el campo |la |el )?(.+)$/);
   if (!match) return null;
   const requested = match[1];
   // La consulta operacional existente de VIH conserva su intención laboratorio.
   if (question.startsWith('donde registro ') && requested === 'vih') return null;
   const matches = chatbotFieldHelp.filter((field) => [field.id, field.label, ...field.aliases]
     .some((name) => normalizeFieldQuestion(name) === requested));
-  if (matches.length !== 1) return null;
-  const field = matches[0];
+  const contextual = matches.filter((field) => fieldMatchesContext(field, context));
+  const field = contextual.length === 1 ? contextual[0] : matches.length === 1 ? matches[0] : null;
+  if (!field && matches.length > 1 && /^(?:que significa|que es) /.test(question)
+    && matches.every(({ help }) => help === matches[0].help)) {
+    return {
+      recognized: true, intent: 'ayuda_campo', title: requested.toUpperCase(),
+      answer: `${matches[0].help} Dime si estás en el registro de paciente o en la ficha de riesgo para explicarte ese campo del formulario.`,
+    };
+  }
+  if (!field) return null;
   return {
     recognized: true,
     intent: 'ayuda_campo',
@@ -42,26 +57,26 @@ function findGenericFieldHelp(message, context) {
   if (!GENERIC_FIELD_QUESTIONS.has(normalizeFieldQuestion(message))) return null;
 
   const route = CHATBOT_ROUTE_OPERATIONAL_CONTEXT[context?.route];
-  const isControlForm = route?.section === 'control_prenatal'
-    && route.form === context?.form
-    && context?.section === 'control_prenatal';
+  const matchingRoute = route && route.form === context?.form && route.section === context?.section;
+  const isControlForm = matchingRoute && route.section === 'control_prenatal';
   const tabLabel = isControlForm ? TAB_LABELS[context?.tab] : null;
-  const field = isControlForm && tabLabel
-    ? chatbotFieldHelp.find(({ id, section, tabs }) => id === context?.focusedField
-      && section === context.section && tabs.includes(context.tab))
-    : null;
+  const field = chatbotFieldHelp.find((item) => item.id === context?.focusedField
+    && fieldMatchesContext(item, context));
 
   if (field) {
     return {
       recognized: true,
       intent: 'ayuda_campo_contextual',
       title: field.label,
-      answer: `Estás en Control prenatal → ${tabLabel} → ${field.label}.\n\n${field.help}\n\n${field.expected}\n\n${field.operationalNote}`,
+      answer: `Estás en ${field.forms ? field.section === 'ficha_riesgo' ? 'Ficha de riesgo' : 'Paciente' : `Control prenatal → ${tabLabel}`} → ${field.label}.\n\n${field.help}\n\n${field.expected}\n\n${field.operationalNote}`,
     };
   }
 
   const location = tabLabel ? `Veo que estás en Control prenatal → ${tabLabel}. `
-    : isControlForm ? 'Veo que estás en Control prenatal. ' : '';
+    : isControlForm ? 'Veo que estás en Control prenatal. '
+      : matchingRoute && context.section === 'ficha_riesgo' ? 'Veo que estás en la Ficha de riesgo. '
+        : matchingRoute && ['nueva_paciente', 'editar_paciente'].includes(context.form)
+          ? 'Veo que estás en el formulario de paciente. ' : '';
   return {
     recognized: true,
     intent: 'ayuda_campo_sin_foco',

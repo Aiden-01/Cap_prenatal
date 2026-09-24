@@ -1,3 +1,5 @@
+import { isSupportedFormField } from "./chatbotFocusedField.js";
+
 const PERMISSION_CODE_PATTERN = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/;
 const PREGNANCY_STATUSES = new Set(["activo", "puerperio", "cerrado"]);
 const MAX_PERMISSIONS = 50;
@@ -111,7 +113,7 @@ export function buildChatbotContext({
     section,
     tab,
     form,
-    focusedField: section === "control_prenatal" && CONTROL_FIELDS[focusedField] === tab
-      ? focusedField : null,
+    focusedField: (section === "control_prenatal" && CONTROL_FIELDS[focusedField] === tab)
+      || isSupportedFormField(focusedField, form) ? focusedField : null,
   };
 }

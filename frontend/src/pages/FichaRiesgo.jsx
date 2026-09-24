@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   CalendarDays,
   ClipboardList,
@@ -22,6 +22,8 @@ import {
 import { useGlobalToast } from "../context/ToastContext";
 import { useFieldErrors } from "../hooks/useFieldErrors";
 import { useAuth } from "../hooks/useAuth";
+import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
+import { captureFormField, riskFieldId } from "../utils/chatbotFocusedField";
 import { deriveAgeRiskFactors } from "../utils/riskAgeRules";
 import "./clinical-secondary-workflows.css";
 
@@ -67,6 +69,7 @@ function Input({ label, name, form, set, type = "text", hint, preserveDecimal = 
         className={inputClass(name)}
         name={name}
         type={type}
+        data-chatbot-field={riskFieldId(name)}
         value={form[name] ?? ""}
         aria-invalid={Boolean(error)}
         aria-describedby={describedBy}
@@ -262,8 +265,11 @@ function defaultsDesdePaciente(paciente = {}, embarazo = {}, referenceDate = INI
 
 export default function FichaRiesgo() {
   const { id } = useParams();
+  const location = useLocation();
+  const { setFocusedField } = useChatbotScreenContext();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  useEffect(() => () => setFocusedField(null), [location.key, setFocusedField]);
   const embarazoId = searchParams.get("embarazo_id") || "";
   const expedientePath = `/pacientes/${id}?embarazo_id=${embarazoId}&tab=riesgo`;
   const toast = useGlobalToast();
@@ -469,7 +475,10 @@ export default function FichaRiesgo() {
         {loadingData ? (
           <ClinicalLoadingSkeleton label="Cargando ficha de riesgo obstétrico" />
         ) : (
-          <form className="secondary-workflow-form" onSubmit={handleSubmit}>
+          <form className="secondary-workflow-form" onSubmit={handleSubmit} onFocusCapture={(event) => {
+            const selected = captureFormField(event.target.dataset.chatbotField, "ficha_riesgo", location.key);
+            if (selected) setFocusedField(selected);
+          }}>
             <FormErrorContext.Provider value={fieldErrors}>
               {fieldErrors.summary.length > 0 && (
                 <ClinicalNotice variant="error" title="Revisa estos datos" className="secondary-workflow-notice">

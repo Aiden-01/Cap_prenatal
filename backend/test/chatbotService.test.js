@@ -830,6 +830,31 @@ for (const [input, intent, expected] of [
   });
 }
 
+test('cortesía mezclada con solicitud clínica mantiene la guarda de datos', () => {
+  for (const message of [
+    'Hola Lía, ¿la paciente Ana tiene VIH?',
+    'Buenos días, ¿María tiene VIH?',
+    'Hola, ¿cuál es el resultado de VIH de la paciente?',
+    'Gracias, pero ¿esta paciente tiene VIH?',
+  ]) {
+    for (const context of [undefined, {
+      route: '/pacientes/:id/controles/nuevo', section: 'control_prenatal',
+      tab: 'laboratorio', form: 'nuevo_control', focusedField: 'vih',
+    }]) {
+      const result = answerQuestion(message, context);
+      assert.equal(result.intent, 'solicitud_dato_clinico', message);
+      assert.match(result.answer, /No consulto ni revelo expedientes o resultados clínicos/);
+      assert.equal(result.recognized, true);
+    }
+  }
+});
+
+test('saludo puro y cortesía con pregunta operacional conservan sus rutas', () => {
+  assert.deepEqual(answerQuestion('Hola Lía').answer, GREETING_ANSWER);
+  assert.equal(answerQuestion('Hola Lía').intent, 'saludo');
+  assert.equal(answerQuestion('Hola Lía, ¿dónde registro VIH?').intent, 'laboratorio');
+});
+
 test('conocimiento de reportes, citas e impresión no indica controles obsoletos', () => {
   for (const id of ['citas_seguimiento', 'reportes', 'filtrar_reportes', 'impresion_no_disponible', 'imprimir_plan_parto', 'imprimir_riesgo']) {
     assert.doesNotMatch(getIntent(id).answer, /Generar censo mensual|Ver censo actual|Citas próximas|nueva pestaña/);

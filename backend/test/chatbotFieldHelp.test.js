@@ -17,7 +17,7 @@ const control = {
 const frontend = (name) => import(pathToFileURL(path.resolve(__dirname, '../../frontend/src/utils', name)).href);
 
 test('catálogo piloto tiene seis IDs únicos y no equipara hematología con hemoglobina', () => {
-  assert.deepEqual(chatbotFieldHelp.map(({ id }) => id), [
+  assert.deepEqual(chatbotFieldHelp.slice(0, 6).map(({ id }) => id), [
     'numero_control', 'cita_siguiente', 'acompanante', 'semanas_gestacion', 'hematologia', 'vih',
   ]);
   assert.match(chatbotFieldHelp.find(({ id }) => id === 'hematologia').operationalNote, /no identifica.*hemoglobina/i);
@@ -27,7 +27,7 @@ test('formulario instrumenta únicamente IDs piloto desde atributos explícitos'
   const source = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/pages/NuevoControl.jsx'), 'utf8');
   assert.match(source, /onFocusCapture=\{\(event\) => \{/);
   assert.match(source, /captureControlField\(event\.target\.dataset\.chatbotField, tab, location\.key\)/);
-  for (const id of chatbotFieldHelp.map((field) => field.id)) {
+  for (const id of chatbotFieldHelp.slice(0, 6).map((field) => field.id)) {
     assert.match(source, new RegExp(`(?:data-chatbot-field|chatbotField)="${id}"`));
   }
 });
