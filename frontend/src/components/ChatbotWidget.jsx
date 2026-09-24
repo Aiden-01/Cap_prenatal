@@ -51,7 +51,7 @@ export default function ChatbotWidget() {
   const { usuario } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { pregnancyStatus } = useChatbotScreenContext();
+  const { pregnancyStatus, screenTab } = useChatbotScreenContext();
   const firstName = getFirstName(usuario);
   const identityKey = String(usuario?.id || usuario?.username || "anonymous");
   const [open, setOpen] = useState(false);
@@ -82,7 +82,8 @@ export default function ChatbotWidget() {
     search: location.search,
     usuario,
     pregnancyStatus,
-  }), [location.pathname, location.search, pregnancyStatus, usuario]);
+    screenTab: screenTab?.navigationKey === location.key ? screenTab.tab : null,
+  }), [location.pathname, location.search, location.key, pregnancyStatus, screenTab, usuario]);
   const safeConversation = conversationForIdentity(conversationMemory, identityKey);
   const currentContextKey = chatbotContextKey(safeContext);
   const input = inputState.identityKey === identityKey ? inputState.value : "";

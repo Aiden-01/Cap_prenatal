@@ -60,6 +60,31 @@ test('schema acepta el contrato minimo de contexto', () => {
   assert.deepEqual(result.data.context, context());
 });
 
+test('schema acepta identificadores operativos validos y rechaza enums o combinaciones incompatibles', () => {
+  const valid = context({ section: 'expediente', tab: 'laboratorio', form: null });
+  assert.equal(chatbotContextSchema.safeParse(valid).success, true);
+  assert.equal(chatbotContextSchema.safeParse(context({ section: 'expediente' })).success, true);
+  assert.equal(chatbotContextSchema.safeParse(context({ tab: 'vacunas' })).success, true);
+  assert.equal(chatbotContextSchema.safeParse(context({ form: null })).success, true);
+  const control = context({
+    route: '/pacientes/:id/controles/nuevo', section: 'control_prenatal',
+    tab: 'suplementacion', form: 'nuevo_control',
+  });
+  assert.equal(chatbotContextSchema.safeParse(control).success, true);
+  for (const invalid of [
+    context({ section: 'desconocida' }),
+    context({ tab: 'desconocida' }),
+    context({ form: 'desconocido' }),
+    context({ section: 'reportes' }),
+    context({ tab: 'suplementacion' }),
+    context({ form: 'nuevo_control' }),
+    context({ route: '/reportes', module: 'reportes', hasPatientContext: false,
+      hasPregnancyContext: false, pregnancyStatus: null, section: 'reportes', tab: 'laboratorio' }),
+  ]) {
+    assert.equal(chatbotContextSchema.safeParse(invalid).success, false);
+  }
+});
+
 test('schema de contexto rechaza campos clinicos o identificadores adicionales', () => {
   for (const forbiddenField of [
     'patientName',
@@ -257,8 +282,11 @@ test('frontend construye solo contexto seguro con datos ya disponibles', async (
     'hasPregnancyContext',
     'pregnancyStatus',
     'permissions',
+    'section',
+    'tab',
+    'form',
   ]);
-  assert.deepEqual(safeContext, context());
+  assert.deepEqual(safeContext, context({ section: 'expediente', tab: null, form: null }));
 
   const serialized = JSON.stringify(safeContext);
   for (const forbiddenValue of [
@@ -272,6 +300,24 @@ test('frontend construye solo contexto seguro con datos ya disponibles', async (
   ]) {
     assert.equal(serialized.includes(forbiddenValue), false);
   }
+});
+
+test('frontend actualiza pestaña y limpia contexto al cambiar ruta, formulario o embarazo', async () => {
+  const { buildChatbotContext } = await loadFrontendContext();
+  const base = { usuario: { permisos: ['pacientes.ver'] }, pregnancyStatus: 'activo' };
+  const expediente = buildChatbotContext({ ...base, pathname: '/pacientes/123', search: '?embarazo_id=77&tab=riesgo' });
+  assert.deepEqual([expediente.section, expediente.tab, expediente.form], ['expediente', 'riesgo', null]);
+  const changedTab = buildChatbotContext({ ...base, pathname: '/pacientes/123', search: '?embarazo_id=88&tab=vacunas' });
+  assert.deepEqual([changedTab.section, changedTab.tab, changedTab.form], ['expediente', 'vacunas', null]);
+  const control = buildChatbotContext({ ...base, pathname: '/pacientes/123/controles/nuevo', screenTab: 'orientaciones' });
+  assert.deepEqual([control.section, control.tab, control.form], ['control_prenatal', 'orientaciones', 'nuevo_control']);
+  const leftForm = buildChatbotContext({ ...base, pathname: '/pacientes/123', search: '?tab=general', screenTab: 'orientaciones' });
+  assert.deepEqual([leftForm.section, leftForm.tab, leftForm.form], ['expediente', 'general', null]);
+  const dashboard = buildChatbotContext({ ...base, pathname: '/dashboard', screenTab: 'orientaciones' });
+  assert.deepEqual([dashboard.section, dashboard.tab, dashboard.form], [null, null, null]);
+  assert.equal(dashboard.hasPregnancyContext, false);
+  assert.equal(dashboard.pregnancyStatus, null);
+  assert.equal(chatbotContextSchema.safeParse(control).success, true);
 });
 
 test('frontend reconoce admin y director para guia de usuarios, no otros roles', async () => {

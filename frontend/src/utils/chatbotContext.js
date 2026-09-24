@@ -1,6 +1,24 @@
 const PERMISSION_CODE_PATTERN = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/;
 const PREGNANCY_STATUSES = new Set(["activo", "puerperio", "cerrado"]);
 const MAX_PERMISSIONS = 50;
+const OPERATIONAL_ROUTES = {
+  "/nuevo": [null, "nueva_paciente"],
+  "/pacientes/:id/expediente": ["expediente", null],
+  "/pacientes/:id/editar": ["expediente", "editar_paciente"],
+  "/pacientes/:id/controles/nuevo": ["control_prenatal", "nuevo_control"],
+  "/pacientes/:id/controles/:id/editar": ["control_prenatal", "editar_control"],
+  "/pacientes/:id/riesgo": ["ficha_riesgo", "ficha_riesgo"],
+  "/pacientes/:id/plan-parto": ["plan_parto", "plan_parto"],
+  "/pacientes/:id/puerperio/nuevo": ["puerperio", "nuevo_puerperio"],
+  "/pacientes/:id/puerperio/:id/editar": ["puerperio", "editar_puerperio"],
+  "/pacientes/:id/morbilidad/nuevo": ["morbilidad", "nueva_morbilidad"],
+  "/pacientes/:id/morbilidad/:id/editar": ["morbilidad", "editar_morbilidad"],
+  "/pacientes/:id/vacunas/nuevo": ["vacunas", "nueva_vacuna"],
+  "/pacientes/:id/vacunas/:id/editar": ["vacunas", "editar_vacuna"],
+  "/reportes": ["reportes", null],
+};
+const EXPEDIENTE_TABS = new Set(["general", "controles", "laboratorio", "riesgo", "plan", "morbilidad", "puerperio", "vacunas"]);
+const CONTROL_TABS = new Set(["general", "laboratorio", "suplementacion", "orientaciones"]);
 
 const STATIC_ROUTES = new Map([
   ["/dashboard", { route: "/dashboard", module: "dashboard" }],
@@ -60,8 +78,17 @@ export function buildChatbotContext({
   search = "",
   usuario,
   pregnancyStatus,
+  screenTab = null,
 }) {
   const location = normalizeChatbotLocation(pathname);
+  const [section, form] = OPERATIONAL_ROUTES[location.route] || [null, null];
+  let tab = null;
+  if (location.route === "/pacientes/:id/expediente") {
+    const requestedTab = new URLSearchParams(search).get("tab") || "general";
+    tab = EXPEDIENTE_TABS.has(requestedTab) ? requestedTab : null;
+  } else if (section === "control_prenatal") {
+    tab = CONTROL_TABS.has(screenTab) ? screenTab : null;
+  }
   const hasPatientContext = location.module === "expediente";
   const safePregnancyStatus = hasPatientContext && PREGNANCY_STATUSES.has(pregnancyStatus)
     ? pregnancyStatus
@@ -76,5 +103,8 @@ export function buildChatbotContext({
     hasPregnancyContext: hasSelectedPregnancy,
     pregnancyStatus: safePregnancyStatus,
     permissions: functionalPermissions(usuario),
+    section,
+    tab,
+    form,
   };
 }

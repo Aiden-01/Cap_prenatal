@@ -5,6 +5,7 @@ const VALID_PREGNANCY_STATUSES = new Set(["activo", "puerperio", "cerrado"]);
 
 export function ChatbotScreenProvider({ children }) {
   const [pregnancyStatus, setStoredPregnancyStatus] = useState(null);
+  const [screenTab, setScreenTab] = useState(null);
 
   const setPregnancyStatus = useCallback((status) => {
     setStoredPregnancyStatus(VALID_PREGNANCY_STATUSES.has(status) ? status : null);
@@ -13,7 +14,9 @@ export function ChatbotScreenProvider({ children }) {
   const value = useMemo(() => ({
     pregnancyStatus,
     setPregnancyStatus,
-  }), [pregnancyStatus, setPregnancyStatus]);
+    screenTab,
+    setScreenTab,
+  }), [pregnancyStatus, setPregnancyStatus, screenTab]);
 
   return (
     <ChatbotScreenContext.Provider value={value}>

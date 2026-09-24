@@ -2,6 +2,10 @@ const { z } = require('./common.schemas');
 const {
   CHATBOT_CONTEXT_MODULES,
   CHATBOT_CONTEXT_ROUTES,
+  CHATBOT_CONTEXT_SECTIONS,
+  CHATBOT_CONTEXT_TABS,
+  CHATBOT_CONTEXT_FORMS,
+  CHATBOT_ROUTE_OPERATIONAL_CONTEXT,
   CHATBOT_MAX_PERMISSIONS,
   CHATBOT_ROUTE_MODULES,
 } = require('../config/chatbotContext');
@@ -30,6 +34,9 @@ const chatbotContextSchema = z.object({
     .refine((permissions) => new Set(permissions).size === permissions.length, {
       message: 'Los permisos no deben repetirse',
     }),
+  section: z.enum(CHATBOT_CONTEXT_SECTIONS).nullable().optional(),
+  tab: z.enum(CHATBOT_CONTEXT_TABS).nullable().optional(),
+  form: z.enum(CHATBOT_CONTEXT_FORMS).nullable().optional(),
 }).strict().superRefine((context, refinement) => {
   const expectedModule = CHATBOT_ROUTE_MODULES[context.route];
   if (expectedModule !== context.module) {
@@ -38,6 +45,15 @@ const chatbotContextSchema = z.object({
       path: ['module'],
       message: 'El modulo no corresponde a la ruta normalizada',
     });
+  }
+  const operational = CHATBOT_ROUTE_OPERATIONAL_CONTEXT[context.route] || { section: null, form: null };
+  for (const field of ['section', 'form']) {
+    if (context[field] !== undefined && context[field] !== operational[field]) {
+      refinement.addIssue({ code: 'custom', path: [field], message: `${field} no corresponde a la ruta` });
+    }
+  }
+  if (context.tab !== undefined && context.tab !== null && !operational.tabs?.includes(context.tab)) {
+    refinement.addIssue({ code: 'custom', path: ['tab'], message: 'La pestaña no corresponde a la ruta' });
   }
 
   const expectedPatientContext = expectedModule === 'expediente';

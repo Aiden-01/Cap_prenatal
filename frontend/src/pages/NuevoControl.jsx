@@ -1,8 +1,9 @@
 ﻿import { useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
+import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
 import {
   Activity,
   AlertTriangle,
@@ -369,6 +370,8 @@ function inferControlFieldErrors(err) {
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────
 export default function NuevoControl() {
   const { id, controlId } = useParams();
+  const location = useLocation();
+  const { setScreenTab } = useChatbotScreenContext();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const embarazoId = searchParams.get("embarazo_id") || "";
@@ -386,6 +389,11 @@ export default function NuevoControl() {
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [tab, setTab]         = useState("general");
+  useEffect(() => {
+    const current = { tab, navigationKey: location.key };
+    setScreenTab(current);
+    return () => setScreenTab((previous) => previous === current ? null : previous);
+  }, [tab, location.key, setScreenTab]);
   const [form, setForm]       = useState(initialControlForm);
   const [fur, setFur]         = useState("");
   const [paciente, setPaciente] = useState(null);
