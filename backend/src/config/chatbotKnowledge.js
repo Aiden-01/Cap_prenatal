@@ -140,9 +140,11 @@ const chatbotKnowledge = [
       'generar pdf expediente',
       'descargar expediente',
       'pdf expediente',
+      'imprimo todo junto',
+      'orden salen los documentos',
     ],
     answer:
-      'Para imprimir o generar documentos desde el expediente:\n1. Abre el expediente de la paciente.\n2. Usa el botón "Expediente" para generar el PDF MSPAS.\n3. En la pestaña "Riesgo obstétrico", usa "Imprimir" para la ficha de riesgo.\n4. En la pestaña "Plan de parto", usa "Imprimir" para ese formato.\n\nSi un PDF no se genera, revisa que el registro exista y que los datos principales estén completos.',
+      'Para imprimir el PDF MSPAS y otros documentos:\n1. Abre el expediente de la paciente y selecciona un embarazo.\n2. Presiona el botón "Expediente" para abrir "IMPRIMIR DOCUMENTOS".\n3. Elige "Documentos individuales" y selecciona entre Expediente, Plan de parto y Ficha de riesgo, o elige "Todo en un solo PDF".\n4. Presiona "Generar PDF" para descargar los documentos.\n\nEl PDF combinado requiere que existan el plan de parto y la ficha de riesgo; si falta alguno, aparece "No disponible" y no se puede generar. El orden combinado es Expediente → Plan de parto → Ficha de riesgo.',
     suggestions: [],
   },
   {
@@ -343,9 +345,15 @@ const chatbotKnowledge = [
       'control siguiente',
       'cita prenatal',
       'agenda',
+      'reprogramo una cita',
+      'cancelar cita',
+      'pacientes que no llegaron',
+      'sin proxima cita y sin control reciente',
+      'seguimiento de inasistencias',
+      'calendario de citas',
     ],
     answer:
-      'Para revisar seguimiento prenatal:\n1. Abre el expediente de la paciente.\n2. Entra en "Controles" y revisa el último control registrado.\n3. Verifica la fecha de "Cita siguiente" si fue registrada.\n4. En el Dashboard puedes revisar "Citas próximas" y "Sin control reciente".\n5. Define la próxima atención según el protocolo local.',
+      'Para revisar las citas prenatales, entra en Inicio → "Calendario de citas" y selecciona un día y una cita para ver su detalle. Una cita programada espera la atención; atendida indica que se vinculó un control prenatal de la fecha; cancelada conserva el registro sin cita vigente; reprogramada conserva la cita anterior y crea otra programada; inasistente indica que la fecha pasó sin un control coincidente. Si tienes permiso para gestionar citas, en el detalle de una cita futura programada puedes usar "Reprogramar" o "Cancelar cita". Para una inasistencia pendiente, usa "Asignar nueva cita"; la inasistencia permanece en el historial. El formulario de control prenatal muestra "Cita siguiente" y la cita estructurada vigente. En Inicio, "Sin próxima cita" reúne embarazos activos con un control previo y sin cita programada vigente, y permite "Asignar cita" cuando tienes permiso. "Sin control" en Inicio y "Sin control reciente" en Reportes identifican controles atrasados; no equivalen a falta de próxima cita.',
     suggestions: [],
   },
   {
@@ -362,9 +370,12 @@ const chatbotKnowledge = [
       'descargar reporte',
       'periodo',
       'rango fechas',
+      'que reportes existen',
+      'exporto a excel',
+      'exporto a pdf',
     ],
     answer:
-      'Para generar reportes:\n1. Entra en "Reportes" desde el menú lateral.\n2. Selecciona el modo de censo o consulta disponible.\n3. Elige el período cuando el sistema lo solicite.\n4. Presiona "Generar censo mensual" o "Ver censo actual".\n5. Revisa la tabla resultante.\n6. Si el botón de exportación está disponible para tu usuario, puedes descargar el archivo.',
+      'Para generar reportes, entra en "Reportes" y elige: Captadas en primer control, Embarazos activos, Próximas a dar a luz, Sin control reciente, Riesgo obstétrico o Resumen por comunidad. Solo "Captadas en primer control" pide las fechas "Desde" y "Hasta"; los demás muestran el estado al consultar. Selecciona el reporte y presiona "Generar reporte". Si hay registros y tu cuenta tiene el permiso reportes.exportar, presiona "Exportar", elige Excel o PDF, selecciona al menos una columna y confirma la exportación. Los filtros activos se aplican a todos los registros coincidentes. Si no hay datos, la pantalla muestra el estado vacío y no permite exportar.',
     suggestions: [],
   },
   {
@@ -380,7 +391,7 @@ const chatbotKnowledge = [
       'periodo reporte',
     ],
     answer:
-      'Para filtrar reportes por fecha o período:\n1. Entra en "Reportes".\n2. Selecciona el tipo de reporte.\n3. Ajusta mes, año o rango de fechas según aparezca en pantalla.\n4. Genera el reporte.\n5. Antes de exportar, confirma que el período mostrado sea el correcto.',
+      'En "Reportes", selecciona el tipo de reporte. Solo "Captadas en primer control" muestra los filtros de fecha "Desde" y "Hasta"; ambos son obligatorios y "Desde" no puede ser posterior a "Hasta". Los otros cinco reportes se consultan sin ese rango. Presiona "Generar reporte" y comprueba el resultado antes de exportar. La exportación conserva los filtros activos.',
     suggestions: [],
   },
   {
@@ -605,7 +616,7 @@ const chatbotKnowledge = [
       'formato plan parto',
     ],
     answer:
-      'Para imprimir el plan de parto:\n1. Abre el expediente de la paciente.\n2. Entra en la pestaña "Plan de parto".\n3. Verifica que ya exista un plan guardado.\n4. Presiona "Imprimir".\n5. El sistema abrirá el PDF en una nueva pestaña.\n\nSi no aparece el botón o falla el PDF, primero guarda el plan de parto.',
+      'Para descargar el PDF del plan de parto, abre el expediente de la paciente y presiona "Expediente". En "IMPRIMIR DOCUMENTOS", elige "Documentos individuales", selecciona "Plan de parto" y presiona "Generar PDF". Si figura "No disponible", primero registra y guarda el plan. También puedes elegir "Todo en un solo PDF" cuando el plan y la ficha de riesgo estén disponibles.',
     suggestions: [],
   },
   {
@@ -622,7 +633,7 @@ const chatbotKnowledge = [
       'plan parto',
     ],
     answer:
-      'Para registrar o editar el plan de parto:\n1. Abre el expediente de la paciente.\n2. Entra en la pestaña "Plan de parto".\n3. Presiona "Registrar plan de parto" o "Editar".\n4. Revisa los datos precargados desde paciente, riesgo y último control.\n5. Completa datos generales, resumen obstétrico, logística, responsables y signos de peligro.\n6. Presiona "Guardar plan".\n7. Para generar el formato, vuelve a la pestaña "Plan de parto" y presiona "Imprimir".',
+      'Para registrar o editar el plan de parto:\n1. Abre el expediente de la paciente.\n2. Entra en la pestaña "Plan de parto".\n3. Presiona "Registrar plan de parto" o "Editar".\n4. Revisa los datos precargados desde paciente, riesgo y último control.\n5. Completa datos generales, resumen obstétrico, logística, responsables y signos de peligro.\n6. Presiona "Guardar plan".\n7. Para generar el formato, vuelve al expediente, presiona "Expediente" y selecciona "Plan de parto" en "Documentos individuales".',
     suggestions: [],
   },
   {
@@ -639,7 +650,7 @@ const chatbotKnowledge = [
       'formato riesgo',
     ],
     answer:
-      'Para imprimir la ficha de riesgo:\n1. Abre el expediente de la paciente.\n2. Entra en la pestaña "Riesgo obstétrico".\n3. Verifica que la ficha esté guardada.\n4. Presiona "Imprimir".\n5. El sistema generará el PDF de la ficha.\n\nSi no hay ficha registrada, primero presiona "Registrar ficha de riesgo" y guarda.',
+      'Para descargar la ficha de riesgo, abre el expediente de la paciente y presiona "Expediente". En "IMPRIMIR DOCUMENTOS", elige "Documentos individuales", selecciona "Ficha de riesgo" y presiona "Generar PDF". Si figura "No disponible", primero registra y guarda la ficha. También puedes elegir "Todo en un solo PDF" cuando la ficha y el plan de parto estén disponibles.',
     suggestions: [],
   },
   {
@@ -670,7 +681,7 @@ const chatbotKnowledge = [
       'que hago primero',
     ],
     answer:
-      'Flujo recomendado para trabajar una paciente:\n1. Registra la paciente desde "Nueva".\n2. Abre el expediente desde "Pacientes".\n3. Registra o revisa la ficha de riesgo.\n4. Agrega controles prenatales conforme se atienda a la paciente.\n5. Dentro de cada control, registra laboratorios, suplementación y orientaciones.\n6. Registra plan de parto cuando corresponda.\n7. Agrega vacunas, morbilidad o puerperio según el caso.\n8. Usa "Reportes" para revisar censos e indicadores.',
+      'Flujo recomendado para trabajar una paciente:\n1. Registra la paciente desde "Nueva".\n2. Abre el expediente desde "Pacientes".\n3. Registra o revisa la ficha de riesgo.\n4. Agrega controles prenatales conforme se atienda a la paciente.\n5. Dentro de cada control, registra laboratorios, suplementación y orientaciones.\n6. Registra plan de parto cuando corresponda.\n7. Agrega vacunas, morbilidad o puerperio según el caso.\n8. Usa "Reportes" para consultar los seis reportes disponibles.',
     suggestions: [],
   },
 ];

@@ -67,9 +67,9 @@ const EXPECTED_INTENTS = [
 ];
 
 const EXPECTED_KEYWORD_COUNTS = [
-  9, 12, 7, 10, 7, 7, 13, 9, 6, 7,
-  8, 6, 13, 9, 8, 7, 7, 10, 7, 7,
-  10, 7, 9, 18, 11, 7, 7, 6, 6, 6,
+  9, 12, 7, 10, 7, 7, 13, 11, 6, 7,
+  8, 6, 13, 9, 8, 7, 7, 10, 7, 13,
+  13, 7, 9, 18, 11, 7, 7, 6, 6, 6,
   6, 6, 7, 7, 12, 8, 8, 7, 6,
 ];
 
@@ -812,6 +812,31 @@ for (const input of [
     assert.match(result.answer, /formulario del control/);
   });
 }
+
+for (const [input, intent, expected] of [
+  ['¿Cómo reprogramo una cita?', 'citas_seguimiento', /"Reprogramar"/],
+  ['¿Dónde veo las pacientes que no llegaron?', 'citas_seguimiento', /inasistente.*"Asignar nueva cita"/i],
+  ['¿Cuál es la diferencia entre sin próxima cita y sin control reciente?', 'citas_seguimiento', /no equivalen a falta de próxima cita/],
+  ['¿Qué reportes existen?', 'reportes', /Captadas en primer control.*Resumen por comunidad/],
+  ['¿Cómo exporto a Excel?', 'reportes', /Excel o PDF.*columna/],
+  ['¿Cómo exporto a PDF?', 'reportes', /reportes\.exportar/],
+  ['¿Cómo imprimo todo junto?', 'impresion_no_disponible', /"Todo en un solo PDF"/],
+  ['¿En qué orden salen los documentos?', 'impresion_no_disponible', /Expediente → Plan de parto → Ficha de riesgo/],
+]) {
+  test(`Lía orienta con el flujo vigente: ${input}`, () => {
+    const result = answerQuestion(input);
+    assert.equal(result.intent, intent);
+    assert.match(result.answer, expected);
+  });
+}
+
+test('conocimiento de reportes, citas e impresión no indica controles obsoletos', () => {
+  for (const id of ['citas_seguimiento', 'reportes', 'filtrar_reportes', 'impresion_no_disponible', 'imprimir_plan_parto', 'imprimir_riesgo']) {
+    assert.doesNotMatch(getIntent(id).answer, /Generar censo mensual|Ver censo actual|Citas próximas|nueva pestaña/);
+  }
+  assert.match(getIntent('reportes').answer, /Solo "Captadas en primer control" pide las fechas "Desde" y "Hasta"/);
+  assert.match(getIntent('impresion_no_disponible').answer, /no se puede generar/);
+});
 
 test('catálogo conserva las 38 intenciones previas y añade cerrar_embarazo', () => {
   assert.equal(chatbotKnowledge.length, 39);

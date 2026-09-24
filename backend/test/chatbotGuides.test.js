@@ -107,6 +107,13 @@ test('guía de vacunas conserva catálogo definitivo e Influenza simple', () => 
   assert.doesNotMatch(`${vaccineHelp}\n${vaccineEditHelp}`, /No\. de dosis/);
 });
 
+test('guía de plan de parto conserva siete pasos y dirige la impresión al selector central', () => {
+  const guide = chatbotGuides.plan_parto;
+  assert.equal(guide.steps.length, 7);
+  assert.match(guide.steps[6], /presiona "Expediente" y selecciona "Plan de parto"/);
+  assert.doesNotMatch(guide.steps[6], /pestaña "Plan de parto".*"Imprimir"/);
+});
+
 for (const [guideId, message] of GUIDE_STARTS) {
   test(`inicia la guia ${guideId} mostrando solo el primer paso`, () => {
     const guide = chatbotGuides[guideId];
