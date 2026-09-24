@@ -285,8 +285,9 @@ test('frontend construye solo contexto seguro con datos ya disponibles', async (
     'section',
     'tab',
     'form',
+    'focusedField',
   ]);
-  assert.deepEqual(safeContext, context({ section: 'expediente', tab: null, form: null }));
+  assert.deepEqual(safeContext, context({ section: 'expediente', tab: null, form: null, focusedField: null }));
 
   const serialized = JSON.stringify(safeContext);
   for (const forbiddenValue of [

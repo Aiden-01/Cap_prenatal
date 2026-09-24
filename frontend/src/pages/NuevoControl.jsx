@@ -4,6 +4,7 @@ import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
 import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
+import { captureControlField } from "../utils/chatbotFocusedField";
 import {
   Activity,
   AlertTriangle,
@@ -76,7 +77,7 @@ function Inp({ label, name, type = "text", form, set, col, errors = {}, ...rest 
   );
 }
 
-function Toggle({ label, name, form, set, disabled = false }) {
+function Toggle({ label, name, form, set, disabled = false, chatbotField }) {
   const val = form[name] ?? false;
   return (
     <button
@@ -86,6 +87,7 @@ function Toggle({ label, name, form, set, disabled = false }) {
       aria-pressed={Boolean(val)}
       aria-disabled={disabled}
       disabled={disabled}
+      data-chatbot-field={chatbotField}
     >
       <div className="toggle-mark">
         {val && "✓"}
@@ -97,12 +99,12 @@ function Toggle({ label, name, form, set, disabled = false }) {
   );
 }
 
-function LabEntry({ label, realizadoKey, form, set, disabled = false, children }) {
+function LabEntry({ label, realizadoKey, form, set, disabled = false, children, chatbotField }) {
   const realizado = Boolean(form[realizadoKey]);
   return (
     <div className="lab-row control-lab-entry">
       <div className="control-lab-check">
-        <Toggle label={label} name={realizadoKey} form={form} set={set} disabled={disabled} />
+        <Toggle label={label} name={realizadoKey} form={form} set={set} disabled={disabled} chatbotField={chatbotField} />
         <span className={`control-lab-state ${realizado ? "is-complete" : ""}`}>
           {realizado ? "Realizado" : "No realizado"}
         </span>
@@ -114,11 +116,11 @@ function LabEntry({ label, realizadoKey, form, set, disabled = false, children }
   );
 }
 
-function LabRow({ label, realizadoKey, resultadoKey, form, set, errors = {}, extra, disabled = false }) {
+function LabRow({ label, realizadoKey, resultadoKey, form, set, errors = {}, extra, disabled = false, chatbotField }) {
   const error = errors[resultadoKey];
   const inputId = `control-${resultadoKey}`;
   return (
-    <LabEntry label={label} realizadoKey={realizadoKey} form={form} set={set} disabled={disabled}>
+    <LabEntry label={label} realizadoKey={realizadoKey} form={form} set={set} disabled={disabled} chatbotField={chatbotField}>
       <div className="control-lab-result-fields">
           <input
             id={inputId}
@@ -131,6 +133,7 @@ function LabRow({ label, realizadoKey, resultadoKey, form, set, errors = {}, ext
             value={form[resultadoKey] ?? ""}
             onChange={(e) => set(resultadoKey, e.target.value)}
             disabled={disabled}
+            data-chatbot-field={chatbotField}
           />
           {extra}
           {error && <div id={`${inputId}-error`} className="field-error-text" role="alert" style={{ flexBasis: "100%" }}>{error}</div>}
@@ -371,7 +374,7 @@ function inferControlFieldErrors(err) {
 export default function NuevoControl() {
   const { id, controlId } = useParams();
   const location = useLocation();
-  const { setScreenTab } = useChatbotScreenContext();
+  const { setScreenTab, setFocusedField } = useChatbotScreenContext();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const embarazoId = searchParams.get("embarazo_id") || "";
@@ -392,8 +395,11 @@ export default function NuevoControl() {
   useEffect(() => {
     const current = { tab, navigationKey: location.key };
     setScreenTab(current);
-    return () => setScreenTab((previous) => previous === current ? null : previous);
-  }, [tab, location.key, setScreenTab]);
+    return () => {
+      setScreenTab((previous) => previous === current ? null : previous);
+      setFocusedField(null);
+    };
+  }, [tab, location.key, setScreenTab, setFocusedField]);
   const [form, setForm]       = useState(initialControlForm);
   const [fur, setFur]         = useState("");
   const [paciente, setPaciente] = useState(null);
@@ -615,7 +621,10 @@ export default function NuevoControl() {
       {loadingData ? (
         <ClinicalLoadingSkeleton label="Cargando control prenatal" />
       ) : (
-      <form className="control-workflow-form" onSubmit={handleSubmit}>
+      <form className="control-workflow-form" onSubmit={handleSubmit} onFocusCapture={(event) => {
+        const selected = captureControlField(event.target.dataset.chatbotField, tab, location.key);
+        if (selected) setFocusedField(selected);
+      }}>
         {soloLectura && (
           <ClinicalNotice variant="readonly" title="Consulta histórica" className="control-workflow-notice">
             {pregnancyState === "puerperio"
@@ -661,7 +670,7 @@ export default function NuevoControl() {
         >
           <div className="form-section-body col-4">
             <Field label="No. Control" htmlFor="control-numero_control" error={fieldError("numero_control")}>
-              <select id="control-numero_control" name="numero_control" className={inputClass("numero_control")} value={form.numero_control}
+              <select id="control-numero_control" name="numero_control" data-chatbot-field="numero_control" className={inputClass("numero_control")} value={form.numero_control}
                 aria-invalid={Boolean(fieldError("numero_control"))}
                 aria-describedby={fieldError("numero_control") ? "control-numero_control-error" : undefined}
                 onChange={(e) => set("numero_control", Number(e.target.value))}>
@@ -671,11 +680,11 @@ export default function NuevoControl() {
             </Field>
             <Inp label="Fecha" name="fecha" type="date" max={todayInputValue} {...p} />
             <Inp label="Hora" name="hora" type="time" {...p} />
-            <Inp label="Semanas de gestación" name="edad_gestacional_semanas" type="number" form={formConEdadGestacional} set={set} errors={fieldErrors} readOnly />
+            <Inp label="Semanas de gestación" name="edad_gestacional_semanas" data-chatbot-field="semanas_gestacion" type="number" form={formConEdadGestacional} set={set} errors={fieldErrors} readOnly />
           </div>
           <div className="form-section-body col-2" style={{ marginTop: "0.5rem" }}>
             <Inp label="Motivo de consulta" name="motivo_consulta" {...p} />
-            <Inp label="Nombre del acompañante" name="nombre_acompanante" {...p} />
+            <Inp label="Nombre del acompañante" name="nombre_acompanante" data-chatbot-field="acompanante" {...p} />
             <Inp label="Nombre y cargo de quien atiende" name="nombre_cargo_atiende" {...p} col={2} />
           </div>
         </ClinicalSection>
@@ -825,6 +834,7 @@ export default function NuevoControl() {
                     <input
                       id="control-cita_siguiente"
                       name="cita_siguiente"
+                      data-chatbot-field="cita_siguiente"
                       className="input-field"
                       type="date"
                       value={toDateInputValue(structuredAppointment.fecha_programada)}
@@ -838,7 +848,7 @@ export default function NuevoControl() {
                     </p>
                   </Field>
                 ) : (
-                  <Inp label="Cita siguiente" name="cita_siguiente" type="date" {...p} />
+                  <Inp label="Cita siguiente" name="cita_siguiente" data-chatbot-field="cita_siguiente" type="date" {...p} />
                 )}
               </div>
             </ClinicalSection>
@@ -866,7 +876,7 @@ export default function NuevoControl() {
                 <span>Resultado</span>
               </div>
 
-            <LabRow label="Hematología" realizadoKey="hematologia_realizada" resultadoKey="hematologia_resultado" {...p} />
+            <LabRow label="Hematología" realizadoKey="hematologia_realizada" resultadoKey="hematologia_resultado" chatbotField="hematologia" {...p} />
             <LabRow label="Glicemia en ayunas" realizadoKey="glicemia_realizada" resultadoKey="glicemia_resultado" {...p} />
             <LabEntry label="Grupo y RH" realizadoKey="grupo_rh_realizado" {...p}>
               <BloodGroupRh {...p} />
@@ -883,10 +893,10 @@ export default function NuevoControl() {
             <LabRow label="Heces" realizadoKey="heces_realizada" resultadoKey="heces_resultado" {...p} />
 
             {puedeCapturarVih && (
-              <LabEntry label="VIH" realizadoKey="vih_realizado" {...p}>
+              <LabEntry label="VIH" realizadoKey="vih_realizado" chatbotField="vih" {...p}>
                   <div className="control-lab-result-fields">
                     <Field label="Resultado" htmlFor="control-vih_resultado" error={fieldError("vih_resultado")}>
-                      <select id="control-vih_resultado" name="vih_resultado" className={inputClass("vih_resultado")} style={{ minWidth: 130 }} value={form.vih_resultado}
+                      <select id="control-vih_resultado" name="vih_resultado" data-chatbot-field="vih" className={inputClass("vih_resultado")} style={{ minWidth: 130 }} value={form.vih_resultado}
                         aria-invalid={Boolean(fieldError("vih_resultado"))}
                         aria-describedby={fieldError("vih_resultado") ? "control-vih_resultado-error" : undefined}
                         onChange={(e) => set("vih_resultado", e.target.value)}>

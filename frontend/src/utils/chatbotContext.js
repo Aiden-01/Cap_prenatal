@@ -19,6 +19,10 @@ const OPERATIONAL_ROUTES = {
 };
 const EXPEDIENTE_TABS = new Set(["general", "controles", "laboratorio", "riesgo", "plan", "morbilidad", "puerperio", "vacunas"]);
 const CONTROL_TABS = new Set(["general", "laboratorio", "suplementacion", "orientaciones"]);
+const CONTROL_FIELDS = {
+  numero_control: "general", cita_siguiente: "general", acompanante: "general",
+  semanas_gestacion: "general", hematologia: "laboratorio", vih: "laboratorio",
+};
 
 const STATIC_ROUTES = new Map([
   ["/dashboard", { route: "/dashboard", module: "dashboard" }],
@@ -79,6 +83,7 @@ export function buildChatbotContext({
   usuario,
   pregnancyStatus,
   screenTab = null,
+  focusedField = null,
 }) {
   const location = normalizeChatbotLocation(pathname);
   const [section, form] = OPERATIONAL_ROUTES[location.route] || [null, null];
@@ -106,5 +111,7 @@ export function buildChatbotContext({
     section,
     tab,
     form,
+    focusedField: section === "control_prenatal" && CONTROL_FIELDS[focusedField] === tab
+      ? focusedField : null,
   };
 }

@@ -10,6 +10,7 @@ const {
   CHATBOT_ROUTE_MODULES,
 } = require('../config/chatbotContext');
 const { chatbotKnowledge } = require('../config/chatbotKnowledge');
+const { chatbotFieldHelp, CHATBOT_FIELD_IDS } = require('../config/chatbotFieldHelp');
 const {
   CHATBOT_GUIDE_IDS,
   CHATBOT_MAX_GUIDE_STEPS,
@@ -37,6 +38,7 @@ const chatbotContextSchema = z.object({
   section: z.enum(CHATBOT_CONTEXT_SECTIONS).nullable().optional(),
   tab: z.enum(CHATBOT_CONTEXT_TABS).nullable().optional(),
   form: z.enum(CHATBOT_CONTEXT_FORMS).nullable().optional(),
+  focusedField: z.enum(CHATBOT_FIELD_IDS).nullable().optional(),
 }).strict().superRefine((context, refinement) => {
   const expectedModule = CHATBOT_ROUTE_MODULES[context.route];
   if (expectedModule !== context.module) {
@@ -54,6 +56,13 @@ const chatbotContextSchema = z.object({
   }
   if (context.tab !== undefined && context.tab !== null && !operational.tabs?.includes(context.tab)) {
     refinement.addIssue({ code: 'custom', path: ['tab'], message: 'La pestaña no corresponde a la ruta' });
+  }
+  if (context.focusedField) {
+    const field = chatbotFieldHelp.find(({ id }) => id === context.focusedField);
+    if (operational.section !== field.section || context.section !== field.section
+      || !field.tabs.includes(context.tab) || !['nuevo_control', 'editar_control'].includes(context.form)) {
+      refinement.addIssue({ code: 'custom', path: ['focusedField'], message: 'El campo enfocado no corresponde a la sección, pestaña y formulario' });
+    }
   }
 
   const expectedPatientContext = expectedModule === 'expediente';
