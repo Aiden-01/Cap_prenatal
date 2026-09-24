@@ -1,5 +1,6 @@
 const pool = require('../db/pool');
 const auditRepository = require('../repositories/auditRepository');
+const { diagnosticCode } = require('../utils/safeErrorLog');
 const {
   buildAuditPayload,
   hasAuditPayload,
@@ -141,7 +142,7 @@ async function registrarEvento(req, event, { db = pool, obligatorio = false } = 
       datosNuevos: auditEvent.datosNuevos ? sanitize(auditEvent.datosNuevos) : null,
     }, db);
   } catch (err) {
-    console.warn('[audit] No se pudo registrar auditoria:', err.message);
+    console.warn('[audit] No se pudo registrar auditoria:', diagnosticCode(err));
     if (obligatorio) throw err;
   }
 }
@@ -211,7 +212,7 @@ async function registrarEventoPrivado(req, event, {
   } catch (err) {
     const detail = context.categoria === 'automatizaciones'
       ? 'evento informativo no registrado'
-      : err.message;
+      : diagnosticCode(err);
     console.warn('[audit] No se pudo registrar auditoria privada:', detail);
     if (obligatorio) throw err;
     return false;

@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const { diagnosticCode } = require('../utils/safeErrorLog');
 
 async function enTransaccion(callback) {
   const client = await pool.connect();
@@ -11,7 +12,7 @@ async function enTransaccion(callback) {
     try {
       await client.query('ROLLBACK');
     } catch (rollbackError) {
-      console.warn('[auth_sessions] No se pudo revertir la transaccion:', rollbackError.message);
+      console.warn('[auth_sessions] No se pudo revertir la transaccion:', diagnosticCode(rollbackError));
     }
     throw error;
   } finally {

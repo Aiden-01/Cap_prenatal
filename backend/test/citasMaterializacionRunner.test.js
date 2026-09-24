@@ -27,5 +27,6 @@ test('fallo del barrido se registra y no se propaga', async () => {
     logger: { error: (...args) => logs.push(args.join(' ')) },
   });
   assert.equal(await runner.ejecutar(), null);
-  assert.match(logs[0], /fallo simulado/);
+  assert.match(logs[0], /UNKNOWN_ERROR/);
+  assert.doesNotMatch(logs[0], /fallo simulado/);
 });

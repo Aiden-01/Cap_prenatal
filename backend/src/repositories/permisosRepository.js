@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const { diagnosticCode } = require('../utils/safeErrorLog');
 
 const PERMISOS_POR_ROL = {
   director: null,
@@ -77,7 +78,7 @@ async function enTransaccion(callback) {
     try {
       await client.query('ROLLBACK');
     } catch (rollbackError) {
-      console.warn('[permisos] No se pudo revertir la transaccion:', rollbackError.message);
+      console.warn('[permisos] No se pudo revertir la transaccion:', diagnosticCode(rollbackError));
     }
     throw err;
   } finally {

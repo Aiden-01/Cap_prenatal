@@ -1,16 +1,12 @@
 const { ZodError } = require('zod');
 const { AppError } = require('../utils/appError');
-const { nodeEnvForValidation } = require('../config/env');
+const { diagnosticCode } = require('../utils/safeErrorLog');
 
 function formatZodIssue(issue) {
   return {
     campo: issue.path.length ? issue.path.join('.') : 'body',
     mensaje: issue.message,
   };
-}
-
-function isProduction() {
-  return nodeEnvForValidation(process.env) === 'production';
 }
 
 function uniqueMessage(err) {
@@ -113,39 +109,35 @@ function normalizeError(err) {
   if (postgresError) return postgresError;
 
   if (err.status || err.statusCode) {
-    return new AppError(err.statusCode || err.status, err.message || 'Error de solicitud', {
+    const status = err.statusCode || err.status;
+    const trusted = err instanceof AppError && status < 500;
+    return new AppError(status, trusted ? err.message
+      : status >= 500 ? 'Error interno del servidor' : 'Error de solicitud', {
       code: err.code,
-      details: err.details,
+      details: trusted ? err.details : undefined,
     });
   }
 
   return new AppError(500, 'Error interno del servidor', { code: 'INTERNAL_SERVER_ERROR' });
 }
 
-function logError(err, req, normalized) {
-  const isAutomationError = String(normalized.code || '').startsWith('AUTOMATION_');
+function logError(req, normalized) {
+  const safeCode = diagnosticCode(normalized);
   const payload = {
     method: req.method,
-    path: req.path,
+    path: req.route?.path || '[unmatched]',
     status: normalized.statusCode,
-    code: normalized.code,
-    message: err.message,
+    code: safeCode,
+    message: safeCode === 'VALIDATION_ERROR' ? 'Datos de entrada invalidos'
+      : normalized.statusCode >= 500 ? 'Error interno del servidor' : 'Solicitud rechazada',
   };
-
-  if (!isProduction() && !isAutomationError) {
-    payload.name = err.name;
-    payload.dbCode = err.code;
-    payload.constraint = err.constraint;
-    payload.stack = err.stack;
-  }
 
   console.error('[error]', payload);
 }
 
 function errorHandler(err, req, res, _next) {
   const normalized = normalizeError(err);
-  const isAutomationError = String(normalized.code || '').startsWith('AUTOMATION_');
-  logError(err, req, normalized);
+  logError(req, normalized);
 
   const response = {
     ok: false,
@@ -156,13 +148,6 @@ function errorHandler(err, req, res, _next) {
   if (normalized.details) {
     response.details = normalized.details;
     response.detalles = normalized.details;
-  }
-
-  if (!isProduction() && normalized.statusCode >= 500 && !isAutomationError) {
-    response.debug = {
-      name: err.name,
-      stack: err.stack,
-    };
   }
 
   return res.status(normalized.statusCode).json(response);

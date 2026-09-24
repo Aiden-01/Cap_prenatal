@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const { diagnosticCode } = require('../utils/safeErrorLog');
 const {
   loadEnvironmentFile,
   nodeEnvForValidation,
@@ -19,7 +20,7 @@ function getPool() {
     if (nodeEnv !== 'test') console.log('Conectado a PostgreSQL');
   });
   activePool.on('error', (error) => {
-    console.error('Error en pool de PostgreSQL:', error.message);
+    console.error('Error en pool de PostgreSQL:', diagnosticCode(error));
   });
 
   return activePool;

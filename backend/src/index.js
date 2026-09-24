@@ -3,6 +3,7 @@ const {
   loadEnvironmentFile,
   validateAppConfig,
 } = require('./config/env');
+const { diagnosticCode } = require('./utils/safeErrorLog');
 
 loadEnvironmentFile();
 let config;
@@ -10,7 +11,7 @@ try {
   config = validateAppConfig(process.env);
 } catch (error) {
   if (error instanceof ConfigError) {
-    console.error(error.message);
+    console.error('Configuracion invalida:', diagnosticCode(error));
     process.exit(1);
   }
   throw error;
@@ -151,12 +152,12 @@ if (require.main === module) {
   startServer().then((server) => {
     installShutdownHandlers(server);
   }).catch(async (error) => {
-    console.error('No se pudo iniciar el servidor:', error.message);
+    console.error('No se pudo iniciar el servidor:', diagnosticCode(error));
     process.exitCode = 1;
     try {
       await Promise.allSettled([pool.end(), puppeteerBrowserManager.close()]);
     } catch (closeError) {
-      console.error('No se pudo cerrar PostgreSQL:', closeError.message);
+      console.error('No se pudo cerrar PostgreSQL:', diagnosticCode(closeError));
     }
   });
 }
