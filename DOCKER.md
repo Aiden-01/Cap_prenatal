@@ -6,9 +6,9 @@ ni utilizarse como plantilla de produccion.
 
 El proyecto incluye:
 
-- `backend/Dockerfile`: API Node.js con Chromium instalado para Puppeteer.
+- `backend/Dockerfile`: API Node.js con Chromium para Puppeteer y LibreOffice Calc para conversiones PDF.
 - `frontend/Dockerfile`: build de Vite servido con Nginx.
-- `docker-compose.yml`: PostgreSQL, backend y frontend para pruebas locales.
+- `docker-compose.yml`: PostgreSQL, backend, n8n y frontend para pruebas locales.
 
 ## Preparacion local
 
@@ -23,7 +23,16 @@ documentacion.
 
 ## Uso local
 
-Levantar todo:
+Preparar la base y aplicar las migraciones antes del primer arranque del backend:
+
+```bash
+docker compose build backend
+docker compose up -d postgres
+docker compose run --rm backend npm run db:migrate
+docker compose up --build
+```
+
+En arranques posteriores, con el esquema al día:
 
 ```bash
 docker compose up --build
@@ -41,12 +50,19 @@ n8n UI:   http://127.0.0.1:5678
 Todos los puertos locales se ligan a `127.0.0.1`. Los servicios usan redes
 separadas: frontend/backend, backend/PostgreSQL y n8n/backend. n8n no comparte
 red con PostgreSQL y la integracion M2M del backend permanece deshabilitada.
+Los datos de PostgreSQL y la configuración de n8n persisten en los volúmenes
+`cap_prenatal_local_postgres_data` y `cap_prenatal_local_n8n_data`.
 
-Ejecutar migracion dentro del contenedor:
+Con el backend ya saludable, también se pueden aplicar migraciones pendientes
+dentro del contenedor:
 
 ```bash
 docker compose exec backend npm run db:migrate
 ```
+
+El comando aplica las migraciones pendientes hasta
+`017_citas_inasistencias.sql`; el backend comprueba al iniciar que el esquema
+requerido está aplicado. Respalde el volumen antes de migrar datos existentes.
 
 Crear la cuenta director inicial, solo cuando sea necesaria:
 
@@ -75,24 +91,22 @@ inventario; no debe convertirse en almacen de secretos productivos. El backend
 acepta `DATABASE_URL` o todas las variables `DB_*`, pero valida la configuracion
 antes de cargar rutas.
 
-La imagen n8n y la dependencia local estan fijadas en `2.34.4`, release `latest`
-oficial del 7 de agosto de 2026 y correccion compatible propuesta por la
-auditoria de npm. Revisar notas de version, respaldar el volumen y probar
-restauracion antes de cualquier actualizacion posterior.
+La imagen n8n está fijada en `2.34.4` y el paquete comunitario
+`n8n-nodes-resend` en `2.8.0`. Revisar notas de versión, respaldar el volumen
+`n8n_data` junto con `N8N_ENCRYPTION_KEY` y probar restauración antes de
+actualizarlos.
 
-El workflow versionado `n8n/workflows/proximas-citas-v1.json` no se monta,
-importa o activa automaticamente desde ningun Compose. Debe importarse
-manualmente y siempre aparece inactivo, sin Header Auth ni SMTP. La
-configuracion productiva limita la concurrencia global de esta instancia a 1
-con `N8N_CONCURRENCY_PRODUCTION_LIMIT=1`; el artefacto JSON no serializa un
-limite por-workflow. Las URLs de CAP se configuran como variables de proyecto
-n8n, mientras el acceso global a `$env` queda bloqueado.
+Ningún Compose importa ni activa workflows automáticamente. Los seis JSON Resend
+de `n8n/workflows/` son los artefactos operativos actuales y requieren importar,
+asignar credenciales Header Auth y Resend y configurar remitente y destinatario
+autorizados. `proximas-citas-v1.json` es un artefacto SMTP heredado. La
+configuración productiva limita la concurrencia global a 1 con
+`N8N_CONCURRENCY_PRODUCTION_LIMIT=1`. Las URLs de CAP se configuran como
+variables de proyecto n8n; el acceso global a `$env` queda bloqueado.
 
 No agregar n8n a `data_internal`, no darle credenciales PostgreSQL y no publicar
-5678. El correo futuro requiere una decision separada de egress: relay SMTP
-institucional en la red privada, red dedicada con firewall limitado al
-proveedor aprobado o servicio institucional privado. Este sprint no agrega una
-red publica ni configura SMTP.
+5678. El flujo actual envía correo mediante Resend por HTTPS saliente; el
+ejemplo productivo requiere configurar y limitar ese egreso antes de desplegar.
 
 Consulte `docs/ROTACION_SECRETOS.md` antes de preparar cualquier entorno nuevo.
 

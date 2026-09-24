@@ -6,30 +6,21 @@ las automatizaciones de CAP Prenatal. La operación diaria está en
 [`RESEND.md`](RESEND.md) y el inventario importable en
 [`../n8n/README.md`](../n8n/README.md).
 
-## Estado observado el 24 de agosto de 2026
+## Estado de los artefactos versionados
 
-- Rama inspeccionada: `main`, HEAD inicial
-  `dbd654323de03ae5dbd6960e31e9d59729502662`.
-- n8n local: `2.34.4`, disponible en `http://127.0.0.1:5678` y ligado a
-  loopback.
-- Perfil persistente: `.n8n-local/`, ignorado por Git.
-- Nodo Resend: `n8n-nodes-resend@2.8.0` instalado en el perfil persistente.
-- Workflows locales: cuatro, con IDs estables, credenciales asignadas y
-  `active=false`.
-- Workflows versionados: inactivos, sin IDs de credenciales, sin claves y con
-  direcciones `.invalid`.
+Los seis workflows Resend de `n8n/workflows/` están versionados con
+`active=false`, sin credenciales ni destinatarios reales. Los Compose fijan n8n
+`2.34.4` y `n8n-nodes-resend@2.8.0`. La presencia de estos archivos no confirma
+el estado de una instancia local ni la entrega de correo.
 
-La inspección del repositorio y de los metadatos locales no implica que el
-dominio, una API key o la entrega productiva se hayan vuelto a validar en los
-paneles externos durante esta sesión.
-
-| ID local | Workflow | Programación | Resultado sin datos | Correo |
-| --- | --- | --- | --- | --- |
-| `NI4eHXsKQmcCB2Xg` | Recordatorio de citas | Diario 08:00 | Termina sin enviar | Resend, sin adjunto |
-| `capCenso2625V1A1` | Censo 26 a 25 | Día 26, 06:00 | Envía aviso sin archivo | Resend, XLSX si hay datos |
-| `capCensoMesV1A1` | Censo de mes cerrado | Día 3, 06:00 | Envía aviso sin archivo | Resend, XLSX si hay datos |
-| `JJylxJ7YxtprYjDZ` | Seguimiento semanal de inasistencias | Lunes 08:00 | Termina sin enviar | Resend, tabla HTML |
-| `yVwDfliCVeeOOg1F` | Watchdog semanal de calidad de datos | Lunes 09:00 | Termina sin enviar | Resend, resumen agregado |
+| Workflow | Programación | Resultado sin datos | Correo |
+| --- | --- | --- | --- |
+| Recordatorio de citas | Diario 08:00 | Termina sin enviar | Resend, sin adjunto |
+| Censo 26 a 25 | Día 26, 06:00 | Envía aviso sin archivo | Resend, XLSX si hay datos |
+| Censo de mes cerrado | Día 3, 06:00 | Envía aviso sin archivo | Resend, XLSX si hay datos |
+| Seguimiento semanal de inasistencias | Lunes 08:00 | Termina sin enviar | Resend, tabla HTML |
+| Seguimiento oportuno Tdap de El Chal | Lunes 08:00 | Termina sin enviar | Resend, XLSX si hay datos |
+| Watchdog semanal de calidad de datos | Lunes 09:00 | Termina sin enviar | Resend, resumen agregado |
 
 Todos usan `America/Guatemala`. Activar un workflow es una decisión operativa
 separada de importarlo o probar nodos individuales.
@@ -109,25 +100,33 @@ válido cumple la única cita vigente del embarazo. La migración 014 garantiza
 una raíz por control, una hija por cita y una sola `programada` por embarazo.
 No reconstruye citas históricas.
 
-N8N-OPS-01A implementa la semana calendario anterior completa y propone su
-ejecución los lunes a las 08:00 en `America/Guatemala`. Una inasistencia es una
-fila de `citas_prenatales` cuya `fecha_programada` está dentro del lunes-domingo
-solicitado, permanece `estado = 'programada'`, no tiene
-`control_cumplimiento_id` y pertenece a un embarazo activo. Las citas
-`atendida`, `cancelada` y `reprogramada` quedan excluidas por el backend.
+N8N-OPS-01A prepara la semana calendario anterior completa los lunes a las
+08:00 en `America/Guatemala`. La migración 017 y el materializador convierten
+las citas vencidas sin control coincidente en `estado = 'inasistente'`.
+El seguimiento incluye inasistencias nuevas de la semana y anteriores aún
+pendientes, hasta el domingo solicitado. Solo considera embarazos `activo` o
+`puerperio`; excluye una inasistencia si ya originó una cita de seguimiento o
+existe un control prenatal posterior. Las citas `atendida`, `cancelada` y
+`reprogramada` quedan excluidas.
 
 El corte seguro es el `applied_at` versionado de
 `014_citas_prenatales.sql`: además del período, la consulta exige
 `citas_prenatales.created_at >= corte`. No usa, infiere ni reconstruye
-`controles_prenatales.cita_siguiente`. La migración 015 agrega solo el estado
-técnico de despacho; debe aplicarse mediante el flujo oficial antes de iniciar
-esta versión del backend. El workflow fue importado y probado, pero permanece
-sin publicar y `active=false`.
+`controles_prenatales.cita_siguiente`. La migración 015 agrega el estado técnico
+de despacho y la 017 el estado y la relación de seguimiento. El esquema hasta
+017 debe aplicarse mediante el flujo oficial antes de iniciar esta versión del
+backend.
 
 Vista previa explícita, de solo lectura:
 
 ```text
 GET /api/automatizaciones/v1/inasistencias?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
+```
+
+Materialización explícita de citas vencidas, también invocada por `preparar`:
+
+```text
+POST /api/automatizaciones/v1/inasistencias/materializar
 ```
 
 Preparación idempotente de la semana anterior:
@@ -140,13 +139,14 @@ Contrato sintético de una preparación lista:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "generated_at": "2026-08-24T14:00:00.000Z",
   "timezone": "America/Guatemala",
   "report_type": "weekly_missed_appointments",
   "range": { "from": "2026-08-17", "to": "2026-08-23" },
   "cutoff_at": "2026-08-01T16:30:00.000Z",
   "dispatch": { "status": "ready", "token": "<token efimero>" },
+  "summary": { "new": 1, "previous_pending": 0, "total": 1 },
   "total": 1,
   "appointments": [
     {
@@ -154,14 +154,17 @@ Contrato sintético de una preparación lista:
       "first_name": "Nombre",
       "last_name": "Apellido",
       "phone": "0000-0000",
-      "community": "Comunidad"
+      "community": "Comunidad",
+      "category": "new"
     }
   ]
 }
 ```
 
-`no_results` y `already_processed` siempre llevan `total=0`, lista vacía y no
-incluyen token. `ready` es el único estado que permite avanzar a Resend. Tras
+`category` distingue `new` de `previous_pending`; `summary` agrega ambos
+grupos y coincide con `total`. `no_results` y `already_processed` siempre
+llevan `total=0`, conteos en cero, lista vacía y no incluyen token. `ready` es
+el único estado que permite avanzar a Resend. Tras
 la aceptación del correo, n8n confirma una sola vez:
 
 ```text
@@ -449,7 +452,8 @@ Schedule lunes 08:00
 El correo incluye fecha de la cita como dato operativo no clínico, primer
 nombre, primer apellido, teléfono y comunidad. Excluye IDs, CUI, expediente,
 dirección, VIH, laboratorios, diagnósticos, riesgo, morbilidad, vacunas y otros
-datos clínicos. La fecha evita ambigüedad al coordinar el seguimiento.
+datos clínicos. Presenta por separado las inasistencias nuevas y los pendientes
+anteriores; la fecha evita ambigüedad al coordinar el seguimiento.
 
 Una API no disponible, timeout, `401`, `409`, respuesta inválida o fallo de
 Resend deja la ejecución fallida; nunca se transforma en “no hay
@@ -576,7 +580,9 @@ No copiar a Git:
 
 ## Resend y artefacto SMTP heredado
 
-Los seis workflows Resend utilizan `n8n-nodes-resend.resend`. El archivo
+Los workflows Resend usan el nodo `n8n-nodes-resend.resend`, salvo el de Tdap,
+que envía mediante `POST https://api.resend.com/emails` tras convertir el XLSX
+a base64. El archivo
 `n8n/workflows/proximas-citas-v1.json` conserva un diseño endurecido de 40
 nodos con `n8n-nodes-base.emailSend`; no está cargado en la instancia local y
 no es el camino operativo actual. Se mantiene como artefacto heredado cubierto

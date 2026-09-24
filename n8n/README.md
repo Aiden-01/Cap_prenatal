@@ -1,8 +1,9 @@
 # Artefactos n8n de CAP Prenatal
 
 Este directorio contiene configuración de ejemplo, workflows importables y
-plantillas. No contiene SQLite, credenciales, ejecuciones, API keys,
-destinatarios reales ni datos clínicos. La operación completa está en
+plantillas. No contiene SQLite, credenciales, ejecuciones, API keys ni datos
+clínicos. Los seis JSON Resend sí contienen un destinatario concreto que debe
+revisarse antes de importar o activar. La operación completa está en
 [`../docs/N8N_OPERACION.md`](../docs/N8N_OPERACION.md).
 
 ## Inventario
@@ -12,14 +13,14 @@ destinatarios reales ni datos clínicos. La operación completa está en
 | `workflows/recordatorio-citas-resend-v1.json` | Citas de mañana con nombre operativo, teléfono y comunidad | Diario 08:00 | No envía |
 | `workflows/censo-primer-control-26-25-resend-v1.json` | Censo del mes logístico 26 a 25 | Día 26, 06:00 | Aviso sin archivo |
 | `workflows/censo-primer-control-mes-cerrado-resend-v1.json` | Censo del mes calendario anterior | Día 3, 06:00 | Aviso sin archivo |
-| `workflows/seguimiento-inasistencias-resend-v1.json` | Citas vencidas de la semana lunes-domingo anterior | Lunes 08:00 | No envía |
+| `workflows/seguimiento-inasistencias-resend-v1.json` | Inasistencias nuevas de la semana anterior y pendientes anteriores sin seguimiento | Lunes 08:00 | No envía |
 | `workflows/seguimiento-tdap-el-chal-resend-v1.json` | Nuevas oportunidades y pendientes Tdap de El Chal, en un XLSX de dos hojas | Lunes 08:00 | No envía |
 | `workflows/watchdog-calidad-datos-resend-v1.json` | Invariantes objetivas resumidas por categoría | Lunes 09:00 | No envía |
 | `workflows/proximas-citas-v1.json` | Diseño SMTP heredado y endurecido | Diario 06:00 | No envía |
 
-Los seis primeros son el camino Resend actual. El último no está cargado en la
-instancia local y no debe importarse para la operación nueva; se conserva como
-referencia heredada cubierta por pruebas hasta autorizar su retiro.
+Los seis primeros son el camino Resend actual. El último es un diseño SMTP
+heredado y no debe importarse para la operación nueva; se conserva como
+referencia cubierta por pruebas hasta autorizar su retiro.
 
 `N8N-OPS-01A · Seguimiento de inasistencias` usa el modelo explícito de
 `citas_prenatales` y la idempotencia transaccional de CAP Prenatal. n8n no
@@ -48,23 +49,16 @@ Todos los JSON:
 - usan `America/Guatemala`;
 - deshabilitan guardado de ejecuciones y exposición MCP;
 - omiten credenciales y resultados;
-- usan direcciones `.invalid` como bloqueo previo a producción;
+- requieren revisar y sustituir las direcciones de correo incorporadas antes de
+  cualquier activación; los remitentes de ejemplo usan `.invalid`, pero los seis
+  JSON Resend también contienen un destinatario concreto;
 - presentan fechas de correo y nombres de adjuntos como `DD-MM-YYYY`, mientras
   los contratos y parámetros HTTP permanecen en ISO `YYYY-MM-DD`.
 
-## Correspondencia local observada
+## Estado de los archivos versionados
 
-| ID | Nombre |
-| --- | --- |
-| `NI4eHXsKQmcCB2Xg` | `CAP Prenatal | Recordatorio de citas | Resend | v1` |
-| `capCenso2625V1A1` | `CAP Prenatal | Censo 26 a 25 | Resend | v1` |
-| `capCensoMesV1A1` | `CAP Prenatal | Censo mes cerrado | Resend | v1` |
-| `JJylxJ7YxtprYjDZ` | `CAP Prenatal | Seguimiento semanal de inasistencias | Resend | v1` |
-| `yVwDfliCVeeOOg1F` | `CAP Prenatal | Watchdog semanal de calidad de datos | Resend | v1` |
-
-Los cuatro estaban inactivos/sin publicar al auditarse. Los nodos HTTP y Resend tenían
-credenciales locales asignadas; sus identificadores, secretos y destinatarios
-se omiten deliberadamente y no aparecen en estos archivos.
+Los siete JSON están `active=false` y no incluyen IDs de credenciales. Esta
+propiedad del repositorio no confirma el estado de ninguna instancia local.
 
 ## Preparar el entorno
 
@@ -91,7 +85,8 @@ Detalles de backup, recuperación de acceso y actualización:
 3. confirmar nombre, agenda, zona y `active=false`;
 4. no publicar todavía;
 5. asignar credenciales según la sección siguiente;
-6. reemplazar únicamente dentro del entorno los valores `.invalid`;
+6. ajustar las URLs de Express y revisar remitente y destinatario incorporados
+   en cada JSON dentro del entorno, antes de cualquier prueba de envío;
 7. probar nodos con información sintética;
 8. revisar diferencias entre el workflow configurado y el JSON versionado;
 9. publicar solo con autorización institucional.
@@ -129,6 +124,7 @@ hash. Las URLs reales son:
 /api/automatizaciones/v1/inasistencias/preparar
 /api/automatizaciones/v1/inasistencias/confirmar
 /api/automatizaciones/v1/inasistencias/resolver
+/api/automatizaciones/v1/inasistencias/materializar
 /api/automatizaciones/v1/tdap/preparar
 /api/automatizaciones/v1/tdap/xlsx
 /api/automatizaciones/v1/tdap/confirmar
@@ -138,9 +134,16 @@ hash. Las URLs reales son:
 /api/automatizaciones/v1/calidad-datos/resolver
 ```
 
-En ejecución programada se usa `http://backend:3001` dentro de Docker; una
-ejecución manual local usa `http://127.0.0.1:3001`. La ruta sin `/v1/` está
-retirada.
+Los seis JSON Resend traen URLs fijas a `http://127.0.0.1:3335`, que no
+corresponden al backend de los Compose. Al importarlos, cambie **cada** URL de
+los nodos HTTP hacia Express: `http://backend:3001` dentro de Docker o
+`http://127.0.0.1:3001` con backend y n8n ejecutados en el host. Revise tanto
+la rama programada como la manual de cada expresión; las variables de proyecto
+`CAP_BACKEND_AUTOMATION_URL` pertenecen al JSON SMTP heredado, no a estos seis.
+La ruta sin `/v1/` está retirada. La integración M2M debe estar habilitada en
+el backend con `N8N_INTEGRATION_ENABLED`, hash de clave y CIDR permitidos;
+en desarrollo se requiere además `N8N_INTEGRATION_LOCAL_ENABLED=true` y solo
+se admite origen loopback. Compose local la deshabilita.
 
 ## Credencial y nodos Resend
 
@@ -150,11 +153,14 @@ Crear una credencial **Resend API** y asignarla a:
 - ambos `Enviar aviso sin datos`;
 - ambos `Enviar correo con Excel`;
 - `Enviar seguimiento por Resend`.
-- `Enviar seguimiento por Resend` del workflow Tdap.
 - `Enviar watchdog por Resend`.
 
-Configurar un remitente de `notificaciones.hercor-nexus.com` y un destinatario
-institucional aprobado. No guardar el destinatario real en el JSON.
+Tdap usa un nodo **HTTP Request** a la API de Resend con la credencial
+predefinida `Resend API`; no usa el nodo comunitario para ese envío.
+
+Configurar un remitente de dominio verificado y un destinatario institucional
+aprobado. El destinatario concreto presente en los JSON versionados debe
+retirarse antes de una exportación reutilizable; no copiarlo a nuevas versiones.
 
 Guía completa: [`../docs/RESEND.md`](../docs/RESEND.md).
 
@@ -193,8 +199,9 @@ Schedule lunes 08:00 -> POST preparar -> validar contrato
                                                                -> POST confirmar
 ```
 
-CAP Prenatal calcula la semana anterior, filtra la agenda estructurada y
-reserva el período. El correo contiene solo fecha de cita, primer nombre,
+CAP Prenatal materializa las citas vencidas como `inasistente`, calcula las
+nuevas de la semana anterior y los pendientes anteriores, y reserva el período.
+El correo separa ambos grupos y contiene solo fecha de cita, primer nombre,
 primer apellido, teléfono y comunidad. `total=0`, `no_results` y
 `already_processed` terminan sin correo. Una reserva ambigua bloquea el replay
 automático hasta que personal autorizado revise Resend.
@@ -285,7 +292,8 @@ nodo Resend hasta que exista un destinatario de prueba autorizado.
 ## Seguridad antes de exportar
 
 - eliminar referencias a IDs/nombres de credenciales;
-- restaurar remitente y destinatario `.invalid`;
+- retirar cualquier destinatario concreto y restaurar direcciones de ejemplo
+  `.invalid` para remitente y destinatario;
 - eliminar `pinData` y resultados de ejecución;
 - no incluir exports de `.n8n-local/`;
 - buscar direcciones reales, API keys, dominios internos no públicos y datos de

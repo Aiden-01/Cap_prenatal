@@ -17,6 +17,9 @@ de n8n. Los contratos funcionales están en [`N8N.md`](N8N.md) y el correo en
 | Zona horaria | `America/Guatemala` |
 | Editor local | `http://127.0.0.1:5678` |
 
+El repositorio incluye seis workflows Resend y un JSON SMTP heredado; el
+inventario vigente está en [`../n8n/README.md`](../n8n/README.md).
+
 `n8n/.env` y `.n8n-local/` están ignorados por Git. El lanzador acepta una
 lista cerrada de variables, elimina variables heredadas que no necesita y
 rechaza una versión distinta de n8n.
@@ -104,9 +107,8 @@ Procedimiento local:
    `N8N_ENCRYPTION_KEY`;
 7. reiniciar y verificar workflows, credenciales y salud.
 
-La inspección local encontró backups previos para recuperación de acceso e
-instalación de Resend bajo `.n8n-local/backups/`. Sus contenidos no se leen ni
-se versionan. Una copia dentro del mismo disco no sustituye un backup externo.
+Una copia dentro del mismo disco no sustituye un backup externo. El repositorio
+no acredita que exista un backup local ni su restaurabilidad.
 
 En Docker se debe respaldar el volumen `n8n_data`; no copiar una base SQLite
 mientras el proceso escribe sobre ella. Definir retención, cifrado, propietario
@@ -157,17 +159,40 @@ la interfaz.
 
 1. iniciar backend y n8n;
 2. instalar/reconciliar Resend antes de importar;
-3. importar los JSON listados en [`../n8n/README.md`](../n8n/README.md);
+3. importar solo los seis JSON Resend listados en
+   [`../n8n/README.md`](../n8n/README.md); dejar el JSON SMTP heredado fuera
+   de la operación actual;
 4. confirmar que todos quedan inactivos;
-5. asignar una credencial Header Auth a cada nodo HTTP;
-6. asignar una credencial Resend a cada nodo de correo;
-7. sustituir remitentes y destinatarios `.invalid` solo dentro del entorno;
-8. guardar sin publicar;
-9. probar nodo por nodo con datos sintéticos;
-10. publicar después de la revisión y autorización institucional.
+5. cambiar en cada nodo HTTP de Express las URLs fijas `127.0.0.1:3335`:
+   usar `backend:3001` en Docker o `127.0.0.1:3001` si ambos procesos corren
+   en el host, y revisar las ramas programada y manual de cada expresión;
+6. asignar `HTTP Header Auth` con `X-CAP-Automation-Key` a los nodos que
+   consultan Express; en el backend configurar `N8N_INTEGRATION_ENABLED=true`,
+   el hash SHA-256 de esa clave y `N8N_ALLOWED_CIDRS`. En desarrollo se requiere
+   además `N8N_INTEGRATION_LOCAL_ENABLED=true` con origen loopback. El Compose
+   local mantiene M2M deshabilitado y no prueba estos endpoints sin ajustar
+   explícitamente su configuración;
+7. asignar la credencial Resend a los nodos de correo; Tdap usa un HTTP Request
+   a la API de Resend con credencial predefinida `Resend API`;
+8. revisar remitente y destinatario de los seis JSON: los remitentes de
+   ejemplo usan `.invalid`, pero incluyen un destinatario concreto. Sustituir
+   ambos por direcciones aprobadas dentro del entorno, sin versionarlas;
+9. guardar sin publicar;
+10. probar nodo por nodo con datos sintéticos;
+11. publicar después de la revisión y autorización institucional.
 
 Una exportación versionable debe eliminar IDs/nombres de credenciales,
 destinatarios reales, remitentes internos y cualquier resultado de ejecución.
+
+Las rutas M2M actuales incluyen recordatorios (`GET /v1/proximas-citas`),
+censos (`GET /v1/censo-primer-control` y `/excel`), inasistencias (`GET`,
+`POST /preparar`, `/confirmar`, `/resolver` y `/materializar`), Tdap
+(`POST /preparar`, `GET /xlsx`, `POST /confirmar` y `/resolver`) y calidad de
+datos (`POST /preparar`, `/confirmar` y `/resolver`), todas bajo
+`/api/automatizaciones/v1/`. El workflow semanal invoca `preparar`, que
+materializa primero las citas vencidas; `materializar` también existe para
+operación explícita. Los detalles de cuerpos y validaciones están en
+[`N8N.md`](N8N.md).
 
 ## Pruebas seguras
 
@@ -183,6 +208,10 @@ Orden recomendado:
 8. un único correo de prueba a destinatario autorizado;
 9. confirmar entrega y ausencia de datos sensibles en logs.
 
+Antes de estas pruebas, verificar que las URLs, el Header Auth y la activación
+M2M correspondan al entorno. Un `404` puede indicar integración deshabilitada;
+un fallo de conexión a `:3335` indica que quedó la URL fija del JSON importado.
+
 Para `Seguimiento semanal de inasistencias`, el orden manual obligatorio es:
 
 1. mantener el workflow sin publicar;
@@ -191,6 +220,8 @@ Para `Seguimiento semanal de inasistencias`, el orden manual obligatorio es:
 3. usar una base temporal nueva para el caso positivo, porque un período ya
    registrado como `sin_resultados` no se reabre;
 4. comprobar que `Preparar semana anterior` devuelve `ready`;
+   el contrato actual es `schema_version: 2`, con `summary.new`,
+   `summary.previous_pending` y `category` por cita `inasistente`;
 5. ejecutar una sola vez el flujo hasta Resend y confirmación;
 6. repetir el workflow y comprobar que termina en `already_processed` antes de
    construir el correo;
@@ -251,8 +282,8 @@ una paciente real para probar formato, errores o adjuntos.
    comparar SHA-256 con una captura exacta de la respuesta HTTP;
 5. confirmar que `Materializar XLSX en base64` devuelve el mismo tamaño y
    SHA-256 después de decodificar;
-6. no conectar el binario almacenado directamente al nodo comunitario Resend
-   2.8.0: `binary.data.data` puede contener `filesystem-v2:...`;
+6. no usar `binary.data.data` directamente como contenido del adjunto:
+   puede contener un localizador `filesystem-v2:...`;
 7. verificar que el nodo `Enviar seguimiento por Resend` use la credencial
    predefinida `Resend API` y `attachments[].content` desde
    `attachment_base64`.
@@ -314,15 +345,23 @@ producción: usar reglas limitadas y registrar el cambio.
 
 ### `The resource you are requesting could not be found`
 
-La causa conocida es usar la ruta retirada
+Puede deberse a usar la ruta retirada
 `/api/automatizaciones/proximas-citas`. Usar la ruta versionada `/v1/...`,
-confirmar puerto `3001`, el opt-in local y el Header Auth. Una integración
+confirmar puerto `3001`, la activación M2M y el Header Auth. Una integración
 deshabilitada responde `404` deliberadamente.
+
+### Fallo de conexión a `127.0.0.1:3335`
+
+Los seis JSON Resend versionados contienen esa URL fija. Ajustar todos los
+nodos HTTP hacia Express al importar y comprobar la URL en ejecución manual y
+programada. Dentro del contenedor n8n, `127.0.0.1` apunta al propio n8n;
+usar `backend:3001` en la red interna de Docker.
 
 ### No se envió el recordatorio
 
 Si `total=0`, es el resultado correcto: la rama termina antes de Resend. Si hay
-citas, revisar contrato, credencial Header Auth, credencial Resend y salida
+citas `programada` próximas, revisar URL de Express, contrato, credencial Header
+Auth, credencial Resend y salida
 HTTPS sin copiar el payload a tickets.
 
 ### Censo sin adjunto
@@ -354,7 +393,8 @@ La ejecución debe quedar fallida. No interpretar un error como `total=0`. En
 **Executions**, identificar el último nodo verde y el primero fallido:
 
 - `Preparar semana anterior`: salud, puerto, allowlist y Header Auth;
-- `Validar contrato y reserva`: cambio incompatible del backend;
+- `Validar contrato y reserva`: comprobar `schema_version: 2`, `summary`,
+  categorías `new` y `previous_pending`, y compatibilidad del backend;
 - `Enviar seguimiento por Resend`: credencial, dominio o egress;
 - `Confirmar despacho en CAP`: revisar primero si Resend aceptó el correo.
 

@@ -71,6 +71,7 @@ Los siguientes modulos ya tienen separacion en controller/service/repository/val
 - reportes
 - automatizaciones
 - PDF
+- citas prenatales e inasistencias
 - chatbot
 
 Los resultados de laboratorio no constituyen un modulo HTTP independiente. Forman parte del modelo y flujo de controles prenatales: se capturan con cada control y se consultan desde los controles y el expediente. Los datos sensibles de VIH mantienen su filtrado por permisos.
@@ -94,10 +95,17 @@ bitacora completa de cada transicion de estado. Los reportes de FPP, falta de
 control, riesgo y comunidad comparten la fecha operativa de
 `America/Guatemala`; no usan `p.created_at` para definir captacion o actividad.
 
-Las descargas nominales requieren `reportes.exportar`, usan oficio horizontal y
+Los seis reportes tienen exportacion Excel y PDF con seleccion de columnas. Las
+descargas requieren `reportes.exportar`, usan oficio horizontal y
 registran metadata minima. Puppeteer genera el PDF directamente en memoria; no
 se escriben censos dentro del repositorio ni se necesitan migraciones para este
 modulo.
+
+Los PDF clinicos se coordinan desde `controllers/pdfController.js` y los
+servicios de documentos; la ruta combinada une expediente, plan de parto y
+ficha de riesgo. `services/puppeteerBrowserManager.js` comparte el navegador
+entre PDF basados en HTML, aisla cada trabajo en una pagina o contexto y lo
+cierra al apagar el backend. `reportesPdfService.js` usa el mismo gestor.
 
 ## Automatizaciones
 
@@ -118,14 +126,24 @@ responde conteos por fecha y el detalle operativo minimo de cada cita: primer
 nombre, primer apellido, telefono y comunidad. No usa JWT, cookies, CSRF, `Authorization`,
 `X-Forwarded-For` ni CORS de navegador.
 
-El repositorio selecciona el ultimo control por `embarazo_id` mediante
-`fecha DESC, numero_control DESC, id DESC`, filtra exclusivamente embarazos
+El repositorio selecciona citas `programada` sin cumplimiento desde
+`citas_prenatales`, filtra exclusivamente embarazos
 activos y no selecciona IDs, CUI, expediente, direccion ni datos clinicos. Los
 endpoints M2M de censo exponen por separado el resumen agregado y un Excel
 nominal en memoria para el adjunto autorizado; ambos validan un periodo de hasta
 31 dias. La auditoria conserva solo conteo, rango y codigos controlados, nunca
 el archivo ni sus filas. El endpoint legacy responde `404`. No se modifico la
-base de datos.
+base de datos para esos contratos.
+
+El seguimiento semanal de inasistencias consulta citas ya materializadas como
+`inasistente`, nuevas del periodo y anteriores aun pendientes. El servicio
+`citasInasistenciasService.js` materializa vencimientos y reconcilia controles
+tardios; `citasMaterializacionRunner.js` ejecuta el barrido al arrancar y cada
+hora. `citasPrenatalesService.js` asigna, reprograma, cancela y crea seguimientos
+con `citasPrenatalesRepository.js`, usando transacciones y auditoria obligatoria.
+La ruta M2M de materializacion y la preparacion del despacho reutilizan ese
+servicio; las lecturas GET no materializan. La migracion 017 agrega el estado y
+la autorrelacion de seguimiento.
 
 `N8N-VAX-01` reutiliza esta frontera y `automatizacion_despachos` con el tipo
 `seguimiento_tdap_el_chal`. El repositorio filtra embarazo activo, municipio El
@@ -213,11 +231,11 @@ nuevo justo antes del repositorio.
 
 Productores en este camino: autenticacion, usuarios, passwords, roles,
 permisos, sesiones, PDF, exportaciones/reportes, automatizaciones, pacientes, embarazos y
-controles prenatales con laboratorios embebidos, riesgo obstetrico, vacunas,
+controles prenatales con laboratorios embebidos, citas prenatales, riesgo obstetrico, vacunas,
 morbilidad, plan de parto, puerperio y comunidades.
 Password, rol, estado, permisos, eliminacion de usuario y escrituras de paciente
 o embarazo, y las escrituras existentes de control prenatal, riesgo, vacuna,
-morbilidad, plan de parto, puerperio o comunidad escriben
+morbilidad, plan de parto, puerperio, cita prenatal o comunidad escriben
 auditoria obligatoria en la misma transaccion. Login,
 expiracion automatica, documentos/reportes y consultas de automatizacion son
 best effort.
@@ -290,10 +308,11 @@ la URL anterior llegan al 404 global `ROUTE_NOT_FOUND`. Los mapeos del productor
 privado se retiraron, mientras el saneador y las politicas conservan el
 reconocimiento de eventos historicos de entidad `referencia`.
 
-El esquema final contiene 17 tablas operativas mas `schema_migrations`. La
+El esquema final contiene 17 tablas operativas mas `schema_migrations` y
+`automatizacion_despachos`. La
 migracion `008_retirar_referencias_efectuadas.sql` bloquea y cuenta antes de
 retirar la tabla vacia, aborta si hay filas y no usa `CASCADE`. El codigo actual
-exige que las migraciones `008` a `014` esten registradas con el checksum de sus
+exige que las migraciones `008` a `017` esten registradas con el checksum de sus
 archivos versionados antes de abrir el puerto HTTP. Esta compuerta solo consulta
 el registro y nunca ejecuta migraciones; cada entorno actualiza su propia base
 con `npm run db:migrate`, sin copiar bases entre PCs.
@@ -307,12 +326,12 @@ embarazo, sin backfill. `controlesPrenatalesService` conserva la captura de
 `cita_siguiente` y crea la cita programada usando el mismo cliente y transaccion
 que el control y su auditoria. Origen, cumplimiento y reprogramacion usan
 relaciones compuestas para impedir cruces de embarazo. CITAS-01B completa el
-ciclo: una cita programada puede quedar atendida, cancelada o reprogramada; una
-reprogramacion conserva el origen y crea una hija enlazada en la misma
-transaccion. El siguiente control nuevo cumple la unica cita vigente antes de
-crear su proxima cita. `reportesRepository` y `automatizacionesRepository`
-leen la agenda operativa; `cita_siguiente` permanece solo como historia y
-compatibilidad de respuesta.
+ciclo inicial: una cita programada puede quedar atendida, cancelada o
+reprogramada; una reprogramacion conserva el origen y crea una hija enlazada en
+la misma transaccion. Un control nuevo atiende una cita programada cuando
+coincide con su fecha clinica y luego puede crear su proxima cita.
+`automatizacionesRepository` lee la agenda operativa para recordatorios;
+`cita_siguiente` permanece como historia y compatibilidad de respuesta.
 
 `017_citas_inasistencias.sql` separa el estado historico `inasistente` de la
 necesidad operativa de seguimiento. Un barrido idempotente usa fecha de
