@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, RotateCcw, X } from "lucide-react";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { getErrorMessage } from "../utils/errorMessage";
@@ -53,17 +53,55 @@ function AppointmentEvent({ appointment, onSelect }) {
   );
 }
 
-function DayAgenda({ date, items, onSelect, open, headingRef }) {
+function DayAgenda({ date, items, onSelect, onClose, returnFocusTarget }) {
+  const dialogRef = useRef(null);
+  const closeRef = useRef(null);
+  const skipRestoreRef = useRef(false);
+  const titleId = useId();
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      } else if (event.key === "Tab") {
+        const focusable = [...dialogRef.current.querySelectorAll("button:not([disabled])")];
+        const first = focusable[0];
+        const last = focusable.at(-1);
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (!skipRestoreRef.current) requestAnimationFrame(() => returnFocusTarget?.focus());
+    };
+  }, [onClose, returnFocusTarget]);
+
   return (
-    <section className={`appointment-day-agenda ${open ? "is-open" : ""}`} aria-labelledby="appointment-day-title">
+    <div className="appointment-dialog-backdrop" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose();
+    }}>
+    <section ref={dialogRef} className="appointment-dialog appointment-day-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div className="appointment-day-agenda-heading">
         <div>
-          <span>Detalle del día</span>
-          <h3 id="appointment-day-title" ref={headingRef} tabIndex="-1">{formatDayHeading(date)}</h3>
+          <span>Citas del día</span>
+          <h2 id={titleId}>{formatDayHeading(date)}</h2>
         </div>
         <span className="badge badge-blue">
           {items.length} cita{items.length === 1 ? "" : "s"}
         </span>
+        <button ref={closeRef} type="button" className="appointment-detail-close" onClick={onClose} aria-label="Cerrar citas del día"><X size={20} aria-hidden="true" /></button>
       </div>
       {items.length ? (
         <div className="appointment-day-list">
@@ -74,7 +112,7 @@ function DayAgenda({ date, items, onSelect, open, headingRef }) {
                 type="button"
                 key={appointment.id}
                 className={`appointment-day-item ${status.className}`}
-                onClick={(event) => onSelect(event, appointment)}
+                onClick={(event) => { skipRestoreRef.current = true; onSelect(event, appointment); }}
                 aria-label={appointmentAccessibleName(appointment)}
               >
                 <span className="appointment-day-icon">
@@ -93,6 +131,7 @@ function DayAgenda({ date, items, onSelect, open, headingRef }) {
         <p className="appointment-day-empty">No hay citas registradas para este día.</p>
       )}
     </section>
+    </div>
   );
 }
 
@@ -102,7 +141,7 @@ export default function AppointmentCalendar({ canManageAppointments, onViewPatie
   const today = useMemo(() => todayInGuatemala(), []);
   const [month, setMonth] = useState(() => startOfMonth(today));
   const [selectedDay, setSelectedDay] = useState(today);
-  const [dayAgendaOpen, setDayAgendaOpen] = useState(false);
+  const [dayAgenda, setDayAgenda] = useState(null);
   const [items, setItems] = useState([]);
   const [loadedRangeKey, setLoadedRangeKey] = useState("");
   const [requestState, setRequestState] = useState({ loading: true, error: "" });
@@ -112,7 +151,6 @@ export default function AppointmentCalendar({ canManageAppointments, onViewPatie
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState("");
   const requestIdentity = useRef(0);
-  const dayHeadingRef = useRef(null);
 
   const range = useMemo(() => getVisibleCalendarRange(month), [month]);
   const rangeKey = `${range.from}:${range.to}`;
@@ -160,18 +198,19 @@ export default function AppointmentCalendar({ canManageAppointments, onViewPatie
     setRequestState({ loading: true, error: "" });
     setMonth(nextMonth);
     setSelectedDay(isDateInMonth(today, nextMonth) ? today : nextMonth);
-    setDayAgendaOpen(false);
+    setDayAgenda(null);
   };
 
-  const selectDay = (date, focusAgenda = false) => {
+  const selectDay = (date, returnFocusTarget) => {
     setSelectedDay(date);
-    setDayAgendaOpen(true);
-    if (focusAgenda) requestAnimationFrame(() => dayHeadingRef.current?.focus());
+    setDayAgenda({ returnFocusTarget });
   };
 
   const openDetail = useCallback((event, appointment) => {
-    setDetail({ appointment, returnFocusTarget: event.currentTarget });
-  }, []);
+    event.stopPropagation();
+    setDayAgenda(null);
+    setDetail({ appointment, returnFocusTarget: dayAgenda?.returnFocusTarget || event.currentTarget });
+  }, [dayAgenda]);
 
   const beginAction = (mode) => {
     if (!detail) return;
@@ -256,7 +295,7 @@ export default function AppointmentCalendar({ canManageAppointments, onViewPatie
     const currentMonth = startOfMonth(today);
     if (month !== currentMonth) changeMonth(currentMonth);
     setSelectedDay(today);
-    setDayAgendaOpen(true);
+    setDayAgenda({ returnFocusTarget: document.activeElement });
   };
 
   return (
@@ -345,11 +384,12 @@ export default function AppointmentCalendar({ canManageAppointments, onViewPatie
                         selectedDay === date ? "is-selected" : "",
                       ].filter(Boolean).join(" ")}
                     >
+                      <button type="button" className="calendar-cell-button" onClick={(event) => selectDay(date, event.currentTarget)} aria-label={`Ver citas del ${formatAccessibleDate(date)}`} tabIndex={-1} />
                       <div className="calendar-day-heading">
                         <button
                           type="button"
                           className="calendar-day-button"
-                          onClick={() => selectDay(date)}
+                          onClick={(event) => { event.stopPropagation(); selectDay(date, event.currentTarget); }}
                           aria-label={`Ver citas del ${formatAccessibleDate(date)}`}
                           aria-pressed={selectedDay === date}
                         >
@@ -372,7 +412,7 @@ export default function AppointmentCalendar({ canManageAppointments, onViewPatie
                           <button
                             type="button"
                             className="calendar-more-button"
-                            onClick={() => selectDay(date, true)}
+                            onClick={(event) => { event.stopPropagation(); selectDay(date, event.currentTarget); }}
                             aria-label={`Mostrar ${extra} citas más del ${formatAccessibleDate(date)}`}
                           >
                             +{extra} más
@@ -392,13 +432,13 @@ export default function AppointmentCalendar({ canManageAppointments, onViewPatie
         <p className="appointment-calendar-empty">No hay citas registradas en este mes.</p>
       ) : null}
 
-      <DayAgenda
+      {dayAgenda ? <DayAgenda
         date={selectedDay}
         items={selectedItems}
         onSelect={openDetail}
-        open={dayAgendaOpen}
-        headingRef={dayHeadingRef}
-      />
+        onClose={() => setDayAgenda(null)}
+        returnFocusTarget={dayAgenda.returnFocusTarget}
+      /> : null}
 
       {detail ? (
         <AppointmentDetailDialog

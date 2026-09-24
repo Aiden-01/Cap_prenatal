@@ -223,6 +223,7 @@
 }
 
 .appointment-calendar-table td {
+  position: relative;
   height: 128px;
   padding: 0.35rem;
   border-right: 1px solid var(--border);
@@ -231,6 +232,19 @@
   vertical-align: top;
   transition: background 0.16s, box-shadow 0.16s;
 }
+
+.calendar-cell-button {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.calendar-day-heading, .calendar-events { position: relative; pointer-events: none; }
+.calendar-day-heading button, .calendar-events button { pointer-events: auto; }
 
 .appointment-calendar-table tr:last-child td { border-bottom: 0; }
 
@@ -358,14 +372,8 @@
   text-align: center;
 }
 
-.appointment-day-agenda {
-  display: none;
-  padding: 1rem;
-  border-top: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface2) 42%, var(--surface));
-}
-
-.appointment-day-agenda.is-open { display: block; }
+.appointment-day-dialog { width: min(100%, 560px); max-height: min(85vh, 720px); display: flex; flex-direction: column; }
+.appointment-day-dialog .appointment-day-list { overflow-y: auto; min-height: 0; }
 
 .appointment-day-agenda-heading {
   display: flex;
@@ -382,7 +390,7 @@
   text-transform: uppercase;
 }
 
-.appointment-day-agenda-heading h3 {
+.appointment-day-agenda-heading h2 {
   margin: 0.08rem 0 0;
   color: var(--text);
   font-size: 0.92rem;
@@ -557,7 +565,6 @@
     font-weight: 800;
   }
   .calendar-events { display: none; }
-  .appointment-day-agenda { display: block; padding: 0.8rem; }
   .appointment-day-item { grid-template-columns: auto minmax(0, 1fr); }
   .appointment-day-item .appointment-status-badge { grid-column: 2; justify-self: start; }
   .appointment-detail-list { grid-template-columns: 1fr; }

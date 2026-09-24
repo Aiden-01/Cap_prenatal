@@ -175,12 +175,13 @@ test("teclado, Escape, foco y dialogos mantienen el patron accesible", async () 
   }
 });
 
-test("responsive conserva tabla en tablet y usa agenda compacta en movil sin overflow global", async () => {
+test("responsive conserva tabla y modal del día en móvil sin overflow global", async () => {
   const css = await read("src/components/appointment-calendar.css");
   assert.match(css, /table-layout: fixed/);
   assert.match(css, /@media \(max-width: 900px\)/);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*\.calendar-events \{ display: none/);
-  assert.match(css, /@media \(max-width: 640px\)[\s\S]*\.appointment-day-agenda \{ display: block/);
+  assert.match(css, /\.appointment-day-dialog \{[^}]*max-height:/);
+  assert.match(css, /\.appointment-day-dialog \.appointment-day-list \{ overflow-y: auto/);
   assert.match(css, /max-width: 100%[\s\S]*overflow: hidden/);
   assert.doesNotMatch(css, /overflow-x: auto/);
 });
