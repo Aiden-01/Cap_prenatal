@@ -1,4 +1,5 @@
 const pool = require('./pool');
+const { diagnosticCode } = require('../utils/safeErrorLog');
 
 async function main() {
   const client = await pool.connect();
@@ -65,6 +66,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(err.message);
+  console.error('Validacion manual de embarazo activo fallida:', diagnosticCode(err));
   process.exit(1);
 });

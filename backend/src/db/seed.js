@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const pool = require('./pool');
+const { diagnosticCode } = require('../utils/safeErrorLog');
 const {
   loadEnvironmentFile,
   validateSeedConfig,
@@ -101,7 +102,7 @@ async function seed({
     return { ok: true, accountCreated };
   } catch (error) {
     if (client) await client.query('ROLLBACK');
-    logger.error('Error en seed:', error.message);
+    logger.error('Error en seed:', diagnosticCode(error));
     throw error;
   } finally {
     if (client) client.release();
@@ -112,7 +113,7 @@ async function seed({
 if (require.main === module) {
   loadEnvironmentFile();
   seed().catch((error) => {
-    console.error('Seed no ejecutado:', error.message);
+    console.error('Seed no ejecutado:', diagnosticCode(error));
     process.exitCode = 1;
   });
 }

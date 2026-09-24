@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { CRITERIA_KEYS, renderRiskPdf } = require('../src/services/riskPdfRenderer');
+const { diagnosticCode } = require('../src/utils/safeErrorLog');
 
 const output = path.resolve(process.argv[2] || path.join(__dirname, '../../output/pdf/cap-63-risk-sample.pdf'));
 const sample = {
@@ -27,6 +28,6 @@ const sample = {
   fs.writeFileSync(output, await renderRiskPdf(sample, { now: new Date(2026, 8, 10) }));
   process.stdout.write(`${output}\n`);
 })().catch((error) => {
-  process.stderr.write(`${error.stack || error}\n`);
+  process.stderr.write(`No se pudo generar la muestra PDF: ${diagnosticCode(error)}\n`);
   process.exitCode = 1;
 });

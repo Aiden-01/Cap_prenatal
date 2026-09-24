@@ -1,4 +1,5 @@
 const pool = require('./pool');
+const { diagnosticCode } = require('../utils/safeErrorLog');
 
 const queries = [
   {
@@ -38,10 +39,10 @@ async function testVistasBi() {
     for (const query of queries) {
       const { rows } = await pool.query(query.sql);
       console.log(`\n=== ${query.title} ===`);
-      console.table(rows);
+      console.log(`Filas devueltas: ${rows.length}`);
     }
   } catch (error) {
-    console.error('Error consultando vistas BI:', error.message);
+    console.error('Error consultando vistas BI:', diagnosticCode(error));
     process.exitCode = 1;
   } finally {
     await pool.end();

@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const pool = require('./pool');
+const { diagnosticCode } = require('../utils/safeErrorLog');
 const {
   calculateMigrationChecksum,
   isMigrationChecksumCompatible,
@@ -136,9 +137,9 @@ async function migrate({
     logger.log(`Migracion completada: ${applied} aplicada(s), ${skipped} omitida(s)`);
   } catch (error) {
     migrationError = error;
-    logger.error('Error en migracion:', error.message);
+    logger.error('Error en migracion:', diagnosticCode(error));
     if (error.rollbackError) {
-      logger.error('Error al revertir migracion:', error.rollbackError.message);
+      logger.error('Error al revertir migracion:', diagnosticCode(error.rollbackError));
     }
     setExitCode(1);
   } finally {
@@ -146,7 +147,7 @@ async function migrate({
     try {
       await db.end();
     } catch (closeError) {
-      logger.error('Error al cerrar el pool de PostgreSQL:', closeError.message);
+      logger.error('Error al cerrar el pool de PostgreSQL:', diagnosticCode(closeError));
       setExitCode(1);
       if (!migrationError) migrationError = closeError;
     }
@@ -157,7 +158,7 @@ async function migrate({
 
 if (require.main === module) {
   migrate().catch((error) => {
-    console.error('Error inesperado ejecutando la migracion:', error.message);
+    console.error('Error inesperado ejecutando la migracion:', diagnosticCode(error));
     process.exitCode = 1;
   });
 }

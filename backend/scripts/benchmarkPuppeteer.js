@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { promisify } = require('node:util');
 const puppeteer = require('puppeteer');
+const { diagnosticCode } = require('../src/utils/safeErrorLog');
 
 const { createReportesPdfService } = require('../src/services/reportesPdfService');
 const { createPuppeteerBrowserManager } = require('../src/services/puppeteerBrowserManager');
@@ -250,7 +251,6 @@ async function main() {
     platform: `${process.platform} ${process.arch}`,
     node: process.version,
     puppeteer: require('puppeteer/package.json').version,
-    executablePath: puppeteer.executablePath(),
     scenarios,
     timingsMs: metrics,
     processObservation: {
@@ -272,6 +272,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error('Benchmark de navegador fallido:', diagnosticCode(error));
   process.exitCode = 1;
 });

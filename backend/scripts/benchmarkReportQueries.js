@@ -3,6 +3,7 @@ const path = require('node:path');
 
 const pool = require('../src/db/pool');
 const { createReportesRepository } = require('../src/repositories/reportesRepository');
+const { diagnosticCode } = require('../src/utils/safeErrorLog');
 
 const REPORTS = [
   ['captadas_primer_control', 'obtenerRowsCensoPrimerControl'],
@@ -179,6 +180,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error.code || error.message);
+  console.error('Benchmark de consultas fallido:', diagnosticCode(error));
   process.exitCode = 1;
 });

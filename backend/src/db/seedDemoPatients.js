@@ -1,4 +1,5 @@
 const pool = require('./pool');
+const { diagnosticCode } = require('../utils/safeErrorLog');
 
 async function recreateDemoPatient(client, data, userId) {
   let step = 'paciente';
@@ -1585,7 +1586,7 @@ async function seedDemoPatients() {
     }
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error cargando pacientes demo:', error.message);
+    console.error('Error cargando pacientes demo:', diagnosticCode(error));
     process.exitCode = 1;
   } finally {
     client.release();

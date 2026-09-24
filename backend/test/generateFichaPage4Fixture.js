@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { generarFichaClinicaPrenatalPdf } = require('../src/services/fichaClinicaPrenatalPdf');
+const { diagnosticCode } = require('../src/utils/safeErrorLog');
 
 const output = path.join(__dirname, '../../tmp/pdfs/page4-long-puerperio.pdf');
 
@@ -30,6 +31,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error('No se pudo generar la muestra de ficha:', diagnosticCode(error));
   process.exitCode = 1;
 });

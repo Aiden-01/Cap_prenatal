@@ -368,7 +368,9 @@ test('rechaza una migracion aplicada cuyo archivo fue modificado y revierte', as
 });
 
 test('un error SQL revierte, cierra el pool y marca codigo 1', async () => {
-  const sqlError = new Error('SQL invalido');
+  const sqlError = new Error('SELECT ficticio con password=secret-example y CUI 1234567890101');
+  sqlError.code = '23505';
+  sqlError.stack = 'Error: SQL ficticio\n at synthetic/internal/file.js:10:2';
   const harness = createHarness({
     query: async (sql) => {
       if (sql === 'SQL INVALIDO;') throw sqlError;
@@ -390,6 +392,8 @@ test('un error SQL revierte, cierra el pool y marca codigo 1', async () => {
     'ROLLBACK',
   ]);
   assert.equal(harness.calls.end, 1);
+  assert.match(harness.entries.error[0].join(' '), /Error en migracion: 23505/);
+  assert.doesNotMatch(JSON.stringify(harness.entries.error), /secret-example|1234567890101|SELECT ficticio|synthetic\/internal/);
   assert.deepEqual(harness.codes, [1]);
 });
 

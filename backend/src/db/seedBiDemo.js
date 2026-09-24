@@ -1,4 +1,5 @@
 const pool = require('./pool');
+const { diagnosticCode } = require('../utils/safeErrorLog');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -224,7 +225,7 @@ async function seedBiDemo() {
     }
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error cargando seed BI:', error.message);
+    console.error('Error cargando seed BI:', diagnosticCode(error));
     process.exitCode = 1;
   } finally {
     client.release();

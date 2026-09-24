@@ -1,5 +1,6 @@
 const authSessionsRepository = require('../repositories/authSessionsRepository');
 const pool = require('./pool');
+const { diagnosticCode } = require('../utils/safeErrorLog');
 
 function retentionDays(env = process.env) {
   const raw = env.SESSION_RETENTION_DAYS || '30';
@@ -29,13 +30,13 @@ async function runCleanup({
     logger.log(`Sesiones antiguas eliminadas: ${count}`);
   } catch (error) {
     cleanupError = error;
-    logger.error('No se pudo limpiar auth_sessions:', error.message);
+    logger.error('No se pudo limpiar auth_sessions:', diagnosticCode(error));
     setExitCode(1);
   } finally {
     try {
       await db.end();
     } catch (closeError) {
-      logger.error('No se pudo cerrar el pool de PostgreSQL:', closeError.message);
+      logger.error('No se pudo cerrar el pool de PostgreSQL:', diagnosticCode(closeError));
       setExitCode(1);
       if (!cleanupError) cleanupError = closeError;
     }
@@ -45,7 +46,7 @@ async function runCleanup({
 
 if (require.main === module) {
   runCleanup().catch((error) => {
-    console.error('Fallo inesperado limpiando auth_sessions:', error.message);
+    console.error('Fallo inesperado limpiando auth_sessions:', diagnosticCode(error));
     process.exitCode = 1;
   });
 }

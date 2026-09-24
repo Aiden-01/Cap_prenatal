@@ -724,7 +724,35 @@ test('limpieza operacional propaga fallo por exit code y siempre cierra el pool'
   assert.equal(result.error, failure);
   assert.equal(ended, 1);
   assert.deepEqual(codes, [1]);
-  assert.match(errors[0].join(' '), /database unavailable/);
+  assert.match(errors[0].join(' '), /No se pudo limpiar auth_sessions: UNKNOWN_ERROR/);
+  assert.doesNotMatch(errors[0].join(' '), /database unavailable/);
+});
+
+test('limpieza operacional no registra contenido sensible de errores sinteticos', async () => {
+  const sensitive = [
+    'Bearer secret-token-example',
+    'password=secret-example',
+    'CUI 1234567890101',
+    'resultado clinico ficticio',
+    'SELECT * FROM pacientes WHERE cui = 1234567890101',
+    'at synthetic/internal/file.js:10:2',
+  ].join(' | ');
+  const failure = new Error(sensitive);
+  failure.stack = `Error: ${sensitive}\n    at synthetic/internal/file.js:10:2`;
+  failure.code = '23505';
+  const logs = [];
+  const exits = [];
+  const result = await runCleanup({
+    cleanupTask: async () => { throw failure; },
+    db: { async end() {} },
+    logger: { log() {}, error: (...parts) => logs.push(parts.join(' ')) },
+    setExitCode: (code) => exits.push(code),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, failure);
+  assert.deepEqual(exits, [1]);
+  assert.match(logs[0], /No se pudo limpiar auth_sessions: 23505/);
+  for (const fragment of sensitive.split(' | ')) assert.equal(logs[0].includes(fragment), false);
 });
 
 test('limpieza operacional tambien falla si no puede cerrar el pool', async () => {
