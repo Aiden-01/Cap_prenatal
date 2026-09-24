@@ -55,7 +55,7 @@ test("exportaciones dependen de reportes.exportar e incluyen Excel y PDF", async
   const modal = await source("src/components/ReportExportModal.jsx");
   const config = await source("src/config/reportExportConfig.js");
   assert.match(reportes, /usuario\?\.permisos\?\.includes\("reportes\.exportar"\)/);
-  assert.match(reportes, /hasExportPermission && <button/);
+  assert.match(reportes, /hasExportPermission && <span/);
   assert.match(reportes, /disabled=\{!exportAvailable \|\| Boolean\(downloading\)\}/);
   assert.match(reportes, /ReportExportModal/);
   assert.match(modal, /id: "excel"/);
@@ -75,9 +75,9 @@ test("cambio de reporte cancela solicitudes y limpia resultados anteriores", asy
   ]) assert.ok(reportes.includes(endpoint));
 });
 
-test("los seis reportes comparten configuración de exportación Excel y PDF", async () => {
+test("los siete reportes comparten configuración de exportación Excel y PDF", async () => {
   const config = await source("src/config/reportExportConfig.js");
-  for (const report of ["PRIMER_CONTROL", "ACTIVOS", "PROXIMAS_PARTO", "SIN_CONTROL", "RIESGO", "COMUNIDADES"]) {
+  for (const report of ["PRIMER_CONTROL", "ACTIVOS", "PROXIMAS_PARTO", "SIN_CONTROL", "RIESGO", "COMUNIDADES", "CONTROLES_PRENATALES"]) {
     assert.ok(config.includes(`REPORTES.${report}`), `Falta configuración: ${report}`);
   }
   assert.match(config, /endpoint: "\/reportes\/censo\/primer-control"/);

@@ -22,6 +22,7 @@ const REPORT_CASES = [
   { title: "Sin control reciente", endpoint: "/reportes/sin-control-reciente", empty: [], one: [{ id: 1, nombre: "Paciente", estado_seguimiento: "nunca_control" }] },
   { title: "Riesgo obstétrico", endpoint: "/reportes/pacientes-riesgo", empty: [], one: [{ id: 1, nombre: "Paciente" }] },
   { title: "Resumen por comunidad", endpoint: "/reportes/resumen-comunidades", empty: { comunidades: [], totales: {} }, one: { comunidades: [{ comunidad: "Centro" }], totales: {} } },
+  { title: "Controles prenatales", endpoint: "/reportes/controles-prenatales", empty: { total: 0, controles: [] }, one: { total: 1, controles: [{ id: 1, paciente: "Paciente", numero_control: 1 }] } },
 ];
 
 function exportButton() {
@@ -88,4 +89,25 @@ test("cambiar de reporte no hereda la disponibilidad anterior", async () => {
   await waitFor(() => assert.equal(exportButton().disabled, false));
   selectReport("Riesgo obstétrico");
   assert.equal(exportButton().disabled, true);
+});
+
+test("controles prenatales muestra fechas, consulta rango y presenta cada control", async () => {
+  apiGet.mockResolvedValue({ data: { total: 2, controles: [
+    { id: 2, paciente: "Paciente", numero_control: 2, fecha_control: "2026-07-20" },
+    { id: 1, paciente: "Paciente", numero_control: 1, fecha_control: "2026-07-10" },
+  ] } });
+  render(React.createElement(Reportes));
+  selectReport("Controles prenatales");
+  fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2026-07-01" } });
+  fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2026-07-31" } });
+  fireEvent.click(screen.getByRole("button", { name: /generar reporte/i }));
+  await waitFor(() => assert.equal(exportButton().disabled, false));
+  assert.equal(apiGet.mock.calls[0][0], "/reportes/controles-prenatales");
+  assert.deepEqual(apiGet.mock.calls[0][1].params, { desde: "2026-07-01", hasta: "2026-07-31" });
+  assert.equal(document.querySelectorAll(".reportes-tabla tbody tr").length, 2);
+  fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2026-08-01" } });
+  assert.equal(exportButton().disabled, true);
+  fireEvent.click(screen.getByRole("button", { name: /generar reporte/i }));
+  assert.equal(apiGet.mock.calls.length, 1);
+  assert.ok(screen.getAllByText(/Desde.*mayor.*Hasta/i).length > 0);
 });

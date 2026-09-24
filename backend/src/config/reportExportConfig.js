@@ -1,6 +1,18 @@
 const column = (key, header, width = 16, type = 'text') => ({ key, header, width, type });
 
 const REPORT_EXPORT_CONFIG = Object.freeze({
+  controles_prenatales: {
+    title: 'Controles prenatales', slug: 'Controles_prenatales', source: 'controlesPrenatales',
+    columns: [
+      column('expediente', 'Expediente', 12), column('paciente', 'Paciente', 28),
+      column('comunidad', 'Comunidad', 19), column('numero_control', 'Número de control', 18, 'number'),
+      column('fecha_control', 'Fecha del control', 17, 'date'),
+      column('semanas_gestacion', 'Semanas de gestación', 20, 'number'),
+      column('peso', 'Peso (kg)', 12, 'number'), column('presion_arterial', 'Presión arterial', 17),
+      column('fcf', 'FCF', 10, 'number'), column('presentacion', 'Presentación', 16),
+      column('personal_atiende', 'Personal que atendió', 24),
+    ],
+  },
   primer_control: {
     title: 'Captadas en primer control', slug: 'Captadas_primer_control', source: 'primerControl',
     columns: [

@@ -57,8 +57,8 @@ function createReportesController({
       metadata: {
         tipo_reporte: reportId,
         formato: format === 'excel' ? 'xlsx' : 'pdf',
-        desde: reportId === 'primer_control' ? req.query.desde : undefined,
-        hasta: reportId === 'primer_control' ? req.query.hasta : undefined,
+        desde: ['primer_control', 'controles_prenatales'].includes(reportId) ? req.query.desde : undefined,
+        hasta: ['primer_control', 'controles_prenatales'].includes(reportId) ? req.query.hasta : undefined,
         cantidad_filas: result.total,
         resultado: 'generado',
       },
@@ -79,6 +79,8 @@ function createReportesController({
     const result = await service.censoMensualPrimerControl(req.query);
     return res.json(result);
   });
+  const controlesPrenatales = asyncHandler(async (req, res) =>
+    res.json(await service.controlesPrenatales(req.query)));
 
   const exportarCensoExcel = asyncHandler(async (req, res) => {
     const result = await service.workbookCensoGeneral();
@@ -156,6 +158,9 @@ function createReportesController({
   const resumenPorComunidad = asyncHandler(async (_req, res) => res.json(await service.resumenPorComunidad()));
 
   return {
+    controlesPrenatales,
+    exportarControlesPrenatalesExcel: createExportHandler('controles_prenatales', 'excel'),
+    exportarControlesPrenatalesPdf: createExportHandler('controles_prenatales', 'pdf'),
     censoMensual,
     censoMensualPrimerControl,
     exportarCensoExcel,

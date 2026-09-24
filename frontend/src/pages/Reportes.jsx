@@ -67,6 +67,12 @@ const REPORT_OPTIONS = [
     description: "Seguimiento territorial",
     Icon: MapPinned,
   },
+  {
+    id: REPORTES.CONTROLES_PRENATALES,
+    title: "Controles prenatales",
+    description: "Lista de controles prenatales registrados dentro de un rango de fechas.",
+    Icon: Activity,
+  },
 ];
 
 const ENDPOINTS = {
@@ -76,6 +82,7 @@ const ENDPOINTS = {
   [REPORTES.SIN_CONTROL]: "/reportes/sin-control-reciente",
   [REPORTES.RIESGO]: "/reportes/pacientes-riesgo",
   [REPORTES.COMUNIDADES]: "/reportes/resumen-comunidades",
+  [REPORTES.CONTROLES_PRENATALES]: "/reportes/controles-prenatales",
 };
 
 function formatDateGt(value) {
@@ -216,6 +223,20 @@ function ComunidadesTable({ resultado }) {
   );
 }
 
+function ControlesPrenatalesTable({ rows }) {
+  return <ReportTable><thead><tr>
+    <th>#</th><th>Expediente</th><th>Paciente</th><th>Comunidad</th>
+    <th>Número de control</th><th>Fecha del control</th><th>Semanas de gestación</th>
+    <th>Peso (kg)</th><th>Presión arterial</th><th>FCF</th><th>Presentación</th><th>Personal que atendió</th>
+  </tr></thead><tbody>{rows.map((row, index) => <tr key={row.id}>
+    <td>{index + 1}</td><td>{row.no_expediente || "—"}</td><td>{row.paciente}</td>
+    <td>{row.comunidad || "—"}</td><td>{row.numero_control}</td><td>{formatDateGt(row.fecha_control)}</td>
+    <td>{row.semanas_gestacion ?? "—"}</td><td>{row.peso ?? "—"}</td>
+    <td>{row.pa_sistolica != null && row.pa_diastolica != null ? `${row.pa_sistolica}/${row.pa_diastolica}` : "—"}</td>
+    <td>{row.fcf ?? "—"}</td><td>{row.presentacion || "—"}</td><td>{row.personal_atiende || "—"}</td>
+  </tr>)}</tbody></ReportTable>;
+}
+
 export default function Reportes() {
   const initialPeriod = typeof window === "undefined"
     ? getDefaultReportPeriod()
@@ -223,6 +244,7 @@ export default function Reportes() {
   const [desde, setDesde] = useState(initialPeriod.desde);
   const [hasta, setHasta] = useState(initialPeriod.hasta);
   const [reporteActivo, setReporteActivo] = useState(REPORTES.PRIMER_CONTROL);
+  const hasDateFilter = [REPORTES.PRIMER_CONTROL, REPORTES.CONTROLES_PRENATALES].includes(reporteActivo);
   const [resultado, setResultado] = useState(null);
   const [generatedQueryKey, setGeneratedQueryKey] = useState("");
   const [loading, setLoading] = useState(false);
@@ -280,7 +302,7 @@ export default function Reportes() {
 
   const cargar = async () => {
     if (loading) return;
-    if (reporteActivo === REPORTES.PRIMER_CONTROL) {
+    if (hasDateFilter) {
       const validation = validatePeriod();
       if (validation) {
         setError(validation);
@@ -301,7 +323,7 @@ export default function Reportes() {
 
     try {
       const config = { signal: controller.signal };
-      if (reporteActivo === REPORTES.PRIMER_CONTROL) config.params = { desde, hasta };
+      if (hasDateFilter) config.params = { desde, hasta };
       const { data } = await api.get(ENDPOINTS[reporteActivo], config);
       if (requestRef.current === controller) {
         setResultado(data);
@@ -336,7 +358,7 @@ export default function Reportes() {
       const exportConfig = getReportExportConfig(reporteActivo);
       const response = await api.get(`${exportConfig.endpoint}/${formato}`, {
         params: {
-          ...(reporteActivo === REPORTES.PRIMER_CONTROL ? { desde, hasta } : {}),
+          ...(hasDateFilter ? { desde, hasta } : {}),
           columnas: columnas.join(","),
         },
         responseType: "blob",
@@ -407,11 +429,11 @@ export default function Reportes() {
             <p>{isPrimerControl
               ? "Embarazadas cuyo primer control prenatal fue registrado dentro del período seleccionado."
               : selected.description}</p></div>
-          {!isPrimerControl && <span className="reportes-periodo">Hora de Guatemala</span>}
+          {!hasDateFilter && <span className="reportes-periodo">Hora de Guatemala</span>}
         </div>
 
         <div className="reportes-filtros">
-          {isPrimerControl && <>
+          {hasDateFilter && <>
             <div className="form-group"><label className="input-label" htmlFor="reporte-desde">Desde</label>
               <input id="reporte-desde" type="date" className={`input-field ${fieldErrors.desde ? "input-error" : ""}`}
                 value={desde} onChange={(event) => { setDesde(event.target.value); setFieldErrors({}); }} />
@@ -444,7 +466,7 @@ export default function Reportes() {
 
       {resultado && <div className="card reportes-censo-card">
         <div className="card-header reportes-card-header"><div><h3>{selected.title}</h3>
-          <p>{isPrimerControl ? `${formatDateGt(desde)} al ${formatDateGt(hasta)}` : "Estado al momento de la consulta"}</p></div>
+          <p>{hasDateFilter ? `${formatDateGt(desde)} al ${formatDateGt(hasta)}` : "Estado al momento de la consulta"}</p></div>
           <span className="badge badge-blue">
             {recordCount} registros
           </span></div>
@@ -470,6 +492,8 @@ export default function Reportes() {
           ? <RiesgoTable rows={rows} /> : <EmptyReport>No hay embarazos activos con ficha de riesgo positiva.</EmptyReport>)}
         {reporteActivo === REPORTES.COMUNIDADES && (resultado.comunidades?.length
           ? <ComunidadesTable resultado={resultado} /> : <EmptyReport>No hay embarazos activos para resumir.</EmptyReport>)}
+        {reporteActivo === REPORTES.CONTROLES_PRENATALES && (resultado.controles?.length
+          ? <ControlesPrenatalesTable rows={resultado.controles} /> : <EmptyReport>No se encontraron controles prenatales en este período.</EmptyReport>)}
       </div>}
       {exportOpen && <ReportExportModal config={getReportExportConfig(reporteActivo)}
         busy={Boolean(downloading)} onClose={() => setExportOpen(false)} onExport={exportar} />}

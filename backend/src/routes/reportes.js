@@ -18,6 +18,13 @@ function createReportesRouter({
   router.use(authenticate);
   router.use(loadPermissions);
 
+  router.get('/controles-prenatales', checkPermission('reportes.ver'),
+    validateQuery(periodoReportesQuerySchema), controllers.controlesPrenatales);
+  router.get('/controles-prenatales/excel', checkPermission('reportes.exportar'),
+    validateQuery(exportPrimerControlQuerySchema), controllers.exportarControlesPrenatalesExcel);
+  router.get('/controles-prenatales/pdf', checkPermission('reportes.exportar'),
+    validateQuery(exportPrimerControlQuerySchema), controllers.exportarControlesPrenatalesPdf);
+
   router.get('/censo/primer-control',
     checkPermission('reportes.ver'),
     validateQuery(periodoReportesQuerySchema),

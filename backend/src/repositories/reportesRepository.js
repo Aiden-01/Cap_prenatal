@@ -3,6 +3,23 @@ const pool = require('../db/pool');
 const GT_TODAY_SQL = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Guatemala')::date";
 
 function createReportesRepository(db = pool) {
+  async function obtenerControlesPrenatales(desde, hasta) {
+    const { rows } = await db.query(`
+      SELECT c.id, p.no_expediente, p.nombres || ' ' || p.apellidos AS paciente,
+        COALESCE(com.nombre, p.comunidad) AS comunidad,
+        c.numero_control, c.fecha AS fecha_control,
+        c.edad_gestacional_semanas AS semanas_gestacion,
+        c.peso_kg AS peso, c.pa_sistolica, c.pa_diastolica,
+        c.fcf, c.presentacion_fetal AS presentacion,
+        c.nombre_cargo_atiende AS personal_atiende
+      FROM controles_prenatales c
+      JOIN pacientes p ON p.id = c.paciente_id
+      LEFT JOIN comunidades com ON com.id = p.comunidad_id
+      WHERE c.fecha BETWEEN $1::date AND $2::date
+      ORDER BY c.fecha DESC, c.id DESC`, [desde, hasta]);
+    return rows;
+  }
+
   async function obtenerRowsCensoPrimerControl(desde, hasta) {
     const { rows } = await db.query(
       `WITH primer_control AS (
@@ -264,6 +281,7 @@ function createReportesRepository(db = pool) {
   }
 
   return {
+    obtenerControlesPrenatales,
     obtenerRowsCensoGeneral,
     obtenerRowsCensoPrimerControl,
     obtenerEstadisticasBase,

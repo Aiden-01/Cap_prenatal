@@ -2,6 +2,7 @@ import { getGuatemalaDateInputValue } from "./guatemalaTime.js";
 
 export const REPORTES = Object.freeze({
   PRIMER_CONTROL: "primer_control",
+  CONTROLES_PRENATALES: "controles_prenatales",
   ACTIVOS: "activos",
   PROXIMAS_PARTO: "proximas_parto",
   SIN_CONTROL: "sin_control",
@@ -17,7 +18,7 @@ export function getReportRecordCount(reportId, resultado) {
 }
 
 export function getReportQueryKey(reportId, { desde = "", hasta = "" } = {}) {
-  return reportId === REPORTES.PRIMER_CONTROL
+  return [REPORTES.PRIMER_CONTROL, REPORTES.CONTROLES_PRENATALES].includes(reportId)
     ? `${reportId}:${desde}:${hasta}`
     : reportId;
 }

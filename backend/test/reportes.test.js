@@ -70,6 +70,9 @@ function routeControllers(onCall = () => {}) {
   return {
     censoMensual: handler('activos'),
     censoMensualPrimerControl: handler('primer-control'),
+    controlesPrenatales: handler('controles-prenatales'),
+    exportarControlesPrenatalesExcel: handler('controles-prenatales-excel'),
+    exportarControlesPrenatalesPdf: handler('controles-prenatales-pdf'),
     exportarCensoExcel: handler('activos-excel'),
     exportarCensoPrimerControlExcel: handler('primer-control-excel'),
     exportarCensoPrimerControlPdf: handler('primer-control-pdf'),
@@ -530,4 +533,71 @@ test('exportacion rechaza columnas ausentes o no permitidas', async () => {
       (error) => error.code === 'INVALID_REPORT_COLUMNS'
     );
   }
+});
+
+test('controles prenatales consulta fecha real inclusiva y conserva cada control ordenado', async () => {
+  let sql;
+  let params;
+  const repository = createReportesRepository({ query: async (statement, values) => {
+    sql = statement;
+    params = values;
+    return { rows: [
+      { id: 8, paciente: 'Paciente', fecha_control: '2026-07-31' },
+      { id: 7, paciente: 'Paciente', fecha_control: '2026-07-31' },
+      { id: 2, paciente: 'Paciente', fecha_control: '2026-07-01' },
+    ] };
+  } });
+  const result = await repository.obtenerControlesPrenatales(PERIODO.desde, PERIODO.hasta);
+  assert.deepEqual(params, [PERIODO.desde, PERIODO.hasta]);
+  assert.match(sql, /WHERE c\.fecha BETWEEN \$1::date AND \$2::date/);
+  assert.match(sql, /ORDER BY c\.fecha DESC, c\.id DESC/);
+  assert.doesNotMatch(sql, /DISTINCT|GROUP BY|e\.estado|created_at/i);
+  assert.deepEqual(result.map(({ id }) => id), [8, 7, 2]);
+});
+
+test('controles prenatales valida rango, permisos y columnas de Excel/PDF', async () => {
+  const row = {
+    id: 8, no_expediente: 'EXP-8', paciente: 'Paciente', comunidad: 'Centro',
+    numero_control: 2, fecha_control: '2026-07-20', semanas_gestacion: 25,
+    peso: '62.5', pa_sistolica: 110, pa_diastolica: 70, fcf: 140,
+    presentacion: 'Cefálica', personal_atiende: 'Enfermería',
+  };
+  const pdfCalls = [];
+  const service = createReportesService({
+    repository: { obtenerControlesPrenatales: async () => [row] },
+    pdfService: { renderReportPdf: async (data) => { pdfCalls.push(data); return Buffer.from('%PDF'); } },
+  });
+  const query = { ...PERIODO, columnas: 'paciente,fecha_control,presion_arterial' };
+  const view = await service.controlesPrenatales(PERIODO);
+  assert.equal(view.total, 1);
+  assert.deepEqual(view.controles, [row]);
+  const excel = await service.exportReport('controles_prenatales', 'excel', query);
+  assert.deepEqual(excel.columns.map(({ key }) => key), query.columnas.split(','));
+  assert.equal(excel.rows[0].presion_arterial, '110/70');
+  assert.match(excel.filters, /2026-07-01 al 2026-07-31/);
+  assert.equal(excel.workbook.getWorksheet('Reporte').getRow(6).getCell(1).value, 'Paciente');
+  const pdf = await service.exportReport('controles_prenatales', 'pdf', query);
+  assert.equal(pdf.pdf.toString(), '%PDF');
+  assert.equal(pdfCalls[0].rows[0].fecha_control, '20/07/2026');
+  for (const columnas of [undefined, '', 'vih', 'paciente,fecha_inexistente']) {
+    await assert.rejects(() => service.exportReport('controles_prenatales', 'excel', { ...PERIODO, columnas }),
+      (error) => error.code === 'INVALID_REPORT_COLUMNS');
+  }
+  const empty = createReportesService({ repository: { obtenerControlesPrenatales: async () => [] } });
+  assert.deepEqual(await empty.controlesPrenatales(PERIODO), { ...PERIODO, total: 0, controles: [] });
+  for (const format of ['excel', 'pdf']) {
+    await assert.rejects(() => empty.exportReport('controles_prenatales', format, query),
+      (error) => error.status === 409 && error.code === 'EMPTY_REPORT');
+  }
+  await withServer(reportRouteApp(), async (baseUrl) => {
+    const path = `/api/reportes/controles-prenatales?desde=${PERIODO.desde}&hasta=${PERIODO.hasta}`;
+    assert.equal((await fetch(`${baseUrl}${path}`, { headers: { Authorization: 'Bearer test', 'X-Permissions': 'reportes.ver' } })).status, 204);
+    assert.equal((await fetch(`${baseUrl}${path.replace(PERIODO.desde, '2026-08-01')}`, { headers: { Authorization: 'Bearer test', 'X-Permissions': 'reportes.ver' } })).status, 400);
+    assert.equal((await fetch(`${baseUrl}${path.replace(PERIODO.desde, '2026-02-30')}`, { headers: { Authorization: 'Bearer test', 'X-Permissions': 'reportes.ver' } })).status, 400);
+    for (const format of ['excel', 'pdf']) {
+      const url = `${baseUrl}/api/reportes/controles-prenatales/${format}?desde=${PERIODO.desde}&hasta=${PERIODO.hasta}&columnas=paciente`;
+      assert.equal((await fetch(url, { headers: { Authorization: 'Bearer test', 'X-Permissions': 'reportes.ver' } })).status, 403);
+      assert.equal((await fetch(url, { headers: { Authorization: 'Bearer test', 'X-Permissions': 'reportes.exportar' } })).status, 204);
+    }
+  });
 });

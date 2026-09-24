@@ -3,6 +3,18 @@ import { REPORTES } from "../utils/reportes";
 const column = (id, label) => ({ id, label });
 
 export const REPORT_EXPORT_CONFIG = Object.freeze({
+  [REPORTES.CONTROLES_PRENATALES]: {
+    title: "Controles prenatales",
+    endpoint: "/reportes/controles-prenatales",
+    columns: [
+      column("expediente", "Expediente"), column("paciente", "Paciente"),
+      column("comunidad", "Comunidad"), column("numero_control", "Número de control"),
+      column("fecha_control", "Fecha del control"),
+      column("semanas_gestacion", "Semanas de gestación"), column("peso", "Peso (kg)"),
+      column("presion_arterial", "Presión arterial"), column("fcf", "FCF"),
+      column("presentacion", "Presentación"), column("personal_atiende", "Personal que atendió"),
+    ],
+  },
   [REPORTES.PRIMER_CONTROL]: {
     title: "Captadas en primer control",
     endpoint: "/reportes/censo/primer-control",

@@ -69,6 +69,19 @@ function normalizeOperationalRow(reportId, row) {
   };
 }
 
+function normalizePrenatalControlRow(row) {
+  return {
+    expediente: row.no_expediente || '', paciente: row.paciente || '',
+    comunidad: row.comunidad || '', numero_control: row.numero_control,
+    fecha_control: row.fecha_control, semanas_gestacion: row.semanas_gestacion ?? '',
+    peso: row.peso ?? '',
+    presion_arterial: row.pa_sistolica != null && row.pa_diastolica != null
+      ? `${row.pa_sistolica}/${row.pa_diastolica}` : '',
+    fcf: row.fcf ?? '', presentacion: row.presentacion || '',
+    personal_atiende: row.personal_atiende || '',
+  };
+}
+
 function selectExportColumns(config, selected) {
   const requested = String(selected || '').split(',').map((value) => value.trim()).filter(Boolean);
   const allowed = new Set(config.columns.map(({ key }) => key));
@@ -431,11 +444,17 @@ function createReportesService({
     return { pdf, total: rows.length };
   }
 
+  async function controlesPrenatales({ desde, hasta }) {
+    const controles = await repository.obtenerControlesPrenatales(desde, hasta);
+    return { desde, hasta, total: controles.length, controles };
+  }
+
   async function exportData(reportId, query = {}) {
     const config = getReportExportConfig(reportId);
     if (!config) throw new AppError(404, 'Reporte no encontrado.', { code: 'REPORT_NOT_FOUND' });
     let rawRows;
     if (reportId === 'primer_control') rawRows = await repository.obtenerRowsCensoPrimerControl(query.desde, query.hasta);
+    else if (reportId === 'controles_prenatales') rawRows = await repository.obtenerControlesPrenatales(query.desde, query.hasta);
     else if (reportId === 'activos') rawRows = await repository.obtenerRowsCensoGeneral();
     else if (reportId === 'proximas_parto') rawRows = await repository.obtenerProximasAParir();
     else if (reportId === 'sin_control') rawRows = await repository.obtenerSinControlReciente();
@@ -444,11 +463,13 @@ function createReportesService({
     if (!rawRows.length) {
       throw new AppError(409, 'No hay registros para exportar con los filtros actuales.', { code: 'EMPTY_REPORT' });
     }
-    const prepared = ['primer_control', 'activos'].includes(reportId)
+    const prepared = reportId === 'controles_prenatales'
+      ? rawRows.map(normalizePrenatalControlRow)
+      : ['primer_control', 'activos'].includes(reportId)
       ? prepararFilasConRiesgo(rawRows).map(normalizeCensoRow)
       : rawRows.map((row) => normalizeOperationalRow(reportId, row));
     const columns = selectExportColumns(config, query.columnas);
-    const filters = reportId === 'primer_control'
+    const filters = ['primer_control', 'controles_prenatales'].includes(reportId)
       ? `Filtros activos: ${query.desde} al ${query.hasta}`
       : 'Filtros activos: estado al momento de la consulta';
     return { config, columns, rows: prepared, filters, total: prepared.length };
@@ -471,6 +492,7 @@ function createReportesService({
   }
 
   return {
+    controlesPrenatales,
     censoMensual,
     censoMensualPrimerControl,
     estadisticas,
