@@ -14,7 +14,7 @@ const ADMIN = [
   'reportes.ver',
 ];
 const PERSONAL = [...ADMIN, 'mapa_riesgo.ver'].sort();
-const CATALOGO = [...new Set([...PERSONAL, 'reportes.exportar'])].sort();
+const CATALOGO = [...new Set([...PERSONAL, 'reportes.exportar', 'auditoria.ver'])].sort();
 
 function crearEscenario({
   rolInicial = 'admin',
@@ -258,6 +258,12 @@ test('fallo de revocacion revierte cambio critico de rol', async () => {
   assert.equal(escenario.usuario().rol, 'admin');
   assert.deepEqual(escenario.permisos(), ADMIN);
   assert.equal(escenario.llamadas.at(-1), 'ROLLBACK');
+});
+
+test('cambio de admin a personal_salud retira auditoria concedida manualmente', async () => {
+  const escenario = crearEscenario({ permisosIniciales: [...ADMIN, 'auditoria.ver'] });
+  await escenario.ejecutar('personal_salud');
+  assert.equal(escenario.permisos().includes('auditoria.ver'), false);
 });
 
 test('cambio de rol retira permisos que no pertenecen al nuevo rol', async () => {

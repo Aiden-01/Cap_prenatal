@@ -30,6 +30,7 @@ async function seed({
 
     await client.query(`
       INSERT INTO permisos (codigo, descripcion, categoria) VALUES
+        ('auditoria.ver', 'Consultar historial de auditoria', 'auditoria'),
         ('pacientes.crear', 'Crear pacientes', 'pacientes'),
         ('pacientes.ver', 'Ver pacientes', 'pacientes'),
         ('pacientes.editar', 'Editar pacientes', 'pacientes'),

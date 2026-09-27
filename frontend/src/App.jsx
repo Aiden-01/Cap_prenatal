@@ -19,6 +19,7 @@ const Usuarios = lazy(() => import("./pages/Usuarios"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const MapaRiesgo = lazy(() => import("./pages/MapaRiesgo"));
 const Comunidades = lazy(() => import("./pages/Comunidades"));
+const Historial = lazy(() => import("./pages/Historial"));
 
 function LazyPage({ children }) {
   return (
@@ -28,9 +29,10 @@ function LazyPage({ children }) {
   );
 }
 
-function PrivateRoute({ children, adminOnly = false, directorOnly = false }) {
+function PrivateRoute({ children, adminOnly = false, directorOnly = false, permission }) {
   const { usuario, isAdmin } = useAuth();
   if (!usuario) return <Navigate to="/login" replace />;
+  if (permission && !usuario.permisos?.includes(permission)) return <Navigate to="/dashboard" replace />;
   if (directorOnly && usuario.rol !== "director") return <Navigate to="/dashboard" replace />;
   if (adminOnly && !isAdmin) return <Navigate to="/dashboard" replace />;
   return children;
@@ -63,6 +65,7 @@ export default function App() {
           <Route path="mapa-riesgo" element={<LazyPage><MapaRiesgo /></LazyPage>} />
           <Route path="comunidades" element={<PrivateRoute directorOnly><LazyPage><Comunidades /></LazyPage></PrivateRoute>} />
           <Route path="usuarios" element={<PrivateRoute adminOnly><LazyPage><Usuarios /></LazyPage></PrivateRoute>} />
+          <Route path="historial" element={<PrivateRoute adminOnly permission="auditoria.ver"><LazyPage><Historial /></LazyPage></PrivateRoute>} />
         </Route>
         <Route path="/404" element={<LazyPage><NotFoundPage /></LazyPage>} />
         <Route path="*" element={<LazyPage><NotFoundPage /></LazyPage>} />

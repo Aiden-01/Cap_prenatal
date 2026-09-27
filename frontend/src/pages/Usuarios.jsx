@@ -13,6 +13,12 @@ import { useFieldErrors } from "../hooks/useFieldErrors";
 const INIT = { nombre_completo: "", username: "", password: "", rol: "personal_salud" };
 
 const PERMISSION_UI = {
+  "auditoria.ver": {
+    label: "Ver historial de actividad",
+    description: "Permite consultar las actividades del sistema. El director puede conceder o retirar este acceso.",
+    section: "auditoria",
+    Icon: ShieldCheck,
+  },
   "controles.crear": {
     label: "Crear controles prenatales",
     description: "Permite registrar nuevos controles prenatales.",
@@ -221,7 +227,7 @@ function ModalPermisos({
   onCancelar,
 }) {
   if (!usuario) return null;
-  const grupos = catalogo.reduce((acc, permiso) => {
+  const grupos = catalogo.filter((permiso) => permiso.codigo !== "auditoria.ver" || usuario.rol === "admin").reduce((acc, permiso) => {
     const ui = getPermissionUi(permiso);
     if (!acc[ui.section]) acc[ui.section] = [];
     acc[ui.section].push({ ...permiso, ui });

@@ -58,6 +58,17 @@ async function reemplazarPermisosEnTransaccion({
     || auditService.registrarEventoPrivado;
   const sessions = dependencies.sessionService || sessionService;
   const nuevos = normalizarCodigos(codigos);
+  if (nuevos.includes('auditoria.ver')) {
+    const usuariosRepo = dependencies.usuariosRepository || usuariosRepository;
+    // Leer el rol vigente después del bloqueo, incluso al cambiar de rol.
+    const objetivo = await usuariosRepo.obtenerPorId(usuarioId, db);
+    if (!objetivo) throw new HttpError(404, 'Usuario no encontrado');
+    if (objetivo.rol === 'personal_salud') {
+      throw new HttpError(400, 'El personal de salud no puede recibir acceso al historial', {
+        code: 'AUDITORIA_ROL_NO_PERMITIDO',
+      });
+    }
+  }
   const existentes = await permisosRepo.existenCodigos(nuevos, db, true);
   const faltantes = nuevos.filter((codigo) => !existentes.includes(codigo));
   if (faltantes.length) {

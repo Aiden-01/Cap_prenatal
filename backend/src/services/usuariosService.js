@@ -247,6 +247,7 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
           revocarSesiones: false,
           dependencies: {
             permisosRepository: permisosRepo,
+            usuariosRepository: usuariosRepo,
             registrarEventoPrivado,
             sessionService: sessions,
             authSessionsRepository: sessionsRepo,

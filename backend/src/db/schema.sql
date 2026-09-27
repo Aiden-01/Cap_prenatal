@@ -77,6 +77,19 @@ CREATE TABLE IF NOT EXISTS usuario_permisos (
   UNIQUE(usuario_id, permiso_id)
 );
 
+INSERT INTO permisos (codigo, descripcion, categoria)
+VALUES ('auditoria.ver', 'Consultar historial de auditoria', 'auditoria')
+ON CONFLICT (codigo) DO UPDATE SET descripcion = EXCLUDED.descripcion, categoria = EXCLUDED.categoria;
+
+-- Historial: solo director por defecto; admin requiere concesión manual.
+-- personal_salud no puede recibir auditoria.ver (validado en permisosService).
+INSERT INTO usuario_permisos (usuario_id, permiso_id)
+SELECT u.id, p.id FROM usuarios u
+JOIN roles r ON r.id = u.rol_id
+JOIN permisos p ON p.codigo = 'auditoria.ver'
+WHERE r.nombre = 'director'
+ON CONFLICT (usuario_id, permiso_id) DO NOTHING;
+
 -- ============================================================
 -- MÓDULO 1 — DATOS GENERALES DE LA PACIENTE
 -- Página 1-4 de la Ficha Clínica Prenatal y Puerperio MSPAS
@@ -978,6 +991,8 @@ CREATE INDEX IF NOT EXISTS idx_auditoria_fecha_hora ON auditoria_eventos(fecha_h
 CREATE INDEX IF NOT EXISTS idx_auditoria_fecha_usuario ON auditoria_eventos(fecha_hora DESC, usuario_id);
 CREATE INDEX IF NOT EXISTS idx_auditoria_fecha_paciente ON auditoria_eventos(fecha_hora DESC, paciente_id);
 CREATE INDEX IF NOT EXISTS idx_auditoria_accion_fecha ON auditoria_eventos(accion, fecha_hora DESC);
+CREATE INDEX IF NOT EXISTS idx_auditoria_cursor
+  ON auditoria_eventos ((COALESCE(fecha_hora, created_at)) DESC NULLS LAST, id DESC);
 
 -- ============================================================
 -- CAMPOS MINIMOS DE CONTROL - MODELO HIBRIDO DE AUDITORIA

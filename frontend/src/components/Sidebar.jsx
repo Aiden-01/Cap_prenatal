@@ -1,8 +1,9 @@
 ﻿import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { canViewHistory } from '../utils/historyAccess';
 import {
   LayoutDashboard, Users, UserPlus, BarChart3,
-  Settings, LogOut, Menu, Moon, Sun, KeyRound, MapPin, MapPinned
+  Settings, LogOut, Menu, Moon, Sun, KeyRound, MapPin, MapPinned, History
 } from "lucide-react";
 
 const NAV = [
@@ -98,6 +99,7 @@ export default function Sidebar({
     ...NAV,
     ...(usuario?.rol === "director" ? NAV_DIRECTOR : []),
     ...(usuario?.rol === "admin" || usuario?.rol === "director" ? NAV_ADMIN : []),
+    ...(canViewHistory(usuario) ? [{ label: 'Historial', path: '/historial', icon: History, delay: 300 }] : []),
   ];
 
   return (
@@ -178,6 +180,7 @@ export default function Sidebar({
             return (
               <div key={path} style={{ position: "relative" }}>
                 <button
+                  aria-label={label}
                   onClick={() => handleNav(path)}
                   style={{
                     display: "flex",

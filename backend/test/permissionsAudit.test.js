@@ -16,6 +16,8 @@ function crearEscenario({
   fallaRevocacion = false,
   actorId = 7,
   usuarioId = 12,
+  rolObjetivo = 'admin',
+  actorRol = 'director',
 } = {}) {
   let estado = [...permisosIniciales].sort();
   const auditorias = [];
@@ -67,6 +69,10 @@ function crearEscenario({
   };
 
   const usuariosRepository = {
+    async obtenerPorId(id, conexion) {
+      assert.equal(conexion, db);
+      return usuarioExiste ? { id, rol: rolObjetivo } : null;
+    },
     async obtenerVisibleParaActor({ id }) {
       return usuarioExiste && String(id) === String(usuarioId) ? { id } : null;
     },
@@ -97,7 +103,7 @@ function crearEscenario({
   }
 
   const req = {
-    usuario: { id: actorId, rol: 'director' },
+    usuario: { id: actorId, rol: actorRol },
     ip: '127.0.0.1',
     headers: { 'user-agent': 'node:test' },
   };
@@ -126,6 +132,33 @@ function crearEscenario({
     usuarioId,
   };
 }
+
+test('solo director puede gestionar auditoria.ver', async () => {
+  for (const actorRol of ['admin', 'personal_salud']) {
+    const escenario = crearEscenario({ catalogo: ['auditoria.ver'], actorRol });
+    await assert.rejects(escenario.ejecutar(['auditoria.ver']), (error) => error.status === 403 && error.code === 'DIRECTOR_ONLY');
+    assert.deepEqual(escenario.llamadas, []);
+  }
+});
+
+test('director concede y retira auditoria.ver a admin manualmente', async () => {
+  const escenario = crearEscenario({ catalogo: ['auditoria.ver'], rolObjetivo: 'admin' });
+  await escenario.ejecutar(['auditoria.ver']);
+  assert.deepEqual(escenario.estado(), ['auditoria.ver']);
+  await escenario.ejecutar([]);
+  assert.deepEqual(escenario.estado(), []);
+  assert.equal(escenario.auditorias.length, 2);
+});
+
+test('personal_salud no recibe auditoria.ver, incluso si ya lo tiene', async () => {
+  for (const permisosIniciales of [[], ['auditoria.ver']]) {
+    const escenario = crearEscenario({ catalogo: ['auditoria.ver'], rolObjetivo: 'personal_salud', permisosIniciales });
+    await assert.rejects(escenario.ejecutar(['auditoria.ver']), (error) => error.status === 400 && error.code === 'AUDITORIA_ROL_NO_PERMITIDO');
+    assert.equal(escenario.llamadas.includes('REPLACE'), false);
+    assert.equal(escenario.llamadas.includes('ROLLBACK'), true);
+    assert.deepEqual(escenario.estado(), permisosIniciales);
+  }
+});
 
 test('agregar permisos registra solo el delta agregado', async () => {
   const escenario = crearEscenario({ permisosIniciales: ['pacientes.ver'] });

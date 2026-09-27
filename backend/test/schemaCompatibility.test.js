@@ -199,7 +199,7 @@ test('el entrypoint valida compatibilidad antes de abrir el puerto y no migra', 
   assert.notEqual(listenCall, -1);
   assert.ok(compatibilityCall < listenCall);
   assert.doesNotMatch(source, /\brequire\(['"]\.\/db\/migrate['"]\)|\bmigrate\s*\(/);
-  assert.match(source, /No se pudo iniciar el servidor:', error\.message/);
+  assert.match(source, /No se pudo iniciar el servidor:', diagnosticCode\(error\)/);
 });
 
 test('la lista requerida es explicita y cada checksum procede del archivo versionado', () => {
@@ -214,6 +214,8 @@ test('la lista requerida es explicita y cada checksum procede del archivo versio
     '015_automatizacion_despachos.sql',
     '016_riesgo_tiempo_horas_decimales.sql',
     '017_citas_inasistencias.sql',
+    '018_auditoria_historial.sql',
+    '019_auditoria_politica_roles.sql',
   ]);
   assert.equal(REQUIRED_STATE.every(({ checksum }) => /^[a-f0-9]{64}$/.test(checksum)), true);
 });
