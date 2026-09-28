@@ -1853,6 +1853,77 @@ test('confirma el orden y la revalidacion frente a una carrera concurrente', asy
   });
 });
 
+test('editar fecha bloquea cita vigente antes de bloquear y escribir el control', async () => {
+  const order = [];
+  const before = { id: 301, embarazo_id: 91, paciente_id: 41, fecha: '2025-02-02' };
+  await withService({
+    repository: {
+      obtenerPorId: async (_id, _db, options) => {
+        order.push(options?.bloquear ? 'bloquear-control' : 'leer-control');
+        return before;
+      },
+      actualizar: async () => {
+        order.push('escribir-control');
+        return { ...before, fecha: '2025-02-01' };
+      },
+    },
+    appointments: {
+      listarProgramadasVigentesPorEmbarazo: async (_id, _db, options) => {
+        assert.equal(options.bloquear, true);
+        order.push('bloquear-cita');
+        return [{ id: 701 }];
+      },
+    },
+    pregnancies: {
+      validarEmbarazoEditable: async () => {
+        order.push('bloquear-embarazo');
+        return { id: 91, paciente_id: 41, estado: 'activo' };
+      },
+    },
+  }, async (service) => {
+    await service.actualizarControl({
+      pacienteId: 41, embarazoId: 91, id: 301,
+      body: { fecha: '2025-02-01' }, req: ACTOR,
+    });
+  });
+  assert.deepEqual(order, [
+    'leer-control', 'bloquear-embarazo', 'bloquear-cita',
+    'bloquear-control', 'escribir-control',
+  ]);
+});
+
+test('upsert de control existente con cambio de fecha bloquea cita antes de escribir', async () => {
+  const order = [];
+  const before = { id: 301, embarazo_id: 91, paciente_id: 41, ...VALID_CONTROL,
+    fecha: '2025-02-02' };
+  await withService({
+    repository: {
+      obtenerPorNumeroYEmbarazo: async () => {
+        order.push('leer-control');
+        return before;
+      },
+      upsert: async () => {
+        order.push('escribir-control');
+        return { ...before, fecha: '2025-02-01' };
+      },
+    },
+    appointments: {
+      listarProgramadasVigentesPorEmbarazo: async (_id, _db, options) => {
+        assert.equal(options.bloquear, true);
+        order.push('bloquear-cita');
+        return [{ id: 701 }];
+      },
+    },
+    pregnancies: { validarEmbarazoActivo: async () => ({ id: 91, paciente_id: 41, estado: 'activo' }) },
+  }, async (service) => {
+    await service.crearControl({
+      pacienteId: 41, embarazoId: 91,
+      body: { ...VALID_CONTROL, fecha: '2025-02-01' }, req: ACTOR,
+    });
+  });
+  assert.deepEqual(order, ['leer-control', 'bloquear-cita', 'escribir-control']);
+});
+
 test('creacion privada conserva solo campos e identificadores internos', async () => {
   const recorder = privateAuditRecorder();
   const client = { transaction: 'control-create' };

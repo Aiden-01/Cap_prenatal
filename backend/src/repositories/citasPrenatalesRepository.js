@@ -349,17 +349,33 @@ async function listarProgramadasVencidas({ fechaOperativa, embarazoId = null }, 
   return rows;
 }
 
-async function listarControlesCoincidentes(cita, db = pool) {
+async function listarControlesCoincidentesPorCitas(citas, db = pool) {
+  const controlesPorCita = new Map(citas.map(({ id }) => [String(id), []]));
+  if (citas.length === 0) return controlesPorCita;
+
+  // Las citas ya estan bloqueadas; agrupar sus pares evita repetir controles y locks.
   const { rows = [] } = await db.query(
-    `SELECT c.*
-     FROM controles_prenatales c
-     WHERE c.embarazo_id = $1
-       AND c.fecha = $2::date
-     ORDER BY c.id ASC
-     FOR UPDATE`,
-    [cita.embarazo_id, cita.fecha_programada]
+    `WITH pares AS (
+       SELECT embarazo_id, fecha_programada,
+         ARRAY_AGG(id ORDER BY id) AS cita_ids,
+         MIN(id) AS primera_cita_id
+       FROM citas_prenatales
+       WHERE id = ANY($1::bigint[])
+       GROUP BY embarazo_id, fecha_programada
+     )
+     SELECT c.*, pares.cita_ids
+     FROM pares
+     JOIN controles_prenatales c
+       ON c.embarazo_id = pares.embarazo_id
+      AND c.fecha = pares.fecha_programada
+     ORDER BY pares.fecha_programada ASC, pares.primera_cita_id ASC, c.id ASC
+     FOR UPDATE OF c`,
+    [citas.map(({ id }) => id)]
   );
-  return rows;
+  for (const { cita_ids: citaIds, ...control } of rows) {
+    for (const citaId of citaIds) controlesPorCita.get(String(citaId))?.push(control);
+  }
+  return controlesPorCita;
 }
 
 async function marcarInasistente({ citaId, embarazoId, usuarioId = null }, db = pool) {
@@ -495,7 +511,7 @@ module.exports = {
   existeRelacionConControl,
   existeSeguimientoDerivado,
   listarCalendarioPorRango,
-  listarControlesCoincidentes,
+  listarControlesCoincidentesPorCitas,
   listarInasistenciasConSeguimiento,
   listarSinProximaCita,
   listarProgramadasVencidas,

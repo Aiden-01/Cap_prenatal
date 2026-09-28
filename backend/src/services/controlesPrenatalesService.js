@@ -305,6 +305,14 @@ async function crearControl({ pacienteId, embarazoId, body, req }) {
     if (before && modifiedFields.length === 0) return before;
     if (before) impedirCambioHistoricoDeCita(modifiedFields);
 
+    // El upsert tambien puede editar la fecha de un control existente. La cita
+    // vigente se bloquea antes de escribir el control, como en la edicion directa.
+    if (before && modifiedFields.includes('fecha')) {
+      await citasRepository.listarProgramadasVigentesPorEmbarazo(
+        embarazoId, client, { bloquear: true }
+      );
+    }
+
     const programadaAntesDeMaterializar = before ? null : resolverCitaProgramadaInequivoca(
       await citasRepository.listarProgramadasVigentesPorEmbarazo(
         embarazoId, client, { bloquear: true }
@@ -439,6 +447,14 @@ async function actualizarControl({ pacienteId, embarazoId, id, body, req }) {
       throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
     }
     await validarEmbarazoParaMutarControl({ pacienteId, embarazoId, db: client, bloquear: true });
+
+    // Materializacion bloquea primero las citas y despues los controles. Mantener
+    // ese orden cuando cambia la fecha evita la carrera y un ciclo de locks.
+    if (campos.includes('fecha')) {
+      await citasRepository.listarProgramadasVigentesPorEmbarazo(
+        embarazoId, client, { bloquear: true }
+      );
+    }
 
     const before = await controlesRepository.obtenerPorId(id, client, { bloquear: true });
     if (!before || String(before.embarazo_id) !== String(embarazoId)) {

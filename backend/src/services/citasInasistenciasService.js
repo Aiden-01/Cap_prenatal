@@ -47,8 +47,11 @@ async function materializarEnTransaccion({
   }
   const citas = await citasRepository.listarProgramadasVencidas({ fechaOperativa, embarazoId }, db);
   const result = { total_procesado: 0, atendidas: 0, inasistentes: 0, omitido_por_bloqueo: false };
+  const controlesPorCita = citas.length
+    ? await citasRepository.listarControlesCoincidentesPorCitas(citas, db)
+    : new Map();
   for (const cita of citas) {
-    const controles = await citasRepository.listarControlesCoincidentes(cita, db);
+    const controles = controlesPorCita.get(String(cita.id)) || [];
     if (controles.length > 1) {
       throw new HttpError(409, 'Existen controles coincidentes ambiguos para una cita vencida', {
         code: 'CITA_CONTROL_COINCIDENTE_AMBIGUO',

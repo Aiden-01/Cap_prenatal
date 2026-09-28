@@ -337,7 +337,7 @@ test('cita vencida se vuelve inasistente y la nueva fecha usa vinculo de seguimi
   await withService({
     repository: {
       listarProgramadasVencidas: async () => state.estado === 'programada' ? [state] : [],
-      listarControlesCoincidentes: async () => [],
+      listarControlesCoincidentesPorCitas: async (citas) => new Map(citas.map(({ id }) => [String(id), []])),
       marcarInasistente: async () => (state = { ...state, estado: 'inasistente' }),
       obtenerPorIdYEmbarazo: async () => state,
       obtenerEstadoSeguimientoInasistencia: async () => ({ seguimiento_pendiente: true }),
@@ -390,7 +390,7 @@ test('cita vencida no puede convertirse en cancelada', async () => {
   await withService({
     repository: {
       listarProgramadasVencidas: async () => state.estado === 'programada' ? [state] : [],
-      listarControlesCoincidentes: async () => [],
+      listarControlesCoincidentesPorCitas: async (citas) => new Map(citas.map(({ id }) => [String(id), []])),
       marcarInasistente: async () => (state = { ...state, estado: 'inasistente' }),
       obtenerPorIdYEmbarazo: async () => state,
     },

@@ -130,10 +130,14 @@ postgresTest('017 aplica limpia, es idempotente y schemaCompatibility acepta el 
   await withDatabase('clean017', async (url) => {
     await installCurrent(url);
     const db = new Pool({ connectionString: url });
-    await assertSchemaCompatible(db);
-    const rows = await db.query('SELECT filename FROM schema_migrations ORDER BY filename');
-    assert.equal(rows.rows.at(-1).filename, '017_citas_inasistencias.sql');
-    const second = await migrate({ db, logger: { log() {}, error() {} }, setExitCode() {} });
+    try {
+      await assertSchemaCompatible(db);
+      const rows = await db.query('SELECT filename FROM schema_migrations ORDER BY filename');
+      assert.ok(rows.rows.some((row) => row.filename === '017_citas_inasistencias.sql'));
+    } finally { await db.end(); }
+    const second = await migrate({
+      db: new Pool({ connectionString: url }), logger: { log() {}, error() {} }, setExitCode() {},
+    });
     assert.equal(second.ok, true);
   });
 });
@@ -318,6 +322,320 @@ postgresTest('advisory lock real excluye otra instancia y la materializacion es 
     await db.end();
     await repository.enTransaccion(async () => {});
     await require('../src/db/pool').end();
+  });
+});
+
+postgresTest('batch real materializa varios embarazos con dos lecturas y conserva auditoria', async () => {
+  await withDatabase('batchmaterializa', async (url) => {
+    await installCurrent(url);
+    const db = new Client({ connectionString: url });
+    await db.connect();
+    try {
+      const userId = await actor(db, 'batch');
+      const ids = [];
+      for (const suffix of ['A', 'B', 'C']) ids.push(await pregnancy(db, userId, `BATCH-${suffix}`));
+      const origins = [];
+      for (const pregnancyIds of ids) origins.push(await control(db, pregnancyIds, 1, '2025-01-01', userId));
+      const matchingControlId = await control(db, ids[1], 2, '2025-02-01', userId);
+      const citas = [];
+      for (let index = 0; index < ids.length; index += 1) {
+        citas.push(await appointment(db, ids[index], origins[index], '2025-02-01'));
+      }
+
+      const statements = [];
+      const client = {
+        query(sql, params) {
+          statements.push(sql);
+          return db.query(sql, params);
+        },
+      };
+      const service = require('../src/services/citasInasistenciasService');
+      await db.query('BEGIN');
+      const first = await service.materializarEnTransaccion({ db: client, fechaOperativa: '2025-02-02' });
+      const contender = new Client({ connectionString: url });
+      await contender.connect();
+      try {
+        await contender.query('BEGIN');
+        await assert.rejects(
+          contender.query('SELECT id FROM controles_prenatales WHERE id = $1 FOR UPDATE NOWAIT', [matchingControlId]),
+          (error) => error.code === '55P03'
+        );
+        await contender.query('ROLLBACK');
+      } finally { await contender.end(); }
+      await db.query('COMMIT');
+      assert.deepEqual(first, {
+        total_procesado: 3, atendidas: 1, inasistentes: 2, omitido_por_bloqueo: false,
+      });
+      assert.equal(statements.filter((sql) => sql.includes('fecha_programada < $1::date')).length, 1);
+      assert.equal(statements.filter((sql) => sql.includes('WITH pares AS')).length, 1);
+      const stored = await db.query(
+        `SELECT id, estado, control_cumplimiento_id
+         FROM citas_prenatales WHERE id = ANY($1::bigint[]) ORDER BY id`, [citas]
+      );
+      const byId = new Map(stored.rows.map((row) => [String(row.id), row]));
+      assert.equal(byId.get(String(citas[0])).estado, 'inasistente');
+      assert.equal(byId.get(String(citas[1])).estado, 'atendida');
+      assert.equal(String(byId.get(String(citas[1])).control_cumplimiento_id), String(matchingControlId));
+      assert.equal(byId.get(String(citas[2])).estado, 'inasistente');
+      const audits = await db.query(
+        `SELECT descripcion FROM auditoria_eventos
+         WHERE entidad_afectada = 'cita_prenatal'
+           AND id_entidad = ANY($1::text[]) ORDER BY id_entidad`, [citas.map(String)]
+      );
+      assert.deepEqual(audits.rows.map((row) => row.descripcion), [
+        'materializar_inasistencia', 'materializar_asistencia', 'materializar_inasistencia',
+      ]);
+
+      statements.length = 0;
+      await db.query('BEGIN');
+      const second = await service.materializarEnTransaccion({ db: client, fechaOperativa: '2025-02-02' });
+      await db.query('COMMIT');
+      assert.equal(second.total_procesado, 0);
+      assert.equal(statements.filter((sql) => sql.includes('fecha_programada < $1::date')).length, 1);
+      assert.equal(statements.filter((sql) => sql.includes('WITH pares AS')).length, 0);
+    } finally { await db.end(); }
+  });
+});
+
+postgresTest('batch real revierte transiciones y auditoria ante controles ambiguos', async () => {
+  await withDatabase('batchambiguo', async (url) => {
+    await installCurrent(url);
+    const db = new Client({ connectionString: url });
+    await db.connect();
+    try {
+      const userId = await actor(db, 'batch_ambiguo');
+      const first = await pregnancy(db, userId, 'BATCH-ROLLBACK-A');
+      const second = await pregnancy(db, userId, 'BATCH-ROLLBACK-B');
+      const firstOrigin = await control(db, first, 1, '2025-01-01', userId);
+      const secondOrigin = await control(db, second, 1, '2025-01-01', userId);
+      const firstCita = await appointment(db, first, firstOrigin, '2025-02-01');
+      const secondCita = await appointment(db, second, secondOrigin, '2025-02-01');
+      await control(db, second, 2, '2025-02-01', userId);
+      await control(db, second, 3, '2025-02-01', userId);
+      const service = require('../src/services/citasInasistenciasService');
+      await db.query('BEGIN');
+      await assert.rejects(
+        service.materializarEnTransaccion({ db, fechaOperativa: '2025-02-02' }),
+        (error) => error.statusCode === 409 && error.code === 'CITA_CONTROL_COINCIDENTE_AMBIGUO'
+      );
+      await db.query('ROLLBACK');
+      const stored = await db.query(
+        'SELECT estado FROM citas_prenatales WHERE id = ANY($1::bigint[]) ORDER BY id',
+        [[firstCita, secondCita]]
+      );
+      assert.deepEqual(stored.rows.map((row) => row.estado), ['programada', 'programada']);
+      const audits = await db.query(
+        `SELECT COUNT(*)::integer AS total FROM auditoria_eventos
+         WHERE entidad_afectada = 'cita_prenatal'
+           AND id_entidad = ANY($1::text[])`, [[firstCita, secondCita].map(String)]
+      );
+      assert.equal(audits.rows[0].total, 0);
+    } finally { await db.end(); }
+  });
+});
+
+postgresTest('READ COMMITTED distingue consulta por cita tardia del listado batch ante edicion concurrente de fecha', async () => {
+  async function reproducir(modo) {
+    let resultado;
+    await withDatabase(`fecha_${modo}`, async (url) => {
+      await installCurrent(url);
+      const setup = new Client({ connectionString: url });
+      const materializador = new Client({ connectionString: url });
+      const editor = new Client({ connectionString: url });
+      await Promise.all([setup.connect(), materializador.connect(), editor.connect()]);
+      try {
+        const userId = await actor(setup, `fecha_${modo}`);
+        const embarazos = [];
+        for (const sufijo of ['A', 'B']) {
+          const ids = await pregnancy(setup, userId, `FECHA-${modo}-${sufijo}`);
+          const origen = await control(setup, ids, 1, '2025-01-01', userId);
+          embarazos.push({ ...ids, citaId: await appointment(setup, ids, origen, '2025-02-01') });
+        }
+        const [citaA, citaB] = embarazos;
+        const controlB = await control(setup, citaB, 2, '2025-02-02', userId);
+        let cambioConfirmado = false;
+        let batchLeido = false;
+        const cambiarFecha = async () => {
+          assert.equal(batchLeido, modo === 'batch');
+          await editor.query('BEGIN');
+          await editor.query(
+            'UPDATE controles_prenatales SET fecha = $1::date WHERE id = $2',
+            ['2025-02-01', controlB]
+          );
+          await editor.query('COMMIT');
+          cambioConfirmado = true;
+        };
+
+        await materializador.query('BEGIN ISOLATION LEVEL READ COMMITTED');
+        if (modo === 'batch') {
+          const service = require('../src/services/citasInasistenciasService');
+          const db = {
+            async query(sql, params) {
+              const queryResult = await materializador.query(sql, params);
+              if (sql.includes('WITH pares AS')) batchLeido = true;
+              if (sql.startsWith('UPDATE citas_prenatales') && String(params[0]) === String(citaA.citaId)) {
+                assert.equal(batchLeido, true);
+                await cambiarFecha();
+              }
+              return queryResult;
+            },
+          };
+          await service.materializarEnTransaccion({ db, fechaOperativa: '2025-02-02' });
+        } else {
+          const { registrarEventoPrivado } = require('../src/services/auditService');
+          const { AUDIT_CONTEXT } = require('../src/services/citasInasistenciasService');
+          const citas = await citasRepository.listarProgramadasVencidas(
+            { fechaOperativa: '2025-02-02' }, materializador
+          );
+          assert.deepEqual(citas.map(({ id }) => String(id)), [citaA.citaId, citaB.citaId].map(String));
+          for (const cita of citas) {
+            // Consulta anterior, reproducida solo en esta prueba y despues del COMMIT para B.
+            const { rows: controles } = await materializador.query(
+              `SELECT c.* FROM controles_prenatales c
+               WHERE c.embarazo_id = $1 AND c.fecha = $2::date
+               ORDER BY c.id ASC FOR UPDATE`,
+              [cita.embarazo_id, cita.fecha_programada]
+            );
+            if (String(cita.id) === String(citaB.citaId)) assert.equal(cambioConfirmado, true);
+            const controlCoincidente = controles[0] || null;
+            const nueva = controlCoincidente
+              ? await citasRepository.marcarAtendida({
+                citaId: cita.id, embarazoId: cita.embarazo_id,
+                controlCumplimientoId: controlCoincidente.id,
+              }, materializador)
+              : await citasRepository.marcarInasistente({
+                citaId: cita.id, embarazoId: cita.embarazo_id,
+              }, materializador);
+            await registrarEventoPrivado({}, {
+              contexto: controlCoincidente ? AUDIT_CONTEXT.asistencia : AUDIT_CONTEXT.inasistencia,
+              accion: 'actualizar', entidadId: cita.id, embarazoId: cita.embarazo_id,
+              cambios: {
+                anteriores: {
+                  estado_cita: cita.estado,
+                  control_cumplimiento_id: cita.control_cumplimiento_id,
+                },
+                nuevos: {
+                  estado_cita: nueva.estado,
+                  control_cumplimiento_id: controlCoincidente ? Number(controlCoincidente.id) : null,
+                },
+              },
+              metadata: {
+                resultado: 'exitoso',
+                motivo_codigo: controlCoincidente
+                  ? 'control_misma_fecha_existente' : 'cita_vencida_sin_control_coincidente',
+                fecha_programada: '2025-02-01',
+              },
+            }, { db: materializador, obligatorio: true });
+            if (String(cita.id) === String(citaA.citaId)) await cambiarFecha();
+          }
+        }
+        assert.equal(cambioConfirmado, true);
+        await materializador.query('COMMIT');
+        const citaFinal = await setup.query(
+          'SELECT estado, control_cumplimiento_id FROM citas_prenatales WHERE id = $1',
+          [citaB.citaId]
+        );
+        const auditoria = await setup.query(
+          `SELECT descripcion, datos_nuevos FROM auditoria_eventos
+           WHERE entidad_afectada = 'cita_prenatal' AND id_entidad = $1`,
+          [String(citaB.citaId)]
+        );
+        assert.equal(auditoria.rowCount, 1);
+        resultado = {
+          estado: citaFinal.rows[0].estado,
+          controlId: citaFinal.rows[0].control_cumplimiento_id,
+          controlB,
+          evento: auditoria.rows[0].descripcion,
+          auditoria: auditoria.rows[0].datos_nuevos,
+        };
+      } finally {
+        await Promise.allSettled([materializador.query('ROLLBACK'), editor.query('ROLLBACK')]);
+        await Promise.all([setup.end(), materializador.end(), editor.end()]);
+      }
+    });
+    return resultado;
+  }
+
+  const anterior = await reproducir('anterior');
+  const batch = await reproducir('batch');
+  assert.equal(anterior.estado, 'atendida');
+  assert.equal(String(anterior.controlId), String(anterior.controlB));
+  assert.equal(anterior.evento, 'materializar_asistencia');
+  assert.equal(batch.estado, 'inasistente');
+  assert.equal(batch.controlId, null);
+  assert.equal(batch.evento, 'materializar_inasistencia');
+  assert.notDeepEqual(anterior.auditoria, batch.auditoria);
+});
+
+postgresTest('edicion coordinada no puede confirmar fecha durante la materializacion batch', async () => {
+  await withDatabase('fecha_coordinada', async (url) => {
+    await installCurrent(url);
+    const setup = new Client({ connectionString: url });
+    const materializador = new Client({ connectionString: url });
+    const editor = new Client({ connectionString: url });
+    await Promise.all([setup.connect(), materializador.connect(), editor.connect()]);
+    try {
+      const userId = await actor(setup, 'fecha_coordinada');
+      const embarazos = [];
+      for (const sufijo of ['A', 'B']) {
+        const ids = await pregnancy(setup, userId, `COORD-${sufijo}`);
+        const origen = await control(setup, ids, 1, '2025-01-01', userId);
+        embarazos.push({ ...ids, citaId: await appointment(setup, ids, origen, '2025-02-01') });
+      }
+      const [citaA, citaB] = embarazos;
+      const controlB = await control(setup, citaB, 2, '2025-02-02', userId);
+      const service = require('../src/services/citasInasistenciasService');
+      let comprobadoBloqueo = false;
+      await materializador.query('BEGIN ISOLATION LEVEL READ COMMITTED');
+      const db = {
+        async query(sql, params) {
+          const result = await materializador.query(sql, params);
+          if (sql.includes('WITH pares AS')) {
+            await editor.query('BEGIN');
+            await editor.query("SET LOCAL lock_timeout = '150ms'");
+            await assert.rejects(
+              citasRepository.listarProgramadasVigentesPorEmbarazo(
+                citaB.pregnancyId, editor, { bloquear: true }
+              ),
+              (error) => error.code === '55P03'
+            );
+            await editor.query('ROLLBACK');
+            comprobadoBloqueo = true;
+          }
+          return result;
+        },
+      };
+      const materializacion = await service.materializarEnTransaccion({ db, fechaOperativa: '2025-02-02' });
+      assert.equal(comprobadoBloqueo, true);
+      assert.equal(materializacion.total_procesado, 2);
+      await materializador.query('COMMIT');
+
+      // Ya liberada la cita, la edicion puede continuar: orden serial materializacion -> edicion.
+      await editor.query('BEGIN');
+      await citasRepository.listarProgramadasVigentesPorEmbarazo(
+        citaB.pregnancyId, editor, { bloquear: true }
+      );
+      await editor.query(
+        'UPDATE controles_prenatales SET fecha = $1::date WHERE id = $2',
+        ['2025-02-01', controlB]
+      );
+      await editor.query('COMMIT');
+      const estados = await setup.query(
+        `SELECT id, estado, control_cumplimiento_id FROM citas_prenatales
+         WHERE id = ANY($1::bigint[]) ORDER BY id`, [[citaA.citaId, citaB.citaId]]
+      );
+      assert.deepEqual(estados.rows.map(({ estado }) => estado), ['inasistente', 'inasistente']);
+      assert.equal(estados.rows[1].control_cumplimiento_id, null);
+      const auditoria = await setup.query(
+        `SELECT descripcion FROM auditoria_eventos
+         WHERE entidad_afectada = 'cita_prenatal' AND id_entidad = $1`,
+        [String(citaB.citaId)]
+      );
+      assert.deepEqual(auditoria.rows.map(({ descripcion }) => descripcion), ['materializar_inasistencia']);
+    } finally {
+      await Promise.allSettled([materializador.query('ROLLBACK'), editor.query('ROLLBACK')]);
+      await Promise.all([setup.end(), materializador.end(), editor.end()]);
+    }
   });
 });
 
