@@ -118,7 +118,7 @@ app.use(errorHandler);
 
 async function startServer() {
   await assertSchemaCompatible(pool);
-  const server = app.listen(config.port, () => {
+  const server = app.listen(config.port, '127.0.0.1', () => {
     console.log(`Servidor iniciado en el puerto ${config.port} (${config.nodeEnv})`);
   });
   createCitasMaterializacionRunner().iniciar();

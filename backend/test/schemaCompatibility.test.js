@@ -198,6 +198,7 @@ test('el entrypoint valida compatibilidad antes de abrir el puerto y no migra', 
   assert.notEqual(compatibilityCall, -1);
   assert.notEqual(listenCall, -1);
   assert.ok(compatibilityCall < listenCall);
+  assert.match(source, /app\.listen\(config\.port,\s*'127\.0\.0\.1',/);
   assert.doesNotMatch(source, /\brequire\(['"]\.\/db\/migrate['"]\)|\bmigrate\s*\(/);
   assert.match(source, /No se pudo iniciar el servidor:', diagnosticCode\(error\)/);
 });
