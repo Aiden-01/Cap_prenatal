@@ -7,6 +7,7 @@ const React = await import("react");
 const { cleanup, fireEvent, render, screen, waitFor } = await import("@testing-library/react");
 const { MemoryRouter, Route, Routes } = await import("react-router-dom");
 const { ToastContext } = await import("../src/context/ToastContext.js");
+const { ChatbotScreenProvider } = await import("../src/context/ChatbotScreenContext.jsx");
 const api = (await import("../src/api/axios.js")).default;
 const FichaRiesgo = (await import("../src/pages/FichaRiesgo.jsx")).default;
 
@@ -33,7 +34,7 @@ function renderRisk() {
         React.createElement(
           Routes,
           null,
-          React.createElement(Route, { path: "/pacientes/:id/riesgo", element: React.createElement(FichaRiesgo) }),
+          React.createElement(Route, { path: "/pacientes/:id/riesgo", element: React.createElement(ChatbotScreenProvider, null, React.createElement(FichaRiesgo)) }),
           React.createElement(Route, { path: "/pacientes/:id", element: React.createElement("div", null, "Expediente") })
         )
       )
