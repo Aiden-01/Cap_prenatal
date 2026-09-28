@@ -19,7 +19,15 @@ export function historyParams(filters, cursor) {
   return { ...Object.fromEntries(Object.entries(filters).filter(([, value]) => value.trim()).map(([key, value]) => [key, value.trim()])),
     ...(cursor ? { cursor } : {}) };
 }
-export function historyResult(tipo) {
+export function historyResult(tipo, resultado) {
+  switch (resultado) {
+    case 'completado': return { label: 'Completado', tone: 'success' };
+    case 'registrado': return { label: 'Registrado', tone: 'neutral' };
+    case 'fallido': return { label: 'Fallido', tone: 'failed' };
+    case 'acceso_denegado': return { label: 'Acceso denegado', tone: 'failed' };
+    case 'no_disponible': return { label: 'No disponible', tone: 'neutral' };
+    default: break;
+  }
   if (tipo === 'login_fallido') return { label: 'Fallido', tone: 'failed' };
   if (tipo === 'login_usuario_inactivo') return { label: 'Acceso denegado', tone: 'failed' };
   if (['crear', 'actualizar', 'eliminar', 'login', 'logout', 'generar_pdf', 'exportar'].includes(tipo)) {
@@ -41,7 +49,7 @@ export function historyInitials(name) {
 }
 export function historyActivity(item) {
   return {
-    date: historyDate(item.fecha), result: historyResult(item.tipo),
+    date: historyDate(item.fecha), result: historyResult(item.tipo, item.presentacion?.resultado),
     title: item.presentacion?.titulo || 'Actividad no identificada',
     module: item.presentacion?.modulo || 'Módulo no identificado',
     user: item.usuario?.nombre_completo || 'Usuario no disponible',

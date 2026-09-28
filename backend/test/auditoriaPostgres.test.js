@@ -9,9 +9,9 @@ const { createAuditHistoryRepository } = require('../src/repositories/auditHisto
 const { createAuditHistoryService } = require('../src/services/auditHistoryService');
 
 // No acepta DATABASE_URL: siempre crea su propio cluster local desechable.
-test('Historial en PostgreSQL temporal: migracion, filtros y cursor sin saltos', {
+test('Historial en PostgreSQL temporal: migracion, filtros, cursor y presentacion segura', {
   skip: process.env.RUN_AUDITORIA_TEMP_POSTGRES !== '1', timeout: 60000,
-}, async () => {
+}, async (t) => {
   const bin = process.env.AUDITORIA_POSTGRES_BIN;
   assert.ok(bin, 'Falta AUDITORIA_POSTGRES_BIN');
   const executable = (name) => path.join(bin, `${name}${process.platform === 'win32' ? '.exe' : ''}`);
@@ -34,7 +34,8 @@ test('Historial en PostgreSQL temporal: migracion, filtros y cursor sin saltos',
       CREATE TABLE usuario_permisos (usuario_id integer, permiso_id integer, otorgado_por integer, UNIQUE(usuario_id, permiso_id));
       CREATE TABLE auth_sessions (usuario_id integer, revoked_at timestamptz, revoked_reason text, updated_at timestamptz);
       CREATE TABLE auditoria_eventos (id bigint PRIMARY KEY, accion text, modulo text,
-        entidad_afectada text, usuario_id integer, fecha_hora timestamptz, created_at timestamptz);
+        entidad_afectada text, usuario_id integer, fecha_hora timestamptz, created_at timestamptz,
+        descripcion text);
       INSERT INTO roles VALUES (1, 'director'), (2, 'admin'), (3, 'personal_salud');
       INSERT INTO usuarios VALUES (1,1,'director','Director'), (2,2,'admin','Administrador'), (3,3,'salud','Personal');`);
     const migration = fs.readFileSync(path.join(__dirname, '../src/db/migrations/018_auditoria_historial.sql'), 'utf8');
@@ -56,10 +57,12 @@ test('Historial en PostgreSQL temporal: migracion, filtros y cursor sin saltos',
     assert.ok((await client.query("SELECT indexdef FROM pg_indexes WHERE indexname = 'idx_auditoria_cursor'"))
       .rows[0].indexdef.includes('COALESCE(fecha_hora, created_at)'));
     await client.query(`INSERT INTO auditoria_eventos
+      (id, accion, modulo, entidad_afectada, usuario_id, fecha_hora, created_at)
       SELECT n, 'crear', 'pacientes', 'paciente', 2,
         CASE WHEN n = 30 THEN NULL ELSE '2026-09-27T06:00:00.123456Z'::timestamptz END,
         '2026-09-27T06:00:00.123456Z'::timestamptz FROM generate_series(1, 30) n;
-      INSERT INTO auditoria_eventos VALUES
+      INSERT INTO auditoria_eventos
+        (id, accion, modulo, entidad_afectada, usuario_id, fecha_hora, created_at) VALUES
         (31, 'exportar', 'reportes', 'reporte', 1, '2026-09-27T05:59:59.999999Z', NULL),
         (32, 'crear', 'pacientes', 'paciente', 3, '2026-09-28T06:00:00Z', NULL),
         (33, 'crear', 'pacientes', 'paciente', NULL, NULL, NULL);`);
@@ -87,6 +90,62 @@ test('Historial en PostgreSQL temporal: migracion, filtros y cursor sin saltos',
       ...JSON.parse(Buffer.from(all.next_cursor, 'base64url')), fecha: null, id: '33',
     })).toString('base64url');
     assert.equal((await service.listar({ cursor: nullCursor })).items.length, 0);
+
+    await t.test('SQL y servicio priorizan eventos concretos y rechazan descripciones libres', async () => {
+      const access = { categoria: 'Acceso y seguridad', modulo: 'Acceso y sesiones', resultado: 'completado' };
+      const changes = { categoria: 'Cambios de información', resultado: 'completado' };
+      const freeText = 'logout: dato_clinico_prueba 192.0.2.1 {"token":"secreto_prueba"}';
+      const cases = [
+        { id: 101, accion: 'login', modulo: 'autenticacion', entidad: 'usuario', descripcion: 'login_exitoso',
+          evento: 'login_exitoso', presentacion: { ...access, titulo: 'Inició sesión' } },
+        { id: 102, accion: 'logout', modulo: 'autenticacion', entidad: 'usuario', descripcion: 'logout',
+          evento: 'logout', presentacion: { ...access, titulo: 'Cerró sesión' } },
+        { id: 103, accion: 'estado', modulo: 'autenticacion', entidad: 'usuario', descripcion: 'logout',
+          evento: 'logout', presentacion: { ...access, titulo: 'Cerró sesión' } },
+        { id: 104, accion: 'estado', modulo: 'autenticacion', entidad: 'sesion', descripcion: 'sesion_revocada',
+          evento: 'sesion_revocada', presentacion: { ...access, titulo: 'Revocó una sesión' } },
+        { id: 105, accion: 'estado', modulo: 'pacientes', entidad: 'embarazo', descripcion: 'cambiar_estado',
+          evento: null, presentacion: { ...changes, titulo: 'Cambió el estado de un embarazo',
+            modulo: 'Embarazos', resultado: 'registrado' } },
+        { id: 106, accion: 'actualizar', modulo: 'usuarios', entidad: 'usuario', descripcion: 'usuario_desactivado',
+          evento: 'usuario_desactivado', presentacion: { ...access, titulo: 'Desactivó una cuenta de usuario', modulo: 'Usuarios' } },
+        { id: 107, accion: 'actualizar', modulo: 'pacientes', entidad: 'cita_prenatal', descripcion: 'materializar_inasistencia',
+          evento: 'materializar_inasistencia', presentacion: { ...changes, titulo: 'Registró una inasistencia', modulo: 'Citas prenatales' } },
+        { id: 108, accion: 'estado', modulo: 'general', entidad: 'registro_ajeno', descripcion: freeText,
+          evento: null, presentacion: { ...changes, titulo: 'Cambió un estado', modulo: 'General', resultado: 'registrado' } },
+        { id: 109, accion: 'estado', modulo: 'autenticacion', entidad: 'usuario', descripcion: freeText,
+          evento: null, presentacion: { ...changes, titulo: 'Cambió un estado', modulo: 'Acceso y sesiones', resultado: 'registrado' } },
+        { id: 110, accion: 'estado', modulo: 'autenticacion', entidad: 'sesion', descripcion: 'login_exitoso',
+          evento: 'login_exitoso', presentacion: { ...access, titulo: 'Inició sesión' } },
+      ];
+      for (const entry of cases) {
+        await client.query(`INSERT INTO auditoria_eventos
+          (id, accion, modulo, entidad_afectada, usuario_id, fecha_hora, descripcion)
+          VALUES ($1, $2, $3, $4, 4, '2026-09-29T06:00:00Z', $5)`,
+        [entry.id, entry.accion, entry.modulo, entry.entidad, entry.descripcion]);
+      }
+      const repository = createAuditHistoryRepository({ db: client });
+      const query = { usuario_id: '4' };
+      const rows = await repository.listar(query);
+      assert.equal(rows.length, cases.length);
+      for (const entry of cases) {
+        const row = rows.find(({ id }) => id === String(entry.id));
+        assert.equal(row.evento_codigo, entry.evento, `codigo SQL del evento ${entry.id}`);
+        assert.equal(Object.hasOwn(row, 'descripcion'), false);
+      }
+      const response = await service.listar(query);
+      assert.equal(response.has_more, false);
+      assert.equal(response.items.length, cases.length);
+      for (const entry of cases) {
+        const item = response.items.find(({ id }) => id === String(entry.id));
+        assert.deepEqual(item.presentacion, entry.presentacion, `presentacion del evento ${entry.id}`);
+        assert.equal(Object.hasOwn(item, 'evento_codigo'), false);
+        assert.equal(Object.hasOwn(item, 'descripcion'), false);
+      }
+      for (const serialized of [JSON.stringify(rows), JSON.stringify(response)]) {
+        assert.doesNotMatch(serialized, /dato_clinico_prueba|192\.0\.2\.1|secreto_prueba/);
+      }
+    });
   } finally {
     if (client) await client.end();
     if (started) run('pg_ctl', ['-D', data, '-m', 'immediate', '-w', 'stop']);

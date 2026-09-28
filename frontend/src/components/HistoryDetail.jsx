@@ -28,7 +28,7 @@ export default function HistoryDetail({ item, onClose, isMobile = false }) {
     };
   }, [onClose, isMobile]);
   const date = historyDate(item.fecha);
-  const result = historyResult(item.tipo);
+  const result = historyResult(item.tipo, item.presentacion?.resultado);
   const content = <aside ref={panelRef} className="card history-detail" role={isMobile ? 'dialog' : undefined}
     aria-modal={isMobile ? true : undefined} aria-labelledby="history-detail-title">
     {isMobile ? <div className="history-sheet-handle" aria-hidden="true" /> : null}

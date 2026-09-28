@@ -157,8 +157,14 @@ test('SQL aplica filtros parametrizados, Guatemala y fin exclusivo del dia', asy
   assert.match(sql, /ORDER BY COALESCE\(ae.fecha_hora, ae.created_at\) DESC NULLS LAST, ae.id DESC/);
   assert.match(sql, /LIMIT 26/);
   assert.ok(!sql.includes("O'Brian"));
-  assert.equal(params.at(-1), "%O'Brian\\%\\_\\\\%");
-  assert.doesNotMatch(sql, /datos_anteriores|datos_nuevos|descripcion|user_agent|\bae.ip\b|paciente_id|embarazo_id|SELECT \*/);
+  assert.equal(params.at(-2), "%O'Brian\\%\\_\\\\%");
+  assert.match(sql, /CASE WHEN ae.descripcion = ANY\(\$9::text\[\]\) THEN ae.descripcion ELSE NULL END AS evento_codigo/);
+  assert.ok(params.at(-1).includes('logout'));
+  assert.ok(params.at(-1).includes('usuario_desactivado'));
+  assert.ok(params.at(-1).includes('materializar_inasistencia'));
+  assert.doesNotMatch(sql, /datos_anteriores|datos_nuevos|user_agent|\bae.ip\b|paciente_id|embarazo_id|SELECT \*/);
+  // No se devuelve ni se busca sobre descripcion libre fuera del CASE de allowlist.
+  assert.doesNotMatch(sql.replace(/CASE WHEN ae.descripcion[^\n]+AS evento_codigo/, ''), /descripcion/);
 });
 test('SQL del cursor usa comparacion por tupla y contempla fechas completamente nulas', async () => {
   const calls = [];
@@ -167,7 +173,7 @@ test('SQL del cursor usa comparacion por tupla y contempla fechas completamente 
   } } });
   await repository.listar({}, { id: '6', fecha: FECHA });
   assert.match(calls[0].sql, /\(COALESCE\(ae.fecha_hora, ae.created_at\), ae.id\) < \(\$4::timestamptz, \$3::bigint\)/);
-  assert.deepEqual(calls[0].params.slice(2), ['6', FECHA]);
+  assert.deepEqual(calls[0].params.slice(2, -1), ['6', FECHA]);
   await repository.listar({}, { id: '5', fecha: null });
   assert.match(calls[1].sql, /IS NULL AND ae.id < \$3::bigint/);
 });

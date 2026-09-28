@@ -1,5 +1,6 @@
 const pool = require('../db/pool');
 const { MODULES, ENTITIES } = require('../validations/auditoria.schemas');
+const { DESCRIPTION_CODES } = require('../services/audit/auditHistoryPresentation');
 
 function createAuditHistoryRepository({ db = pool } = {}) {
   return {
@@ -38,9 +39,12 @@ function createAuditHistoryRepository({ db = pool } = {}) {
             OR COALESCE(ae.fecha_hora, ae.created_at) IS NULL)`);
         }
       }
+      // La descripcion libre nunca sale de la base: solo se proyectan codigos exactos.
+      const descriptionCodes = bind(DESCRIPTION_CODES);
       const { rows } = await db.query(`SELECT ae.id::text AS id, ae.accion,
         CASE WHEN ae.modulo = ANY($1::text[]) THEN ae.modulo ELSE 'desconocido' END AS modulo,
         CASE WHEN ae.entidad_afectada = ANY($2::text[]) THEN ae.entidad_afectada ELSE 'desconocida' END AS entidad_afectada,
+        CASE WHEN ae.descripcion = ANY(${descriptionCodes}::text[]) THEN ae.descripcion ELSE NULL END AS evento_codigo,
         ae.usuario_id, u.username, u.nombre_completo,
         to_char(COALESCE(ae.fecha_hora, ae.created_at) AT TIME ZONE 'UTC',
           'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS fecha

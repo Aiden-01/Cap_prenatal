@@ -50,6 +50,7 @@ function createAuditHistoryService({ repository = createAuditHistoryRepository()
           entidad: ENTITIES.includes(row.entidad_afectada) ? row.entidad_afectada : 'desconocida',
           presentacion: presentAuditHistoryEvent({
             tipo: row.accion, modulo: row.modulo, entidad: row.entidad_afectada,
+            evento: row.evento_codigo,
           }),
           usuario: row.usuario_id == null ? null : {
             id: row.usuario_id, username: row.username, nombre_completo: row.nombre_completo,

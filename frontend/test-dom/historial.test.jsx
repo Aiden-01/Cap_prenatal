@@ -52,6 +52,38 @@ test('muestra presentacion directa, fecha Guatemala y detalle seguro accesible',
   expect(screen.queryByRole('complementary')).toBeNull();
   expect(document.activeElement).toBe(trigger);
 });
+
+test.each([
+  { name: 'login', tipo: 'login', titulo: 'Inició sesión', modulo: 'Acceso y sesiones',
+    categoria: 'Acceso y seguridad', resultado: 'completado', label: 'Completado' },
+  { name: 'logout guardado como estado', tipo: 'estado', titulo: 'Cerró sesión', modulo: 'Acceso y sesiones',
+    categoria: 'Acceso y seguridad', resultado: 'completado', label: 'Completado' },
+  { name: 'estado genérico con resultado desconocido', tipo: 'estado', titulo: 'Cambió un estado', modulo: 'Módulo no identificado',
+    categoria: 'Cambios de información', resultado: 'RESULTADO_LIBRE_SECRETO', label: 'Registrado' },
+].flatMap((event) => [false, true].map((mobile) => ({ ...event, mobile, view: mobile ? 'móvil' : 'escritorio' }))))(
+  '$name conserva título, módulo, categoría y resultado en $view y detalle',
+  async ({ tipo, titulo, modulo, categoria, resultado, label, mobile }) => {
+    mobileViewport(mobile);
+    install(() => Promise.resolve(page([activity('1', { tipo, modulo: 'usuarios', entidad: 'usuario',
+      descripcion: 'DESCRIPCION_LIBRE_SECRETA', datos_nuevos: { diagnostico: 'CLINICO_SECRETO' }, ip: 'IP_SECRETA',
+      presentacion: { titulo, modulo, categoria, resultado } })])));
+    mount();
+    const title = await screen.findByText(titulo);
+    const activityView = title.closest(mobile ? 'article' : 'tr');
+    expect(within(activityView).getByText(modulo)).toBeTruthy();
+    expect(within(activityView).getByText(label)).toBeTruthy();
+    fireEvent.click(within(activityView).getByRole('button', { name: `Ver detalles: ${titulo}` }));
+    const detail = screen.getByRole(mobile ? 'dialog' : 'complementary', { name: 'Detalle de actividad' });
+    expect(within(detail).getByRole('heading', { name: titulo })).toBeTruthy();
+    expect(within(detail).getByText(modulo)).toBeTruthy();
+    expect(within(detail).getByText(categoria)).toBeTruthy();
+    expect(within(detail).getAllByText(label)).toHaveLength(2);
+    for (const secret of ['RESULTADO_LIBRE_SECRETO', 'DESCRIPCION_LIBRE_SECRETA', 'CLINICO_SECRETO', 'IP_SECRETA']) {
+      expect(document.body.textContent).not.toContain(secret);
+    }
+  },
+);
+
 test('permiso protege pagina y sidebar, sin peticiones para acceso denegado', async () => {
   auth.usuario = { id: 2, rol: 'director', permisos: [] };
   mount();
