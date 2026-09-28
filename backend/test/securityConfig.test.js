@@ -59,7 +59,7 @@ test('el entrypoint falla de forma controlada antes de cargar rutas', () => {
   });
   assert.equal(result.status, 1);
   assert.equal(result.stdout, '');
-  assert.match(result.stderr, /^Configuracion invalida: JWT_SECRET\s*$/);
+  assert.match(result.stderr, /^Configuracion invalida: CONFIG_INVALID\s*$/);
 });
 
 test('JWT_SECRET ausente produce un error controlado', () => {

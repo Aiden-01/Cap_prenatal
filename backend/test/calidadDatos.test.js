@@ -313,7 +313,7 @@ test('error inesperado del repositorio produce 500 controlado', async () => {
     assert.equal(response.status, 500);
     assert.deepEqual(await response.json(), {
       ok: false,
-      message: 'No se pudo preparar la revision de calidad de datos',
+      message: 'Error interno del servidor',
       code: 'AUTOMATION_INTERNAL_ERROR',
     });
   });
