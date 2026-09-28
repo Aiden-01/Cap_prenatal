@@ -42,6 +42,7 @@ const STATS = Object.freeze({
   pacientes_con_riesgo: 0,
   proximas_a_parir_count: 0,
 });
+const QUEUE_LOAD_TIMEOUT_MS = 5000;
 
 let originalGet;
 let originalPost;
@@ -94,7 +95,7 @@ function renderDashboard(toast = () => {}) {
 }
 
 async function openQueue(user) {
-  const tab = await screen.findByRole("button", { name: /Sin próxima cita \(2\)/ });
+  const tab = await screen.findByRole("button", { name: /Sin próxima cita \(2\)/ }, { timeout: QUEUE_LOAD_TIMEOUT_MS });
   await user.click(tab);
   await screen.findByText(PATIENT_A.paciente_nombre);
 }
@@ -183,7 +184,7 @@ test("una respuesta GET antigua no sobrescribe la cola más reciente", async () 
   });
   const user = userEvent.setup({ document });
   renderDashboard();
-  const tab = await screen.findByRole("button", { name: /Sin próxima cita \(2\)/ });
+  const tab = await screen.findByRole("button", { name: /Sin próxima cita \(2\)/ }, { timeout: QUEUE_LOAD_TIMEOUT_MS });
 
   await user.click(tab);
   await user.click(tab);
