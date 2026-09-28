@@ -118,11 +118,15 @@ const PERMISSION_SECTIONS = [
 
 function getPermissionUi(permiso) {
   return PERMISSION_UI[permiso.codigo] || {
-    label: permiso.descripcion || permiso.codigo,
-    description: "Permite realizar esta acción dentro del sistema.",
+    label: permiso.descripcion || "Permiso adicional",
+    description: "Acceso adicional del sistema.",
     section: permiso.categoria || "otros",
     Icon: ShieldCheck,
   };
+}
+
+function normalizarBusquedaPermisos(texto) {
+  return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
 const FIELD_LABELS = {
@@ -232,6 +236,8 @@ function ModalPermisos({
   onGuardar,
   onCancelar,
 }) {
+  const [busqueda, setBusqueda] = useState("");
+  const [seccionesCerradas, setSeccionesCerradas] = useState({});
   if (!usuario) return null;
   const grupos = catalogo.filter((permiso) => permiso.codigo !== "auditoria.ver" || usuario.rol === "admin").reduce((acc, permiso) => {
     const ui = getPermissionUi(permiso);
@@ -239,42 +245,61 @@ function ModalPermisos({
     acc[ui.section].push({ ...permiso, ui });
     return acc;
   }, {});
+  const termino = normalizarBusquedaPermisos(busqueda);
+  const gruposFiltrados = Object.fromEntries(Object.entries(grupos).map(([id, permisos]) => [
+    id,
+    termino
+      ? permisos.filter(({ ui }) => normalizarBusquedaPermisos(`${ui.label} ${ui.description}`).includes(termino))
+      : permisos,
+  ]));
   const sections = [
     ...PERMISSION_SECTIONS,
     ...Object.keys(grupos)
       .filter((id) => !PERMISSION_SECTIONS.some((section) => section.id === id))
       .map((id) => ({
         id,
-        title: id.replace("_", " "),
+        title: "Otros permisos",
         description: "Permisos adicionales del sistema.",
         Icon: ShieldCheck,
       })),
-  ].filter((section) => grupos[section.id]?.length);
+  ].filter((section) => gruposFiltrados[section.id]?.length);
   const selectedCount = seleccionados.length;
 
   return (
-    <div className="modal-backdrop">
-      <div className="card modal-card permissions-modal">
+    <div className="modal-backdrop permissions-backdrop">
+      <div className="card modal-card permissions-modal" role="dialog" aria-modal="true" aria-labelledby="permissions-modal-title">
         <div className="permissions-modal-header">
           <div className="permissions-modal-titlebar">
             <div className="permissions-modal-icon">
               <ShieldCheck size={20} />
             </div>
             <div>
-              <h2>Permisos del usuario</h2>
-              <p>
-                {usuario.nombre_completo}
-              </p>
+              <h2 id="permissions-modal-title">Permisos del usuario</h2>
+              <p>{usuario.nombre_completo} <span className="permissions-role">{rolLabel(usuario.rol)}</span></p>
             </div>
           </div>
-          <button type="button" className="password-modal-close" onClick={onCancelar} disabled={saving} aria-label="Cerrar">
+          <button type="button" className="password-modal-close permissions-modal-close" onClick={onCancelar} disabled={saving} aria-label="Cerrar">
             <X size={18} />
           </button>
         </div>
 
-        <div className="permissions-modal-guidance">
-          <Info size={15} />
-          <span>Selecciona solo las acciones necesarias. Los permisos sensibles deben asignarse únicamente a personal autorizado.</span>
+        <div className="permissions-modal-tools">
+          <label className="sr-only" htmlFor="permissions-search">Buscar permisos</label>
+          <div className="permissions-search">
+            <Search size={18} aria-hidden="true" />
+            <input
+              id="permissions-search"
+              type="search"
+              value={busqueda}
+              onChange={(event) => setBusqueda(event.target.value)}
+              placeholder="Buscar permisos"
+              disabled={loading}
+            />
+          </div>
+          <div className="permissions-modal-guidance">
+            <Info size={15} />
+            <span>Selecciona solo las acciones necesarias. Los permisos sensibles deben asignarse únicamente a personal autorizado.</span>
+          </div>
         </div>
 
         {loading ? (
@@ -284,27 +309,34 @@ function ModalPermisos({
           </div>
         ) : (
           <div className="permissions-modal-body">
+            {sections.length === 0 && (
+              <p className="permissions-empty">No hay permisos que coincidan con la búsqueda.</p>
+            )}
             {sections.map((section) => {
               const SectionIcon = section.Icon;
+              const abierta = !seccionesCerradas[section.id];
+              const seleccionadosEnSeccion = grupos[section.id].filter((permiso) => seleccionados.includes(permiso.codigo)).length;
               return (
               <section
                 key={section.id}
                 className={`permission-section ${section.sensitive ? "is-sensitive" : ""}`}
               >
-                <div className="permission-section-header">
-                  <span className="permission-section-icon">
-                    <SectionIcon size={16} />
+                <button
+                  type="button"
+                  className="permission-section-header"
+                  aria-expanded={abierta}
+                  onClick={() => setSeccionesCerradas((actuales) => ({ ...actuales, [section.id]: abierta }))}
+                >
+                  <span className="permission-section-icon"><SectionIcon size={18} /></span>
+                  <span className="permission-section-heading">
+                    <span className="permission-section-title">{section.title}</span>
+                    <span className="permission-section-description">{section.description}</span>
                   </span>
-                  <div>
-                    <h3>{section.title}</h3>
-                    <p>{section.description}</p>
-                  </div>
-                  <span className="permission-section-count">
-                    {grupos[section.id].filter((permiso) => seleccionados.includes(permiso.codigo)).length}/{grupos[section.id].length}
-                  </span>
-                </div>
-                <div className="permission-list">
-                  {grupos[section.id].map((permiso) => {
+                  <span className="permission-section-count">{seleccionadosEnSeccion}/{grupos[section.id].length}</span>
+                  <span className="permission-section-chevron" aria-hidden="true">{abierta ? "−" : "+"}</span>
+                </button>
+                {abierta && <div className="permission-list">
+                  {gruposFiltrados[section.id].map((permiso) => {
                     const { ui } = permiso;
                     const Icon = ui.Icon;
                     const checked = seleccionados.includes(permiso.codigo);
@@ -312,7 +344,6 @@ function ModalPermisos({
                       <label
                         key={permiso.codigo}
                         className={`permission-row ${checked ? "is-checked" : ""} ${ui.sensitive ? "is-sensitive" : ""}`}
-                        title={`Código técnico: ${permiso.codigo}`}
                       >
                         <input
                           type="checkbox"
@@ -333,14 +364,11 @@ function ModalPermisos({
                           <span className="permission-row-description">
                             {ui.description}
                           </span>
-                          <span className="permission-row-code">
-                            {permiso.codigo}
-                          </span>
                         </span>
                       </label>
                     );
                   })}
-                </div>
+                </div>}
               </section>
               );
             })}
@@ -348,7 +376,7 @@ function ModalPermisos({
         )}
 
         <div className="permissions-modal-footer">
-          <span>{selectedCount} permisos seleccionados. Los cambios se aplican inmediatamente.</span>
+          <span>{selectedCount} permisos seleccionados. Los cambios se aplican al guardar.</span>
           <div className="permissions-modal-actions">
           <button className="btn-secondary" onClick={onCancelar} disabled={saving}>
             Cancelar
@@ -516,6 +544,7 @@ export default function Usuarios() {
         onCancelar={() => setAEliminar(null)}
       />
       <ModalPermisos
+        key={permisosUsuario?.id ?? "cerrado"}
         usuario={permisosUsuario}
         catalogo={catalogoPermisos}
         seleccionados={permisosSeleccionados}

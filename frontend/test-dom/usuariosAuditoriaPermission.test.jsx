@@ -76,16 +76,80 @@ test('el catálogo conserva los once códigos y guarda los códigos internos', a
   expect(screen.getAllByRole('checkbox')).toHaveLength(permisos.length);
   for (const [codigo, nombre, descripcion] of permisos) {
     const fila = screen.getByText(nombre).closest('label');
-    expect(fila.textContent).toContain(codigo);
     expect(fila.textContent).toContain(descripcion);
+    expect(screen.queryByText(codigo)).toBeNull();
   }
-  expect(screen.getByRole('heading', { name: 'Historial de actividad' })).toBeTruthy();
-  expect(screen.getByRole('heading', { name: 'Resultados de VIH' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /Historial de actividad/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /Resultados de VIH/ })).toBeTruthy();
+  expect(screen.getByRole('dialog').textContent).toContain('Objetivo');
+  expect(screen.getByRole('dialog').textContent).toContain('Admin');
+
+  const vih = screen.getByText('Ver resultados de VIH').closest('label').querySelector('input');
+  expect(vih.checked).toBe(false);
+  fireEvent.click(vih);
+  expect(vih.checked).toBe(true);
+  fireEvent.click(vih);
+  expect(vih.checked).toBe(false);
 
   fireEvent.click(screen.getByText('Registrar pacientes').closest('label').querySelector('input'));
   fireEvent.click(screen.getByText('Ver historial de actividad').closest('label').querySelector('input'));
   fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
   await waitFor(() => expect(api.put).toHaveBeenCalledWith('/usuarios/2/permisos', {
     permisos: ['pacientes.crear', 'auditoria.ver'],
+  }));
+});
+
+test('busca por nombre y descripción y oculta categorías sin coincidencias', async () => {
+  install('admin');
+  render(<Usuarios />);
+  fireEvent.click(await screen.findByTitle('Gestionar permisos'));
+  await screen.findByText('Ver pacientes');
+  const busqueda = screen.getByRole('searchbox', { name: 'Buscar permisos' });
+
+  fireEvent.change(busqueda, { target: { value: 'HISTORIAL' } });
+  expect(screen.getByText('Ver historial de actividad')).toBeTruthy();
+  expect(screen.queryByText('Ver pacientes')).toBeNull();
+  expect(screen.queryByRole('button', { name: /Pacientes/ })).toBeNull();
+
+  fireEvent.change(busqueda, { target: { value: 'expedientes' } });
+  expect(screen.getByText('Ver pacientes')).toBeTruthy();
+  expect(screen.queryByText('Ver historial de actividad')).toBeNull();
+
+  fireEvent.change(busqueda, { target: { value: 'sin coincidencias' } });
+  expect(screen.getByText('No hay permisos que coincidan con la búsqueda.')).toBeTruthy();
+});
+
+test('contraer, buscar y expandir conserva selección, contadores y códigos al guardar', async () => {
+  install('admin');
+  render(<Usuarios />);
+  fireEvent.click(await screen.findByTitle('Gestionar permisos'));
+  const paciente = await screen.findByText('Ver pacientes');
+  const categoria = screen.getByRole('button', { name: /Pacientes/ });
+  const checkbox = paciente.closest('label').querySelector('input');
+  expect(categoria.getAttribute('aria-expanded')).toBe('true');
+  expect(categoria.textContent).toContain('0/1');
+
+  fireEvent.click(checkbox);
+  expect(categoria.textContent).toContain('1/1');
+  fireEvent.click(categoria);
+  expect(categoria.getAttribute('aria-expanded')).toBe('false');
+  expect(screen.queryByText('Ver pacientes')).toBeNull();
+
+  const busqueda = screen.getByRole('searchbox', { name: 'Buscar permisos' });
+  fireEvent.change(busqueda, { target: { value: 'pacientes' } });
+  expect(categoria.getAttribute('aria-expanded')).toBe('false');
+  fireEvent.change(busqueda, { target: { value: '' } });
+  expect(categoria.getAttribute('aria-expanded')).toBe('false');
+  fireEvent.click(categoria);
+  expect(screen.getByText('Ver pacientes').closest('label').querySelector('input').checked).toBe(true);
+
+  fireEvent.click(screen.getByText('Ver pacientes').closest('label').querySelector('input'));
+  expect(categoria.textContent).toContain('0/1');
+  fireEvent.click(screen.getByText('Ver pacientes').closest('label').querySelector('input'));
+  fireEvent.change(busqueda, { target: { value: 'historial' } });
+  fireEvent.click(screen.getByText('Ver historial de actividad').closest('label').querySelector('input'));
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  await waitFor(() => expect(api.put).toHaveBeenCalledWith('/usuarios/2/permisos', {
+    permisos: ['pacientes.ver', 'auditoria.ver'],
   }));
 });
