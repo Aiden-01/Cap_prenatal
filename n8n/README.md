@@ -2,8 +2,9 @@
 
 Este directorio contiene configuración de ejemplo, workflows importables y
 plantillas. No contiene SQLite, credenciales, ejecuciones, API keys ni datos
-clínicos. Los seis JSON Resend sí contienen un destinatario concreto que debe
-revisarse antes de importar o activar. La operación completa está en
+clínicos. Los seis JSON Resend versionados usan `responsable@example.invalid`;
+el preparador inserta destinatarios aprobados antes de importarlos. La operación
+completa está en
 [`../docs/N8N_OPERACION.md`](../docs/N8N_OPERACION.md).
 
 ## Inventario
@@ -49,9 +50,8 @@ Todos los JSON:
 - usan `America/Guatemala`;
 - deshabilitan guardado de ejecuciones y exposición MCP;
 - omiten credenciales y resultados;
-- requieren revisar y sustituir las direcciones de correo incorporadas antes de
-  cualquier activación; los remitentes de ejemplo usan `.invalid`, pero los seis
-  JSON Resend también contienen un destinatario concreto;
+- requieren configurar destinatarios aprobados fuera de Git antes de cualquier
+  activación; sin configuración usan `responsable@example.invalid`;
 - presentan fechas de correo y nombres de adjuntos como `DD-MM-YYYY`, mientras
   los contratos y parámetros HTTP permanecen en ISO `YYYY-MM-DD`.
 
@@ -81,12 +81,13 @@ Detalles de backup, recuperación de acceso y actualización:
 ## Importación
 
 1. instalar/reconciliar Resend y reiniciar n8n;
-2. importar un JSON desde **Workflows > Import from file**;
+2. preparar los seis JSON para `production-host` o `local` como se indica abajo e importar
+   el archivo de `n8n/generated/` desde **Workflows > Import from file**;
 3. confirmar nombre, agenda, zona y `active=false`;
 4. no publicar todavía;
 5. asignar credenciales según la sección siguiente;
-6. ajustar las URLs de Express y revisar remitente y destinatario incorporados
-   en cada JSON dentro del entorno, antes de cualquier prueba de envío;
+6. verificar la URL de Express, el destinatario renderizado y el remitente
+   antes de cualquier prueba de envío;
 7. probar nodos con información sintética;
 8. revisar diferencias entre el workflow configurado y el JSON versionado;
 9. publicar solo con autorización institucional.
@@ -134,12 +135,12 @@ hash. Las URLs reales son:
 /api/automatizaciones/v1/calidad-datos/resolver
 ```
 
-Los seis JSON Resend traen URLs fijas a `http://127.0.0.1:3335`, que no
-corresponden al backend de los Compose. Al importarlos, cambie **cada** URL de
-los nodos HTTP hacia Express: `http://backend:3001` dentro de Docker o
-`http://127.0.0.1:3001` con backend y n8n ejecutados en el host. Revise tanto
-la rama programada como la manual de cada expresión; las variables de proyecto
-`CAP_BACKEND_AUTOMATION_URL` pertenecen al JSON SMTP heredado, no a estos seis.
+Los seis JSON Resend versionados conservan `http://backend:3001` como base
+de plantilla; no deben importarse directamente en el servidor actual. El
+preparador sustituye esa base por `http://127.0.0.1:3335` en `production-host`
+y por `http://127.0.0.1:3001` en `local`. La URL depende de la red de despliegue,
+no de que la ejecución sea manual o programada. La variable de proyecto
+`CAP_BACKEND_AUTOMATION_URL` pertenece al JSON SMTP heredado, no a estos seis.
 La ruta sin `/v1/` está retirada. La integración M2M debe estar habilitada en
 el backend con `N8N_INTEGRATION_ENABLED`, hash de clave y CIDR permitidos;
 en desarrollo se requiere además `N8N_INTEGRATION_LOCAL_ENABLED=true` y solo
@@ -158,9 +159,33 @@ Crear una credencial **Resend API** y asignarla a:
 Tdap usa un nodo **HTTP Request** a la API de Resend con la credencial
 predefinida `Resend API`; no usa el nodo comunitario para ese envío.
 
-Configurar un remitente de dominio verificado y un destinatario institucional
-aprobado. El destinatario concreto presente en los JSON versionados debe
-retirarse antes de una exportación reutilizable; no copiarlo a nuevas versiones.
+Configurar un remitente de dominio verificado y destinatarios institucionales
+aprobados. Antes de importar, definir en la terminal que ejecuta el preparador
+`CAP_NOTIFICATION_RECIPIENT` (recordatorios, inasistencias y censos),
+`CAP_TDAP_RECIPIENT` y `CAP_WATCHDOG_RECIPIENT`. Después ejecutar desde la raíz:
+
+```powershell
+node scripts/render-n8n-workflows.js production-host
+# Para n8n y backend locales en el mismo host:
+node scripts/render-n8n-workflows.js local
+```
+
+`production-host` corresponde al servidor actual: n8n es un servicio systemd,
+escucha solo en `127.0.0.1:5678` para el túnel SSH y llega al backend por
+`127.0.0.1:3335`. No requiere Docker ni cambios en esos servicios. El mismo
+script y los mismos nombres de configuración sirven para ambos perfiles. Los
+resultados quedan en `n8n/generated/production-host/` o
+`n8n/generated/local/`, directorios ignorados por Git. Sin destinatario,
+conserva `responsable@example.invalid`; no publicar ni probar envíos hasta
+configurar uno aprobado. El preparador no lee ni serializa credenciales y no
+importa ni ejecuta workflows. Las variables son solo del proceso preparador: no se pasan
+al proceso n8n. `N8N_BLOCK_ENV_ACCESS_IN_NODE=true` impide leer desde un
+workflow `N8N_ENCRYPTION_KEY` y otras variables del entorno de n8n. Los JSON
+importados sí contienen el destinatario, por lo que sus exportaciones deben
+revisarse antes de volver a Git.
+Si ya existe un `n8n/.env` local de la configuración anterior, fijar allí
+`N8N_BLOCK_ENV_ACCESS_IN_NODE=true` antes de reiniciar; el ejemplo versionado
+ya tiene ese valor.
 
 Guía completa: [`../docs/RESEND.md`](../docs/RESEND.md).
 

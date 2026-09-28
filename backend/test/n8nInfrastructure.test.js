@@ -143,7 +143,7 @@ test('script local usa solo n8n/.env, lista cerrada y binario fijado', () => {
   assert.match(localScript, /N8N_COMMUNITY_PACKAGES debe fijar solo n8n-nodes-resend con version y checksum oficiales/);
 });
 
-test('configuracion n8n 2.34.4 evita variables deprecadas y acceso global al entorno', () => {
+test('configuracion n8n 2.34.4 bloquea acceso al entorno desde nodos', () => {
   for (const source of [
     serviceBlock(localCompose, 'n8n'),
     serviceBlock(productionCompose, 'n8n'),
@@ -153,6 +153,7 @@ test('configuracion n8n 2.34.4 evita variables deprecadas y acceso global al ent
     assert.match(source, /N8N_RUNNERS_MODE(?::|=)\s*internal/);
     assert.match(source, /N8N_RUNNERS_TASK_TIMEOUT(?::|=)\s*"?60"?/);
     assert.match(source, /N8N_BLOCK_ENV_ACCESS_IN_NODE(?::|=)\s*"?true"?/);
+    assert.doesNotMatch(source, /CAP_(?:NOTIFICATION|TDAP|WATCHDOG)_RECIPIENT(?::|=)/);
     assert.match(source, /N8N_COMMUNITY_PACKAGES_ENABLED(?::|=)\s*"?true"?/);
     assert.match(source, /N8N_UNVERIFIED_PACKAGES_ENABLED(?::|=)\s*"?false"?/);
     assert.match(source, /N8N_COMMUNITY_PACKAGES_MANAGED_BY_ENV(?::|=)\s*"?true"?/);

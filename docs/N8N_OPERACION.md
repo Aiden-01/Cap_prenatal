@@ -159,13 +159,15 @@ la interfaz.
 
 1. iniciar backend y n8n;
 2. instalar/reconciliar Resend antes de importar;
-3. importar solo los seis JSON Resend listados en
+3. preparar los seis JSON Resend con `node scripts/render-n8n-workflows.js production-host`
+   en el servidor actual, o `local` en un host de desarrollo, e importarlos desde
+   `n8n/generated/` como describe
    [`../n8n/README.md`](../n8n/README.md); dejar el JSON SMTP heredado fuera
    de la operación actual;
 4. confirmar que todos quedan inactivos;
-5. cambiar en cada nodo HTTP de Express las URLs fijas `127.0.0.1:3335`:
-   usar `backend:3001` en Docker o `127.0.0.1:3001` si ambos procesos corren
-   en el host, y revisar las ramas programada y manual de cada expresión;
+5. comprobar `127.0.0.1:3335` en `production-host` (n8n systemd y backend en
+   el mismo servidor) o `127.0.0.1:3001` en `local`; la ejecución manual utiliza
+   la misma red;
 6. asignar `HTTP Header Auth` con `X-CAP-Automation-Key` a los nodos que
    consultan Express; en el backend configurar `N8N_INTEGRATION_ENABLED=true`,
    el hash SHA-256 de esa clave y `N8N_ALLOWED_CIDRS`. En desarrollo se requiere
@@ -174,9 +176,10 @@ la interfaz.
    explícitamente su configuración;
 7. asignar la credencial Resend a los nodos de correo; Tdap usa un HTTP Request
    a la API de Resend con credencial predefinida `Resend API`;
-8. revisar remitente y destinatario de los seis JSON: los remitentes de
-   ejemplo usan `.invalid`, pero incluyen un destinatario concreto. Sustituir
-   ambos por direcciones aprobadas dentro del entorno, sin versionarlas;
+8. configurar `CAP_NOTIFICATION_RECIPIENT`, `CAP_TDAP_RECIPIENT` y
+   `CAP_WATCHDOG_RECIPIENT` solo en el entorno del preparador, antes de generar
+   los JSON ignorados por Git; sin valor se usa `responsable@example.invalid`.
+   Revisar también el remitente de ejemplo y sustituirlo por uno aprobado;
 9. guardar sin publicar;
 10. probar nodo por nodo con datos sintéticos;
 11. publicar después de la revisión y autorización institucional.
@@ -210,7 +213,7 @@ Orden recomendado:
 
 Antes de estas pruebas, verificar que las URLs, el Header Auth y la activación
 M2M correspondan al entorno. Un `404` puede indicar integración deshabilitada;
-un fallo de conexión a `:3335` indica que quedó la URL fija del JSON importado.
+un fallo de conexión indica que debe revisarse la URL del JSON importado.
 
 Para `Seguimiento semanal de inasistencias`, el orden manual obligatorio es:
 
@@ -350,12 +353,12 @@ Puede deberse a usar la ruta retirada
 confirmar puerto `3001`, la activación M2M y el Header Auth. Una integración
 deshabilitada responde `404` deliberadamente.
 
-### Fallo de conexión a `127.0.0.1:3335`
+### Fallo de conexión al backend desde n8n
 
-Los seis JSON Resend versionados contienen esa URL fija. Ajustar todos los
-nodos HTTP hacia Express al importar y comprobar la URL en ejecución manual y
-programada. Dentro del contenedor n8n, `127.0.0.1` apunta al propio n8n;
-usar `backend:3001` en la red interna de Docker.
+Comprobar que se importó el JSON preparado para el perfil correcto. La
+producción actual ejecuta n8n mediante systemd, escucha en
+`127.0.0.1:5678` y accede al backend por `127.0.0.1:3335`. El perfil `local`
+usa `127.0.0.1:3001`. No se requiere migrar a Docker.
 
 ### No se envió el recordatorio
 

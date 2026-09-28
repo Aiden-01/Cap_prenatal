@@ -149,8 +149,8 @@ test('requests usan endpoints M2M, Header Auth, fechas calculadas y descarga bin
       assert.equal(request.parameters.genericAuthType, 'httpHeaderAuth');
       assert.equal(request.parameters.sendHeaders, false);
       assert.match(request.parameters.url, /censo-primer-control/);
-      assert.match(request.parameters.url, /127\.0\.0\.1/);
-      assert.match(request.parameters.url, /http:\/\/backend:3001/);
+      assert.match(request.parameters.url, /^http:\/\/backend:3001\/api\/automatizaciones\/v1\/censo-primer-control/);
+      assert.doesNotMatch(request.parameters.url, /\$execution\.mode/);
       assert.equal(request.parameters.options.redirect.redirect.followRedirects, false);
       assert.equal(request.parameters.options.sendCredentialsOnCrossOriginRedirect, false);
     }
