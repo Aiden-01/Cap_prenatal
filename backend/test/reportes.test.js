@@ -146,7 +146,7 @@ test('schema rechaza orden inverso, periodo excesivo y parametros repetidos', ()
   assert.equal(periodoReportesQuerySchema.safeParse({ desde: ['2026-07-01', '2026-07-02'], hasta: '2026-07-31' }).success, false);
 });
 
-test('consulta de primer control usa una fila determinista por embarazo y no p.created_at', async () => {
+test('consulta de primer control filtra número y fecha antes de los joins y no usa p.created_at', async () => {
   let captured;
   const repository = createReportesRepository({
     async query(sql, params) {
@@ -156,11 +156,11 @@ test('consulta de primer control usa una fila determinista por embarazo y no p.c
   });
   const rows = await repository.obtenerRowsCensoPrimerControl(PERIODO.desde, PERIODO.hasta);
   assert.deepEqual(captured.params, [PERIODO.desde, PERIODO.hasta]);
-  assert.match(captured.sql, /DISTINCT ON \(c\.embarazo_id\)/);
-  assert.match(captured.sql, /ORDER BY c\.embarazo_id, c\.fecha ASC, c\.id ASC/);
-  assert.match(captured.sql, /AGE\(pc\.fecha, p\.fecha_nacimiento\)/);
-  assert.match(captured.sql, /pc\.fecha - COALESCE\(e\.fur, p\.fur\)/);
-  assert.match(captured.sql, /pc\.fecha BETWEEN \$1::date AND \$2::date/);
+  assert.doesNotMatch(captured.sql, /DISTINCT ON/);
+  assert.match(captured.sql, /WHERE c\.numero_control = 1\s+AND c\.fecha BETWEEN \$1::date AND \$2::date/);
+  assert.match(captured.sql, /AGE\(c\.fecha, p\.fecha_nacimiento\)/);
+  assert.match(captured.sql, /c\.fecha - COALESCE\(e\.fur, p\.fur\)/);
+  assert.match(captured.sql, /ORDER BY c\.fecha ASC, p\.apellidos ASC, p\.nombres ASC, e\.numero_embarazo ASC/);
   assert.match(captured.sql, /COALESCE\(com\.nombre, p\.comunidad\)/);
   assert.doesNotMatch(captured.sql, /p\.created_at/);
   assert.equal(rows[0].estado_embarazo, 'cerrado');
