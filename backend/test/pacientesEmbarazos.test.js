@@ -147,6 +147,35 @@ function privateAuditRecorder({ fail = false, failAt = null } = {}) {
   };
 }
 
+test('listado construye búsqueda libre y paginación sin cambiar el contrato', async () => {
+  const calls = [];
+  await withPacientesService({
+    repository: {
+      listar: async (args) => {
+        calls.push(['listar', args]);
+        return [{ id: 41, no_expediente: 'SYN-000123' }];
+      },
+      contar: async (args) => {
+        calls.push(['contar', args]);
+        return 7;
+      },
+    },
+  }, async (service) => {
+    assert.deepEqual(await service.listarPacientes(), {
+      data: [{ id: 41, no_expediente: 'SYN-000123' }], total: 7,
+    });
+    assert.deepEqual(await service.listarPacientes({
+      buscar: 'SYN-000123', pagina: '3', limite: '25',
+    }), { data: [{ id: 41, no_expediente: 'SYN-000123' }], total: 7 });
+  });
+  assert.deepEqual(calls, [
+    ['listar', { q: '%%', limite: 20, offset: 0 }],
+    ['contar', { q: '%%' }],
+    ['listar', { q: '%SYN-000123%', limite: 25, offset: 50 }],
+    ['contar', { q: '%SYN-000123%' }],
+  ]);
+});
+
 test('acepta los datos obligatorios de una paciente valida', () => {
   const result = pacienteCreateSchema.safeParse(VALID_PATIENT);
   assert.equal(result.success, true);

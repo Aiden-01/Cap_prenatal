@@ -2,7 +2,19 @@ const pool = require('../db/pool');
 
 async function listar({ q, limite, offset }) {
   const { rows } = await pool.query(
-    `SELECT pacientes.id, no_expediente, cui,
+    `WITH pacientes_pagina AS MATERIALIZED (
+       SELECT id, no_expediente, cui, nombres, apellidos,
+              fecha_nacimiento, fur, fpp, municipio, comunidad,
+              telefono, created_at, tiene_ficha_riesgo
+       FROM pacientes
+       WHERE nombres ILIKE $1
+          OR apellidos ILIKE $1
+          OR no_expediente ILIKE $1
+          OR cui ILIKE $1
+       ORDER BY nombres ASC, apellidos ASC
+       LIMIT $2 OFFSET $3
+     )
+     SELECT pacientes.id, no_expediente, cui,
             nombres, apellidos,
             fecha_nacimiento, pacientes.fur, pacientes.fpp,
             municipio, comunidad, telefono,
@@ -12,7 +24,7 @@ async function listar({ q, limite, offset }) {
             embarazo_actual.fur AS embarazo_fur,
             embarazo_actual.fpp AS embarazo_fpp,
             COALESCE(riesgo_actual.tiene_riesgo, pacientes.tiene_ficha_riesgo, FALSE) AS tiene_riesgo
-     FROM pacientes
+     FROM pacientes_pagina pacientes
      LEFT JOIN LATERAL (
        SELECT id, estado, fur, fpp
        FROM embarazos
@@ -32,12 +44,7 @@ async function listar({ q, limite, offset }) {
        WHERE embarazo_id = embarazo_actual.id
        ORDER BY fecha DESC LIMIT 1
      ) riesgo_actual ON TRUE
-     WHERE nombres ILIKE $1
-        OR apellidos ILIKE $1
-        OR no_expediente ILIKE $1
-        OR cui ILIKE $1
-     ORDER BY nombres ASC, apellidos ASC
-     LIMIT $2 OFFSET $3`,
+     ORDER BY nombres ASC, apellidos ASC`,
     [q, limite, offset]
   );
   return rows;
