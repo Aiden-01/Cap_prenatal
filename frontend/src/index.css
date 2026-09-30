@@ -10526,3 +10526,22 @@ html.dark .patient-file-transition__kicker {
     font-size: 16px;
   }
 }
+
+/* Confirmación de concesión de acceso sensible. */
+.modal-backdrop.vih-confirmation-backdrop { z-index: 1100; padding: 16px; }
+.modal-card.vih-confirmation {
+  width: min(520px, 100%); min-width: 0; max-height: calc(100dvh - 32px);
+  overflow-y: auto; overflow-wrap: anywhere; border-top: 5px solid var(--warn);
+  padding: clamp(16px, 4vw, 28px);
+}
+.vih-confirmation-icon { color: var(--warn); }
+.vih-confirmation h2 { font-size: 1.25rem; line-height: 1.4; margin: 12px 0; }
+.vih-confirmation-user { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
+.vih-confirmation-user span { color: var(--text-muted); }
+.vih-confirmation p { font-size: 1rem; line-height: 1.6; margin-bottom: 24px; }
+.vih-confirmation-actions { display: flex; justify-content: flex-end; gap: 12px; }
+.vih-confirmation-actions button { min-height: 44px; font-size: 1rem; }
+@media (max-width: 480px) {
+  .vih-confirmation-actions { flex-direction: column; }
+  .vih-confirmation-actions button { width: 100%; justify-content: center; }
+}

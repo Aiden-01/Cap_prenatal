@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import {
   UserPlus, ShieldCheck, ShieldOff, ShieldAlert,
   User, KeyRound, BadgeCheck, Loader2, CheckCircle2, Trash2, X, LockKeyhole, AlertTriangle,
@@ -9,6 +9,8 @@ import { useAuth } from "../hooks/useAuth";
 import { useGlobalToast } from "../context/ToastContext";
 import { getErrorMessage } from "../utils/errorMessage";
 import { useFieldErrors } from "../hooks/useFieldErrors";
+
+import { requiresVihConfirmation } from "../utils/permissionConfirmation";
 
 const INIT = { nombre_completo: "", username: "", password: "", rol: "personal_salud" };
 
@@ -195,6 +197,47 @@ function ModalEliminar({ usuario, onConfirmar, onCancelar }) {
   );
 }
 
+function ModalConfirmarVih({ usuario, saving, onConfirmar, onCancelar }) {
+  const cancelarRef = useRef(null);
+  const dialogRef = useRef(null);
+  useEffect(() => {
+    const anterior = document.activeElement;
+    cancelarRef.current?.focus();
+    return () => anterior?.focus();
+  }, []);
+  const onKeyDown = (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      if (!saving) onCancelar();
+    }
+    if (event.key === "Tab") {
+      const botones = [...dialogRef.current.querySelectorAll('button:not(:disabled)')];
+      const primero = botones[0];
+      const ultimo = botones.at(-1);
+      if (!primero) { event.preventDefault(); return; }
+      if (event.shiftKey && document.activeElement === primero) {
+        event.preventDefault(); ultimo.focus();
+      } else if (!event.shiftKey && document.activeElement === ultimo) {
+        event.preventDefault(); primero.focus();
+      }
+    }
+  };
+  return (
+    <div className="modal-backdrop vih-confirmation-backdrop" onKeyDown={onKeyDown}>
+      <div ref={dialogRef} className="card modal-card vih-confirmation" role="alertdialog" aria-modal="true" aria-labelledby="vih-confirmation-title" aria-describedby="vih-confirmation-description" aria-busy={saving}>
+        <ShieldAlert size={32} className="vih-confirmation-icon" aria-hidden="true" />
+        <h2 id="vih-confirmation-title">Asignar acceso a resultados de VIH</h2>
+        <div className="vih-confirmation-user"><strong>{usuario.nombre_completo}</strong><span>@{usuario.username}</span></div>
+        <p id="vih-confirmation-description">Estás por permitir que este usuario consulte resultados de VIH. Este permiso da acceso a información clínica especialmente sensible. ¿Deseas continuar?</p>
+        <div className="vih-confirmation-actions">
+          <button ref={cancelarRef} type="button" className="btn-secondary" onClick={onCancelar} disabled={saving}>Cancelar</button>
+          <button type="button" className="btn-primary" onClick={onConfirmar} disabled={saving}>{saving ? <><Loader2 className="spin" size={16} /> Guardando...</> : "Asignar permiso"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function rolLabel(rol) {
   if (rol === "director") return "Director";
   if (rol === "admin") return "Admin";
@@ -228,6 +271,7 @@ function ModalPermisos({
   saving,
   onToggle,
   onGuardar,
+  blocked,
   onCancelar,
 }) {
   const [busqueda, setBusqueda] = useState("");
@@ -260,7 +304,7 @@ function ModalPermisos({
   const selectedCount = seleccionados.length;
 
   return (
-    <div className="modal-backdrop permissions-backdrop">
+    <div className="modal-backdrop permissions-backdrop" inert={blocked || undefined} aria-hidden={blocked || undefined}>
       <div className="card modal-card permissions-modal" role="dialog" aria-modal="true" aria-labelledby="permissions-modal-title">
         <div className="permissions-modal-header">
           <div className="permissions-modal-titlebar">
@@ -342,6 +386,7 @@ function ModalPermisos({
                         <input
                           type="checkbox"
                           checked={checked}
+                          disabled={saving}
                           onChange={() => onToggle(permiso.codigo)}
                         />
                         <span className="permission-row-check" aria-hidden="true">
@@ -397,6 +442,9 @@ export default function Usuarios() {
   const [permisosSeleccionados, setPermisosSeleccionados] = useState([]);
   const [permisosLoading, setPermisosLoading] = useState(false);
   const [permisosSaving, setPermisosSaving] = useState(false);
+  const [permisosOriginales, setPermisosOriginales] = useState([]);
+  const [confirmarVih, setConfirmarVih] = useState(false);
+  const permisosRequestRef = useRef(false);
   const [filtroEstado, setFiltroEstado] = useState("activos");
   const [filtroRol, setFiltroRol] = useState("todos");
   const [busqueda, setBusqueda] = useState("");
@@ -489,6 +537,8 @@ export default function Usuarios() {
     setPermisosUsuario(usuario);
     setPermisosLoading(true);
     setPermisosSeleccionados([]);
+    setPermisosOriginales([]);
+    setConfirmarVih(false);
     try {
       const [{ data: catalogo }, { data: actuales }] = await Promise.all([
         api.get("/permisos"),
@@ -496,6 +546,7 @@ export default function Usuarios() {
       ]);
       setCatalogoPermisos(catalogo);
       setPermisosSeleccionados(actuales.map((permiso) => permiso.codigo));
+      setPermisosOriginales(actuales.map((permiso) => permiso.codigo));
     } catch (err) {
       toast(getErrorMessage(err, "Error al cargar permisos"), "error");
       setPermisosUsuario(null);
@@ -513,18 +564,22 @@ export default function Usuarios() {
   };
 
   const guardarPermisos = async () => {
-    if (!permisosUsuario) return;
+    if (!permisosUsuario || permisosLoading || permisosRequestRef.current) return;
+    permisosRequestRef.current = true;
     setPermisosSaving(true);
     try {
       await api.put(`/usuarios/${permisosUsuario.id}/permisos`, { permisos: permisosSeleccionados });
+      setPermisosOriginales([...permisosSeleccionados]);
       toast("Permisos actualizados", "success");
       if (permisosUsuario.id === yo?.id) {
         await refreshUsuario();
       }
       setPermisosUsuario(null);
+      setConfirmarVih(false);
     } catch (err) {
       toast(getErrorMessage(err, "Error al guardar permisos"), "error");
     } finally {
+      permisosRequestRef.current = false;
       setPermisosSaving(false);
     }
   };
@@ -545,11 +600,23 @@ export default function Usuarios() {
         loading={permisosLoading}
         saving={permisosSaving}
         onToggle={togglePermiso}
-        onGuardar={guardarPermisos}
+        blocked={confirmarVih}
+        onGuardar={() => {
+          if (permisosLoading || permisosRequestRef.current || confirmarVih) return;
+          if (requiresVihConfirmation(permisosOriginales, permisosSeleccionados)) setConfirmarVih(true);
+          else guardarPermisos();
+        }}
         onCancelar={() => !permisosSaving && setPermisosUsuario(null)}
       />
 
-      <div className="record-page">
+      {confirmarVih && permisosUsuario && <ModalConfirmarVih
+        usuario={permisosUsuario}
+        saving={permisosSaving}
+        onConfirmar={guardarPermisos}
+        onCancelar={() => !permisosRequestRef.current && setConfirmarVih(false)}
+      />}
+
+      <div className="record-page" inert={confirmarVih || undefined}>
         <div className="page-header">
           <ShieldCheck size={26} color="var(--primary)" />
           <div>
