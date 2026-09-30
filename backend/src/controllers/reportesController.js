@@ -3,6 +3,7 @@ const { asyncHandler } = require('../middleware/asyncHandler');
 const { registrarEventoPrivado } = require('../services/auditService');
 const { PDF_RESPONSE_HEADERS, sanitizePdfFilename } = require('../utils/pdfResponse');
 const { getGuatemalaDateInputValue } = require('../utils/guatemalaTime');
+const { operationMetrics } = require('../utils/operationMetrics');
 
 function setPrivateDownloadHeaders(res) {
   res.set({
@@ -48,8 +49,13 @@ function exportAuditData({ tipoReporte, formato, periodo, total }) {
 function createReportesController({
   service = reportesService,
   audit = registrarEventoPrivado,
+  metrics = operationMetrics,
 } = {}) {
-  const createExportHandler = (reportId, format) => asyncHandler(async (req, res) => {
+  const measuredHandler = (operation, handler) => asyncHandler(
+    (req, res) => metrics.measure(operation, () => handler(req, res))
+  );
+
+  const createExportHandler = (reportId, format) => measuredHandler(`report.${format}.${reportId}`, async (req, res) => {
     const result = await service.exportReport(reportId, format, req.query);
     await audit(req, {
       contexto: { categoria: 'reportes', entidad: 'exportacion', evento: 'exportacion_reporte' },
@@ -70,19 +76,19 @@ function createReportesController({
       : sendReportPdf(res, result.pdf, filename);
   });
 
-  const censoMensual = asyncHandler(async (_req, res) => {
+  const censoMensual = measuredHandler('report.query.censo_general', async (_req, res) => {
     const result = await service.censoMensual({});
     return res.json(result);
   });
 
-  const censoMensualPrimerControl = asyncHandler(async (req, res) => {
+  const censoMensualPrimerControl = measuredHandler('report.query.censo_primer_control', async (req, res) => {
     const result = await service.censoMensualPrimerControl(req.query);
     return res.json(result);
   });
-  const controlesPrenatales = asyncHandler(async (req, res) =>
+  const controlesPrenatales = measuredHandler('report.query.controles_prenatales', async (req, res) =>
     res.json(await service.controlesPrenatales(req.query)));
 
-  const exportarCensoExcel = asyncHandler(async (req, res) => {
+  const exportarCensoExcel = measuredHandler('report.excel.censo_general', async (req, res) => {
     const result = await service.workbookCensoGeneral();
     await audit(req, {
       contexto: {
@@ -105,7 +111,7 @@ function createReportesController({
     );
   });
 
-  const exportarCensoPrimerControlExcel = asyncHandler(async (req, res) => {
+  const exportarCensoPrimerControlExcel = measuredHandler('report.excel.censo_primer_control', async (req, res) => {
     const result = await service.workbookCensoPrimerControl(req.query);
     await audit(req, {
       contexto: {
@@ -128,7 +134,7 @@ function createReportesController({
     );
   });
 
-  const exportarCensoPrimerControlPdf = asyncHandler(async (req, res) => {
+  const exportarCensoPrimerControlPdf = measuredHandler('report.pdf.censo_primer_control', async (req, res) => {
     const result = await service.pdfCensoPrimerControl(req.query);
     await audit(req, {
       contexto: {
@@ -151,11 +157,11 @@ function createReportesController({
     );
   });
 
-  const estadisticas = asyncHandler(async (_req, res) => res.json(await service.estadisticas()));
-  const pacientesConRiesgo = asyncHandler(async (_req, res) => res.json(await service.pacientesConRiesgo()));
-  const proximasAParir = asyncHandler(async (_req, res) => res.json(await service.proximasAParir()));
-  const sinControlReciente = asyncHandler(async (_req, res) => res.json(await service.sinControlReciente()));
-  const resumenPorComunidad = asyncHandler(async (_req, res) => res.json(await service.resumenPorComunidad()));
+  const estadisticas = measuredHandler('report.query.estadisticas', async (_req, res) => res.json(await service.estadisticas()));
+  const pacientesConRiesgo = measuredHandler('report.query.riesgo', async (_req, res) => res.json(await service.pacientesConRiesgo()));
+  const proximasAParir = measuredHandler('report.query.proximas_parto', async (_req, res) => res.json(await service.proximasAParir()));
+  const sinControlReciente = measuredHandler('report.query.sin_control', async (_req, res) => res.json(await service.sinControlReciente()));
+  const resumenPorComunidad = measuredHandler('report.query.comunidades', async (_req, res) => res.json(await service.resumenPorComunidad()));
 
   return {
     controlesPrenatales,

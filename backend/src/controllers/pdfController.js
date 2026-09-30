@@ -16,6 +16,7 @@ const {
   puppeteerBrowserManager,
 } = require('../services/puppeteerBrowserManager');
 const { runDocumentProcess, terminateProcessByPid } = require('../utils/documentProcess');
+const { operationMetrics } = require('../utils/operationMetrics');
 
 const TEXT_FORMAT_CELLS = new Set(['T8', 'V8', 'AE8:AN8', 'F61', 'G19:J19', 'P19:S19', 'Q19:T19', 'AK19:AN19']);
 const CENTER_FORMAT_RE = /^(N6|O6|P6|Q6|S6|T6|U6|V6|Y6|Z6|AA6|AB6|AA7:AB7|AA13:AB13|AE8:AN8|K18|X18|X19|E20|K20|Q20|X20|F21|M21)$/;
@@ -1378,13 +1379,14 @@ function createPdfController(overrides = {}) {
     sendPdfResponse,
     ...overrides,
   };
+  const metrics = overrides.metrics || operationMetrics;
 
   return {
-    pdfCombinado: (req, res) => pdfCombinadoHandler(req, res, dependencies),
-    pdfControl: (req, res) => pdfControlHandler(req, res, dependencies),
-    pdfMspas: (req, res) => pdfMspasHandler(req, res, dependencies),
-    pdfPlanParto: (req, res) => pdfPlanPartoHandler(req, res, dependencies),
-    pdfRiesgoObstetrico: (req, res) => pdfRiesgoObstetricoHandler(req, res, dependencies),
+    pdfCombinado: (req, res) => metrics.measure('pdf.combined', () => pdfCombinadoHandler(req, res, dependencies)),
+    pdfControl: (req, res) => metrics.measure('pdf.control', () => pdfControlHandler(req, res, dependencies)),
+    pdfMspas: (req, res) => metrics.measure('pdf.expediente', () => pdfMspasHandler(req, res, dependencies)),
+    pdfPlanParto: (req, res) => metrics.measure('pdf.plan_parto', () => pdfPlanPartoHandler(req, res, dependencies)),
+    pdfRiesgoObstetrico: (req, res) => metrics.measure('pdf.riesgo', () => pdfRiesgoObstetricoHandler(req, res, dependencies)),
   };
 }
 
