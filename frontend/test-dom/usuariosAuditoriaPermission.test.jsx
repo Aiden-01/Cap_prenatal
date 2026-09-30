@@ -49,7 +49,7 @@ test('admin no gestiona permisos', async () => {
   expect(screen.queryByTitle('Gestionar permisos')).toBeNull();
 });
 
-test('el catálogo conserva los once códigos y guarda los códigos internos', async () => {
+test('el catálogo conserva los diez códigos vigentes y guarda los códigos internos', async () => {
   const permisos = [
     ['auditoria.ver', 'Ver historial de actividad', 'Consultar el historial de actividad del sistema.'],
     ['controles.crear', 'Registrar controles prenatales', 'Registrar un nuevo control prenatal.'],
@@ -58,7 +58,6 @@ test('el catálogo conserva los once códigos y guarda los códigos internos', a
     ['mapa_riesgo.ver', 'Ver mapa de riesgo', 'Consultar el mapa de riesgo obstétrico.'],
     ['pacientes.crear', 'Registrar pacientes', 'Abrir un expediente para una nueva paciente.'],
     ['pacientes.editar', 'Editar pacientes', 'Actualizar datos generales de las pacientes.'],
-    ['pacientes.eliminar', 'Eliminar pacientes', 'Eliminar expedientes de pacientes.'],
     ['pacientes.ver', 'Ver pacientes', 'Consultar expedientes de pacientes.'],
     ['reportes.exportar', 'Exportar reportes', 'Descargar reportes en Excel o PDF.'],
     ['reportes.ver', 'Ver reportes', 'Consultar reportes de atención y seguimiento.'],
@@ -74,6 +73,10 @@ test('el catálogo conserva los once códigos y guarda los códigos internos', a
   fireEvent.click(await screen.findByTitle('Gestionar permisos'));
   await screen.findByText('Registrar pacientes');
   expect(screen.getAllByRole('checkbox')).toHaveLength(permisos.length);
+  expect(screen.queryByText('Eliminar pacientes')).toBeNull();
+  expect(screen.queryByText('Eliminar expedientes de pacientes.')).toBeNull();
+  expect(screen.getByRole('button', { name: /Pacientes/ }).textContent).toContain('0/3');
+  expect(screen.getByRole('dialog').querySelectorAll('.permission-section')).toHaveLength(5);
   for (const [codigo, nombre, descripcion] of permisos) {
     const fila = screen.getByText(nombre).closest('label');
     expect(fila.textContent).toContain(descripcion);

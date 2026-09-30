@@ -46,7 +46,7 @@ function rejectsAsPending(promise, filenamePattern) {
   );
 }
 
-test('008 a 015 presentes con checksums correctos permiten continuar', async () => {
+test('todas las migraciones requeridas con checksums correctos permiten continuar', async () => {
   const registry = createRegistry();
   await assertSchemaCompatible(registry.db);
 
@@ -217,6 +217,7 @@ test('la lista requerida es explicita y cada checksum procede del archivo versio
     '017_citas_inasistencias.sql',
     '018_auditoria_historial.sql',
     '019_auditoria_politica_roles.sql',
+    '020_retirar_permiso_pacientes_eliminar.sql',
   ]);
   assert.equal(REQUIRED_STATE.every(({ checksum }) => /^[a-f0-9]{64}$/.test(checksum)), true);
 });

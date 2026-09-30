@@ -34,7 +34,6 @@ async function seed({
         ('pacientes.crear', 'Crear pacientes', 'pacientes'),
         ('pacientes.ver', 'Ver pacientes', 'pacientes'),
         ('pacientes.editar', 'Editar pacientes', 'pacientes'),
-        ('pacientes.eliminar', 'Eliminar pacientes', 'pacientes'),
         ('controles.crear', 'Crear controles prenatales', 'controles'),
         ('controles.editar', 'Editar controles prenatales', 'controles'),
         ('controles.ver_vih', 'Ver y gestionar datos VIH', 'datos_sensibles'),

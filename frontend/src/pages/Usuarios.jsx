@@ -56,12 +56,6 @@ const PERMISSION_UI = {
     section: "pacientes",
     Icon: Pencil,
   },
-  "pacientes.eliminar": {
-    label: "Eliminar pacientes",
-    description: "Eliminar expedientes de pacientes.",
-    section: "pacientes",
-    Icon: Trash2,
-  },
   "mapa_riesgo.ver": {
     label: "Ver mapa de riesgo",
     description: "Consultar el mapa de riesgo obstétrico.",

@@ -119,6 +119,28 @@ test('seed idempotente no genera hash ni cambia una cuenta existente', async () 
   assert.equal(calls.query.some(({ text }) => /UPDATE\s+usuarios/i.test(text)), false);
 });
 
+test('seed limpio y repetido conserva solo los diez permisos vigentes', async () => {
+  const esperados = [
+    'auditoria.ver', 'controles.crear', 'controles.editar', 'controles.ver_vih',
+    'mapa_riesgo.ver', 'pacientes.crear', 'pacientes.editar', 'pacientes.ver',
+    'reportes.exportar', 'reportes.ver',
+  ];
+  for (const existing of [false, true]) {
+    const { db, calls } = createDb({ existing });
+    for (let intento = 0; intento < 2; intento += 1) {
+      await seed({ db, env: seedEnv(), logger: createLogger().logger,
+        hashPassword: async () => 'test-only-password-hash' });
+    }
+    const catalogos = calls.query.filter(({ text }) => text.includes('INSERT INTO permisos '));
+    assert.equal(catalogos.length, 2);
+    for (const { text } of catalogos) {
+      const codigos = [...text.matchAll(/\('([^']+)'/g)].map((match) => match[1]).sort();
+      assert.deepEqual(codigos, esperados);
+      assert.doesNotMatch(text, /pacientes\.eliminar/);
+    }
+  }
+});
+
 test('seed no convierte silenciosamente una cuenta existente de otro rol', async () => {
   const { db, calls } = createDb({ existing: true, existingRole: 'personal_salud' });
   await assert.rejects(

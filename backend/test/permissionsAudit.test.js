@@ -141,6 +141,15 @@ test('solo director puede gestionar auditoria.ver', async () => {
   }
 });
 
+test('el permiso retirado no es un codigo valido y no cambia concesiones', async () => {
+  const escenario = crearEscenario({ permisosIniciales: ['pacientes.ver'] });
+  await assert.rejects(escenario.ejecutar(['pacientes.eliminar']),
+    (error) => error.status === 400 && error.code === 'PERMISOS_INVALIDOS');
+  assert.deepEqual(escenario.estado(), ['pacientes.ver']);
+  assert.equal(escenario.llamadas.includes('REPLACE'), false);
+  assert.equal(escenario.llamadas.includes('ROLLBACK'), true);
+});
+
 test('director concede y retira auditoria.ver a admin manualmente', async () => {
   const escenario = crearEscenario({ catalogo: ['auditoria.ver'], rolObjetivo: 'admin' });
   await escenario.ejecutar(['auditoria.ver']);
