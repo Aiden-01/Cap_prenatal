@@ -126,11 +126,17 @@ postgresTest('watchdog detecta solo inconsistencias objetivas sobre PostgreSQL t
       );
 
       const otherPatient = await createPatient('QUALITY-OTHER-01');
+      // Simula datos legacy anteriores al enforcement; solo en esta BD desechable.
+      await db.query('ALTER TABLE morbilidad_embarazo DROP CONSTRAINT morbilidad_embarazo_embarazo_paciente_fkey');
       await db.query(
         `INSERT INTO morbilidad_embarazo (paciente_id, embarazo_id, fecha, registrado_por)
          VALUES ($1, $2, CURRENT_DATE, $3)`,
         [otherPatient, validPregnancy, user.rows[0].id]
       );
+      await db.query(`ALTER TABLE morbilidad_embarazo
+        ADD CONSTRAINT morbilidad_embarazo_embarazo_paciente_fkey
+        FOREIGN KEY (embarazo_id, paciente_id) REFERENCES embarazos(id, paciente_id)
+        ON DELETE CASCADE NOT VALID`);
 
       await createPregnancy(validPatient, 2, 'puerperio');
 

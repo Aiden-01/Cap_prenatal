@@ -108,7 +108,8 @@ async function assertCurrentDatabase(db) {
 postgresTest('instalación limpia usa schema como bootstrap y queda compatible', async () => {
   await withDatabase('clean', async (url) => {
     const messages = await runMigrator(url);
-    assert.match(messages.join('\n'), /Migracion completada: 14 aplicada\(s\), 0 omitida\(s\)/);
+    const total = discoverMigrationFiles().length;
+    assert.ok(messages.includes(`Migracion completada: ${total} aplicada(s), 0 omitida(s)`));
     const db = new Pool({ connectionString: url });
     try {
       await assertCurrentDatabase(db);
@@ -132,7 +133,8 @@ postgresTest('upgrade real 016→017 migra antes del schema y segunda ejecución
     await setup.end();
 
     const firstMessages = await runMigrator(url);
-    assert.match(firstMessages.join('\n'), /Migracion completada: 1 aplicada\(s\), 13 omitida\(s\)/);
+    const pending = discoverMigrationFiles().filter(({ filename }) => filename >= '017_').length;
+    assert.ok(firstMessages.includes(`Migracion completada: ${pending} aplicada(s), 13 omitida(s)`));
 
     const db = new Pool({ connectionString: url });
     try {
@@ -142,6 +144,7 @@ postgresTest('upgrade real 016→017 migra antes del schema y segunda ejecución
     }
 
     const secondMessages = await runMigrator(url);
-    assert.match(secondMessages.join('\n'), /Migracion completada: 0 aplicada\(s\), 14 omitida\(s\)/);
+    const total = discoverMigrationFiles().length;
+    assert.ok(secondMessages.includes(`Migracion completada: 0 aplicada(s), ${total} omitida(s)`));
   });
 });
