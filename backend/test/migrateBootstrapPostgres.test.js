@@ -119,7 +119,7 @@ postgresTest('instalación limpia usa schema como bootstrap y queda compatible',
   });
 });
 
-postgresTest('upgrade real 016→017 migra antes del schema y segunda ejecución es idempotente', async () => {
+postgresTest('upgrade real 016→017 usa solo numeradas y segunda ejecución es idempotente', async () => {
   await withDatabase('upgrade016', async (url) => {
     const setup = await installSchemaAt016(url);
     const before = await setup.query(`
@@ -134,7 +134,8 @@ postgresTest('upgrade real 016→017 migra antes del schema y segunda ejecución
 
     const firstMessages = await runMigrator(url);
     const pending = discoverMigrationFiles().filter(({ filename }) => filename >= '017_').length;
-    assert.ok(firstMessages.includes(`Migracion completada: ${pending} aplicada(s), 13 omitida(s)`));
+    const previous = discoverMigrationFiles().length - pending;
+    assert.ok(firstMessages.includes(`Migracion completada: ${pending} aplicada(s), ${previous} omitida(s)`));
 
     const db = new Pool({ connectionString: url });
     try {

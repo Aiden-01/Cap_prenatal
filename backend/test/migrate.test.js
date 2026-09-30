@@ -6,7 +6,9 @@ const test = require('node:test');
 const {
   checksum,
   discoverMigrationFiles,
-  isApplicationSchemaInitialized,
+  classifyDatabase,
+  APPLICATION_CORE_TABLES,
+  DATABASE_STATES,
   migrate,
 } = require('../src/db/migrate');
 const {
@@ -17,20 +19,28 @@ const {
 function legacyChecksum(sql) {
   return crypto.createHash('sha256').update(sql, 'utf8').digest('hex');
 }
+const identityColumns = ['id', 'nombre', 'rol_id', 'codigo', 'usuario_id',
+  'permiso_id', 'no_expediente', 'paciente_id', 'numero_embarazo', 'embarazo_id'];
 
-function createHarness({ query = null, closeError = null, schemaInitialized = false } = {}) {
+function createHarness({ query = null, closeError = null, schemaInitialized = false, relations = null } = {}) {
   const calls = { query: [], end: 0 };
   const entries = { log: [], error: [] };
   const codes = [];
   return {
+    verifyCompatibility: async () => {},
     calls,
     codes,
     entries,
     db: {
       async query(sql, params) {
         calls.query.push({ sql, params });
-        if (sql === 'SELECT to_regclass($1) AS application_schema') {
-          return { rows: [{ application_schema: schemaInitialized ? 'pacientes' : null }] };
+        if (sql.includes('FROM pg_catalog.pg_class c')) {
+          return { rows: relations || (schemaInitialized ? APPLICATION_CORE_TABLES.map(name => ({
+            schema_name: 'public', name, kind: 'r', columns: identityColumns,
+          })) : []) };
+        }
+        if (sql.startsWith('SELECT pg_advisory_unlock')) {
+          return { rows: [{ unlocked: true }] };
         }
         if (query) return query(sql, params);
         return { rows: [], rowCount: 0 };
@@ -141,60 +151,62 @@ test('DB nueva aplica schema antes de registrar y ejecutar migraciones', async (
   assert.equal(harness.calls.end, 1);
   assert.deepEqual(harness.codes, []);
   const querySql = harness.calls.query.map(({ sql }) => sql);
-  assert.deepEqual(querySql.slice(0, 4), [
-    'SELECT to_regclass($1) AS application_schema',
+  assert.equal(querySql[0], 'SELECT pg_advisory_lock(hashtext($1))');
+  assert.match(querySql[1], /FROM pg_catalog.pg_class c/);
+  assert.deepEqual(querySql.slice(2, 5), [
     'BEGIN',
     'SELECT schema_base;',
     'COMMIT',
   ]);
-  assert.match(harness.calls.query[4].sql, /CREATE TABLE IF NOT EXISTS schema_migrations/);
-  assert.deepEqual(querySql.slice(5), [
+  assert.match(harness.calls.query[5].sql, /CREATE TABLE IF NOT EXISTS schema_migrations/);
+  assert.deepEqual(querySql.slice(6), [
     'BEGIN',
     'SELECT pg_advisory_xact_lock(hashtext($1))',
     'SELECT checksum FROM schema_migrations WHERE filename = $1',
     'CREATE TABLE IF NOT EXISTS auth_sessions (id UUID);',
     'INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2)',
     'COMMIT',
+    'SELECT pg_advisory_unlock(hashtext($1)) AS unlocked',
   ]);
   const insert = harness.calls.query.find(({ sql }) => sql.startsWith('INSERT INTO schema_migrations'));
   assert.equal(insert.params[0], '007_auth_sessions.sql');
   assert.equal(insert.params[1].length, 64);
 });
 
-test('detecta el esquema de aplicación por una tabla núcleo, no por schema_migrations', async () => {
-  const queries = [];
-  const initialized = await isApplicationSchemaInitialized({
-    async query(sql, params) {
-      queries.push({ sql, params });
-      return { rows: [{ application_schema: 'pacientes' }] };
-    },
-  });
-
-  assert.equal(initialized, true);
-  assert.deepEqual(queries, [{
-    sql: 'SELECT to_regclass($1) AS application_schema',
-    params: ['public.pacientes'],
-  }]);
+test('clasifica vacío, núcleo completo y parciales sin depender solo de pacientes', async () => {
+  const classify = rows => classifyDatabase({ query: async () => ({ rows }) });
+  const core = APPLICATION_CORE_TABLES.map(name => ({ schema_name: 'public', name, kind: 'r', columns: identityColumns }));
+  assert.equal(await classify([]), DATABASE_STATES.FRESH);
+  assert.equal(await classify(core), DATABASE_STATES.EXISTING);
+  for (const name of ['pacientes', 'schema_migrations', 'usuarios', 'embarazos', 'otra_tabla']) {
+    assert.equal(await classify([{ schema_name: 'public', name, kind: 'r' }]), DATABASE_STATES.PARTIAL);
+  }
+  assert.equal(await classify(core.slice(1)), DATABASE_STATES.PARTIAL);
+  assert.equal(await classify(core.map(r => ({ ...r, columns: ['id'] }))), DATABASE_STATES.PARTIAL);
+  assert.equal(await classify(core.map(r => r.name === 'pacientes' ? { ...r, kind: 'v' } : r)), DATABASE_STATES.PARTIAL);
+  assert.equal(await classify([...core, { schema_name: 'otra', name: 'pacientes', kind: 'r' }]), DATABASE_STATES.PARTIAL);
+  assert.equal(await classify([...core, { schema_name: 'public', name: 'schema_migrations', kind: 'v' }]), DATABASE_STATES.PARTIAL);
 });
 
-test('DB existente ejecuta migraciones antes de schema', async () => {
+test('DB existente ejecuta migraciones sin leer ni ejecutar schema', async () => {
   const harness = createHarness({ schemaInitialized: true });
   const migrationSql = 'SELECT migration_017;';
   const result = await migrate({
     ...harness,
-    readSchema: () => 'SELECT schema_base;',
+    readSchema: () => { throw new Error('Existing nunca debe leer schema'); },
     readDirectory: () => ['017_citas_inasistencias.sql'],
     readMigration: () => migrationSql,
   });
 
   assert.equal(result.ok, true);
   const sql = harness.calls.query.map((call) => call.sql);
-  assert.ok(sql.indexOf(migrationSql) < sql.indexOf('SELECT schema_base;'));
-  assert.match(sql[1], /CREATE TABLE IF NOT EXISTS schema_migrations/);
-  assert.deepEqual(sql.slice(-3), ['BEGIN', 'SELECT schema_base;', 'COMMIT']);
+  assert.ok(sql.includes(migrationSql));
+  assert.equal(sql.includes('SELECT schema_base;'), false);
+  assert.match(sql[2], /CREATE TABLE IF NOT EXISTS schema_migrations/);
+  assert.equal(sql.at(-1), 'SELECT pg_advisory_unlock(hashtext($1)) AS unlocked');
 });
 
-test('DB existente omite migración aplicada por checksum y luego aplica schema', async () => {
+test('DB existente omite migración aplicada sin DML ni schema', async () => {
   const migrationSql = 'SELECT migration_017;';
   const harness = createHarness({
     schemaInitialized: true,
@@ -211,7 +223,8 @@ test('DB existente omite migración aplicada por checksum y luego aplica schema'
 
   assert.equal(result.ok, true);
   assert.equal(harness.calls.query.some(({ sql }) => sql === migrationSql), false);
-  assert.equal(harness.calls.query.some(({ sql }) => sql === 'SELECT schema_base;'), true);
+  assert.equal(harness.calls.query.some(({ sql }) => sql === 'SELECT schema_base;'), false);
+  assert.equal(harness.calls.query.some(({ sql }) => /^(INSERT|UPDATE|DELETE)/.test(sql)), false);
 });
 
 test('DB existente no ejecuta schema posterior si una migración falla', async () => {
@@ -235,7 +248,7 @@ test('DB existente no ejecuta schema posterior si una migración falla', async (
   assert.equal(harness.calls.query.some(({ sql }) => sql === 'SELECT schema_base;'), false);
 });
 
-test('error de schema posterior conserva la migración confirmada y reporta fallo', async () => {
+test('fallo de compatibilidad conserva migración confirmada y libera lock', async () => {
   const schemaError = new Error('schema posterior falló');
   const harness = createHarness({
     schemaInitialized: true,
@@ -246,6 +259,7 @@ test('error de schema posterior conserva la migración confirmada y reporta fall
   });
   const result = await migrate({
     ...harness,
+    verifyCompatibility: async () => { throw schemaError; },
     readSchema: () => 'SELECT schema_base;',
     readDirectory: () => ['017_citas_inasistencias.sql'],
     readMigration: () => 'SELECT migration_017;',
@@ -256,7 +270,7 @@ test('error de schema posterior conserva la migración confirmada y reporta fall
   const sql = harness.calls.query.map((call) => call.sql);
   const insertIndex = sql.findIndex((value) => value.startsWith('INSERT INTO schema_migrations'));
   assert.equal(sql[insertIndex + 1], 'COMMIT');
-  assert.equal(sql.at(-1), 'ROLLBACK');
+  assert.equal(sql.at(-1), 'SELECT pg_advisory_unlock(hashtext($1)) AS unlocked');
 });
 
 test('omite una migracion ya registrada con el mismo checksum', async () => {
@@ -363,7 +377,8 @@ test('rechaza una migracion aplicada cuyo archivo fue modificado y revierte', as
 
   assert.equal(result.ok, false);
   assert.deepEqual(harness.codes, [1]);
-  assert.equal(harness.calls.query.at(-1).sql, 'ROLLBACK');
+  assert.equal(harness.calls.query.at(-2).sql, 'ROLLBACK');
+  assert.equal(harness.calls.query.at(-1).sql, 'SELECT pg_advisory_unlock(hashtext($1)) AS unlocked');
   assert.match(result.error.message, /fue modificada: 007_auth_sessions\.sql/);
 });
 
@@ -385,11 +400,13 @@ test('un error SQL revierte, cierra el pool y marca codigo 1', async () => {
 
   assert.equal(result.ok, false);
   assert.equal(result.error, sqlError);
-  assert.deepEqual(harness.calls.query.map(({ sql }) => sql), [
-    'SELECT to_regclass($1) AS application_schema',
+  assert.match(harness.calls.query[1].sql, /FROM pg_catalog.pg_class c/);
+  assert.deepEqual(harness.calls.query.map(({ sql }) => sql).filter(sql => !sql.includes('FROM pg_catalog.pg_class c')), [
+    'SELECT pg_advisory_lock(hashtext($1))',
     'BEGIN',
     'SQL INVALIDO;',
     'ROLLBACK',
+    'SELECT pg_advisory_unlock(hashtext($1)) AS unlocked',
   ]);
   assert.equal(harness.calls.end, 1);
   assert.match(harness.entries.error[0].join(' '), /Error en migracion: 23505/);
@@ -397,7 +414,7 @@ test('un error SQL revierte, cierra el pool y marca codigo 1', async () => {
   assert.deepEqual(harness.codes, [1]);
 });
 
-test('un error leyendo schema no ejecuta SQL y siempre cierra el pool', async () => {
+test('un error leyendo schema libera lock y siempre cierra el pool', async () => {
   const readError = new Error('No se pudo leer schema.sql');
   const harness = createHarness();
   const result = await migrate({
@@ -406,7 +423,9 @@ test('un error leyendo schema no ejecuta SQL y siempre cierra el pool', async ()
   });
 
   assert.equal(result.error, readError);
-  assert.deepEqual(harness.calls.query, []);
+  assert.equal(harness.calls.query[0].sql, 'SELECT pg_advisory_lock(hashtext($1))');
+  assert.equal(harness.calls.query.at(-1).sql, 'SELECT pg_advisory_unlock(hashtext($1)) AS unlocked');
+  assert.equal(harness.calls.query.some(({ sql }) => sql === 'BEGIN'), false);
   assert.equal(harness.calls.end, 1);
   assert.deepEqual(harness.codes, [1]);
 });
@@ -424,4 +443,48 @@ test('un error cerrando el pool despues del exito marca fallo', async () => {
   assert.equal(result.error, closeError);
   assert.equal(harness.calls.end, 1);
   assert.deepEqual(harness.codes, [1]);
+});
+
+test('parcial falla antes de leer archivos o crear registro y libera lock', async () => {
+  const harness = createHarness({ relations: [{ schema_name: 'public', name: 'pacientes', kind: 'r', columns: ['id'] }] });
+  const result = await migrate({ ...harness,
+    readSchema() { assert.fail('No leer schema parcial'); },
+    readDirectory() { assert.fail('No descubrir archivos parcial'); } });
+  assert.equal(result.error.code, 'MIGRATION_DATABASE_PARTIAL');
+  assert.match(harness.entries.error.flat().join(' '), /requiere inspeccion manual/);
+  assert.equal(harness.calls.query.length, 3);
+  assert.equal(harness.calls.query.at(-1).sql, 'SELECT pg_advisory_unlock(hashtext($1)) AS unlocked');
+  assert.equal(harness.calls.end, 1);
+});
+
+test('misma conexión cubre lock/detección/compatibilidad y unlock antes de release/end', async () => {
+  const harness = createHarness({ schemaInitialized: true });
+  const order = [];
+  const client = { query: async (...args) => { order.push(args[0]); return harness.db.query(...args); },
+    release: () => order.push('release') };
+  const db = { connect: async () => client, end: async () => order.push('end') };
+  const result = await migrate({ ...harness, db, readDirectory: () => [],
+    readSchema() { assert.fail('Existing'); },
+    verifyCompatibility: async received => { assert.equal(received, client); order.push('verify'); } });
+  assert.equal(result.ok, true);
+  assert.equal(order[0], 'SELECT pg_advisory_lock(hashtext($1))');
+  assert.match(order[1], /FROM pg_catalog.pg_class c/);
+  assert.deepEqual(order.slice(-4), ['verify', 'SELECT pg_advisory_unlock(hashtext($1)) AS unlocked', 'release', 'end']);
+});
+
+test('unlock fallido descarta cliente, cierra pool y conserva fallo previo', async () => {
+  const harness = createHarness({ schemaInitialized: true });
+  const migrationError = new Error('migración fallida');
+  const unlockError = new Error('conexión terminada');
+  let releasedWith;
+  const client = { query: async (...args) => {
+    if (args[0].startsWith('SELECT pg_advisory_unlock')) throw unlockError;
+    if (args[0] === 'FAIL;') throw migrationError;
+    return harness.db.query(...args);
+  }, release: error => { releasedWith = error; } };
+  const result = await migrate({ ...harness,
+    db: { connect: async () => client, end: harness.db.end },
+    readDirectory: () => ['022_future.sql'], readMigration: () => 'FAIL;' });
+  assert.equal(result.ok, false); assert.equal(result.error, migrationError);
+  assert.equal(releasedWith, unlockError); assert.equal(harness.calls.end, 1);
 });
