@@ -55,6 +55,13 @@ function createAuditHistoryService({ repository = createAuditHistoryRepository()
           usuario: row.usuario_id == null ? null : {
             id: row.usuario_id, username: row.username, nombre_completo: row.nombre_completo,
           },
+          ...(row.modulo === 'permisos' ? {
+            usuario_objetivo: row.usuario_objetivo_id == null ? null : {
+              id: row.usuario_objetivo_id,
+              username: row.usuario_objetivo_username,
+              nombre_completo: row.usuario_objetivo_nombre_completo,
+            },
+          } : {}),
         })),
         next_cursor: hasMore ? Buffer.from(JSON.stringify({
           v: 1, fecha: last.fecha, id: String(last.id), filtros: fingerprint(query),

@@ -47,7 +47,7 @@
 .history-detail-summary p { font-size: 12px; color: var(--text-muted); margin: 5px 0 10px; }
 .history-detail-fields { margin: 10px 0 0; }
 .history-detail-fields > div { display: grid; grid-template-columns: 105px minmax(0, 1fr); gap: 12px; padding: 14px 0; font-size: 13px; }
-.history-detail-fields dt { display: flex; align-items: flex-start; gap: 8px; color: var(--text-muted); }
+.history-detail-fields dt { display: flex; align-items: flex-start; gap: 8px; color: var(--text-muted); min-width: 0; overflow-wrap: anywhere; }
 .history-detail-fields dt svg { flex-shrink: 0; }
 .history-detail-fields dd { margin: 0; overflow-wrap: anywhere; line-height: 1.5; }
 

@@ -44,8 +44,11 @@ export default function HistoryDetail({ item, onClose, isMobile = false }) {
       </div>
     </div>
     <dl className="history-detail-fields">
-      <div><dt><UserRound size={18} />Usuario</dt><dd>{item.usuario?.nombre_completo || 'Usuario no disponible'}
+      <div><dt><UserRound size={18} />{item.modulo === 'permisos' ? 'Realizado por' : 'Usuario'}</dt><dd>{item.usuario?.nombre_completo || 'Usuario no disponible'}
         {item.usuario?.username ? <small>{item.usuario.username}</small> : null}</dd></div>
+      {item.modulo === 'permisos' ? <div><dt><UserRound size={18} />Usuario afectado</dt>
+        <dd>{item.usuario_objetivo?.nombre_completo || item.usuario_objetivo?.username || 'No disponible'}
+          {item.usuario_objetivo?.username ? <small>{item.usuario_objetivo.username}</small> : null}</dd></div> : null}
       <div><dt><CalendarDays size={18} />Fecha y hora</dt><dd>{date.date}{date.time ? <small>{date.time}</small> : null}</dd></div>
       <div><dt><Layers size={18} />Módulo</dt><dd>{item.presentacion?.modulo || 'Módulo no identificado'}</dd></div>
       <div><dt><FileText size={18} />Actividad</dt><dd>{item.presentacion?.titulo || 'Actividad no identificada'}</dd></div>

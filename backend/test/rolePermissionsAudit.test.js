@@ -197,6 +197,10 @@ test('cambio de rol agrega los permisos predeterminados faltantes', async () => 
 
   assert.deepEqual(escenario.permisos(), PERSONAL);
   const evento = eventoPermisos(escenario);
+  assert.equal(evento.usuarioId, escenario.actorId);
+  assert.equal(String(evento.idEntidad), String(escenario.usuarioId));
+  assert.equal(String(evento.registroId), String(escenario.usuarioId));
+  assert.equal(evento.descripcion, 'permisos_reemplazados');
   assert.deepEqual(evento.datosNuevos.cambios.permisos_agregados, ['mapa_riesgo.ver']);
   assert.equal(evento.datosNuevos.cambios.permisos_retirados, undefined);
   assert.equal(evento.datosNuevos.permisos, undefined);

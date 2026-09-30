@@ -46,9 +46,19 @@ function createAuditHistoryRepository({ db = pool } = {}) {
         CASE WHEN ae.entidad_afectada = ANY($2::text[]) THEN ae.entidad_afectada ELSE 'desconocida' END AS entidad_afectada,
         CASE WHEN ae.descripcion = ANY(${descriptionCodes}::text[]) THEN ae.descripcion ELSE NULL END AS evento_codigo,
         ae.usuario_id, u.username, u.nombre_completo,
+        objetivo.id AS usuario_objetivo_id,
+        objetivo.username AS usuario_objetivo_username,
+        objetivo.nombre_completo AS usuario_objetivo_nombre_completo,
         to_char(COALESCE(ae.fecha_hora, ae.created_at) AT TIME ZONE 'UTC',
           'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS fecha
         FROM auditoria_eventos ae LEFT JOIN usuarios u ON u.id = ae.usuario_id
+        -- Solo el productor conocido usa estos identificadores como ID de usuario.
+        -- No interpretar IDs de concesiones legacy ni identificadores discordantes.
+        LEFT JOIN usuarios objetivo ON ae.modulo = 'permisos'
+          AND ae.entidad_afectada = 'usuario_permisos' AND ae.tabla = 'usuario_permisos'
+          AND ae.descripcion = 'permisos_reemplazados'
+          AND (ae.id_entidad IS NULL OR ae.registro_id IS NULL OR ae.id_entidad = ae.registro_id)
+          AND objetivo.id::text = COALESCE(ae.id_entidad, ae.registro_id)
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         ORDER BY COALESCE(ae.fecha_hora, ae.created_at) DESC NULLS LAST, ae.id DESC
         LIMIT 26`, params);

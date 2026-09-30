@@ -163,8 +163,10 @@ test('SQL aplica filtros parametrizados, Guatemala y fin exclusivo del dia', asy
   assert.ok(params.at(-1).includes('usuario_desactivado'));
   assert.ok(params.at(-1).includes('materializar_inasistencia'));
   assert.doesNotMatch(sql, /datos_anteriores|datos_nuevos|user_agent|\bae.ip\b|paciente_id|embarazo_id|SELECT \*/);
-  // No se devuelve ni se busca sobre descripcion libre fuera del CASE de allowlist.
-  assert.doesNotMatch(sql.replace(/CASE WHEN ae.descripcion[^\n]+AS evento_codigo/, ''), /descripcion/);
+  // Solo se compara el código exacto del productor al resolver el destinatario;
+  // la descripcion libre no se devuelve ni se usa en la búsqueda.
+  assert.doesNotMatch(sql.replace(/CASE WHEN ae.descripcion[^\n]+AS evento_codigo/, '')
+    .replace("ae.descripcion = 'permisos_reemplazados'", ''), /descripcion/);
 });
 test('SQL del cursor usa comparacion por tupla y contempla fechas completamente nulas', async () => {
   const calls = [];
@@ -187,4 +189,45 @@ test('allowlist excluye datos sensibles incluso si el repositorio devuelve extra
   assert.equal(unknown.items[0].modulo, 'desconocido');
   assert.equal(unknown.items[0].entidad, 'desconocida');
   assert.equal(unknown.items[0].usuario, null);
+});
+
+test('Historial de permisos devuelve actor y objetivo independientes con allowlist', async () => {
+  const event = row(40, { accion: 'actualizar', modulo: 'permisos', entidad_afectada: 'usuario_permisos',
+    usuario_objetivo_id: 12, usuario_objetivo_nombre_completo: 'Objetivo Sintetico', usuario_objetivo_username: 'objetivo',
+    usuario_objetivo_password_hash: 'PRIVADO', refresh_token: 'PRIVADO', email: 'PRIVADO',
+    datos_nuevos: { cambios: { permisos_retirados: ['controles.ver_vih'] } }, ip: 'PRIVADO', user_agent: 'PRIVADO' });
+  await httpTest({ permisos: ['auditoria.ver'], service: serviceWithRows([event]) }, async (url) => {
+    const response = await fetch(url);
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.deepEqual(body.items[0].usuario, { id: 2, username: 'operador', nombre_completo: 'Operador Sintetico' });
+    assert.deepEqual(body.items[0].usuario_objetivo, { id: 12, username: 'objetivo', nombre_completo: 'Objetivo Sintetico' });
+    assert.doesNotMatch(JSON.stringify(body), /PRIVADO|controles\.ver_vih|datos_nuevos|password_hash|refresh_token|user_agent/);
+  });
+});
+
+test('legacy y objetivo inexistente devuelven null; actor igual al objetivo sigue explicito', async () => {
+  for (const id of [undefined, null]) {
+    const [item] = (await serviceWithRows([row(41, { modulo: 'permisos', usuario_objetivo_id: id })]).listar({})).items;
+    assert.equal(item.usuario_objetivo, null);
+    assert.equal(item.usuario.id, 2);
+  }
+  const [same] = (await serviceWithRows([row(42, { modulo: 'permisos', usuario_objetivo_id: 2,
+    usuario_objetivo_username: 'operador', usuario_objetivo_nombre_completo: 'Operador Sintetico' })]).listar({})).items;
+  assert.deepEqual(same.usuario_objetivo, same.usuario);
+  const [other] = (await serviceWithRows([row(43, { usuario_objetivo_id: 12,
+    usuario_objetivo_username: 'PRIVADO' })]).listar({})).items;
+  assert.equal(Object.hasOwn(other, 'usuario_objetivo'), false);
+});
+
+test('JOIN de objetivo exige evidencia del productor y conserva usuarios inactivos', async () => {
+  let sql;
+  const repository = createAuditHistoryRepository({ db: { async query(text) { sql = text; return { rows: [] }; } } });
+  await repository.listar({});
+  assert.match(sql, /LEFT JOIN usuarios objetivo ON ae.modulo = 'permisos'/);
+  assert.match(sql, /ae.entidad_afectada = 'usuario_permisos' AND ae.tabla = 'usuario_permisos'/);
+  assert.match(sql, /ae.descripcion = 'permisos_reemplazados'/);
+  assert.match(sql, /ae.id_entidad IS NULL OR ae.registro_id IS NULL OR ae.id_entidad = ae.registro_id/);
+  assert.match(sql, /objetivo.id::text = COALESCE\(ae.id_entidad, ae.registro_id\)/);
+  assert.doesNotMatch(sql, /objetivo\.activo|id_entidad::(?:int|bigint)|registro_id::(?:int|bigint)|objetivo\.\*|password_hash|refresh_token/);
 });

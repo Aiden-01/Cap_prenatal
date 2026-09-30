@@ -226,3 +226,46 @@ test('cambiar ancho mantiene datos y convierte detalle sin repetir peticiones', 
   expect(document.body.style.overflow).not.toBe('hidden');
   expect(api.get.mock.calls.length).toBe(calls);
 });
+
+test.each([false, true])('detalle de permisos distingue actor y objetivo y cierra (movil=%s)', async (mobile) => {
+  mobileViewport(mobile);
+  install(() => Promise.resolve(page([activity('49', { tipo: 'actualizar', modulo: 'permisos', entidad: 'usuario_permisos',
+    usuario_objetivo: { id: 12, nombre_completo: 'Objetivo Sintético', username: 'objetivo.sintetico' },
+    presentacion: { titulo: 'Actualizó información', modulo: 'Permisos', categoria: 'Cambios de información' },
+    datos_nuevos: { permisos: ['CLAVE_PRIVADA'] }, password_hash: 'HASH_PRIVADO', refresh_token: 'TOKEN_PRIVADO' })])));
+  mount();
+  const trigger = await screen.findByRole('button', { name: 'Ver detalles: Actualizó información' });
+  fireEvent.click(trigger);
+  const detail = screen.getByRole(mobile ? 'dialog' : 'complementary', { name: 'Detalle de actividad' });
+  const actor = within(detail).getByText('Realizado por').closest('div');
+  const target = within(detail).getByText('Usuario afectado').closest('div');
+  expect(actor.textContent).toContain('María López');
+  expect(actor.textContent).toContain('maria');
+  expect(target.textContent).toContain('Objetivo Sintético');
+  expect(target.textContent).toContain('objetivo.sintetico');
+  expect(detail.textContent).not.toMatch(/CLAVE_PRIVADA|HASH_PRIVADO|TOKEN_PRIVADO|usuario_permisos|id_entidad/);
+  fireEvent.click(within(detail).getByRole('button', { name: 'Cerrar detalle' }));
+  expect(screen.queryByRole(mobile ? 'dialog' : 'complementary')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+});
+
+test.each([undefined, null])('evento de permisos legacy sin objetivo usa No disponible (%s)', async (target) => {
+  install(() => Promise.resolve(page([activity('49', { modulo: 'permisos', usuario_objetivo: target })])));
+  mount();
+  fireEvent.click(await screen.findByRole('button', { name: 'Ver detalles: Generó un documento PDF' }));
+  const detail = screen.getByRole('complementary');
+  expect(within(detail).getByText('Usuario afectado').closest('div').textContent).toContain('No disponible');
+});
+
+test('actor igual al objetivo conserva ambas identidades; otros módulos no muestran objetivo', async () => {
+  const usuario = activity().usuario;
+  install(() => Promise.resolve(page([activity('49', { modulo: 'permisos', usuario_objetivo: usuario })])));
+  mount();
+  fireEvent.click(await screen.findByRole('button', { name: 'Ver detalles: Generó un documento PDF' }));
+  expect(within(screen.getByRole('complementary')).getAllByText('María López')).toHaveLength(2);
+  cleanup();
+  install(() => Promise.resolve(page([activity('50', { usuario_objetivo: usuario })])));
+  mount();
+  fireEvent.click(await screen.findByRole('button', { name: 'Ver detalles: Generó un documento PDF' }));
+  expect(screen.queryByText('Usuario afectado')).toBeNull();
+});

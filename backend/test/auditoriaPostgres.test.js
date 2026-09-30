@@ -35,7 +35,7 @@ test('Historial en PostgreSQL temporal: migracion, filtros, cursor y presentacio
       CREATE TABLE auth_sessions (usuario_id integer, revoked_at timestamptz, revoked_reason text, updated_at timestamptz);
       CREATE TABLE auditoria_eventos (id bigint PRIMARY KEY, accion text, modulo text,
         entidad_afectada text, usuario_id integer, fecha_hora timestamptz, created_at timestamptz,
-        descripcion text);
+        descripcion text, tabla text, id_entidad text, registro_id text);
       INSERT INTO roles VALUES (1, 'director'), (2, 'admin'), (3, 'personal_salud');
       INSERT INTO usuarios VALUES (1,1,'director','Director'), (2,2,'admin','Administrador'), (3,3,'salud','Personal');`);
     const migration = fs.readFileSync(path.join(__dirname, '../src/db/migrations/018_auditoria_historial.sql'), 'utf8');
@@ -145,6 +145,47 @@ test('Historial en PostgreSQL temporal: migracion, filtros, cursor y presentacio
       for (const serialized of [JSON.stringify(rows), JSON.stringify(response)]) {
         assert.doesNotMatch(serialized, /dato_clinico_prueba|192\.0\.2\.1|secreto_prueba/);
       }
+    });
+
+    await t.test('objetivo seguro: asignacion/revocacion, inactivo, legacy y IDs ambiguos', async () => {
+      await client.query(`ALTER TABLE usuarios ADD COLUMN activo boolean DEFAULT true;
+        UPDATE usuarios SET activo = false WHERE id = 4;`);
+      const cases = [
+        [201, '4', '4', 'permisos_reemplazados', 'usuario_permisos', 4],
+        [202, '4', null, 'permisos_reemplazados', 'usuario_permisos', 4],
+        [203, null, '4', 'permisos_reemplazados', 'usuario_permisos', 4],
+        [204, '2', '2', 'permisos_reemplazados', 'usuario_permisos', 2],
+        [205, null, null, 'permisos_reemplazados', 'usuario_permisos', null],
+        [206, '9999', '9999', 'permisos_reemplazados', 'usuario_permisos', null],
+        [207, '4', '4', 'actualizar', 'usuario_permisos', null],
+        [208, '4', '2', 'permisos_reemplazados', 'usuario_permisos', null],
+        [209, 'texto-no-identificable', null, 'permisos_reemplazados', 'usuario_permisos', null],
+        [210, '9999999999999999999999999999999999', null, 'permisos_reemplazados', 'usuario_permisos', null],
+        [211, '4', '4', 'permisos_reemplazados', 'permisos', null],
+      ];
+      for (const [id, idEntidad, registroId, evento, tabla] of cases) {
+        await client.query(`INSERT INTO auditoria_eventos (id, accion, modulo, entidad_afectada,
+          usuario_id, fecha_hora, descripcion, tabla, id_entidad, registro_id)
+          VALUES ($1, 'actualizar', 'permisos', 'usuario_permisos', 2, NOW(), $2, $3, $4, $5)`,
+        [id, evento, tabla, idEntidad, registroId]);
+      }
+      const service = createAuditHistoryService({ repository: createAuditHistoryRepository({ db: client }) });
+      const result = await service.listar({ modulo: 'permisos' });
+      assert.equal(result.items.length, cases.length);
+      for (const [id, , , , , expectedId] of cases) {
+        const item = result.items.find((entry) => entry.id === String(id));
+        assert.equal(item.usuario.id, 2);
+        assert.deepEqual(item.usuario_objetivo, expectedId == null ? null : {
+          id: expectedId, username: expectedId === 4 ? 'admin_manual' : 'admin',
+          nombre_completo: expectedId === 4 ? 'Admin manual' : 'Administrador',
+        });
+      }
+      assert.doesNotMatch(JSON.stringify(result), /id_entidad|registro_id|activo|datos_nuevos|datos_anteriores/);
+      // Si el destinatario deja de existir, el evento sigue visible con null.
+      await client.query('DELETE FROM usuarios WHERE id = 4');
+      const deleted = await service.listar({ modulo: 'permisos' });
+      assert.equal(deleted.items.length, cases.length);
+      assert.equal(deleted.items.find((entry) => entry.id === '201').usuario_objetivo, null);
     });
   } finally {
     if (client) await client.end();

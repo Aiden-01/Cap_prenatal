@@ -179,6 +179,10 @@ test('agregar permisos registra solo el delta agregado', async () => {
   assert.equal(evento.descripcion, 'permisos_reemplazados');
   assert.equal(evento.usuarioId, escenario.actorId);
   assert.equal(evento.idEntidad, escenario.usuarioId);
+  assert.equal(evento.registroId, escenario.usuarioId);
+  assert.equal(evento.entidadAfectada, 'usuario_permisos');
+  assert.equal(evento.tabla, 'usuario_permisos');
+  assert.equal(evento.modulo, 'permisos');
   assert.deepEqual(evento.datosNuevos.cambios.permisos_agregados, ['controles.crear']);
   assert.equal(evento.datosNuevos.cambios.permisos_retirados, undefined);
   assert.equal(evento.datosNuevos.permisos, undefined);
@@ -211,6 +215,12 @@ test('retirar permisos registra solamente los codigos retirados', async () => {
     permisosIniciales: ['controles.crear', 'pacientes.ver'],
   });
   await escenario.ejecutar(['pacientes.ver']);
+
+  const evento = escenario.auditorias[0].evento;
+  assert.equal(evento.usuarioId, escenario.actorId);
+  assert.equal(evento.idEntidad, escenario.usuarioId);
+  assert.equal(evento.registroId, escenario.usuarioId);
+  assert.equal(evento.descripcion, 'permisos_reemplazados');
 
   assert.deepEqual(
     escenario.auditorias[0].evento.datosNuevos.cambios.permisos_retirados,
