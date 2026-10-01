@@ -55,6 +55,13 @@ export default function HistoryDetail({ item, onClose, isMobile = false }) {
       <div><dt>Categoría</dt><dd>{item.presentacion?.categoria || 'Otros eventos'}</dd></div>
       <div><dt>Resultado</dt><dd><span className={`history-result ${result.tone}`}>{result.label}</span></dd></div>
     </dl>
+    {item.modulo === 'permisos' && item.detalle_permisos?.length ?
+      <section className="history-permission-changes" aria-labelledby="history-permission-title">
+        <h3 id="history-permission-title">Cambios de permisos</h3>
+        <ul>{item.detalle_permisos.map(({ codigo, anterior, nuevo }) =>
+          <li key={codigo}><strong>{codigo}</strong><span>{anterior ? 'Asignado' : 'No asignado'} → {nuevo ? 'Asignado' : 'No asignado'}</span></li>
+        )}</ul>
+      </section> : null}
   </aside>;
   return isMobile ? createPortal(<div className="history-sheet-backdrop" onPointerDown={(event) => {
     if (event.target === event.currentTarget) onClose();

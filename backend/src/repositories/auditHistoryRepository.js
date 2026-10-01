@@ -46,6 +46,15 @@ function createAuditHistoryRepository({ db = pool } = {}) {
         CASE WHEN ae.entidad_afectada = ANY($2::text[]) THEN ae.entidad_afectada ELSE 'desconocida' END AS entidad_afectada,
         CASE WHEN ae.descripcion = ANY(${descriptionCodes}::text[]) THEN ae.descripcion ELSE NULL END AS evento_codigo,
         ae.usuario_id, u.username, u.nombre_completo,
+        CASE WHEN ae.modulo = 'permisos' THEN ARRAY(SELECT codigo FROM permisos) ELSE NULL END AS catalogo_permisos,
+        CASE WHEN ae.modulo = 'permisos' AND ae.entidad_afectada = 'usuario_permisos'
+          AND ae.tabla = 'usuario_permisos' AND ae.descripcion = 'permisos_reemplazados'
+          AND ae.accion = 'actualizar' AND ae.datos_nuevos->>'politica_version' = '1'
+          THEN ae.datos_nuevos->'cambios'->'permisos_agregados' ELSE NULL END AS permisos_agregados,
+        CASE WHEN ae.modulo = 'permisos' AND ae.entidad_afectada = 'usuario_permisos'
+          AND ae.tabla = 'usuario_permisos' AND ae.descripcion = 'permisos_reemplazados'
+          AND ae.accion = 'actualizar' AND ae.datos_nuevos->>'politica_version' = '1'
+          THEN ae.datos_nuevos->'cambios'->'permisos_retirados' ELSE NULL END AS permisos_retirados,
         objetivo.id AS usuario_objetivo_id,
         objetivo.username AS usuario_objetivo_username,
         objetivo.nombre_completo AS usuario_objetivo_nombre_completo,

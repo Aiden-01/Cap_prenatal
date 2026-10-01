@@ -76,6 +76,8 @@ test('productores no llaman auditRepository ni construyen payloads legacy', () =
       ...LEGACY_CENTRAL_FILES,
       ...HISTORICAL_SANITIZER_FILES,
       'repositories/auditRepository.js',
+      // Lector: proyecta dos rutas JSON explícitas, no construye payloads legacy.
+      'repositories/auditHistoryRepository.js',
     ]),
   }), 'Payload legacy encontrado');
 });

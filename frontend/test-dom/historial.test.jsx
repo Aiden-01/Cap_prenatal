@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import Historial from '../src/pages/Historial';
 import Sidebar from '../src/components/Sidebar';
 import api from '../src/api/axios';
+import HistoryDetail from '../src/components/HistoryDetail';
 
 const auth = vi.hoisted(() => ({ usuario: { id: 2, nombre_completo: 'Operador', permisos: ['auditoria.ver'], rol: 'admin' } }));
 vi.mock('../src/hooks/useAuth', () => ({ useAuth: () => auth }));
@@ -24,6 +25,32 @@ function mount() {
     <Route path="/historial" element={<Historial />} /><Route path="/dashboard" element={<p>Inicio autorizado</p>} />
   </Routes></MemoryRouter>);
 }
+test.each([
+  [[{ codigo: 'auditoria.ver', anterior: false, nuevo: true }], ['No asignado → Asignado']],
+  [[{ codigo: 'auditoria.ver', anterior: true, nuevo: false }], ['Asignado → No asignado']],
+  [[{ codigo: 'auditoria.ver', anterior: false, nuevo: true }, { codigo: 'reportes.ver', anterior: true, nuevo: false }],
+    ['No asignado → Asignado', 'Asignado → No asignado']],
+])('detalle muestra cambios amigables y conserva actor/target: %j', (diff, labels) => {
+  const close = vi.fn();
+  const { container } = render(<HistoryDetail item={activity('1', { modulo: 'permisos',
+    usuario: { nombre_completo: 'Director sintético' }, usuario_objetivo: { nombre_completo: 'Admin sintético' },
+    detalle_permisos: diff, datos_nuevos: { token: 'CANARIO' } })} onClose={close} />);
+  expect(screen.getByText('Cambios de permisos')).toBeTruthy();
+  expect(screen.getByText('Director sintético')).toBeTruthy();
+  expect(screen.getByText('Admin sintético')).toBeTruthy();
+  labels.forEach((label) => expect(screen.getByText(label)).toBeTruthy());
+  expect(container.textContent).not.toMatch(/CANARIO|true|false|datos_nuevos/);
+  expect(container.querySelector('pre')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar detalle' }));
+  expect(close).toHaveBeenCalledOnce();
+});
+test('detalle legacy conserva actividad genérica y no inventa sin cambios', () => {
+  render(<HistoryDetail item={activity('1', { modulo: 'permisos',
+    presentacion: { titulo: 'Actualizó información' } })} onClose={() => {}} />);
+  expect(screen.queryByText('Cambios de permisos')).toBeNull();
+  expect(screen.queryByText('Sin cambios')).toBeNull();
+  expect(screen.getAllByText('Actualizó información').length).toBeGreaterThan(0);
+});
 beforeEach(() => { auth.usuario = { id: 2, nombre_completo: 'Operador', permisos: ['auditoria.ver'], rol: 'admin' }; vi.clearAllMocks(); install(); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 function mobileViewport(initial = true) {

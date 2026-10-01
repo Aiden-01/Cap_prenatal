@@ -74,7 +74,10 @@ const SPECIFIC_EVENTS = Object.freeze([
     modulos: ['pacientes', 'citas_prenatales'], entidades: APPOINTMENT_ENTITIES,
     titulo, categoria: 'Cambios de información', modulo: 'Citas prenatales', resultado: 'completado' })),
 ].map(Object.freeze));
-const DESCRIPTION_CODES = Object.freeze([...new Set(SPECIFIC_EVENTS.flatMap(({ eventos }) => eventos))]);
+const DESCRIPTION_CODES = Object.freeze([...new Set([
+  ...SPECIFIC_EVENTS.flatMap(({ eventos }) => eventos),
+  'permisos_reemplazados',
+])]);
 const STATE_ENTITIES = Object.freeze([
   { entidades: ['embarazo', 'embarazos'], modulos: ['pacientes'], titulo: 'Cambió el estado de un embarazo',
     categoria: 'Cambios de información', modulo: 'Embarazos' },

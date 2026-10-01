@@ -46,6 +46,10 @@
 .history-detail-summary h3 { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.5; }
 .history-detail-summary p { font-size: 12px; color: var(--text-muted); margin: 5px 0 10px; }
 .history-detail-fields { margin: 10px 0 0; }
+.history-permission-changes { min-width: 0; margin-top: 18px; }
+.history-permission-changes h3 { font-size: 14px; }
+.history-permission-changes ul { list-style: none; padding: 0; margin: 0; }
+.history-permission-changes li { display: grid; gap: 6px; padding: 12px 0; overflow-wrap: anywhere; font-size: 13px; }
 .history-detail-fields > div { display: grid; grid-template-columns: 105px minmax(0, 1fr); gap: 12px; padding: 14px 0; font-size: 13px; }
 .history-detail-fields dt { display: flex; align-items: flex-start; gap: 8px; color: var(--text-muted); min-width: 0; overflow-wrap: anywhere; }
 .history-detail-fields dt svg { flex-shrink: 0; }

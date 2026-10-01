@@ -28,6 +28,7 @@ test('Historial en PostgreSQL temporal: migracion, filtros, cursor y presentacio
     run('pg_ctl', ['-D', data, '-l', path.join(root, 'postgres.log'), '-o', `-h 127.0.0.1 -p ${port}`, '-w', 'start']);
     client = new Client({ host: '127.0.0.1', port, user: 'audit_test', database: 'postgres' });
     await client.connect();
+    t.diagnostic(`PostgreSQL ${(await client.query('SHOW server_version')).rows[0].server_version}`);
     await client.query(`CREATE TABLE roles (id integer PRIMARY KEY, nombre text);
       CREATE TABLE usuarios (id integer PRIMARY KEY, rol_id integer, username text, nombre_completo text);
       CREATE TABLE permisos (id serial PRIMARY KEY, codigo text UNIQUE, descripcion text, categoria text);
@@ -35,7 +36,7 @@ test('Historial en PostgreSQL temporal: migracion, filtros, cursor y presentacio
       CREATE TABLE auth_sessions (usuario_id integer, revoked_at timestamptz, revoked_reason text, updated_at timestamptz);
       CREATE TABLE auditoria_eventos (id bigint PRIMARY KEY, accion text, modulo text,
         entidad_afectada text, usuario_id integer, fecha_hora timestamptz, created_at timestamptz,
-        descripcion text, tabla text, id_entidad text, registro_id text);
+        descripcion text, tabla text, id_entidad text, registro_id text, datos_nuevos jsonb);
       INSERT INTO roles VALUES (1, 'director'), (2, 'admin'), (3, 'personal_salud');
       INSERT INTO usuarios VALUES (1,1,'director','Director'), (2,2,'admin','Administrador'), (3,3,'salud','Personal');`);
     const migration = fs.readFileSync(path.join(__dirname, '../src/db/migrations/018_auditoria_historial.sql'), 'utf8');
@@ -187,9 +188,71 @@ test('Historial en PostgreSQL temporal: migracion, filtros, cursor y presentacio
       assert.equal(deleted.items.length, cases.length);
       assert.equal(deleted.items.find((entry) => entry.id === '201').usuario_objetivo, null);
     });
+    await t.test('CPREN-56: SELECT y DTO reales con esquema versionado y deltas sintéticos', async () => {
+      await client.query('CREATE SCHEMA cpren56; SET search_path TO cpren56, public');
+      await client.query(fs.readFileSync(path.join(__dirname, '../src/db/schema.sql'), 'utf8'));
+      await client.query(`INSERT INTO roles (id,nombre) VALUES (101,'director'),(102,'admin');
+        INSERT INTO usuarios (id,rol_id,username,nombre_completo,password_hash) VALUES
+        (101,101,'actor_sintetico','Director sintético','CANARIO_HASH'),
+        (102,102,'target_sintetico','Admin sintético','CANARIO_HASH');
+        INSERT INTO permisos (codigo,descripcion,categoria) VALUES
+        ('reportes.ver','Sintético','reportes'),('pacientes.editar','Sintético','pacientes')
+        ON CONFLICT (codigo) DO NOTHING;`);
+      const type = await client.query(`SELECT data_type FROM information_schema.columns
+        WHERE table_schema='cpren56' AND table_name='auditoria_eventos' AND column_name='datos_nuevos'`);
+      assert.equal(type.rows[0].data_type, 'jsonb');
+      const change = (codigo, anterior, nuevo) => ({ codigo, anterior, nuevo });
+      const cases = [
+        ['grant', { permisos_agregados: ['auditoria.ver'] }, [change('auditoria.ver',false,true)]],
+        ['revoke', { permisos_retirados: ['auditoria.ver'] }, [change('auditoria.ver',true,false)]],
+        ['multi', { permisos_agregados: ['reportes.ver'], permisos_retirados: ['pacientes.editar'] },
+          [change('pacientes.editar',true,false),change('reportes.ver',false,true)]],
+        ['legacy NULL', null, []], ['cambios string', 'CANARIO', []],
+        ['no-array', { permisos_agregados: 'CANARIO' }, []],
+        ['unknown', { permisos_agregados: ['desconocido.ver'] }, []],
+        ['duplicate', { permisos_agregados: ['auditoria.ver','auditoria.ver'] }, []],
+        ['conflict', { permisos_agregados: ['auditoria.ver'], permisos_retirados: ['auditoria.ver'] }, []],
+        ['wrong producer', { permisos_agregados: ['auditoria.ver'] }, [], 'actualizar'],
+        ['wrong table', { permisos_agregados: ['auditoria.ver'] }, [], 'permisos_reemplazados', 'permisos'],
+        ['wrong version', { permisos_agregados: ['auditoria.ver'] }, [], 'permisos_reemplazados', 'usuario_permisos', 2],
+      ];
+      const repository = createAuditHistoryRepository({ db: client });
+      const realService = createAuditHistoryService({ repository });
+      for (let index=0; index<cases.length; index++) {
+        const [label, cambios, expected, producer='permisos_reemplazados', table='usuario_permisos', version=1] = cases[index];
+        const id = String(1001+index);
+        const metadata = cambios === null ? null : { politica_version:version,cambios,
+          password_hash:'CANARIO',token:'CANARIO',cookies:'CANARIO',jwt:'CANARIO',csrf:'CANARIO',
+          diagnostico:'CANARIO',permisos:['CANARIO'],arbitrario:'CANARIO' };
+        await client.query(`INSERT INTO auditoria_eventos
+          (id,usuario_id,accion,modulo,entidad_afectada,tabla,id_entidad,registro_id,descripcion,
+           datos_anteriores,datos_nuevos,ip,user_agent)
+          VALUES ($1,101,'actualizar','permisos','usuario_permisos',$2,'102','102',$3,
+            '{"password_hash":"CANARIO"}',$4,'192.0.2.1','CANARIO')`, [id,table,producer,metadata]);
+        const rows = await repository.listar({modulo:'permisos'});
+        const row = rows.find(entry=>entry.id===id);
+        assert.ok(row, label);
+        assert.equal(row.usuario_id,101);
+        assert.ok(Object.hasOwn(row,'permisos_agregados'));
+        assert.ok(Object.hasOwn(row,'permisos_retirados'));
+        assert.equal(Object.hasOwn(row,'datos_nuevos'),false);
+        const response = await realService.listar({modulo:'permisos'});
+        const item = response.items.find(entry=>entry.id===id);
+        assert.deepEqual(item.detalle_permisos,expected,label);
+        assert.equal(item.usuario.id,101);
+        assert.equal(item.usuario_objetivo?.id, ['wrong producer','wrong table'].includes(label) ? undefined : 102);
+        assert.doesNotMatch(JSON.stringify(response), /CANARIO|192\.0\.2\.1|datos_nuevos|datos_anteriores|password_hash|token|cookies|jwt|csrf|diagnostico|arbitrario|catalogo_permisos/);
+        assert.deepEqual(Object.keys(item).sort(), ['detalle_permisos','entidad','fecha','id','modulo','presentacion','tipo','usuario','usuario_objetivo']);
+        t.diagnostic(`${label}: PASS`);
+      }
+    });
   } finally {
     if (client) await client.end();
     if (started) run('pg_ctl', ['-D', data, '-m', 'immediate', '-w', 'stop']);
-    // Conserva el directorio temporal para diagnostico; nunca borra rutas calculadas.
+    const resolved = fs.realpathSync(root);
+    const temp = fs.realpathSync(os.tmpdir());
+    assert.equal(path.dirname(resolved), temp, 'Cleanup solo del cluster temporal creado');
+    assert.ok(path.basename(resolved).startsWith('cap-auditoria-test-'));
+    fs.rmSync(resolved, { recursive: true, force: true });
   }
 });

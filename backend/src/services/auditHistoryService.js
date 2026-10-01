@@ -4,6 +4,7 @@ const { isRealIsoDate } = require('../validations/reportes.schemas');
 const { ACTIONS, MODULES, ENTITIES } = require('../validations/auditoria.schemas');
 const { createAuditHistoryRepository } = require('../repositories/auditHistoryRepository');
 const { presentAuditHistoryEvent } = require('./audit/auditHistoryPresentation');
+const { permissionHistoryDetail } = require('./audit/permissionHistoryDetail');
 
 function fingerprint(query) {
   return createHash('sha256').update(JSON.stringify(
@@ -56,6 +57,7 @@ function createAuditHistoryService({ repository = createAuditHistoryRepository()
             id: row.usuario_id, username: row.username, nombre_completo: row.nombre_completo,
           },
           ...(row.modulo === 'permisos' ? {
+            detalle_permisos: permissionHistoryDetail(row),
             usuario_objetivo: row.usuario_objetivo_id == null ? null : {
               id: row.usuario_objetivo_id,
               username: row.usuario_objetivo_username,

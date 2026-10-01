@@ -86,7 +86,7 @@ test('solo director recibe auditoria por defecto', () => {
   assert.match(migration, /ON CONFLICT \(usuario_id, permiso_id\) DO NOTHING/);
   const schema = fs.readFileSync(path.join(__dirname, '../src/db/schema.sql'), 'utf8');
   const index = /CREATE INDEX IF NOT EXISTS idx_auditoria_cursor[\s\S]*?;/;
-  assert.equal(schema.match(index)[0], migration.match(index)[0]);
+  assert.equal(schema.match(index)[0].replaceAll('\r\n', '\n'), migration.match(index)[0].replaceAll('\r\n', '\n'));
 });
 test('pagina fija de 25, cursor con microsegundos y bigint como texto', async () => {
   const rows = Array.from({ length: 26 }, (_, i) => row(9223372036854775807n - BigInt(i)));
@@ -162,11 +162,14 @@ test('SQL aplica filtros parametrizados, Guatemala y fin exclusivo del dia', asy
   assert.ok(params.at(-1).includes('logout'));
   assert.ok(params.at(-1).includes('usuario_desactivado'));
   assert.ok(params.at(-1).includes('materializar_inasistencia'));
-  assert.doesNotMatch(sql, /datos_anteriores|datos_nuevos|user_agent|\bae.ip\b|paciente_id|embarazo_id|SELECT \*/);
+  assert.ok(params.at(-1).includes('permisos_reemplazados'));
+  assert.doesNotMatch(sql, /datos_anteriores|user_agent|\bae.ip\b|paciente_id|embarazo_id|SELECT \*/);
+  assert.match(sql, /datos_nuevos->'cambios'->'permisos_agregados'/);
+  assert.match(sql, /datos_nuevos->'cambios'->'permisos_retirados'/);
   // Solo se compara el código exacto del productor al resolver el destinatario;
   // la descripcion libre no se devuelve ni se usa en la búsqueda.
   assert.doesNotMatch(sql.replace(/CASE WHEN ae.descripcion[^\n]+AS evento_codigo/, '')
-    .replace("ae.descripcion = 'permisos_reemplazados'", ''), /descripcion/);
+    .replaceAll("ae.descripcion = 'permisos_reemplazados'", ''), /descripcion/);
 });
 test('SQL del cursor usa comparacion por tupla y contempla fechas completamente nulas', async () => {
   const calls = [];
