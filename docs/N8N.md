@@ -16,11 +16,11 @@ el estado de una instancia local ni la entrega de correo.
 | Workflow | Programación | Resultado sin datos | Correo |
 | --- | --- | --- | --- |
 | Recordatorio de citas | Diario 08:00 | Termina sin enviar | Resend, sin adjunto |
-| Censo 26 a 25 | Día 26, 06:00 | Envía aviso sin archivo | Resend, XLSX si hay datos |
-| Censo de mes cerrado | Día 3, 06:00 | Envía aviso sin archivo | Resend, XLSX si hay datos |
+| Censo 26 a 25 | Día 26, 08:00 | Envía aviso sin archivo | Resend, XLSX si hay datos |
+| Censo de mes cerrado | Día 3, 08:00 | Envía aviso sin archivo | Resend, XLSX si hay datos |
 | Seguimiento semanal de inasistencias | Lunes 08:00 | Termina sin enviar | Resend, tabla HTML |
 | Seguimiento oportuno Tdap de El Chal | Lunes 08:00 | Termina sin enviar | Resend, XLSX si hay datos |
-| Watchdog semanal de calidad de datos | Lunes 09:00 | Termina sin enviar | Resend, resumen agregado |
+| Watchdog semanal de calidad de datos | Lunes 08:00 | Termina sin enviar | Resend, resumen agregado |
 
 Todos usan `America/Guatemala`. Activar un workflow es una decisión operativa
 separada de importarlo o probar nodos individuales.
@@ -290,7 +290,7 @@ consulta el evento del proveedor y luego se resuelve con evidencia.
 ### Watchdog semanal de calidad de datos (`N8N-OPS-01B`)
 
 El watchdog calcula en CAP Prenatal la semana calendario anterior completa y
-se propone para los lunes a las 09:00 en `America/Guatemala`. Su primera
+queda configurado oficialmente para los lunes a las 08:00 en `America/Guatemala`. Su primera
 versión incluye únicamente invariantes objetivas ya respaldadas por el modelo,
 las restricciones y las validaciones del backend:
 
@@ -501,7 +501,7 @@ esta combinación de versiones ese campo es un localizador interno
 Archivo: `n8n/workflows/watchdog-calidad-datos-resend-v1.json`.
 
 ```text
-Schedule lunes 09:00
+Schedule lunes 08:00
     -> POST preparar semana anterior
     -> validar contrato agregado
     -> ¿dispatch=ready y total>0?
@@ -525,7 +525,7 @@ solo está conectada después de Resend y no hay reintentos automáticos.
 
 Archivo: `n8n/workflows/censo-primer-control-26-25-resend-v1.json`.
 
-Cada día 26 a las 06:00 calcula el último período completo que inicia el 26 del
+Cada día 26 a las 08:00 calcula el último período completo que inicia el 26 del
 mes anterior y termina el 25 del mes actual. Ejemplo: el 26 de febrero procesa
 del 26 de enero al 25 de febrero.
 
@@ -533,7 +533,7 @@ del 26 de enero al 25 de febrero.
 
 Archivo: `n8n/workflows/censo-primer-control-mes-cerrado-resend-v1.json`.
 
-Cada día 3 a las 06:00 procesa desde el día 1 hasta el último día del mes
+Cada día 3 a las 08:00 procesa desde el día 1 hasta el último día del mes
 calendario anterior.
 
 ### Comportamiento común

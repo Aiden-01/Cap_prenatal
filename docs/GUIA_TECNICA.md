@@ -1186,14 +1186,14 @@ Los seis workflows Resend versionados permanecen inactivos y sin credenciales:
 
 - recordatorio diario a las 08:00: sin citas termina sin correo; con citas
   envía un único HTML con el detalle operativo mínimo;
-- censo de mes logístico cada 26 a las 06:00: procesa del 26 al 25;
-- censo de mes calendario cada 3 a las 06:00: procesa el mes anterior.
+- censo de mes logístico cada 26 a las 08:00: procesa del 26 al 25;
+- censo de mes calendario cada 3 a las 08:00: procesa el mes anterior.
 - seguimiento de inasistencias cada lunes a las 08:00: CAP Prenatal calcula y
   reserva la semana anterior; `total=0` o período ya procesado termina sin
   correo, y Resend se confirma en backend para impedir duplicados.
 - seguimiento Tdap cada lunes a las 08:00: prepara oportunidades y pendientes
   de El Chal en un XLSX de dos hojas;
-- watchdog de calidad de datos cada lunes a las 09:00: resume invariantes
+- watchdog de calidad de datos cada lunes a las 08:00: resume invariantes
   objetivas por categoria sin detalle nominal.
 
 Los censos envían un aviso sin archivo cuando `total=0`; cuando hay datos

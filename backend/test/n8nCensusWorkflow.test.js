@@ -9,7 +9,7 @@ const CASES = [
     file: 'censo-primer-control-26-25-resend-v1.json',
     id: 'capCenso2625V1A1',
     name: 'CAP Prenatal | Censo 26 a 25 | Resend | v1',
-    scheduleName: 'Cada 26 a las 06:00',
+    scheduleName: 'Cada 26 a las 08:00',
     triggerDay: 26,
     periodNode: 'Calcular periodo 26 a 25',
   },
@@ -17,7 +17,7 @@ const CASES = [
     file: 'censo-primer-control-mes-cerrado-resend-v1.json',
     id: 'capCensoMesV1A1',
     name: 'CAP Prenatal | Censo mes cerrado | Resend | v1',
-    scheduleName: 'Cada 3 a las 06:00',
+    scheduleName: 'Cada 3 a las 08:00',
     triggerDay: 3,
     periodNode: 'Calcular mes calendario anterior',
   },
@@ -80,14 +80,14 @@ test('workflows mensuales son validos, inactivos y no versionan credenciales', (
   }
 });
 
-test('schedules mensuales usan el dia solicitado a las 06:00 de Guatemala', () => {
+test('schedules mensuales usan el dia solicitado a las 08:00 de Guatemala', () => {
   for (const entry of CASES) {
     const schedule = byName(entry.workflow, entry.scheduleName);
     assert.deepEqual(schedule.parameters.rule.interval, [{
       field: 'months',
       monthsInterval: 1,
       triggerAtDayOfMonth: entry.triggerDay,
-      triggerAtHour: 6,
+      triggerAtHour: 8,
       triggerAtMinute: 0,
     }]);
     assert.equal(entry.workflow.settings.timezone, 'America/Guatemala');

@@ -7,17 +7,23 @@ el preparador inserta destinatarios aprobados antes de importarlos. La operació
 completa está en
 [`../docs/N8N_OPERACION.md`](../docs/N8N_OPERACION.md).
 
+Horario oficial (CPREN-23): todos los workflows programados usan las 08:00
+en `America/Guatemala`, conservando sus frecuencias y días. Los artefactos
+permanecen inactivos; este ajuste no autoriza su activación ni ejecución.
+CPREN-20 requiere orden directa posterior del usuario. El diseño SMTP
+heredado es solo una referencia y no se importa a producción.
+
 ## Inventario
 
 | Archivo | Propósito | Agenda | Correo sin datos |
 | --- | --- | --- | --- |
 | `workflows/recordatorio-citas-resend-v1.json` | Citas de mañana con nombre operativo, teléfono y comunidad | Diario 08:00 | No envía |
-| `workflows/censo-primer-control-26-25-resend-v1.json` | Censo del mes logístico 26 a 25 | Día 26, 06:00 | Aviso sin archivo |
-| `workflows/censo-primer-control-mes-cerrado-resend-v1.json` | Censo del mes calendario anterior | Día 3, 06:00 | Aviso sin archivo |
+| `workflows/censo-primer-control-26-25-resend-v1.json` | Censo del mes logístico 26 a 25 | Día 26, 08:00 | Aviso sin archivo |
+| `workflows/censo-primer-control-mes-cerrado-resend-v1.json` | Censo del mes calendario anterior | Día 3, 08:00 | Aviso sin archivo |
 | `workflows/seguimiento-inasistencias-resend-v1.json` | Inasistencias nuevas de la semana anterior y pendientes anteriores sin seguimiento | Lunes 08:00 | No envía |
 | `workflows/seguimiento-tdap-el-chal-resend-v1.json` | Nuevas oportunidades y pendientes Tdap de El Chal, en un XLSX de dos hojas | Lunes 08:00 | No envía |
-| `workflows/watchdog-calidad-datos-resend-v1.json` | Invariantes objetivas resumidas por categoría | Lunes 09:00 | No envía |
-| `workflows/proximas-citas-v1.json` | Diseño SMTP heredado y endurecido | Diario 06:00 | No envía |
+| `workflows/watchdog-calidad-datos-resend-v1.json` | Invariantes objetivas resumidas por categoría | Lunes 08:00 | No envía |
+| `workflows/proximas-citas-v1.json` | Diseño SMTP heredado y endurecido | Diario 08:00 | No envía |
 
 Los seis primeros son el camino Resend actual. El último es un diseño SMTP
 heredado y no debe importarse para la operación nueva; se conserva como
@@ -234,7 +240,7 @@ automático hasta que personal autorizado revise Resend.
 ### Watchdog semanal de calidad de datos
 
 ```text
-Schedule lunes 09:00 -> POST preparar -> validar contrato agregado
+Schedule lunes 08:00 -> POST preparar -> validar contrato agregado
                                       -> ¿ready y total > 0?
                                          ├─ no: fin
                                          └─ sí: resumen HTML -> Resend

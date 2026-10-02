@@ -130,13 +130,13 @@ test('workflow JSON es válido, versionado, inactivo y sin datos fijados', () =>
   assert.equal(workflow.meta.templateCredsSetupCompleted, false);
 });
 
-test('Schedule diario queda a las 06:00 America/Guatemala', () => {
-  const schedule = byName('Ejecutar diariamente a las 06:00');
+test('Schedule diario queda a las 08:00 America/Guatemala', () => {
+  const schedule = byName('Ejecutar diariamente a las 08:00');
   assert.equal(schedule.type, 'n8n-nodes-base.scheduleTrigger');
   assert.deepEqual(schedule.parameters.rule.interval, [{
     field: 'days',
     daysInterval: 1,
-    triggerAtHour: 6,
+    triggerAtHour: 8,
     triggerAtMinute: 0,
   }]);
   assert.equal(workflow.settings.timezone, 'America/Guatemala');

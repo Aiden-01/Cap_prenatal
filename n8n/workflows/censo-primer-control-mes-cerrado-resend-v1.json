@@ -11,14 +11,14 @@
               "field": "months",
               "monthsInterval": 1,
               "triggerAtDayOfMonth": 3,
-              "triggerAtHour": 6,
+              "triggerAtHour": 8,
               "triggerAtMinute": 0
             }
           ]
         }
       },
       "id": "9cc059e8-f39e-4b93-a1ce-f736351d40c1",
-      "name": "Cada 3 a las 06:00",
+      "name": "Cada 3 a las 08:00",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
@@ -239,7 +239,7 @@
     }
   ],
   "connections": {
-    "Cada 3 a las 06:00": {
+    "Cada 3 a las 08:00": {
       "main": [
         [
           {

@@ -13,14 +13,14 @@
               "triggerAtDay": [
                 1
               ],
-              "triggerAtHour": 9,
+              "triggerAtHour": 8,
               "triggerAtMinute": 0
             }
           ]
         }
       },
       "id": "7557c399-b334-45bf-8b55-fcb5a42010a1",
-      "name": "Cada lunes a las 09:00",
+      "name": "Cada lunes a las 08:00",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
@@ -186,7 +186,7 @@
     }
   ],
   "connections": {
-    "Cada lunes a las 09:00": {
+    "Cada lunes a las 08:00": {
       "main": [
         [
           {

@@ -50,7 +50,7 @@ function validPayload(overrides = {}) {
   };
 }
 
-test('workflow queda inactivo y programado lunes 09:00 America/Guatemala', () => {
+test('workflow queda inactivo y programado lunes 08:00 America/Guatemala', () => {
   assert.equal(workflow.id, 'capQualityV1A1');
   assert.equal(workflow.active, false);
   assert.equal(workflow.nodes.length, 7);
@@ -60,11 +60,11 @@ test('workflow queda inactivo y programado lunes 09:00 America/Guatemala', () =>
   assert.equal(workflow.settings.saveManualExecutions, false);
   assert.equal(workflow.settings.availableInMCP, false);
   assert.ok(workflow.nodes.every((node) => !node.credentials));
-  assert.deepEqual(byName('Cada lunes a las 09:00').parameters.rule.interval, [{
+  assert.deepEqual(byName('Cada lunes a las 08:00').parameters.rule.interval, [{
     field: 'weeks',
     weeksInterval: 1,
     triggerAtDay: [1],
-    triggerAtHour: 9,
+    triggerAtHour: 8,
     triggerAtMinute: 0,
   }]);
 });
