@@ -13,6 +13,7 @@ import { getErrorMessage } from "../utils/errorMessage";
 import { useFieldErrors } from "../hooks/useFieldErrors";
 import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
 import { captureFormField, patientFieldId } from "../utils/chatbotFocusedField";
+import { ESTABLECIMIENTO_CATALOGS, ESTABLECIMIENTO_DEFAULTS } from "../utils/establecimientoCatalogs";
 
 const FormErrorContext = createContext({
   fieldError: () => "",
@@ -66,6 +67,9 @@ const FIELD_LABELS = {
   edad_manual: "Edad",
   municipio: "Municipio",
   categoria_servicio: "Categoria",
+  nombre_establecimiento: "Nombre del Establecimiento",
+  distrito: "Distrito",
+  area_salud: "Área de Salud",
   nivel_estudios: "Nivel de estudios",
   ultimo_anio_aprobado: "Ultimo anio aprobado",
   estado_civil: "Estado civil",
@@ -214,12 +218,12 @@ function getPuebloPayloadValue(pueblo) {
 }
 
 // ─── HELPERS DE CAMPO ────────────────────────────────────────
-function Field({ label, required, children, name }) {
+function Field({ label, required, children, name, controlId }) {
   const { fieldError } = useFormErrorUi();
   const error = name ? fieldError(name) : "";
   return (
     <div className="form-group">
-      <label className="input-label">
+      <label className="input-label" htmlFor={controlId}>
         {label}{required && <span style={{ color: "var(--danger)", marginLeft: 2 }}>*</span>}
       </label>
       {children}
@@ -246,26 +250,37 @@ function Input({ label, name, type = "text", required, form, set, inputRef, ...r
   );
 }
 
-function Select({ label, name, options, required, form, set, disabled = false, helpText = "" }) {
+function Select({ label, name, options, required, form, set, disabled = false, helpText = "", emptyOption = true }) {
   const { inputClass } = useFormErrorUi();
   return (
-    <Field label={label} required={required} name={name}>
+    <Field label={label} required={required} name={name} controlId={name}>
       <select
         className={`${inputClass(name)} ${disabled ? "community-locked-field" : ""}`}
         name={name}
+        id={name}
         value={form[name] ?? ""}
         data-chatbot-field={patientFieldId(name)}
         onChange={(e) => set(name, e.target.value)}
         disabled={disabled}
       >
-        <option value="">— Seleccionar —</option>
+        {emptyOption && <option value="">— Seleccionar —</option>}
         {options.map((o) => (
-          <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>
+          <option key={o.value ?? o} value={o.value ?? o} disabled={o.disabled}>{o.label ?? o}</option>
         ))}
       </select>
       {helpText && <p className="community-field-help">{helpText}</p>}
     </Field>
   );
+}
+
+function EstablecimientoSelect({ label, name, form, set, editando }) {
+  const values = ESTABLECIMIENTO_CATALOGS[name];
+  const legacy = editando && !values.includes(form[name]);
+  const options = legacy
+    ? [{ value: form[name] ?? "", label: form[name] || "Sin valor registrado", disabled: true }, ...values]
+    : values;
+  return <Select label={label} name={name} form={form} set={set} options={options} emptyOption={false}
+    helpText={legacy ? "Valor histórico fuera del catálogo. Se conserva mientras no seleccione otro valor." : ""} />;
 }
 
 function ComunidadLinguisticaField({ form, set }) {
@@ -542,9 +557,7 @@ function calcularFppDesdeFur(fur) {
 const INIT = {
   // Establecimiento
   no_expediente: "", cui: "",
-  nombre_establecimiento: "CAP El Chal",
-  distrito: "El Chal",
-  area_salud: "Petén Sur Oriente",
+  ...ESTABLECIMIENTO_DEFAULTS,
   categoria_servicio: "CAP",
   // Datos personales
   nombres: "", apellidos: "",
@@ -617,6 +630,7 @@ export default function NuevaPaciente() {
   const [comunidadesError, setComunidadesError] = useState("");
   const [modoLibreElChal, setModoLibreElChal] = useState(false);
   const cuiInputRef           = useRef(null);
+  const establecimientoOriginal = useRef({});
   const navigate              = useNavigate();
   const toast                 = useGlobalToast();
   const editando              = Boolean(id);
@@ -741,12 +755,17 @@ export default function NuevaPaciente() {
 
     api.get(`/pacientes/${id}`)
       .then(({ data }) => {
+        const valoresEstablecimiento = Object.fromEntries(
+          Object.keys(ESTABLECIMIENTO_CATALOGS).map((field) => [field, data[field] ?? null])
+        );
+        establecimientoOriginal.current = valoresEstablecimiento;
         const fechaNacimiento = data.fecha_nacimiento ? data.fecha_nacimiento.split("T")[0] : "";
         const edadDesdeFecha = calcularEdad(fechaNacimiento);
         const comunidadConfig = getComunidadLinguisticaConfig(data.pueblo);
         setForm((f) => ({
           ...f,
           ...data,
+          ...valoresEstablecimiento,
           fecha_nacimiento: fechaNacimiento,
           edad_manual: data.edad_manual ?? edadDesdeFecha.anios,
           edad_calculada: data.edad_calculada ?? edadDesdeFecha.texto,
@@ -890,6 +909,12 @@ export default function NuevaPaciente() {
         antec_emb_ectopico: Number(form.antec_emb_ectopico_num || 0) > 0,
       };
 
+      if (editando) {
+        for (const field of Object.keys(ESTABLECIMIENTO_CATALOGS)) {
+          if (payload[field] === establecimientoOriginal.current[field]) delete payload[field];
+        }
+      }
+
       const { data } = editando
         ? await api.put(`/pacientes/${id}`, payload)
         : await api.post("/pacientes", payload);
@@ -902,7 +927,7 @@ export default function NuevaPaciente() {
       if (msg.toLowerCase().includes("cui")) {
         setCuiError(msg);
         goToCuiField();
-      } else if (result.firstField === "no_expediente" || result.firstField === "cui") {
+      } else if (result.firstField === "no_expediente" || result.firstField === "cui" || Object.hasOwn(ESTABLECIMIENTO_CATALOGS, result.firstField)) {
         setStep(0);
       } else if (result.firstField === "nombres" || result.firstField === "apellidos") {
         setStep(1);
@@ -1024,9 +1049,9 @@ export default function NuevaPaciente() {
                     <span>{cuiError}</span>
                   </div>
                 )}
-                <Input label="Nombre del Establecimiento" name="nombre_establecimiento" form={form} set={set} />
-                <Input label="Distrito" name="distrito" form={form} set={set} />
-                <Input label="Área de Salud" name="area_salud" form={form} set={set} />
+                <EstablecimientoSelect label="Nombre del Establecimiento" name="nombre_establecimiento" {...p} editando={editando} />
+                <EstablecimientoSelect label="Distrito" name="distrito" {...p} editando={editando} />
+                <EstablecimientoSelect label="Área de Salud" name="area_salud" {...p} editando={editando} />
                 <Select label="Categoría" name="categoria_servicio" form={form} set={set}
                   options={[
                     { value: "CCS", label: "CCS" },

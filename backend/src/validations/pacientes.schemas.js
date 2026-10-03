@@ -8,6 +8,7 @@ const {
   optionalText,
   requiredText,
 } = require('./common.schemas');
+const { ESTABLECIMIENTO_CATALOGS } = require('../domain/establecimientoCatalogs');
 
 const optionalEnum = (values) => z.preprocess(
   (value) => (value === '' || value === null ? undefined : value),
@@ -71,12 +72,22 @@ const pacienteBase = {
 
 const pacienteCreateSchema = z.object({
   ...pacienteBase,
+  ...Object.fromEntries(Object.entries(ESTABLECIMIENTO_CATALOGS).map(([field, values]) => [
+    field, z.enum(values, { error: 'Seleccione un valor del catálogo permitido' }).optional(),
+  ])),
   no_expediente: requiredText(30),
   nombres: requiredText(150),
   apellidos: requiredText(150),
 }).passthrough();
 
-const pacienteUpdateSchema = z.object(pacienteBase).passthrough();
+const pacienteUpdateSchema = z.object({
+  ...pacienteBase,
+  // Sin trim ni coerción: el servicio compara con la fila bloqueada antes de
+  // permitir reenviar un valor histórico. Valores nuevos deben ser canónicos.
+  nombre_establecimiento: z.string().max(150).nullable().optional(),
+  distrito: z.string().max(100).nullable().optional(),
+  area_salud: z.string().max(150).nullable().optional(),
+}).passthrough();
 
 const pacienteListQuerySchema = z.object({
   buscar: optionalText(100),

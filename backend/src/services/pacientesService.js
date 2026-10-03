@@ -7,6 +7,7 @@ const { filtrarCamposVih } = require('../utils/datosSensibles');
 const { resolverEmbarazoParaLectura, requerirEmbarazoId, validarEmbarazoEditable } = require('../utils/embarazos');
 const { esMunicipioElChal } = require('../domain/municipioRules');
 const { applyAgeRiskFactors } = require('../domain/riskAgeRules');
+const { validarEstablecimientoPaciente } = require('../domain/establecimientoCatalogs');
 
 const ESTADO_EMBARAZO_ACTIVO = 'activo';
 const ESTADO_EMBARAZO_PUERPERIO = 'puerperio';
@@ -321,7 +322,7 @@ async function obtenerPaciente(id) {
 }
 
 async function crearPaciente({ body, req }) {
-  const bodyPermitido = filtrarCamposVih(body, req.usuario.permisos);
+  const bodyPermitido = validarEstablecimientoPaciente(filtrarCamposVih(body, req.usuario.permisos));
   const cui = normalizeCui(bodyPermitido.cui);
   const bodyConComunidad = await normalizarComunidadPaciente(bodyPermitido);
   const data = buildPacienteInsertData(bodyConComunidad, req.usuario.id);
@@ -383,8 +384,12 @@ async function actualizarPaciente({ id, body, req }) {
     const before = await pacientesRepository.obtenerPacienteParaActualizar(id, client);
     if (!before) throw new HttpError(404, 'Paciente no encontrado');
 
-    const bodyConComunidad = await normalizarComunidadPaciente(bodyPermitido, before);
+    const bodyConCatalogos = validarEstablecimientoPaciente(bodyPermitido, before);
+    const bodyConComunidad = await normalizarComunidadPaciente(bodyConCatalogos, before);
     const { data, campos } = buildPacienteUpdateData(bodyConComunidad);
+    if (campos.length === 0 && Object.keys(bodyPermitido).length > Object.keys(bodyConCatalogos).length) {
+      return { message: 'Paciente actualizado' };
+    }
     if (campos.length === 0) throw new HttpError(400, 'Sin campos para actualizar');
 
     const camposModificados = campos.filter(
