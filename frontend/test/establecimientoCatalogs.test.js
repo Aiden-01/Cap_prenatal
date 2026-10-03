@@ -8,7 +8,9 @@ const backend = require('../../backend/src/domain/establecimientoCatalogs.js');
 
 test('catálogos administrativos frontend/backend coinciden exactamente sin duplicados', () => {
   assert.deepEqual(ESTABLECIMIENTO_CATALOGS, backend.ESTABLECIMIENTO_CATALOGS);
-  assert.deepEqual(Object.values(ESTABLECIMIENTO_CATALOGS).map((values) => values.length), [5, 6, 1]);
+  assert.deepEqual(Object.values(ESTABLECIMIENTO_CATALOGS).map((values) => values.length), [5, 1, 1]);
+  assert.deepEqual(ESTABLECIMIENTO_CATALOGS.distrito, ['El Chal']);
+  assert.deepEqual(backend.ESTABLECIMIENTO_CATALOGS.distrito, ['El Chal']);
   for (const [field, values] of Object.entries(ESTABLECIMIENTO_CATALOGS)) {
     assert.equal(new Set(values).size, values.length);
     assert.ok(values.includes(ESTABLECIMIENTO_DEFAULTS[field]));

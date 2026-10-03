@@ -11,7 +11,7 @@ import NuevaPaciente from '../src/pages/NuevaPaciente.jsx';
 
 const CATALOGS = {
   'Nombre del Establecimiento': ['CAP El Chal', 'P/S Colpetén', 'C/C Nuevas Delicias', 'P/S Las Flores', 'P/S Santa Amelia'],
-  Distrito: ['El Chal', 'Santa Ana', 'Dolores', 'Poptún', 'San Luis', 'Chacté'],
+  Distrito: ['El Chal'],
   'Área de Salud': ['Petén Sur Oriente'],
 };
 const SYNTHETIC = { id: 41, no_expediente: 'SYN-UI-001', nombres: 'Sintetica', apellidos: 'Catalogo', pueblo: 'mestizo' };
@@ -62,30 +62,30 @@ test('renderiza tres selects con labels, opciones exactas y defaults en el estad
   assert.equal(payload.area_salud, 'Petén Sur Oriente');
 });
 
-test('selecciona todos los establecimientos, cambia distrito y conserva al avanzar/regresar', async () => {
+test('selecciona todos los establecimientos y conserva El Chal al avanzar/regresar', async () => {
   const user = userEvent.setup();
   const { container } = renderForm();
   for (const value of CATALOGS['Nombre del Establecimiento']) {
     await user.selectOptions(screen.getByLabelText('Nombre del Establecimiento'), value);
     assert.equal(screen.getByLabelText('Nombre del Establecimiento').value, value);
   }
-  await user.selectOptions(screen.getByLabelText('Distrito'), 'Poptún');
+  await user.selectOptions(screen.getByLabelText('Distrito'), 'El Chal');
   screen.getByLabelText('Distrito').focus();
   await user.keyboard('{Tab}');
   assert.equal(document.activeElement, screen.getByLabelText('Área de Salud'));
   await user.click(screen.getByRole('button', { name: /Siguiente/ }));
   await user.click(screen.getByRole('button', { name: /Atrás/ }));
   assert.equal(screen.getByLabelText('Nombre del Establecimiento').value, 'P/S Santa Amelia');
-  assert.equal(screen.getByLabelText('Distrito').value, 'Poptún');
+  assert.equal(screen.getByLabelText('Distrito').value, 'El Chal');
   assert.equal(screen.getByLabelText('Área de Salud').value, 'Petén Sur Oriente');
   await finish(container);
   await waitFor(() => assert.equal(api.post.mock.calls.length, 1));
   assert.equal(api.post.mock.calls[0][1].nombre_establecimiento, 'P/S Santa Amelia');
-  assert.equal(api.post.mock.calls[0][1].distrito, 'Poptún');
+  assert.equal(api.post.mock.calls[0][1].distrito, 'El Chal');
 });
 
 test('edición muestra legacy sin input libre y omite los tres valores si no cambian', async () => {
-  const legacy = { ...SYNTHETIC, nombre_establecimiento: 'Unidad histórica ', distrito: 'Distrito Sur Oriente', area_salud: 'Peten, Area Sur Oriente' };
+  const legacy = { ...SYNTHETIC, nombre_establecimiento: 'Unidad histórica ', distrito: 'Santa Ana', area_salud: 'Peten, Area Sur Oriente' };
   api.get.mockImplementation(async (url) => ({ data: url === '/comunidades/activas' ? [] : legacy }));
   const { container } = renderForm(true);
   await waitFor(() => assert.equal(screen.getByLabelText('Distrito').value, legacy.distrito));
@@ -94,20 +94,22 @@ test('edición muestra legacy sin input libre y omite los tres valores si no cam
     assert.equal(select.tagName, 'SELECT');
     assert.equal(select.selectedOptions[0].disabled, true);
   }
+  assert.deepEqual(Array.from(screen.getByLabelText('Distrito').options, (option) => option.value), ['Santa Ana', 'El Chal']);
+  assert.deepEqual(Array.from(screen.getByLabelText('Distrito').options).filter((option) => !option.disabled).map((option) => option.value), ['El Chal']);
   await finish(container, true);
   await waitFor(() => assert.equal(api.put.mock.calls.length, 1));
   for (const field of ['nombre_establecimiento', 'distrito', 'area_salud']) assert.equal(Object.hasOwn(api.put.mock.calls[0][1], field), false);
 });
 
 test('edición permite sustituir legacy intencionalmente con valor canónico', async () => {
-  api.get.mockImplementation(async (url) => ({ data: url === '/comunidades/activas' ? [] : { ...SYNTHETIC, distrito: 'Distrito Sur Oriente', area_salud: null, nombre_establecimiento: null } }));
+  api.get.mockImplementation(async (url) => ({ data: url === '/comunidades/activas' ? [] : { ...SYNTHETIC, distrito: 'Chacté', area_salud: null, nombre_establecimiento: null } }));
   const { container } = renderForm(true);
-  await waitFor(() => assert.equal(screen.getByLabelText('Distrito').value, 'Distrito Sur Oriente'));
+  await waitFor(() => assert.equal(screen.getByLabelText('Distrito').value, 'Chacté'));
   assert.equal(screen.getByLabelText('Área de Salud').value, '');
-  fireEvent.change(screen.getByLabelText('Distrito'), { target: { value: 'Chacté' } });
+  await userEvent.setup().selectOptions(screen.getByLabelText('Distrito'), 'El Chal');
   await finish(container, true);
   await waitFor(() => assert.equal(api.put.mock.calls.length, 1));
-  assert.equal(api.put.mock.calls[0][1].distrito, 'Chacté');
+  assert.equal(api.put.mock.calls[0][1].distrito, 'El Chal');
   assert.equal(Object.hasOwn(api.put.mock.calls[0][1], 'area_salud'), false);
   assert.equal(Object.hasOwn(api.put.mock.calls[0][1], 'nombre_establecimiento'), false);
 });

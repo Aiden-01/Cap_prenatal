@@ -80,8 +80,8 @@ for (const [field, values] of Object.entries(ESTABLECIMIENTO_CATALOGS)) {
 
 test('PUT permite sustituciones canónicas y rechaza nuevo texto libre o vaciado', async () => {
   await withEndpoint(CANONICAL, async ({ request, writes }) => {
-    assert.equal((await request('PUT', { nombre_establecimiento: 'P/S Colpetén', distrito: 'Chacté' })).status, 200);
-    assert.deepEqual(writes[0], { nombre_establecimiento: 'P/S Colpetén', distrito: 'Chacté' });
+    assert.equal((await request('PUT', { nombre_establecimiento: 'P/S Colpetén' })).status, 200);
+    assert.deepEqual(writes[0], { nombre_establecimiento: 'P/S Colpetén' });
     for (const field of Object.keys(CANONICAL)) {
       for (const value of ['asdf', '', null, CANONICAL[field].toLowerCase()]) {
         assert.equal((await request('PUT', { [field]: value })).status, 400);
@@ -90,6 +90,34 @@ test('PUT permite sustituciones canónicas y rechaza nuevo texto libre o vaciado
     assert.equal(writes.length, 1);
   });
 });
+
+for (const distrito of ['Santa Ana', 'Dolores', 'Poptún', 'San Luis', 'Chacté', 'EL CHAL', 'el chal', 'asdf']) {
+  for (const method of ['POST', 'PUT']) {
+    test(`${method} rechaza distrito nuevo ${distrito} sin escribir ni autocorregir`, async () => {
+      await withEndpoint(CANONICAL, async ({ request, writes }) => {
+        const body = method === 'POST' ? { ...BASE, ...CANONICAL, distrito } : { distrito };
+        const result = await request(method, body);
+        assert.equal(result.status, 400);
+        assert.equal(result.body.code, 'VALIDATION_ERROR');
+        assert.equal(result.body.details[0].campo, 'distrito');
+        assert.equal(writes.length, 0);
+      });
+    });
+  }
+}
+
+for (const distrito of ['Santa Ana', 'Dolores', 'Poptún', 'San Luis', 'Chacté']) {
+  test(`PUT conserva distrito histórico ${distrito} y permite sustitución explícita por El Chal`, async () => {
+    await withEndpoint({ ...CANONICAL, distrito }, async ({ request, writes }) => {
+      assert.equal((await request('PUT', { telefono: '00000000' })).status, 200);
+      assert.deepEqual(writes[0], { telefono: '00000000' });
+      assert.equal((await request('PUT', { distrito })).status, 200);
+      assert.equal(writes.length, 1);
+      assert.equal((await request('PUT', { distrito: 'El Chal' })).status, 200);
+      assert.deepEqual(writes[1], { distrito: 'El Chal' });
+    });
+  });
+}
 
 test('PUT conserva legacy idéntico sin escribirlo y admite migración intencional al catálogo', async () => {
   const legacy = { nombre_establecimiento: 'Unidad histórica ', distrito: 'Distrito Sur Oriente', area_salud: 'Peten, Area Sur Oriente' };
