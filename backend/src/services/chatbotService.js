@@ -8,6 +8,7 @@ const {
   chatbotGuides,
 } = require('../config/chatbotGuides');
 const { findExplicitFieldHelp, findGenericFieldHelp } = require('./chatbotFieldHelpService');
+const { screenHelp } = require('../config/chatbotScreenHelp');
 const {
   CLINICAL_DISCLAIMER,
   CONTEXT_RESPONSES,
@@ -236,6 +237,7 @@ function isClinicalAdviceRequest(message) {
   const normalized = withoutSocialLeadIn(message);
   return [
     /^debo aplicar (?:esta|la|una) vacuna$/,
+    /^(?:debo aplicar|debe aplicarse|deberia aplicarse) (?:tdap|td|influenza|sr\/spr)$/,
     /^que diagnostico (?:pongo aqui|debo poner)$/,
     /^debo marcar este factor(?: de riesgo)?$/,
     /^que tratamiento (?:deberia|debo) poner(?: aqui)?$/,
@@ -482,7 +484,9 @@ function answerQuestionWithoutConversation(message, context) {
     return {
       recognized: false,
       intent: 'no_reconocida',
-      answer: SPECIAL_RESPONSES.fallback,
+      answer: screenHelp(context)
+        ? `${screenHelp(context)} Dime el nombre del campo o botón que te dio duda.`
+        : SPECIAL_RESPONSES.fallback,
       suggestions: [...SPECIAL_SUGGESTIONS.fallback],
     };
   }

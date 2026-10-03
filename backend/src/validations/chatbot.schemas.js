@@ -39,6 +39,7 @@ const chatbotContextSchema = z.object({
   tab: z.enum(CHATBOT_CONTEXT_TABS).nullable().optional(),
   form: z.enum(CHATBOT_CONTEXT_FORMS).nullable().optional(),
   focusedField: z.enum(CHATBOT_FIELD_IDS).nullable().optional(),
+  vaccineType: z.enum(['td', 'tdap', 'influenza', 'spr_sr']).nullable().optional(),
 }).strict().superRefine((context, refinement) => {
   const expectedModule = CHATBOT_ROUTE_MODULES[context.route];
   if (expectedModule !== context.module) {
@@ -49,6 +50,9 @@ const chatbotContextSchema = z.object({
     });
   }
   const operational = CHATBOT_ROUTE_OPERATIONAL_CONTEXT[context.route] || { section: null, form: null };
+  if (context.vaccineType && operational.section !== 'vacunas') {
+    refinement.addIssue({ code: 'custom', path: ['vaccineType'], message: 'La categoría de vacuna no corresponde a la ruta' });
+  }
   for (const field of ['section', 'form']) {
     if (context[field] !== undefined && context[field] !== operational[field]) {
       refinement.addIssue({ code: 'custom', path: [field], message: `${field} no corresponde a la ruta` });

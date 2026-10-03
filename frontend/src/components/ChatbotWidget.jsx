@@ -52,7 +52,7 @@ export default function ChatbotWidget() {
   const { usuario } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { pregnancyStatus, screenTab, focusedField } = useChatbotScreenContext();
+  const { pregnancyStatus, screenTab, focusedField, vaccineScreen } = useChatbotScreenContext();
   const firstName = getFirstName(usuario);
   const identityKey = String(usuario?.id || usuario?.username || "anonymous");
   const [open, setOpen] = useState(false);
@@ -84,9 +84,10 @@ export default function ChatbotWidget() {
     usuario,
     pregnancyStatus,
     screenTab: screenTab?.navigationKey === location.key ? screenTab.tab : null,
+    vaccineType: vaccineScreen?.navigationKey === location.key ? vaccineScreen.vaccineType : null,
     focusedField: currentControlField(focusedField, screenTab?.navigationKey === location.key ? screenTab.tab : null, location.key)
       || currentFormField(focusedField, location.key),
-  }), [location.pathname, location.search, location.key, pregnancyStatus, screenTab, focusedField, usuario]);
+  }), [location.pathname, location.search, location.key, pregnancyStatus, screenTab, focusedField, vaccineScreen, usuario]);
   const safeConversation = conversationForIdentity(conversationMemory, identityKey);
   const currentContextKey = chatbotContextKey(safeContext);
   const input = inputState.identityKey === identityKey ? inputState.value : "";

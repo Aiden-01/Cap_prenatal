@@ -7,6 +7,7 @@ export function ChatbotScreenProvider({ children }) {
   const [pregnancyStatus, setStoredPregnancyStatus] = useState(null);
   const [screenTab, setScreenTab] = useState(null);
   const [focusedField, setFocusedField] = useState(null);
+  const [vaccineScreen, setVaccineScreen] = useState(null);
 
   const setPregnancyStatus = useCallback((status) => {
     setStoredPregnancyStatus(VALID_PREGNANCY_STATUSES.has(status) ? status : null);
@@ -19,7 +20,9 @@ export function ChatbotScreenProvider({ children }) {
     setScreenTab,
     focusedField,
     setFocusedField,
-  }), [pregnancyStatus, setPregnancyStatus, screenTab, focusedField]);
+    vaccineScreen,
+    setVaccineScreen,
+  }), [pregnancyStatus, setPregnancyStatus, screenTab, focusedField, vaccineScreen]);
 
   return (
     <ChatbotScreenContext.Provider value={value}>

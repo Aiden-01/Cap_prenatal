@@ -1,11 +1,17 @@
 const { chatbotFieldHelp } = require('../config/chatbotFieldHelp');
 const { CHATBOT_ROUTE_OPERATIONAL_CONTEXT } = require('../config/chatbotContext');
 const { SPECIAL_RESPONSES } = require('../config/chatbotSpecialResponses');
+const { screenHelp } = require('../config/chatbotScreenHelp');
 
 const GENERIC_FIELD_QUESTIONS = new Set([
   'que pongo aqui', 'que va aqui', 'que significa este campo',
   'no entiendo este campo', 'no entiendo este recuadro',
   'que debo escribir aqui', 'para que sirve este campo', 'que dato va aqui',
+  'que significa esto', 'para que sirve esto', 'que selecciono',
+  'que selecciono aqui', 'que selecciono aca', 'que hago aqui', 'que hago aca',
+  'que pongo aca', 'que va aca', 'que coloco aqui', 'que coloco aca',
+  'que debo colocar aqui', 'que debo colocar aca', 'que debo escribir aca',
+  'que debo poner aqui', 'que debo poner aca',
 ]);
 const TAB_LABELS = Object.freeze({
   general: 'General', laboratorio: 'Laboratorio',
@@ -40,7 +46,7 @@ function findExplicitFieldHelp(message, context) {
       answer: 'Al abrir un plan nuevo, el formulario propone datos de identificación, residencia y contacto desde el expediente; antecedentes obstétricos desde la paciente, el embarazo y la ficha de riesgo; y algunos signos y responsables desde controles previos. Puedes revisar y editar esos campos. La edad gestacional por UR se calcula con FUR y la fecha del plan y se muestra en solo lectura. La FPP puede venir precargada, pero este formulario no la recalcula al cambiar FUR.',
     };
   }
-  const match = question.match(/^(?:que significa|que es|que va en|donde registro|donde se registra|como lleno) (?:el campo |la |el )?(.+)$/);
+  const match = question.match(/^(?:que significa|que es|que va en|que pongo en|que coloco en|para que sirve|donde registro|donde se registra|como lleno) (?:el campo |la |el )?(.+)$/);
   if (!match) return null;
   const requested = match[1];
   // La consulta operacional existente de VIH conserva su intención laboratorio.
@@ -56,7 +62,9 @@ function findExplicitFieldHelp(message, context) {
     && matches.every(({ help }) => help === matches[0].help)) {
     return {
       recognized: true, intent: 'ayuda_campo', title: requested.toUpperCase(),
-      answer: `${matches[0].help} Dime si estás en el registro de paciente o en la ficha de riesgo para explicarte ese campo del formulario.`,
+      answer: `${matches[0].help} ${context?.route && context.route !== '/otro'
+        ? 'Dime el nombre exacto del campo que te dio duda en esta pantalla.'
+        : 'Dime si estás en el registro de paciente o en la ficha de riesgo para explicarte ese campo del formulario.'}`,
     };
   }
   if (!field) return null;
@@ -79,11 +87,28 @@ function findGenericFieldHelp(message, context) {
     && fieldMatchesContext(item, context));
 
   if (field) {
+    if (context.vaccineType === 'tdap' && ['vacuna_tipo_vacuna', 'vacuna_numero_dosis'].includes(field.id)) {
+      return {
+        recognized: true,
+        intent: 'ayuda_campo_contextual',
+        title: field.label,
+        answer: `Estás en el registro de Tdap → ${field.label}. El formulario muestra «Dosis única del embarazo» y solicita el momento y la fecha oficial de la aplicación documentada. Usa el carné o antecedente disponible; Lía no decide si corresponde aplicar la vacuna ni inventa fechas.`,
+      };
+    }
     return {
       recognized: true,
       intent: 'ayuda_campo_contextual',
       title: field.label,
       answer: `Estás en ${field.forms ? FORM_SECTION_LABELS[field.section] : `Control prenatal → ${tabLabel}`} → ${field.label}.\n\n${field.help}\n\n${field.expected}\n\n${field.operationalNote}`,
+    };
+  }
+
+  const help = screenHelp(context);
+  if (help) {
+    return {
+      recognized: true,
+      intent: 'ayuda_campo_sin_foco',
+      answer: `${help} Dime el nombre del campo si quieres que lo explique en detalle.`,
     };
   }
 

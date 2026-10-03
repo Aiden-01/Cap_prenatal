@@ -19,7 +19,7 @@ const {
 } = require('../src/services/chatbotService');
 
 const FALLBACK_ANSWER =
-  'Eso no lo manejo bien todavía, y prefiero no inventarte algo. Puedes decirme en qué pantalla estás y qué campo o botón te dio duda. Si es algo de permisos o configuración, revísalo con el administrador del sistema.';
+  'No tengo suficiente contexto para identificar el campo o la acción exacta. Dime el nombre del campo o botón y te explico cómo se usa dentro del sistema.';
 
 const GREETING_ANSWER =
   '¡Hola! Aquí estoy 😊\nDime qué necesitas hacer en el sistema y te ayudo paso a paso.';

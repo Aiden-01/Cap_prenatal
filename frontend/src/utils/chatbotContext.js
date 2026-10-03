@@ -1,4 +1,5 @@
 import { isSupportedFormField } from "./chatbotFocusedField.js";
+import { VACCINE_TYPES } from "./vaccineSchedule.js";
 
 const PERMISSION_CODE_PATTERN = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/;
 const PREGNANCY_STATUSES = new Set(["activo", "puerperio", "cerrado"]);
@@ -86,6 +87,7 @@ export function buildChatbotContext({
   pregnancyStatus,
   screenTab = null,
   focusedField = null,
+  vaccineType = null,
 }) {
   const location = normalizeChatbotLocation(pathname);
   const [section, form] = OPERATIONAL_ROUTES[location.route] || [null, null];
@@ -115,5 +117,8 @@ export function buildChatbotContext({
     form,
     focusedField: (section === "control_prenatal" && CONTROL_FIELDS[focusedField] === tab)
       || isSupportedFormField(focusedField, form) ? focusedField : null,
+    ...(section === "vacunas" ? {
+      vaccineType: Object.values(VACCINE_TYPES).includes(vaccineType) ? vaccineType : null,
+    } : {}),
   };
 }

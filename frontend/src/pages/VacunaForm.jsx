@@ -23,6 +23,7 @@ import { useGlobalToast } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
 import { useFieldErrors } from "../hooks/useFieldErrors";
 import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
+import { useChatbotVaccineScreen } from "../hooks/useChatbotVaccineScreen";
 import { captureFormField, vaccineFieldId } from "../utils/chatbotFocusedField";
 import { calculateGestationalAge } from "../utils/gestationalAge";
 import { getGuatemalaDateInputValue } from "../utils/guatemalaTime";
@@ -102,6 +103,7 @@ export default function VacunaForm() {
   const { id, vacunaId } = useParams();
   const location = useLocation();
   const { setFocusedField } = useChatbotScreenContext();
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   useEffect(() => () => setFocusedField(null), [location.key, setFocusedField]);
@@ -110,6 +112,7 @@ export default function VacunaForm() {
   const toast = useGlobalToast();
   const { usuario } = useAuth();
   const [form, setForm] = useState(INIT);
+  useChatbotVaccineScreen(form.tipo_vacuna);
   const [expediente, setExpediente] = useState(null);
   const [historialVacunas, setHistorialVacunas] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true);
