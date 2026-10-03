@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import assert from "node:assert/strict";
-import { afterEach, beforeEach, test } from "vitest";
+import { afterEach, beforeEach, test, vi } from "vitest";
 
 const React = await import("react");
 const { cleanup, fireEvent, render, screen, waitFor, within } = await import("@testing-library/react");
@@ -111,6 +111,9 @@ async function assignPatientA(user) {
 }
 
 beforeEach(() => {
+  // La cita del fixture debe ser futura; RAF/userEvent conservan timers reales.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-09-15T12:00:00-06:00"));
   originalGet = api.get;
   originalPost = api.post;
   localStorage.clear();
@@ -122,6 +125,9 @@ afterEach(() => {
   cleanup();
   api.get = originalGet;
   api.post = originalPost;
+  localStorage.clear();
+  sessionStorage.clear();
+  vi.useRealTimers();
 });
 
 test("POST 201 seguido de GET reducido elimina la fila y actualiza 2 a 1", async () => {
@@ -140,7 +146,8 @@ test("POST 201 seguido de GET reducido elimina la fila y actualiza 2 a 1", async
 
   await assignPatientA(user);
 
-  await waitFor(() => assert.equal(screen.queryByText(PATIENT_A.paciente_nombre), null));
+  // No serializar el árbol React del elemento mientras waitFor reintenta.
+  await waitFor(() => assert.ok(screen.queryByText(PATIENT_A.paciente_nombre) === null));
   assert.ok(screen.getByText(PATIENT_B.paciente_nombre));
   assert.ok(screen.getByRole("button", { name: /Sin próxima cita \(1\)/ }));
   assert.deepEqual(
@@ -166,7 +173,7 @@ test("una excepción del toast no bloquea el refetch ni el render confirmado", a
 
   await assignPatientA(user);
 
-  await waitFor(() => assert.equal(screen.queryByText(PATIENT_A.paciente_nombre), null));
+  await waitFor(() => assert.ok(screen.queryByText(PATIENT_A.paciente_nombre) === null));
   assert.ok(screen.getByText(PATIENT_B.paciente_nombre));
   assert.ok(screen.getByRole("button", { name: /Sin próxima cita \(1\)/ }));
 });
@@ -192,7 +199,7 @@ test("una respuesta GET antigua no sobrescribe la cola más reciente", async () 
   await screen.findByRole("button", { name: /Sin próxima cita \(1\)/ });
   oldRequest.resolve({ data: { items: [PATIENT_A, PATIENT_B] } });
 
-  await waitFor(() => assert.equal(screen.queryByText(PATIENT_A.paciente_nombre), null));
+  await waitFor(() => assert.ok(screen.queryByText(PATIENT_A.paciente_nombre) === null));
   assert.ok(screen.getByRole("button", { name: /Sin próxima cita \(1\)/ }));
 });
 

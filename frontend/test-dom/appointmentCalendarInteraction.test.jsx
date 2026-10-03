@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
-import { afterEach, test } from "vitest";
+import { afterEach, beforeEach, test, vi } from "vitest";
 
 const React = await import("react");
 const { cleanup, fireEvent, render, screen, within } = await import("@testing-library/react");
@@ -8,7 +8,13 @@ const api = (await import("../src/api/axios.js")).default;
 const AppointmentCalendar = (await import("../src/components/AppointmentCalendar.jsx")).default;
 const originalGet = api.get;
 
-afterEach(() => { cleanup(); api.get = originalGet; });
+beforeEach(() => {
+  // Fija el mes de los fixtures sin detener timers ni restauración de foco por RAF.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-09-15T12:00:00-06:00"));
+});
+
+afterEach(() => { cleanup(); api.get = originalGet; vi.useRealTimers(); });
 
 const statuses = ["programada", "atendida", "reprogramada", "cancelada", "inasistente"];
 const appointments = statuses.map((status, index) => ({
