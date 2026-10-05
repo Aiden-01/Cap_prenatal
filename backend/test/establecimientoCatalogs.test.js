@@ -10,7 +10,7 @@ const BASE = { no_expediente: 'SYN-CAT-001', nombres: 'Sintetica', apellidos: 'C
 const CANONICAL = { nombre_establecimiento: 'CAP El Chal', distrito: 'El Chal', area_salud: 'Petén Sur Oriente' };
 
 async function withEndpoint(before, callback) {
-  let stored = { id: 41, ...BASE, ...before };
+  let stored = { version: 1, id: 41, ...BASE, ...before };
   const writes = [];
   const repository = {
     enTransaccion: async (fn) => fn({ synthetic: true }),
@@ -20,7 +20,7 @@ async function withEndpoint(before, callback) {
     crearEmbarazoInicial: async () => null,
     obtenerPacienteParaActualizar: async () => ({ ...stored }),
     actualizarPaciente: async (_id, data) => {
-      writes.push(data); stored = { ...stored, ...data };
+      writes.push(data); stored = { ...stored, ...data, version: stored.version + 1 };
       return { paciente: stored, rowCount: 1 };
     },
   };
@@ -46,7 +46,7 @@ async function withEndpoint(before, callback) {
   await new Promise((resolve) => server.once('listening', resolve));
   const request = async (method, body) => {
     const response = await fetch(`http://127.0.0.1:${server.address().port}/api/pacientes${method === 'PUT' ? '/41' : ''}`, {
-      method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(method === 'PUT' ? { version: stored.version, ...body } : body),
     });
     return { status: response.status, body: await response.json() };
   };

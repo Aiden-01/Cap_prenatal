@@ -68,6 +68,18 @@ async function withPacientesService({ repository = {}, communities = {}, audit, 
     enTransaccion: async (operation) => operation({ transaction: true }),
     ...repository,
   };
+  if (repository.obtenerPacienteParaActualizar) {
+    repositoryWithTransaction.obtenerPacienteParaActualizar = async (...args) => {
+      const patient = await repository.obtenerPacienteParaActualizar(...args);
+      return patient ? { version: 1, ...patient } : null;
+    };
+  }
+  if (repository.actualizarPaciente) {
+    repositoryWithTransaction.actualizarPaciente = async (...args) => {
+      const result = await repository.actualizarPaciente(...args);
+      return { ...result, paciente: result.paciente ? { version: 2, ...result.paciente } : null };
+    };
+  }
   const restore = [
     cacheModule(REPOSITORY_PATH, strictMock(repositoryWithTransaction, 'pacientesRepository')),
     cacheModule(COMMUNITIES_PATH, strictMock(communities, 'comunidadesRepository')),
@@ -284,10 +296,10 @@ test('actualiza una paciente y atribuye el cambio al actor autenticado', async (
     assert.deepEqual(
       await service.actualizarPaciente({
         id: before.id,
-        body: { telefono: '55550000' },
+        body: { version: 1, telefono: '55550000' },
         req: ACTOR,
       }),
-      { message: 'Paciente actualizado' }
+      { message: 'Paciente actualizado', version: 2 }
     );
     assert.equal(updateArgs[0], before.id);
     assert.deepEqual(updateArgs[1], { telefono: '55550000' });
@@ -1094,7 +1106,7 @@ test('auditoria privada de actualizacion conserva solo nombres realmente modific
   }, async (service) => {
     await service.actualizarPaciente({
       id: 41,
-      body: {
+      body: { version: 1,
         nombres: 'Nombre nuevo',
         cui: '2222222222222',
         telefono: '49999999',
@@ -1130,8 +1142,8 @@ test('actualizacion sin diferencia real no escribe ni genera auditoria', async (
     audit: async () => { audits += 1; },
   }, async (service) => {
     assert.deepEqual(
-      await service.actualizarPaciente({ id: 41, body: { telefono: '55550000' }, req: ACTOR }),
-      { message: 'Paciente actualizado' }
+      await service.actualizarPaciente({ id: 41, body: { version: 1, telefono: '55550000' }, req: ACTOR }),
+      { message: 'Paciente actualizado', version: 1 }
     );
   });
   assert.equal(updates, 0);
@@ -1169,7 +1181,7 @@ test('sincronizacion de fechas audita el embarazo solo por nombres de campos cli
   }, async (service) => {
     await service.actualizarPaciente({
       id: 41,
-      body: { fur: '2026-02-01', fpp: '2026-11-08' },
+      body: { version: 1, fur: '2026-02-01', fpp: '2026-11-08' },
       req: ACTOR,
     });
   });
@@ -1223,7 +1235,7 @@ test('fallo de la segunda auditoria revierte actualizaciones de paciente y embar
     await assert.rejects(
       service.actualizarPaciente({
         id: 41,
-        body: { fur: '2026-02-01', fpp: '2026-11-08' },
+        body: { version: 1, fur: '2026-02-01', fpp: '2026-11-08' },
         req: ACTOR,
       }),
       /audit insert failed/

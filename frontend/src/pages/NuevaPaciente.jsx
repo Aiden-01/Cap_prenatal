@@ -1,4 +1,4 @@
-﻿import { useRef, useState } from "react";
+﻿import { useCallback, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useMemo } from "react";
 import { createContext, useContext } from "react";
@@ -14,6 +14,7 @@ import { useFieldErrors } from "../hooks/useFieldErrors";
 import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
 import { captureFormField, patientFieldId } from "../utils/chatbotFocusedField";
 import { ESTABLECIMIENTO_CATALOGS, ESTABLECIMIENTO_DEFAULTS } from "../utils/establecimientoCatalogs";
+import PatientVersionConflict from "../components/PatientVersionConflict";
 
 const FormErrorContext = createContext({
   fieldError: () => "",
@@ -616,6 +617,74 @@ const INIT = {
   tiene_ficha_riesgo: false,
 };
 
+function calcularEdad(fecha) {
+  if (!fecha) return { texto: "", anios: "" };
+
+  const nacimiento = new Date(`${fecha}T00:00:00`);
+  const hoy = new Date();
+  if (Number.isNaN(nacimiento.getTime()) || nacimiento > hoy) {
+    return { texto: "", anios: "" };
+  }
+
+  let anios = hoy.getFullYear() - nacimiento.getFullYear();
+  let meses = hoy.getMonth() - nacimiento.getMonth();
+  let dias = hoy.getDate() - nacimiento.getDate();
+
+  if (dias < 0) {
+    meses -= 1;
+    const ultimoDiaMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0).getDate();
+    dias += ultimoDiaMesAnterior;
+  }
+
+  if (meses < 0) {
+    anios -= 1;
+    meses += 12;
+  }
+
+  return {
+    texto: `${anios} año${anios !== 1 ? "s" : ""}, ${meses} mes${meses !== 1 ? "es" : ""} y ${dias} día${dias !== 1 ? "s" : ""}`,
+    anios,
+  };
+}
+
+function buildPacientePayload(form) {
+  const municipioElChal = esMunicipioElChal(form.municipio);
+  const comunidadLinguisticaConfig = getComunidadLinguisticaConfig(form.pueblo);
+  const comunidadLinguistica = comunidadLinguisticaConfig.mode === "automatic"
+    ? comunidadLinguisticaConfig.value
+    : String(form.comunidad_linguistica || "").trim();
+  const payload = {
+    ...form,
+    pueblo: getPuebloPayloadValue(form.pueblo),
+    comunidad_linguistica: comunidadLinguistica,
+    comunidad_id: municipioElChal ? (form.comunidad_id || null) : null,
+    fpp: form.fpp || calcularFppDesdeFur(form.fur),
+    antec_diabetes: Boolean(form.antec_diabetes_tipo),
+    fuma_activamente: Boolean(
+      form.fuma_activamente_1er_trimestre ||
+      form.fuma_activamente_2do_trimestre ||
+      form.fuma_activamente_3er_trimestre
+    ),
+    fuma_pasivamente: Boolean(
+      form.fuma_pasivamente_1er_trimestre ||
+      form.fuma_pasivamente_2do_trimestre ||
+      form.fuma_pasivamente_3er_trimestre
+    ),
+    consume_alcohol: Boolean(
+      form.consume_alcohol_1er_trimestre ||
+      form.consume_alcohol_2do_trimestre ||
+      form.consume_alcohol_3er_trimestre
+    ),
+    consume_drogas: Boolean(
+      form.consume_drogas_1er_trimestre ||
+      form.consume_drogas_2do_trimestre ||
+      form.consume_drogas_3er_trimestre
+    ),
+    antec_emb_ectopico: Number(form.antec_emb_ectopico_num || 0) > 0,
+  };
+  return payload;
+}
+
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────
 export default function NuevaPaciente() {
   const { id } = useParams();
@@ -625,12 +694,15 @@ export default function NuevaPaciente() {
   const [form, setForm]       = useState(INIT);
   const [cuiError, setCuiError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [versionConflict, setVersionConflict] = useState(false);
+  const [reloading, setReloading] = useState(false);
+  const [reloadError, setReloadError] = useState("");
   const [comunidadesActivas, setComunidadesActivas] = useState([]);
   const [comunidadesLoading, setComunidadesLoading] = useState(true);
   const [comunidadesError, setComunidadesError] = useState("");
   const [modoLibreElChal, setModoLibreElChal] = useState(false);
   const cuiInputRef           = useRef(null);
-  const establecimientoOriginal = useRef({});
+  const formularioOriginal = useRef(null);
   const navigate              = useNavigate();
   const toast                 = useGlobalToast();
   const editando              = Boolean(id);
@@ -699,36 +771,6 @@ export default function NuevaPaciente() {
     setTimeout(() => cuiInputRef.current?.focus(), 0);
   };
 
-  const calcularEdad = (fecha) => {
-    if (!fecha) return { texto: "", anios: "" };
-
-    const nacimiento = new Date(`${fecha}T00:00:00`);
-    const hoy = new Date();
-    if (Number.isNaN(nacimiento.getTime()) || nacimiento > hoy) {
-      return { texto: "", anios: "" };
-    }
-
-    let anios = hoy.getFullYear() - nacimiento.getFullYear();
-    let meses = hoy.getMonth() - nacimiento.getMonth();
-    let dias = hoy.getDate() - nacimiento.getDate();
-
-    if (dias < 0) {
-      meses -= 1;
-      const ultimoDiaMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0).getDate();
-      dias += ultimoDiaMesAnterior;
-    }
-
-    if (meses < 0) {
-      anios -= 1;
-      meses += 12;
-    }
-
-    return {
-      texto: `${anios} año${anios !== 1 ? "s" : ""}, ${meses} mes${meses !== 1 ? "es" : ""} y ${dias} día${dias !== 1 ? "s" : ""}`,
-      anios,
-    };
-  };
-
   useEffect(() => {
     let alive = true;
 
@@ -750,37 +792,44 @@ export default function NuevaPaciente() {
     };
   }, []);
 
+  const aplicarPaciente = useCallback((data) => {
+    const valoresEstablecimiento = Object.fromEntries(
+      Object.keys(ESTABLECIMIENTO_CATALOGS).map((field) => [field, data[field] ?? null])
+    );
+    const fechaNacimiento = data.fecha_nacimiento ? data.fecha_nacimiento.split("T")[0] : "";
+    const edadDesdeFecha = calcularEdad(fechaNacimiento);
+    const comunidadConfig = getComunidadLinguisticaConfig(data.pueblo);
+    const loadedForm = {
+      ...INIT,
+      ...data,
+      ...valoresEstablecimiento,
+      fecha_nacimiento: fechaNacimiento,
+      edad_manual: data.edad_manual ?? edadDesdeFecha.anios,
+      edad_calculada: data.edad_calculada ?? edadDesdeFecha.texto,
+      fur: data.fur ? data.fur.split("T")[0] : "",
+      fpp: data.fpp ? data.fpp.split("T")[0] : "",
+      fin_embarazo_anterior: data.fin_embarazo_anterior ? data.fin_embarazo_anterior.split("T")[0] : "",
+      antec_emb_ectopico_num: data.antec_emb_ectopico_num ?? (data.antec_emb_ectopico ? 1 : 0),
+      comunidad_linguistica: comunidadConfig.mode === "automatic"
+        ? comunidadConfig.value
+        : (data.comunidad_linguistica ?? ""),
+      comunidad_id: esMunicipioElChal(data.municipio) ? (data.comunidad_id ?? null) : null,
+    };
+    formularioOriginal.current = loadedForm;
+    setForm(loadedForm);
+  }, []);
+
   useEffect(() => {
     if (!editando) return;
+    let alive = true;
 
     api.get(`/pacientes/${id}`)
       .then(({ data }) => {
-        const valoresEstablecimiento = Object.fromEntries(
-          Object.keys(ESTABLECIMIENTO_CATALOGS).map((field) => [field, data[field] ?? null])
-        );
-        establecimientoOriginal.current = valoresEstablecimiento;
-        const fechaNacimiento = data.fecha_nacimiento ? data.fecha_nacimiento.split("T")[0] : "";
-        const edadDesdeFecha = calcularEdad(fechaNacimiento);
-        const comunidadConfig = getComunidadLinguisticaConfig(data.pueblo);
-        setForm((f) => ({
-          ...f,
-          ...data,
-          ...valoresEstablecimiento,
-          fecha_nacimiento: fechaNacimiento,
-          edad_manual: data.edad_manual ?? edadDesdeFecha.anios,
-          edad_calculada: data.edad_calculada ?? edadDesdeFecha.texto,
-          fur: data.fur ? data.fur.split("T")[0] : "",
-          fpp: data.fpp ? data.fpp.split("T")[0] : "",
-          fin_embarazo_anterior: data.fin_embarazo_anterior ? data.fin_embarazo_anterior.split("T")[0] : "",
-          antec_emb_ectopico_num: data.antec_emb_ectopico_num ?? (data.antec_emb_ectopico ? 1 : 0),
-          comunidad_linguistica: comunidadConfig.mode === "automatic"
-            ? comunidadConfig.value
-            : (data.comunidad_linguistica ?? ""),
-          comunidad_id: esMunicipioElChal(data.municipio) ? (data.comunidad_id ?? null) : null,
-        }));
+        if (alive) aplicarPaciente(data);
       })
-      .catch(() => toast("Error al cargar datos de la paciente", "error"))
-  }, [editando, id, toast]);
+      .catch(() => { if (alive) toast("Error al cargar datos de la paciente", "error"); });
+    return () => { alive = false; };
+  }, [editando, id, toast, aplicarPaciente]);
 
   const clasificarEdad = (edad) => {
     if (edad === "" || edad === null || edad === undefined) return "";
@@ -841,6 +890,8 @@ export default function NuevaPaciente() {
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
   const handleSubmit = async () => {
+    if (loading || reloading || versionConflict) return;
+    if (editando && (!Number.isInteger(form.version) || String(form.id) !== String(id))) return;
     if (!form.no_expediente || !form.nombres || !form.apellidos) {
       const details = [
         !form.no_expediente && { campo: "no_expediente", mensaje: "Campo requerido" },
@@ -875,53 +926,35 @@ export default function NuevaPaciente() {
     setLoading(true);
     fieldErrors.clearFieldErrors();
     try {
-      const municipioElChal = esMunicipioElChal(form.municipio);
-      const comunidadLinguistica = comunidadLinguisticaConfig.mode === "automatic"
-        ? comunidadLinguisticaConfig.value
-        : String(form.comunidad_linguistica || "").trim();
-      const payload = {
-        ...form,
-        pueblo: getPuebloPayloadValue(form.pueblo),
-        comunidad_linguistica: comunidadLinguistica,
-        comunidad_id: municipioElChal ? (form.comunidad_id || null) : null,
-        fpp: form.fpp || calcularFppDesdeFur(form.fur),
-        antec_diabetes: Boolean(form.antec_diabetes_tipo),
-        fuma_activamente: Boolean(
-          form.fuma_activamente_1er_trimestre ||
-          form.fuma_activamente_2do_trimestre ||
-          form.fuma_activamente_3er_trimestre
-        ),
-        fuma_pasivamente: Boolean(
-          form.fuma_pasivamente_1er_trimestre ||
-          form.fuma_pasivamente_2do_trimestre ||
-          form.fuma_pasivamente_3er_trimestre
-        ),
-        consume_alcohol: Boolean(
-          form.consume_alcohol_1er_trimestre ||
-          form.consume_alcohol_2do_trimestre ||
-          form.consume_alcohol_3er_trimestre
-        ),
-        consume_drogas: Boolean(
-          form.consume_drogas_1er_trimestre ||
-          form.consume_drogas_2do_trimestre ||
-          form.consume_drogas_3er_trimestre
-        ),
-        antec_emb_ectopico: Number(form.antec_emb_ectopico_num || 0) > 0,
-      };
+      const payload = buildPacientePayload(form);
 
       if (editando) {
-        for (const field of Object.keys(ESTABLECIMIENTO_CATALOGS)) {
-          if (payload[field] === establecimientoOriginal.current[field]) delete payload[field];
+        // Comparar con el formulario cargado evita guardar defaults/derivados que
+        // solo se calcularon para la presentación, sin intervención del usuario.
+        const originalPayload = buildPacientePayload(formularioOriginal.current);
+        for (const field of Object.keys(payload)) {
+          if (field !== "version" && Object.is(payload[field], originalPayload[field])) delete payload[field];
         }
+        // La FPP puede haberse corregido manualmente: enviarla junto a una FUR
+        // modificada evita que el backend la recalcule por omisión.
+        if (Object.hasOwn(payload, "fur")) payload.fpp = form.fpp || calcularFppDesdeFur(form.fur);
       }
 
       const { data } = editando
         ? await api.put(`/pacientes/${id}`, payload)
         : await api.post("/pacientes", payload);
 
+      if (editando && Number.isInteger(data.version)) {
+        formularioOriginal.current = { ...form, version: data.version };
+        setForm((current) => ({ ...current, version: data.version }));
+      }
       toast(editando ? "Paciente actualizada exitosamente" : "Paciente registrada exitosamente", "success");
       setTimeout(() => navigate(`/pacientes/${editando ? id : data.id}`), 800);
     } catch (e) {
+      if (e?.response?.status === 409 && e?.response?.data?.code === "PATIENT_VERSION_CONFLICT") {
+        setVersionConflict(true);
+        return;
+      }
       const result = fieldErrors.setErrorsFromResponse(e, "Error al guardar");
       const msg = result.message;
       if (msg.toLowerCase().includes("cui")) {
@@ -935,6 +968,27 @@ export default function NuevaPaciente() {
       toast(msg, "error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const reloadPatient = async () => {
+    if (reloading) return;
+    setReloading(true);
+    setReloadError("");
+    try {
+      const { data } = await api.get(`/pacientes/${id}`);
+      if (!Number.isInteger(data.version) || data.version < 1) throw new Error("Versión inválida");
+      aplicarPaciente(data);
+      fieldErrors.clearFieldErrors();
+      setCuiError("");
+      setModoLibreElChal(false);
+      setVersionConflict(false);
+      setStep(0);
+      toast("Versión reciente cargada. Revise los datos antes de continuar.", "success");
+    } catch {
+      setReloadError("No se pudo cargar el expediente. Sus datos siguen en el formulario. Intente nuevamente.");
+    } finally {
+      setReloading(false);
     }
   };
 
@@ -964,6 +1018,8 @@ export default function NuevaPaciente() {
           </p>
         </div>
       </div>
+
+      {versionConflict && <PatientVersionConflict onReload={reloadPatient} loading={reloading} error={reloadError} />}
 
       {/* STEPPER */}
       <div className="clinical-stepper" role="tablist" aria-label="Etapas del registro de paciente">
@@ -1467,7 +1523,7 @@ export default function NuevaPaciente() {
             <button
               className="btn-primary"
               onClick={handleSubmit}
-              disabled={loading || !form.no_expediente || !form.nombres || !form.apellidos}
+              disabled={loading || reloading || versionConflict || (editando && (!Number.isInteger(form.version) || String(form.id) !== String(id))) || !form.no_expediente || !form.nombres || !form.apellidos}
               style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
             >
               <Save size={15} />

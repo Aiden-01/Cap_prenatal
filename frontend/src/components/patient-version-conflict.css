@@ -1,0 +1,20 @@
+.patient-version-conflict {
+  margin-bottom: 1.5rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid var(--warn);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.patient-version-conflict-heading { display: flex; align-items: flex-start; gap: .75rem; }
+.patient-version-conflict-heading svg { flex-shrink: 0; color: var(--warn); }
+.patient-version-conflict h2 { margin: 0; font-size: 1.15rem; line-height: 1.5; }
+.patient-version-conflict p { margin: .75rem 0; line-height: 1.6; }
+.patient-version-conflict-confirm { border-top: 1px solid var(--border, #d5dce5); margin-top: 1rem; }
+.patient-version-conflict-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+.patient-version-conflict button { white-space: normal; justify-content: center; }
+@media (max-width: 600px) {
+  .patient-version-conflict button { width: 100%; }
+  .patient-version-conflict-actions { flex-direction: column; }
+}

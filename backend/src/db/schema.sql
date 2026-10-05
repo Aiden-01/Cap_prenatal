@@ -1472,3 +1472,7 @@ BEGIN
       tabla, tabla || '_embarazo_paciente_fkey');
   END LOOP;
 END $$;
+
+-- CPREN-65. Aplicar con migrate.js, dentro de su transacción por archivo.
+-- PostgreSQL inicializa también los registros existentes con versión 1.
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;

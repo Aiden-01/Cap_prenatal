@@ -128,7 +128,7 @@ async function actualizarPaciente(id, data, campos, updatedBy = null, db = pool)
   valores.push(updatedBy, id);
 
   const { rows, rowCount } = await db.query(
-    `UPDATE pacientes SET ${sets}, updated_at = NOW(), updated_by = $${valores.length - 1}
+    `UPDATE pacientes SET ${sets}, version = version + 1, updated_at = NOW(), updated_by = $${valores.length - 1}
      WHERE id = $${valores.length}
      RETURNING *`,
     valores
@@ -291,6 +291,7 @@ async function sincronizarPacienteConEmbarazo({ pacienteId, fur, fpp, updatedBy 
   const { rows } = await db.query(
     `UPDATE pacientes
      SET fur = $2, fpp = $3, tiene_ficha_riesgo = FALSE,
+         version = version + 1,
          updated_at = NOW(), updated_by = $4
      WHERE id = $1
      RETURNING *`,
@@ -352,7 +353,7 @@ async function cerrarEmbarazoEnSeguimiento({ pacienteId, embarazoId, fechaCierre
 async function actualizarEmbarazoFechas({ embarazoId, fur, fpp, updatedBy = null }, db = pool) {
   const { rows } = await db.query(
     `UPDATE embarazos
-     SET fur = COALESCE($2, fur), fpp = COALESCE($3, fpp),
+     SET fur = $2, fpp = $3,
          updated_at = NOW(), updated_by = $4
      WHERE id = $1
      RETURNING *`,

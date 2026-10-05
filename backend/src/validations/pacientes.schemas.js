@@ -82,6 +82,7 @@ const pacienteCreateSchema = z.object({
 
 const pacienteUpdateSchema = z.object({
   ...pacienteBase,
+  version: z.number().int().min(1).max(2147483647),
   // Sin trim ni coerción: el servicio compara con la fila bloqueada antes de
   // permitir reenviar un valor histórico. Valores nuevos deben ser canónicos.
   nombre_establecimiento: z.string().max(150).nullable().optional(),

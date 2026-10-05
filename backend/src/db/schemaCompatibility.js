@@ -24,6 +24,7 @@ const REQUIRED_MIGRATIONS = Object.freeze([
   '019_auditoria_politica_roles.sql',
   '020_retirar_permiso_pacientes_eliminar.sql',
   '021_integridad_paciente_embarazo.sql',
+  '022_pacientes_version.sql',
 ]);
 const REQUIRED_MIGRATION = REQUIRED_MIGRATIONS[0];
 const MIGRATION_COMMAND = 'npm run db:migrate';
@@ -75,7 +76,7 @@ async function queryMigrationRegistry(db, requiredMigrations) {
     );
     if (relationRows[0]?.migration_registry === null) {
       throw new SchemaCompatibilityError(migrationInstruction(
-        'El backend requiere el registro schema_migrations y las migraciones 008 a 021.'
+        'El backend requiere el registro schema_migrations y las migraciones 008 a 022.'
       ));
     }
 

@@ -18,7 +18,7 @@ const diagnosticSql = fs.readFileSync(path.join(__dirname,
 
 test('schema y 021 comparten exactamente el bloque de integridad', () => {
   const schema = fs.readFileSync(path.join(__dirname, '../src/db/schema.sql'), 'utf8');
-  assert.ok(schema.trimEnd().endsWith(sql.trimEnd()));
+  assert.ok(schema.includes(sql.trimEnd()));
 });
 
 async function isolated(callback) {
@@ -89,6 +89,7 @@ pgTest('pre-021 válida: seis tablas, nueve operaciones por tabla y cambio del p
     t.diagnostic('FK pre-021: ' + JSON.stringify(originalFks.rows));
     await fixtures(db);
     await applyMigration({ db, filename, sql });
+    await applyMigration({ db, filename: '022_pacientes_version.sql', sql: fs.readFileSync(path.join(__dirname, '../src/db/migrations/022_pacientes_version.sql'), 'utf8') });
     await assertSchemaCompatible(db);
     assert.equal(await applyMigration({ db, filename, sql }), false);
     const constraints = await db.query(`SELECT conname, convalidated FROM pg_constraint

@@ -280,6 +280,18 @@ function buildPacienteInsertData(d, usuarioId) {
 const PACIENTE_UPDATE_FIELDS = Object.keys(buildPacienteInsertData({}, null))
   .filter((campo) => campo !== 'registrado_por');
 
+const PACIENTE_DATE_FIELDS = new Set(['fecha_nacimiento', 'fur', 'fpp', 'fin_embarazo_anterior']);
+
+function camposPacienteIguales(campo, anterior, nuevo) {
+  // pg convierte DATE a medianoche local; comparar el día civil, no el instante UTC.
+  const fechaCivil = (value) => value instanceof Date
+    ? `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+    : value;
+  return PACIENTE_DATE_FIELDS.has(campo)
+    ? structurallyEqual(fechaCivil(anterior), fechaCivil(nuevo))
+    : structurallyEqual(anterior, nuevo);
+}
+
 function buildPacienteUpdateData(data) {
   const normalized = { ...data };
   if (
@@ -294,7 +306,7 @@ function buildPacienteUpdateData(data) {
 
   const updateData = {};
   for (const campo of campos) {
-    updateData[campo] = campo === 'cui' ? normalizeCui(normalized[campo]) : emptyToNull(normalized[campo]);
+    updateData[campo] = campo === 'cui' ? normalizeCui(normalized[campo]) : emptyToNull(normalized[campo]) ?? null;
   }
 
   return { data: updateData, campos };
@@ -379,23 +391,31 @@ async function crearPaciente({ body, req }) {
 }
 
 async function actualizarPaciente({ id, body, req }) {
+  if (!Number.isInteger(body.version) || body.version < 1 || body.version > 2147483647) {
+    throw new HttpError(400, 'Se requiere una versión válida del expediente', {
+      code: 'PATIENT_VERSION_REQUIRED',
+    });
+  }
   const bodyPermitido = filtrarCamposVih(body, req.usuario.permisos);
   return pacientesRepository.enTransaccion(async (client) => {
     const before = await pacientesRepository.obtenerPacienteParaActualizar(id, client);
     if (!before) throw new HttpError(404, 'Paciente no encontrado');
 
+    if (body.version !== before.version) {
+      throw new HttpError(409, 'Otro usuario actualizó el expediente. Cargue la versión más reciente antes de guardar.', {
+        code: 'PATIENT_VERSION_CONFLICT',
+      });
+    }
+
     const bodyConCatalogos = validarEstablecimientoPaciente(bodyPermitido, before);
     const bodyConComunidad = await normalizarComunidadPaciente(bodyConCatalogos, before);
     const { data, campos } = buildPacienteUpdateData(bodyConComunidad);
-    if (campos.length === 0 && Object.keys(bodyPermitido).length > Object.keys(bodyConCatalogos).length) {
-      return { message: 'Paciente actualizado' };
-    }
-    if (campos.length === 0) throw new HttpError(400, 'Sin campos para actualizar');
+    if (campos.length === 0) return { message: 'Paciente actualizado', version: before.version };
 
     const camposModificados = campos.filter(
-      (campo) => !structurallyEqual(before[campo], data[campo])
+      (campo) => !camposPacienteIguales(campo, before[campo], data[campo])
     );
-    if (camposModificados.length === 0) return { message: 'Paciente actualizado' };
+    if (camposModificados.length === 0) return { message: 'Paciente actualizado', version: before.version };
     const datosModificados = seleccionarCamposAuditoria(data, camposModificados);
 
     if (
@@ -432,8 +452,8 @@ async function actualizarPaciente({ id, body, req }) {
         const embarazoBefore = await pacientesRepository.obtenerEmbarazoPorId(embarazoId, client);
         const embarazo = await pacientesRepository.actualizarEmbarazoFechas({
           embarazoId,
-          fur: emptyToNull(datosModificados.fur),
-          fpp: emptyToNull(datosModificados.fpp),
+          fur: paciente.fur,
+          fpp: paciente.fpp,
           updatedBy: req.usuario.id,
         }, client);
 
@@ -454,7 +474,7 @@ async function actualizarPaciente({ id, body, req }) {
       }
     }
 
-    return { message: 'Paciente actualizado' };
+    return { message: 'Paciente actualizado', version: paciente.version };
   });
 }
 
@@ -561,12 +581,15 @@ async function nuevoEmbarazo({ id, body, req }) {
       throw error;
     }
 
-    const pacienteActualizado = await pacientesRepository.sincronizarPacienteConEmbarazo({
+    const cambiaPaciente = !camposPacienteIguales('fur', paciente.fur, emptyToNull(body.fur) ?? null)
+      || !camposPacienteIguales('fpp', paciente.fpp, fpp)
+      || paciente.tiene_ficha_riesgo !== false;
+    const pacienteActualizado = cambiaPaciente ? await pacientesRepository.sincronizarPacienteConEmbarazo({
       pacienteId: id,
       fur: emptyToNull(body.fur),
       fpp,
       updatedBy: req.usuario.id,
-    }, client);
+    }, client) : paciente;
 
     await registrarAuditoria(req, {
       contexto: CONTEXTO_AUDITORIA.embarazoCrear,

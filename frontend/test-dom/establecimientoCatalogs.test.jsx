@@ -14,7 +14,7 @@ const CATALOGS = {
   Distrito: ['El Chal'],
   'Área de Salud': ['Petén Sur Oriente'],
 };
-const SYNTHETIC = { id: 41, no_expediente: 'SYN-UI-001', nombres: 'Sintetica', apellidos: 'Catalogo', pueblo: 'mestizo' };
+const SYNTHETIC = { version: 1, id: 41, no_expediente: 'SYN-UI-001', nombres: 'Sintetica', apellidos: 'Catalogo', pueblo: 'mestizo' };
 const toast = () => {};
 
 function renderForm(edit = false) {
