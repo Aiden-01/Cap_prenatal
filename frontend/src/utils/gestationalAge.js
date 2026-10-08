@@ -1,13 +1,14 @@
-export function parseClinicalDate(value) {
-  if (!value) return null;
-  const [year, month, day] = String(value).split("T")[0].split("-").map(Number);
-  if (!year || !month || !day) return null;
+import { normalizeClinicalDate } from "./riskAgeRules.js";
 
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (Number.isNaN(date.getTime())) return null;
-  const normalized = date.toISOString().slice(0, 10);
-  if (normalized !== `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`) return null;
-  return date;
+export function parseClinicalDate(value) {
+  const normalized = normalizeClinicalDate(value);
+  return normalized ? new Date(`${normalized}T00:00:00Z`) : null;
+}
+
+export function formatClinicalDate(value) {
+  if (!value) return "—";
+  const date = parseClinicalDate(value);
+  return date ? date.toLocaleDateString("es-GT", { timeZone: "UTC" }) : "Sin fecha";
 }
 
 export function calculateGestationalAge(fur, referenceDate) {

@@ -17,15 +17,13 @@ import {
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
 import { isValidPregnancyId } from "../utils/pregnancyState";
+import { formatClinicalDate as formatDate, parseClinicalDate } from "../utils/gestationalAge";
+import { getGuatemalaDateInputValue } from "../utils/guatemalaTime";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
 const MS_DAY = 86400000;
 const PATIENT_FILE_TRANSITION_MS = 1050;
 const EXPEDIENTE_LOAD_ERROR = "El embarazo solicitado no existe o no pertenece a la paciente";
-
-function formatDate(value) {
-  return value ? new Date(value).toLocaleDateString("es-GT") : "—";
-}
 
 function titleCase(value) {
   if (!value) return "Sin embarazo";
@@ -61,9 +59,9 @@ function getFppInfo(paciente) {
   const fppValue = paciente.embarazo_fpp || paciente.fpp;
   const furValue = paciente.embarazo_fur || paciente.fur;
   const fpp = fppValue
-    ? new Date(fppValue)
+    ? parseClinicalDate(fppValue)
     : furValue
-      ? new Date(new Date(furValue).getTime() + 280 * MS_DAY)
+      ? parseClinicalDate(furValue)
       : null;
 
   if (!fpp) {
@@ -75,13 +73,16 @@ function getFppInfo(paciente) {
     };
   }
 
-  const daysRemaining = Math.ceil((fpp.getTime() - Date.now()) / MS_DAY);
+  if (!fppValue) fpp.setUTCDate(fpp.getUTCDate() + 280);
+  const fppDay = fpp.toISOString().slice(0, 10);
+  const today = parseClinicalDate(getGuatemalaDateInputValue());
+  const daysRemaining = (fpp.getTime() - today.getTime()) / MS_DAY;
   const weeksRemaining = Math.max(0, Math.ceil(daysRemaining / 7));
   const title = `${weeksRemaining} semanas para la fecha probable de parto`;
 
   if (weeksRemaining < 4) {
     return {
-      label: formatDate(fpp),
+      label: formatDate(fppDay),
       color: "var(--danger)",
       title,
       urgent: true,
@@ -90,7 +91,7 @@ function getFppInfo(paciente) {
 
   if (weeksRemaining < 8) {
     return {
-      label: formatDate(fpp),
+      label: formatDate(fppDay),
       color: "var(--warn)",
       title,
       urgent: false,
@@ -98,7 +99,7 @@ function getFppInfo(paciente) {
   }
 
   return {
-    label: formatDate(fpp),
+    label: formatDate(fppDay),
     color: "var(--text)",
     title,
     urgent: false,
@@ -338,7 +339,7 @@ export default function Pacientes() {
                       </div>
                       <div>
                         <span>Registrada</span>
-                        <strong>{formatDate(p.created_at)}</strong>
+                        <strong>{p.created_at ? new Date(p.created_at).toLocaleDateString("es-GT") : "—"}</strong>
                       </div>
                     </div>
                   )}

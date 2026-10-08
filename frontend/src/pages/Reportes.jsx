@@ -15,6 +15,7 @@ import {
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessage";
+import { formatClinicalDate as formatDateGt } from "../utils/gestationalAge";
 import ReportExportModal from "../components/ReportExportModal";
 import { getReportExportConfig } from "../config/reportExportConfig";
 import { useGlobalToast } from "../context/ToastContext";
@@ -84,12 +85,6 @@ const ENDPOINTS = {
   [REPORTES.COMUNIDADES]: "/reportes/resumen-comunidades",
   [REPORTES.CONTROLES_PRENATALES]: "/reportes/controles-prenatales",
 };
-
-function formatDateGt(value) {
-  if (!value) return "—";
-  const dateOnly = String(value).split("T")[0];
-  return new Date(`${dateOnly}T00:00:00`).toLocaleDateString("es-GT");
-}
 
 function RiskBadge({ paciente, officialOnly = false }) {
   const level = officialOnly ? "alto" : getReportRiskLevel(paciente);

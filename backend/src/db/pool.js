@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const clinicalDateTypes = require('./clinicalDateTypes');
 const { diagnosticCode } = require('../utils/safeErrorLog');
 const {
   loadEnvironmentFile,
@@ -14,7 +15,7 @@ function getPool() {
   loadEnvironmentFile();
   const nodeEnv = nodeEnvForValidation(process.env);
   const dbConfig = validateDatabaseConfig(process.env, { nodeEnv });
-  activePool = new Pool(dbConfig);
+  activePool = new Pool({ ...dbConfig, types: clinicalDateTypes });
 
   activePool.on('connect', () => {
     if (nodeEnv !== 'test') console.log('Conectado a PostgreSQL');

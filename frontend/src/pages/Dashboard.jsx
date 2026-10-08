@@ -10,6 +10,8 @@ import { getErrorMessage } from "../utils/errorMessage";
 import { getMissingAppointmentTabState } from "../utils/missingAppointmentQueue";
 import AppointmentCalendar from "../components/AppointmentCalendar";
 import MissingAppointmentQueue from "../components/MissingAppointmentQueue";
+import { formatClinicalDate, parseClinicalDate } from "../utils/gestationalAge";
+import { getGuatemalaDateInputValue } from "../utils/guatemalaTime";
 
 const COLOR_VARIANTS = {
   primary: "var(--primary)",
@@ -123,16 +125,17 @@ function BadgeDias({ dias }) {
 }
 
 function getFppInfo(fppValue) {
-  if (!fppValue) {
+  const fpp = parseClinicalDate(fppValue);
+  if (!fpp) {
     return { label: "—", color: "var(--text-muted)", title: "Fecha probable de parto: sin dato" };
   }
 
-  const fpp = new Date(fppValue);
-  const daysRemaining = Math.ceil((fpp.getTime() - Date.now()) / MS_DAY);
+  const today = parseClinicalDate(getGuatemalaDateInputValue());
+  const daysRemaining = (fpp.getTime() - today.getTime()) / MS_DAY;
   const weeksRemaining = Math.max(0, Math.ceil(daysRemaining / 7));
 
   return {
-    label: fpp.toLocaleDateString("es-GT"),
+    label: formatClinicalDate(fppValue),
     color: weeksRemaining < 4
       ? "var(--danger)"
       : weeksRemaining < 8

@@ -15,6 +15,7 @@ import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
 import { captureFormField, patientFieldId } from "../utils/chatbotFocusedField";
 import { ESTABLECIMIENTO_CATALOGS, ESTABLECIMIENTO_DEFAULTS } from "../utils/establecimientoCatalogs";
 import PatientVersionConflict from "../components/PatientVersionConflict";
+import { normalizeClinicalDate } from "../utils/riskAgeRules";
 
 const FormErrorContext = createContext({
   fieldError: () => "",
@@ -806,8 +807,8 @@ export default function NuevaPaciente() {
       fecha_nacimiento: fechaNacimiento,
       edad_manual: data.edad_manual ?? edadDesdeFecha.anios,
       edad_calculada: data.edad_calculada ?? edadDesdeFecha.texto,
-      fur: data.fur ? data.fur.split("T")[0] : "",
-      fpp: data.fpp ? data.fpp.split("T")[0] : "",
+      fur: normalizeClinicalDate(data.fur) || "",
+      fpp: normalizeClinicalDate(data.fpp) || "",
       fin_embarazo_anterior: data.fin_embarazo_anterior ? data.fin_embarazo_anterior.split("T")[0] : "",
       antec_emb_ectopico_num: data.antec_emb_ectopico_num ?? (data.antec_emb_ectopico ? 1 : 0),
       comunidad_linguistica: comunidadConfig.mode === "automatic"

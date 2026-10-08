@@ -16,6 +16,7 @@ import {
   CircleDashed,
 } from "lucide-react";
 import { getErrorMessage } from "../utils/errorMessage";
+import { formatClinicalDate as fecha } from "../utils/gestationalAge";
 import {
   canCreatePregnancy,
   hasPregnancyBlockingCreation,
@@ -113,13 +114,6 @@ function PuerperioClinicalRow({ icon: Icon, title, children }) {
       <p>{children}</p>
     </div>
   );
-}
-
-function fecha(d) {
-  if (!d) return "—";
-  const dateOnly = String(d).split("T")[0];
-  const date = new Date(`${dateOnly}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? "Sin fecha" : date.toLocaleDateString("es-GT");
 }
 
 function tipoParto(value) {
