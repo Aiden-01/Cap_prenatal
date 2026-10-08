@@ -35,6 +35,7 @@ import {
   canConsultPrenatalControl,
   canEditPrenatalControl,
   preparePrenatalControlUpdatePayload,
+  prenatalControlEditPath,
 } from "../utils/prenatalControlAccess";
 import "./nuevo-control.css";
 
@@ -371,7 +372,7 @@ function inferControlFieldErrors(err) {
 }
 
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────
-export default function NuevoControl() {
+export default function NuevoControl({ consultationOnly = false }) {
   const { id, controlId } = useParams();
   const location = useLocation();
   const { setScreenTab, setFocusedField } = useChatbotScreenContext();
@@ -427,8 +428,8 @@ export default function NuevoControl() {
     pregnancyState,
     pregnancyId: embarazoId,
   });
-  const puedeGuardar = editando ? puedeEditar : puedeCrear;
-  const soloLectura = editando && puedeConsultar && !puedeEditar;
+  const puedeGuardar = !consultationOnly && (editando ? puedeEditar : puedeCrear);
+  const soloLectura = editando && puedeConsultar && (consultationOnly || !puedeEditar);
 
   const set = (k, v) => {
     if (!puedeGuardar) return;
@@ -531,7 +532,7 @@ export default function NuevoControl() {
       ? "Editar Control Prenatal"
       : "Registrar Control Prenatal";
   const workflowDescription = soloLectura
-    ? `Control ${form.numero_control} · Consulta histórica`
+    ? `Control ${form.numero_control} · Consulta de solo lectura`
     : editando
       ? `Control ${form.numero_control}`
       : `Se registrará como control ${form.numero_control}`;
@@ -626,10 +627,14 @@ export default function NuevoControl() {
         if (selected) setFocusedField(selected);
       }}>
         {soloLectura && (
-          <ClinicalNotice variant="readonly" title="Consulta histórica" className="control-workflow-notice">
+          <ClinicalNotice variant="readonly" title="Consulta de solo lectura" className="control-workflow-notice">
             {pregnancyState === "puerperio"
               ? "Este control pertenece a un embarazo en puerperio. Puedes revisar toda la información, pero no modificarla."
-              : "Este embarazo está cerrado. Puedes revisar toda la información del control, pero no modificarla."}
+              : pregnancyState === "cerrado" || isReadOnly
+                ? "Este embarazo está cerrado. Puedes revisar toda la información del control, pero no modificarla."
+                : !tienePermisoEscritura
+                  ? "No tienes permiso para editar este control. Puedes consultar la información autorizada, pero no modificarla."
+                  : "Esta vista es de consulta. Para modificar el control, utiliza la acción Editar."}
           </ClinicalNotice>
         )}
 
@@ -1117,6 +1122,9 @@ export default function NuevoControl() {
           <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>
             {soloLectura ? "Volver" : "Cancelar"}
           </button>
+          {consultationOnly && puedeEditar && (
+            <button type="button" className="btn-secondary" onClick={() => navigate(prenatalControlEditPath({ pacienteId: id, embarazoId, controlId }))}>Editar</button>
+          )}
           {puedeGuardar && (
             <button type="submit" className="btn-primary" disabled={loading}
               style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>

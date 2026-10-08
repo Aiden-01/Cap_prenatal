@@ -56,5 +56,10 @@ export function prenatalControlDetailPath({ pacienteId, embarazoId, controlId })
     return null;
   }
 
-  return `/pacientes/${pacienteId}/controles/${controlId}/editar?embarazo_id=${encodeURIComponent(embarazoId)}`;
+  return `/pacientes/${pacienteId}/controles/${controlId}?embarazo_id=${encodeURIComponent(embarazoId)}`;
+}
+
+export function prenatalControlEditPath(context) {
+  const detail = prenatalControlDetailPath(context);
+  return detail ? detail.replace('?embarazo_id=', '/editar?embarazo_id=') : null;
 }

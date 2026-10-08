@@ -15,6 +15,7 @@ vi.mock('../src/pages/Reportes', () => ({ default: () => <h1>Reportes autorizado
 vi.mock('../src/pages/MapaRiesgo', () => ({ default: () => <h1>Mapa autorizado</h1> }));
 vi.mock('../src/pages/Pacientes', () => ({ default: () => <h1>Pacientes autorizados</h1> }));
 vi.mock('../src/pages/NuevaPaciente', () => ({ default: () => <h1>Formulario autorizado</h1> }));
+vi.mock('../src/pages/NuevoControl', () => ({ default: ({ consultationOnly }) => <h1>{consultationOnly ? 'Consulta autorizada' : 'Edición autorizada'}</h1> }));
 vi.mock('../src/pages/Usuarios', () => ({ default: () => <h1>Usuarios autorizados</h1> }));
 vi.mock('../src/pages/Comunidades', () => ({ default: () => <h1>Comunidades autorizadas</h1> }));
 vi.mock('../src/pages/Historial', () => ({ default: () => <h1>Historial autorizado</h1> }));
@@ -28,6 +29,7 @@ beforeEach(() => {
   get = vi.spyOn(api, 'get').mockImplementation(async url => {
     if (url === '/reportes/estadisticas') return { data: { embarazos_activos: 7 } };
     if (url.startsWith('/reportes/')) return { data: [] };
+    if (url === '/mapa/riesgo') return { data: [] };
     return { data: { items: [] } };
   });
 });
@@ -39,6 +41,9 @@ const profiles = [
   ['reportes', ['reportes.ver'], 'medico'],
   ['solo exportar', ['reportes.exportar'], 'medico'],
   ['mapa', ['mapa_riesgo.ver'], 'medico'],
+  ['solo crear', ['pacientes.crear'], 'medico'],
+  ['crear y mapa', ['pacientes.crear', 'mapa_riesgo.ver'], 'medico'],
+  ['pacientes y mapa', ['pacientes.ver', 'mapa_riesgo.ver'], 'medico'],
   ['admin mínimo', [], 'admin'],
   ['director parcial', ['pacientes.ver', 'auditoria.ver'], 'director'],
   ['completo', ['pacientes.ver', 'pacientes.crear', 'controles.editar', 'reportes.ver', 'reportes.exportar', 'mapa_riesgo.ver', 'auditoria.ver'], 'admin'],
@@ -61,13 +66,15 @@ for (const [name, permissions, role] of profiles) {
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
     const urls = get.mock.calls.map(([url]) => url);
     for (const url of urls) {
-      expect(permissions.includes(url.startsWith('/reportes/') ? 'reportes.ver' : 'pacientes.ver')).toBe(true);
+      expect(permissions.includes(url.startsWith('/reportes/') ? 'reportes.ver' : url === '/mapa/riesgo' ? 'mapa_riesgo.ver' : 'pacientes.ver')).toBe(true);
     }
     expect(Boolean(screen.queryByText('Embarazos activos'))).toBe(permissions.includes('reportes.ver'));
     expect(Boolean(screen.queryByRole('button', { name: 'Calendario de citas' }))).toBe(permissions.includes('pacientes.ver'));
-    if (!permissions.includes('reportes.ver')) expect(screen.getByText('Funciones disponibles')).toBeTruthy();
+    expect(screen.queryByText('Funciones disponibles')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
-    if (!permissions.includes('reportes.ver') && !permissions.includes('pacientes.ver')) expect(urls).toEqual([]);
+    expect(Boolean(screen.queryByRole('button', { name: 'Abrir mapa completo' }))).toBe(permissions.includes('mapa_riesgo.ver'));
+    expect(Boolean(screen.queryByRole('button', { name: 'Registrar paciente', exact: true }))).toBe(permissions.includes('pacientes.crear') && !permissions.includes('pacientes.ver'));
+    if (!permissions.includes('reportes.ver') && !permissions.includes('pacientes.ver') && !permissions.includes('mapa_riesgo.ver')) expect(urls).toEqual([]);
     if (permissions.includes('reportes.ver')) expect(urls).toEqual(expect.arrayContaining(['/reportes/estadisticas','/reportes/proximas-a-parir','/reportes/sin-control-reciente']));
   });
 }
@@ -78,6 +85,8 @@ for (const [path, permission, allowedTitle] of [
   ['/pacientes', 'pacientes.ver', 'Pacientes autorizados'],
   ['/nuevo', 'pacientes.crear', 'Formulario autorizado'],
   ['/pacientes/test/editar', 'pacientes.editar', 'Formulario autorizado'],
+  ['/pacientes/1/controles/3?embarazo_id=2', 'pacientes.ver', 'Consulta autorizada'],
+  ['/pacientes/1/controles/3/editar?embarazo_id=2', 'controles.editar', 'Edición autorizada'],
 ]) {
   test(`URL ${path}: bloqueada antes de montar módulo; permiso efectivo permite entrar`, async () => {
     window.history.replaceState({}, '', path);
@@ -106,6 +115,71 @@ test('roles admin/director respetan restricciones propias sin bypass de permisos
     expect(await screen.findByText('Usuarios autorizados')).toBeTruthy();
     view.unmount();
   }
+});
+
+test.each([
+  [['mapa_riesgo.ver'], 'medico'],
+  [['pacientes.crear', 'mapa_riesgo.ver'], 'medico'],
+  [[], 'admin'],
+  [[], 'director'],
+])('Inicio mínimo %j permanece en Dashboard con su acceso específico', async (permissions, role) => {
+  auth.usuario = user(permissions, role);
+  window.history.replaceState({}, '', '/dashboard');
+  render(<App />);
+  expect(await screen.findByRole('heading', { name: 'Inicio', exact: true })).toBeTruthy();
+  expect(window.location.pathname).toBe('/dashboard');
+  expect(get.mock.calls.every(([url]) => url === '/mapa/riesgo')).toBe(true);
+  expect(availableModules(auth.usuario).some(m => m.path === '/dashboard')).toBe(true);
+  expect(screen.queryByText('Funciones disponibles')).toBeNull();
+});
+
+test('sin módulos: bienvenida neutral sin tarjeta genérica, pestañas ni peticiones', () => {
+  render(<MemoryRouter><Dashboard /></MemoryRouter>);
+  expect(screen.getByText(/Tu cuenta no tiene módulos asignados/)).toBeTruthy();
+  expect(document.querySelector('.content-tabs')).toBeNull();
+  expect(screen.queryByText('Funciones disponibles')).toBeNull();
+  expect(get.mock.calls).toEqual([]);
+});
+
+test('resumen mapa usa su GET autorizado, muestra agregados y CTA sin exponer filas', async () => {
+  auth.usuario = user(['mapa_riesgo.ver']);
+  get.mockResolvedValue({ data: [{ total_riesgo: 2, pacientes_riesgo: [{ nombre: 'CANARIO-OCULTO' }] }, { total_riesgo: 1 }] });
+  window.history.replaceState({}, '', '/dashboard');
+  render(<App />);
+  expect(await screen.findByText('2 comunidades · 3 pacientes con riesgo en el mapa')).toBeTruthy();
+  expect(screen.queryByText('CANARIO-OCULTO')).toBeNull();
+  expect(document.querySelector('.content-tabs')).toBeNull();
+  expect(get.mock.calls.map(([url]) => url)).toEqual(['/mapa/riesgo']);
+  fireEvent.click(screen.getByRole('button', { name: 'Abrir mapa completo' }));
+  expect(await screen.findByText('Mapa autorizado')).toBeTruthy();
+  expect(window.location.pathname).toBe('/mapa-riesgo');
+});
+
+test('error genuino de resumen mapa conserva error y reintento; no presenta ceros ficticios', async () => {
+  auth.usuario = user(['mapa_riesgo.ver']);
+  get.mockRejectedValueOnce(new Error('Resumen no disponible')).mockResolvedValue({ data: [] });
+  render(<MemoryRouter><Dashboard /></MemoryRouter>);
+  expect(await screen.findByText('Resumen no disponible')).toBeTruthy();
+  expect(screen.queryByText(/0 comunidades/)).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Reintentar resumen del mapa' }));
+  expect(await screen.findByText('0 comunidades · 0 pacientes con riesgo en el mapa')).toBeTruthy();
+  expect(get.mock.calls.map(([url]) => url)).toEqual(['/mapa/riesgo', '/mapa/riesgo']);
+});
+
+test('revocar mapa aborta resumen pendiente y descarta respuesta tardía sin perder Inicio', async () => {
+  let resolveMap;
+  auth.usuario = user(['mapa_riesgo.ver']);
+  get.mockImplementation(() => new Promise(resolve => { resolveMap = resolve; }));
+  const view = render(<MemoryRouter><Dashboard /></MemoryRouter>);
+  await waitFor(() => expect(resolveMap).toBeTypeOf('function'));
+  const signal = get.mock.calls[0][1].signal;
+  auth.usuario = user([]);
+  view.rerender(<MemoryRouter><Dashboard /></MemoryRouter>);
+  expect(signal.aborted).toBe(true);
+  await act(async () => resolveMap({ data: [{ total_riesgo: 999 }] }));
+  expect(screen.queryByText(/999/)).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Abrir mapa completo' })).toBeNull();
+  expect(screen.getByRole('heading', { name: 'Inicio', exact: true })).toBeTruthy();
 });
 
 test('errores genuinos de módulos autorizados siguen visibles y no esconden la sección independiente', async () => {

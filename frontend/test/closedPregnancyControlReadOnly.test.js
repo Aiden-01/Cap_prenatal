@@ -8,6 +8,7 @@ import {
   canEditPrenatalControl,
   preparePrenatalControlUpdatePayload,
   prenatalControlDetailPath,
+  prenatalControlEditPath,
 } from "../src/utils/prenatalControlAccess.js";
 
 const source = (relativePath) => readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
@@ -81,9 +82,11 @@ test("la consulta exige lectura e identificadores validos", () => {
 test("la ruta de detalle conserva el embarazo historico seleccionado", () => {
   assert.equal(
     prenatalControlDetailPath(controlContext),
-    "/pacientes/41/controles/201/editar?embarazo_id=88"
+    "/pacientes/41/controles/201?embarazo_id=88"
   );
   assert.equal(prenatalControlDetailPath({ ...controlContext, embarazoId: "" }), null);
+  assert.equal(prenatalControlEditPath(controlContext), "/pacientes/41/controles/201/editar?embarazo_id=88");
+  assert.equal(prenatalControlEditPath({ ...controlContext, embarazoId: "" }), null);
 });
 
 test("Abrir navega por permiso de consulta sin depender del acordeon ni de edicion", async () => {
@@ -141,7 +144,7 @@ test("la ruta directa deja puerperio y cerrado en consulta sin afectar la edicio
   assert.match(detail, /const puedeCrear = canCreatePrenatalControl/);
   assert.match(detail, /if \(!editando && selectedState !== "activo"\)/);
   assert.match(detail, /Los controles prenatales nuevos solo se registran en un embarazo activo/);
-  assert.match(detail, /const puedeGuardar = editando \? puedeEditar : puedeCrear/);
+  assert.match(detail, /const puedeGuardar = !consultationOnly && \(editando \? puedeEditar : puedeCrear\)/);
   assert.match(detail, /pregnancyState,/);
   assert.match(detail, /Este control pertenece a un embarazo en puerperio/);
   assert.match(detail, /Este embarazo está cerrado/);

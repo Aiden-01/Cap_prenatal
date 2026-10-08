@@ -44,6 +44,7 @@ export default function App() {
           <Route path="pacientes/:id" element={<PrivateRoute access={ACCESS.patients}><LazyPage><ExpedientePaciente /></LazyPage></PrivateRoute>} />
           <Route path="pacientes/:id/editar" element={<PrivateRoute access={ACCESS.editPatient}><LazyPage><NuevaPaciente /></LazyPage></PrivateRoute>} />
           <Route path="pacientes/:id/controles/nuevo" element={<PrivateRoute access={ACCESS.newControl}><LazyPage><NuevoControl /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes/:id/controles/:controlId" element={<PrivateRoute access={ACCESS.patients}><LazyPage><NuevoControl consultationOnly /></LazyPage></PrivateRoute>} />
           <Route path="pacientes/:id/controles/:controlId/editar" element={<PrivateRoute access={ACCESS.editControl}><LazyPage><NuevoControl /></LazyPage></PrivateRoute>} />
           <Route path="pacientes/:id/riesgo" element={<PrivateRoute access={ACCESS.riskForm}><LazyPage><FichaRiesgo /></LazyPage></PrivateRoute>} />
           <Route path="pacientes/:id/plan-parto" element={<PrivateRoute access={ACCESS.planForm}><LazyPage><PlanPartoForm /></LazyPage></PrivateRoute>} />

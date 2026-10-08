@@ -7,6 +7,7 @@ import {
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
 import { ACCESS, accessIdentity, availableModules, canAccess, hasPermission } from "../utils/accessRules";
+import DashboardMapSummary from "../components/DashboardMapSummary";
 import { getErrorMessage } from "../utils/errorMessage";
 import { getMissingAppointmentTabState } from "../utils/missingAppointmentQueue";
 import AppointmentCalendar from "../components/AppointmentCalendar";
@@ -199,6 +200,9 @@ function DashboardContent({ usuario }) {
   const mesActual = new Date().toLocaleDateString("es-GT", { month: "long" });
   const canViewAppointments = canAccess(usuario, ACCESS.patients);
   const canViewReports = canAccess(usuario, ACCESS.reports);
+  const canViewMap = canAccess(usuario, ACCESS.riskMap);
+  const canRegisterPatient = !canViewAppointments && canAccess(usuario, ACCESS.newPatient);
+  const secondaryModules = availableModules(usuario).filter(module => ['/usuarios', '/comunidades', '/historial'].includes(module.path));
   const canManageAppointments = canViewAppointments && hasPermission(usuario, "controles.editar");
 
   const loadMissingAppointments = useCallback(async () => {
@@ -325,7 +329,6 @@ function DashboardContent({ usuario }) {
     },
   ].filter(tab => ['citas', 'sincita'].includes(tab.id) ? canViewAppointments : canViewReports);
   const activeTab = TABS.some(tab => tab.id === tabActiva) ? tabActiva : TABS[0]?.id;
-  const functionsAvailable = availableModules(usuario).filter(module => module.path !== '/dashboard');
 
   return (
     <div className="dashboard-page">
@@ -383,16 +386,24 @@ function DashboardContent({ usuario }) {
           </div>
         </>
       ))}
-      {!canViewReports && (
-        <div className="card">
-          <h2>Funciones disponibles</h2>
-          {functionsAvailable.length ? functionsAvailable.map(module => (
-            <button key={module.path} type="button" className="btn-secondary" onClick={() => navigate(module.path)}>{module.label}</button>
-          )) : <p>No tiene módulos asignados. Consulte al administrador si necesita acceso.</p>}
-        </div>
+      {canViewMap && <DashboardMapSummary onOpen={() => navigate('/mapa-riesgo')} />}
+      {canRegisterPatient && (
+        <section className="card" aria-label="Registro de pacientes">
+          <h2>Registrar paciente</h2>
+          <p>Inicia un expediente nuevo. El formulario se abrirá cuando decidas registrar a una paciente.</p>
+          <button type="button" className="btn-primary" onClick={() => navigate('/nuevo')}>Registrar paciente</button>
+        </section>
+      )}
+      {!canViewReports && !canViewAppointments && !canViewMap && !canRegisterPatient && (
+        <section aria-label="Bienvenida">
+          {secondaryModules.length ? <>
+            <p>Accede a las herramientas de administración autorizadas para tu cuenta.</p>
+            {secondaryModules.map(module => <button key={module.path} type="button" className="btn-secondary" onClick={() => navigate(module.path)}>Abrir {module.label.toLowerCase()}</button>)}
+          </> : <p>Tu cuenta no tiene módulos asignados. Consulta al administrador para obtener acceso.</p>}
+        </section>
       )}
 
-      <div>
+      {TABS.length > 0 && <div>
             <div className="content-tabs">
               {TABS.map((t) => (
                 <button
@@ -578,7 +589,7 @@ function DashboardContent({ usuario }) {
                 </div>
               )
             )}
-      </div>
+      </div>}
     </div>
   );
 }
