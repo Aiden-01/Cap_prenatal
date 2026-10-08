@@ -40,6 +40,6 @@ test("toda ruta lazy usa el fallback compartido", () => {
 
 test("auth y permisos envuelven las rutas antes de renderizar páginas lazy", () => {
   assert.match(appSource, /<Route path="\/" element=\{<PrivateRoute><Layout \/><\/PrivateRoute>\}>/);
-  assert.match(appSource, /path="comunidades" element=\{<PrivateRoute directorOnly><LazyPage><Comunidades \/><\/LazyPage><\/PrivateRoute>\}/);
-  assert.match(appSource, /path="usuarios" element=\{<PrivateRoute adminOnly><LazyPage><Usuarios \/><\/LazyPage><\/PrivateRoute>\}/);
+  assert.match(appSource, /path="comunidades" element=\{<PrivateRoute access=\{ACCESS.communities\}><LazyPage><Comunidades \/><\/LazyPage><\/PrivateRoute>\}/);
+  assert.match(appSource, /path="usuarios" element=\{<PrivateRoute access=\{ACCESS.users\}><LazyPage><Usuarios \/><\/LazyPage><\/PrivateRoute>\}/);
 });

@@ -8,6 +8,8 @@ import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
 import iconUrl from "leaflet/dist/images/marker-icon.png";
 import shadowUrl from "leaflet/dist/images/marker-shadow.png";
 import api from "../api/axios";
+import { useAuth } from "../hooks/useAuth";
+import { ACCESS, canAccess } from "../utils/accessRules";
 import MapBaseLayerControl from "../components/MapBaseLayerControl";
 import { getErrorMessage } from "../utils/errorMessage";
 
@@ -51,6 +53,9 @@ function createCommunityIcon(totalRiesgo) {
 
 export default function MapaRiesgo() {
   const navigate = useNavigate();
+  const { usuario } = useAuth();
+  const canOpenPatient = canAccess(usuario, ACCESS.patients);
+  const PatientItem = canOpenPatient ? 'button' : 'div';
   const [comunidades, setComunidades] = useState([]);
   const [selected, setSelected] = useState(null);
   const [riskListOpen, setRiskListOpen] = useState(false);
@@ -527,15 +532,15 @@ export default function MapaRiesgo() {
           <div className="mapa-riesgo-drawer-body">
             {pacientesRiesgo.length > 0 ? (
               pacientesRiesgo.map((paciente) => (
-                <button
+                <PatientItem
                   key={`${paciente.paciente_id}-${paciente.embarazo_id || "sin-embarazo"}`}
-                  type="button"
+                  type={canOpenPatient ? "button" : undefined}
                   className="mapa-riesgo-patient"
-                  onClick={() => navigate(`/pacientes/${paciente.paciente_id}`)}
+                  onClick={canOpenPatient ? () => navigate(`/pacientes/${paciente.paciente_id}`) : undefined}
                 >
                   <strong>{paciente.nombre || "Paciente sin nombre"}</strong>
                   <span>No. expediente: {paciente.expediente || "—"}</span>
-                </button>
+                </PatientItem>
               ))
             ) : (
               <div className="mapa-riesgo-empty">

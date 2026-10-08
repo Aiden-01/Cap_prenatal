@@ -4,6 +4,8 @@ import { useMemo } from "react";
 import { createContext, useContext } from "react";
 import { useEffect } from "react";
 import api from "../api/axios";
+import { useAuth } from "../hooks/useAuth";
+import { ACCESS, canAccess } from "../utils/accessRules";
 import { useGlobalToast } from "../context/ToastContext";
 import {
   Building2, User, Heart, Baby, ShieldAlert, CheckCircle,
@@ -688,6 +690,8 @@ function buildPacientePayload(form) {
 
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────
 export default function NuevaPaciente() {
+  const { usuario } = useAuth();
+  const canViewPatients = canAccess(usuario, ACCESS.patients);
   const { id } = useParams();
   const location = useLocation();
   const { setFocusedField } = useChatbotScreenContext();
@@ -950,7 +954,7 @@ export default function NuevaPaciente() {
         setForm((current) => ({ ...current, version: data.version }));
       }
       toast(editando ? "Paciente actualizada exitosamente" : "Paciente registrada exitosamente", "success");
-      setTimeout(() => navigate(`/pacientes/${editando ? id : data.id}`), 800);
+      setTimeout(() => navigate(canViewPatients ? `/pacientes/${editando ? id : data.id}` : "/dashboard"), 800);
     } catch (e) {
       if (e?.response?.status === 409 && e?.response?.data?.code === "PATIENT_VERSION_CONFLICT") {
         setVersionConflict(true);
@@ -1002,7 +1006,7 @@ export default function NuevaPaciente() {
     <div className="clinical-form-page">
       {/* HEADER */}
       <div className="clinical-form-header">
-        <button className="btn-secondary" onClick={() => navigate("/pacientes")}>
+        <button className="btn-secondary" onClick={() => navigate(canViewPatients ? "/pacientes" : "/dashboard")}>
           <ChevronLeft size={15} /> Volver
         </button>
         <div className="clinical-form-title">

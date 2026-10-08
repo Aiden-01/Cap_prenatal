@@ -2,6 +2,8 @@
 import { lazy, Suspense } from "react";
 import { useAuth } from "./hooks/useAuth";
 import Layout from "./components/Layout";
+import PrivateRoute from "./components/AccessRoute";
+import { ACCESS } from "./utils/accessRules";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 
@@ -29,15 +31,6 @@ function LazyPage({ children }) {
   );
 }
 
-function PrivateRoute({ children, adminOnly = false, directorOnly = false, permission }) {
-  const { usuario, isAdmin } = useAuth();
-  if (!usuario) return <Navigate to="/login" replace />;
-  if (permission && !usuario.permisos?.includes(permission)) return <Navigate to="/dashboard" replace />;
-  if (directorOnly && usuario.rol !== "director") return <Navigate to="/dashboard" replace />;
-  if (adminOnly && !isAdmin) return <Navigate to="/dashboard" replace />;
-  return children;
-}
-
 export default function App() {
   const { usuario } = useAuth();
   return (
@@ -47,25 +40,25 @@ export default function App() {
         <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
           <Route index element={<Navigate to="/dashboard" />} />
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="pacientes" element={<LazyPage><Pacientes /></LazyPage>} />
-          <Route path="pacientes/:id" element={<LazyPage><ExpedientePaciente /></LazyPage>} />
-          <Route path="pacientes/:id/editar" element={<LazyPage><NuevaPaciente /></LazyPage>} />
-          <Route path="pacientes/:id/controles/nuevo" element={<LazyPage><NuevoControl /></LazyPage>} />
-          <Route path="pacientes/:id/controles/:controlId/editar" element={<LazyPage><NuevoControl /></LazyPage>} />
-          <Route path="pacientes/:id/riesgo" element={<LazyPage><FichaRiesgo /></LazyPage>} />
-          <Route path="pacientes/:id/plan-parto" element={<LazyPage><PlanPartoForm /></LazyPage>} />
-          <Route path="pacientes/:id/puerperio/nuevo" element={<LazyPage><PuerperioForm /></LazyPage>} />
-          <Route path="pacientes/:id/puerperio/:puerperioId/editar" element={<LazyPage><PuerperioForm /></LazyPage>} />
-          <Route path="pacientes/:id/morbilidad/nuevo" element={<LazyPage><MorbilidadForm /></LazyPage>} />
-          <Route path="pacientes/:id/morbilidad/:morbilidadId/editar" element={<LazyPage><MorbilidadForm /></LazyPage>} />
-          <Route path="pacientes/:id/vacunas/nuevo" element={<LazyPage><VacunaForm /></LazyPage>} />
-          <Route path="pacientes/:id/vacunas/:vacunaId/editar" element={<LazyPage><VacunaForm /></LazyPage>} />
-          <Route path="nuevo" element={<LazyPage><NuevaPaciente /></LazyPage>} />
-          <Route path="reportes" element={<LazyPage><Reportes /></LazyPage>} />
-          <Route path="mapa-riesgo" element={<LazyPage><MapaRiesgo /></LazyPage>} />
-          <Route path="comunidades" element={<PrivateRoute directorOnly><LazyPage><Comunidades /></LazyPage></PrivateRoute>} />
-          <Route path="usuarios" element={<PrivateRoute adminOnly><LazyPage><Usuarios /></LazyPage></PrivateRoute>} />
-          <Route path="historial" element={<PrivateRoute adminOnly permission="auditoria.ver"><LazyPage><Historial /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes" element={<PrivateRoute access={ACCESS.patients}><LazyPage><Pacientes /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes/:id" element={<PrivateRoute access={ACCESS.patients}><LazyPage><ExpedientePaciente /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes/:id/editar" element={<PrivateRoute access={ACCESS.editPatient}><LazyPage><NuevaPaciente /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes/:id/controles/nuevo" element={<PrivateRoute access={ACCESS.newControl}><LazyPage><NuevoControl /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes/:id/controles/:controlId/editar" element={<PrivateRoute access={ACCESS.editControl}><LazyPage><NuevoControl /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes/:id/riesgo" element={<PrivateRoute access={ACCESS.riskForm}><LazyPage><FichaRiesgo /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes/:id/plan-parto" element={<PrivateRoute access={ACCESS.planForm}><LazyPage><PlanPartoForm /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes/:id/puerperio/nuevo" element={<PrivateRoute access={ACCESS.planForm}><LazyPage><PuerperioForm /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes/:id/puerperio/:puerperioId/editar" element={<PrivateRoute access={ACCESS.editControl}><LazyPage><PuerperioForm /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes/:id/morbilidad/nuevo" element={<PrivateRoute access={ACCESS.newControl}><LazyPage><MorbilidadForm /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes/:id/morbilidad/:morbilidadId/editar" element={<PrivateRoute access={ACCESS.editControl}><LazyPage><MorbilidadForm /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes/:id/vacunas/nuevo" element={<PrivateRoute access={ACCESS.newControl}><LazyPage><VacunaForm /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes/:id/vacunas/:vacunaId/editar" element={<PrivateRoute access={ACCESS.editControl}><LazyPage><VacunaForm /></LazyPage></PrivateRoute>} />
+          <Route path="nuevo" element={<PrivateRoute access={ACCESS.newPatient}><LazyPage><NuevaPaciente /></LazyPage></PrivateRoute>} />
+          <Route path="reportes" element={<PrivateRoute access={ACCESS.reports}><LazyPage><Reportes /></LazyPage></PrivateRoute>} />
+          <Route path="mapa-riesgo" element={<PrivateRoute access={ACCESS.riskMap}><LazyPage><MapaRiesgo /></LazyPage></PrivateRoute>} />
+          <Route path="comunidades" element={<PrivateRoute access={ACCESS.communities}><LazyPage><Comunidades /></LazyPage></PrivateRoute>} />
+          <Route path="usuarios" element={<PrivateRoute access={ACCESS.users}><LazyPage><Usuarios /></LazyPage></PrivateRoute>} />
+          <Route path="historial" element={<PrivateRoute access={ACCESS.history}><LazyPage><Historial /></LazyPage></PrivateRoute>} />
         </Route>
         <Route path="/404" element={<LazyPage><NotFoundPage /></LazyPage>} />
         <Route path="*" element={<LazyPage><NotFoundPage /></LazyPage>} />

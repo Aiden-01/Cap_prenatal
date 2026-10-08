@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
+import { ACCESS, accessIdentity, availableModules, canAccess, hasPermission } from "../utils/accessRules";
 import { getErrorMessage } from "../utils/errorMessage";
 import { getMissingAppointmentTabState } from "../utils/missingAppointmentQueue";
 import AppointmentCalendar from "../components/AppointmentCalendar";
@@ -175,11 +176,17 @@ function SeccionTabla({ titulo, badge, badgeVariant = "blue", vacia, children })
 }
 
 export default function Dashboard() {
+  const { usuario } = useAuth();
+  return <DashboardContent key={accessIdentity(usuario)} usuario={usuario} />;
+}
+
+function DashboardContent({ usuario }) {
   const [stats,          setStats]          = useState(null);
   const [proximasParir,  setProximasParir]  = useState([]);
   const [sinControl,     setSinControl]     = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [loadingAlertas, setLoadingAlertas] = useState(true);
+  const [alertErrors, setAlertErrors] = useState({});
   const [tabActiva,      setTabActiva]      = useState("citas");
   const [statsError,     setStatsError]     = useState("");
   const [sinProximaCita, setSinProximaCita] = useState([]);
@@ -188,14 +195,14 @@ export default function Dashboard() {
   const sinCitaRequestRef = useRef(null);
   const dashboardMountedRef = useRef(true);
 
-  const { usuario } = useAuth();
   const navigate = useNavigate();
   const mesActual = new Date().toLocaleDateString("es-GT", { month: "long" });
-  const canViewAppointments = usuario?.permisos?.includes("pacientes.ver");
-  const canManageAppointments = usuario?.permisos?.includes("controles.editar");
+  const canViewAppointments = canAccess(usuario, ACCESS.patients);
+  const canViewReports = canAccess(usuario, ACCESS.reports);
+  const canManageAppointments = canViewAppointments && hasPermission(usuario, "controles.editar");
 
   const loadMissingAppointments = useCallback(async () => {
-    if (!dashboardMountedRef.current) return false;
+    if (!canViewAppointments || !dashboardMountedRef.current) return false;
     sinCitaRequestRef.current?.abort();
     const controller = new AbortController();
     sinCitaRequestRef.current = controller;
@@ -218,7 +225,7 @@ export default function Dashboard() {
         setLoadingSinCita(false);
       }
     }
-  }, []);
+  }, [canViewAppointments]);
 
   useEffect(() => {
     dashboardMountedRef.current = true;
@@ -229,21 +236,24 @@ export default function Dashboard() {
   }, []);
 
   const loadStats = useCallback(async () => {
+    if (!canViewReports || !dashboardMountedRef.current) return;
     setLoading(true);
     setStatsError("");
     try {
       const { data } = await api.get("/reportes/estadisticas");
-      setStats(data);
+      if (dashboardMountedRef.current) setStats(data);
     } catch (error) {
-      setStatsError(getErrorMessage(error, "No fue posible cargar el resumen del dashboard."));
+      if (dashboardMountedRef.current) setStatsError(getErrorMessage(error, "No fue posible cargar el resumen del dashboard."));
     } finally {
-      setLoading(false);
+      if (dashboardMountedRef.current) setLoading(false);
     }
-  }, []);
+  }, [canViewReports]);
 
   useEffect(() => {
+    if (!canViewReports) return undefined;
     let active = true;
-    api.get("/reportes/estadisticas")
+    const controller = new AbortController();
+    api.get("/reportes/estadisticas", { signal: controller.signal })
       .then(({ data }) => {
         if (active) setStats(data);
       })
@@ -253,21 +263,29 @@ export default function Dashboard() {
       .finally(() => {
         if (active) setLoading(false);
       });
-    return () => { active = false; };
-  }, []);
+    return () => { active = false; controller.abort(); };
+  }, [canViewReports]);
 
   useEffect(() => {
-    Promise.all([
-      api.get("/reportes/proximas-a-parir"),
-      api.get("/reportes/sin-control-reciente"),
-    ])
-      .then(([r1, r2]) => {
-        setProximasParir(r1.data);
-        setSinControl(r2.data);
-      })
-      .catch(console.error)
-      .finally(() => setLoadingAlertas(false));
-  }, []);
+    if (!canViewReports) return undefined;
+    let active = true;
+    const controller = new AbortController();
+    const request = { signal: controller.signal };
+    Promise.allSettled([
+      api.get("/reportes/proximas-a-parir", request),
+      api.get("/reportes/sin-control-reciente", request),
+    ]).then(([parto, sincontrol]) => {
+      if (!active) return;
+      if (parto.status === "fulfilled") setProximasParir(parto.value.data);
+      if (sincontrol.status === "fulfilled") setSinControl(sincontrol.value.data);
+      setAlertErrors({
+        parto: parto.status === "rejected" ? getErrorMessage(parto.reason, "No se pudieron cargar las próximas al parto.") : "",
+        sincontrol: sincontrol.status === "rejected" ? getErrorMessage(sincontrol.reason, "No se pudieron cargar los controles recientes.") : "",
+      });
+      setLoadingAlertas(false);
+    });
+    return () => { active = false; controller.abort(); };
+  }, [canViewReports]);
 
   useEffect(() => {
     if (!canViewAppointments) return undefined;
@@ -305,7 +323,9 @@ export default function Dashboard() {
       label: `Sin control (${sinControl.length})`,
       alert: sinControl.length > 0,
     },
-  ];
+  ].filter(tab => ['citas', 'sincita'].includes(tab.id) ? canViewAppointments : canViewReports);
+  const activeTab = TABS.some(tab => tab.id === tabActiva) ? tabActiva : TABS[0]?.id;
+  const functionsAvailable = availableModules(usuario).filter(module => module.path !== '/dashboard');
 
   return (
     <div className="dashboard-page">
@@ -319,7 +339,7 @@ export default function Dashboard() {
         </span>
       </div>
 
-      {loading ? (
+      {canViewReports && (loading ? (
         <p style={{ color: "var(--text-muted)" }}>Cargando estadísticas...</p>
       ) : statsError && !stats ? (
         <div className="dashboard-load-error" role="alert">
@@ -335,7 +355,7 @@ export default function Dashboard() {
               variant="primary"
               Icon={Users}
               sublabel="seguimientos prenatales vigentes"
-              onClick={() => navigate("/pacientes")}
+              onClick={canViewAppointments ? () => navigate("/pacientes") : undefined}
             />
             <StatCard
               label="Controles este mes"
@@ -362,6 +382,14 @@ export default function Dashboard() {
             />
           </div>
         </>
+      ))}
+      {!canViewReports && (
+        <div className="card">
+          <h2>Funciones disponibles</h2>
+          {functionsAvailable.length ? functionsAvailable.map(module => (
+            <button key={module.path} type="button" className="btn-secondary" onClick={() => navigate(module.path)}>{module.label}</button>
+          )) : <p>No tiene módulos asignados. Consulte al administrador si necesita acceso.</p>}
+        </div>
       )}
 
       <div>
@@ -373,7 +401,7 @@ export default function Dashboard() {
                     setTabActiva(t.id);
                     if (t.id === "sincita" && canViewAppointments) loadMissingAppointments();
                   }}
-                  className={`content-tab ${tabActiva === t.id ? "is-active" : ""}`}
+                  className={`content-tab ${activeTab === t.id ? "is-active" : ""}`}
                 >
                   {t.label}
                   {t.alert && (
@@ -389,7 +417,7 @@ export default function Dashboard() {
               ))}
             </div>
 
-            {tabActiva === "citas" && (
+            {activeTab === "citas" && (
               canViewAppointments ? (
                 <AppointmentCalendar
                   canManageAppointments={canManageAppointments}
@@ -402,7 +430,9 @@ export default function Dashboard() {
               )
             )}
 
-            {tabActiva === "parto" && (
+            {alertErrors[activeTab] && <div role="alert" className="dashboard-load-error">{alertErrors[activeTab]}</div>}
+
+            {activeTab === "parto" && !alertErrors.parto && (
               <SeccionTabla
                 titulo="Próximas al Parto - 30 días"
                 badge={`${proximasParir.length} paciente${proximasParir.length !== 1 ? "s" : ""}`}
@@ -428,8 +458,8 @@ export default function Dashboard() {
                   </thead>
                   <tbody>
                     {proximasParir.map((p) => (
-                      <tr key={p.id} style={{ cursor: "pointer" }}
-                        onClick={() => navigate(`/pacientes/${p.id}`)}>
+                      <tr key={p.id} style={{ cursor: canViewAppointments ? "pointer" : "default" }}
+                        onClick={canViewAppointments ? () => navigate(`/pacientes/${p.id}`) : undefined}>
                         <td><PatientName>{p.nombre}</PatientName></td>
                         <td><span className="badge badge-blue">{p.no_expediente}</span></td>
                         <td><FppText value={p.fpp} /></td>
@@ -461,7 +491,7 @@ export default function Dashboard() {
               </SeccionTabla>
             )}
 
-            {tabActiva === "sincontrol" && (
+            {activeTab === "sincontrol" && !alertErrors.sincontrol && (
               <SeccionTabla
                 titulo="Sin control en las últimas 4 semanas"
                 badge={`${sinControl.length} paciente${sinControl.length !== 1 ? "s" : ""}`}
@@ -487,8 +517,8 @@ export default function Dashboard() {
                   </thead>
                   <tbody>
                     {sinControl.map((p) => (
-                      <tr key={p.id} style={{ cursor: "pointer" }}
-                        onClick={() => navigate(`/pacientes/${p.id}`)}>
+                      <tr key={p.id} style={{ cursor: canViewAppointments ? "pointer" : "default" }}
+                        onClick={canViewAppointments ? () => navigate(`/pacientes/${p.id}`) : undefined}>
                         <td><PatientName>{p.nombre}</PatientName></td>
                         <td><span className="badge badge-blue">{p.no_expediente}</span></td>
                         <td style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
@@ -533,7 +563,7 @@ export default function Dashboard() {
               </SeccionTabla>
             )}
 
-            {tabActiva === "sincita" && (
+            {activeTab === "sincita" && (
               canViewAppointments ? (
                 <MissingAppointmentQueue
                   canManageAppointments={canManageAppointments}

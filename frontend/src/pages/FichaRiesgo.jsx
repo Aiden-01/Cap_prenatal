@@ -12,6 +12,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import api from "../api/axios";
+import { ACCESS, canAccess } from "../utils/accessRules";
 import {
   ClinicalActionBar,
   ClinicalLoadingSkeleton,
@@ -278,6 +279,7 @@ export default function FichaRiesgo() {
   const [form, setForm] = useState(INIT);
   const [paciente, setPaciente] = useState(null);
   const [existingRisk, setExistingRisk] = useState(false);
+  const canSaveRisk = canAccess(usuario, existingRisk ? ACCESS.editControl : ACCESS.newControl);
   const [loadingData, setLoadingData] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showReferralAlert, setShowReferralAlert] = useState(false);
@@ -380,6 +382,7 @@ export default function FichaRiesgo() {
   }, [showReferralAlert]);
 
   const saveFicha = async () => {
+    if (!canSaveRisk) return;
     setLoading(true);
     fieldErrors.clearFieldErrors();
     const payload = { ...form };
@@ -405,6 +408,7 @@ export default function FichaRiesgo() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!canSaveRisk) return;
     if (hasRiskFeatures && referralMissing) {
       fieldErrors.setErrorsFromResponse(
         { response: { data: { details: [{ campo: "referida_a", mensaje: "Debe indicar a donde fue referida o confirmar que no aplica" }] } } },
@@ -650,10 +654,10 @@ export default function FichaRiesgo() {
                 detail={loading ? "Espera mientras se registra la información" : "La evaluación se guardará con los mismos criterios clínicos vigentes."}
               >
                 <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>Cancelar</button>
-                <button type="submit" className="btn-primary" disabled={loading}>
+                {canSaveRisk && <button type="submit" className="btn-primary" disabled={loading}>
                   <Save size={15} aria-hidden="true" />
                   {loading ? "Guardando..." : existingRisk ? "Guardar cambios" : "Guardar ficha"}
-                </button>
+                </button>}
               </ClinicalActionBar>
             </FormErrorContext.Provider>
           </form>

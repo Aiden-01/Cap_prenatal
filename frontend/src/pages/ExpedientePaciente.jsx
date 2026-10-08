@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import { useLocation, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
+import { ACCESS, canAccess } from "../utils/accessRules";
 import { useGlobalToast } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
 import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
@@ -829,7 +830,8 @@ export default function ExpedientePaciente() {
     pregnancyState: estadoEmbarazo,
     pregnancyId: embarazoSeleccionado?.id,
   });
-  const puedeRegistrarPuerperio = estadoEmbarazo === "activo" || estadoEmbarazo === "puerperio";
+  const puedeGuardarPlan = canAccess(usuario, ACCESS.planForm);
+  const puedeRegistrarPuerperio = puedeGuardarPlan && (estadoEmbarazo === "activo" || estadoEmbarazo === "puerperio");
   const riskTotalCriteria = riskTotalCount();
   const riskPositiveCriteria = exp.ficha_riesgo
     ? RISK_SECTIONS.reduce((total, section) => total + riskPositiveCount(exp.ficha_riesgo, section), 0)
@@ -1408,7 +1410,7 @@ export default function ExpedientePaciente() {
                       </span>
                       <span><CalendarDays size={15} /> {fecha(selectedPuerperio.fecha)}</span>
                     </div>
-                    {!isReadOnly && (
+                    {!isReadOnly && puedeEditarControles && (
                       <div className="puerperium-detail-actions">
                         <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/puerperio/${selectedPuerperio.id}/editar`))}>
                           <Pencil size={13} /> Editar
@@ -1478,7 +1480,7 @@ export default function ExpedientePaciente() {
       ══════════════════════════════════════════ */}
       {hasEmbarazo && tab === "morbilidad" && (
         <div className="morbidity-module">
-          {!isReadOnly && (
+          {!isReadOnly && puedeCrearControles && (
             <div className="morbidity-top-actions">
               <button className="btn-primary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/morbilidad/nuevo`))}>
                 <Plus size={14} /> Registrar morbilidad
@@ -1522,7 +1524,7 @@ export default function ExpedientePaciente() {
                     );
                   })}
                 </div>
-                {!isReadOnly && (
+                {!isReadOnly && puedeCrearControles && (
                   <button className="btn-secondary morbidity-register-inline" onClick={() => navigate(rutaClinica(`/pacientes/${id}/morbilidad/nuevo`))}>
                     <Plus size={14} /> Registrar morbilidad
                   </button>
@@ -1539,7 +1541,7 @@ export default function ExpedientePaciente() {
                         <p><CalendarDays size={13} /> {fecha(selectedMorbilidad.fecha)}{selectedMorbilidad.hora ? ` · ${selectedMorbilidad.hora}` : ""}</p>
                       </div>
                     </div>
-                    {!isReadOnly && (
+                    {!isReadOnly && puedeEditarControles && (
                       <div className="morbidity-detail-actions">
                         <button className="btn-secondary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/morbilidad/${selectedMorbilidad.id}/editar`))}>
                           <Pencil size={13} /> Editar
@@ -1590,7 +1592,7 @@ export default function ExpedientePaciente() {
           {!exp.ficha_riesgo ? (
             <div className="empty-state">
               No hay ficha de riesgo registrada.
-              {!isReadOnly && <div style={{ marginTop: "1rem" }}>
+              {!isReadOnly && puedeCrearControles && <div style={{ marginTop: "1rem" }}>
                 <button className="btn-primary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/riesgo`))}>
                   Registrar ficha de riesgo
                 </button>
@@ -1606,10 +1608,10 @@ export default function ExpedientePaciente() {
                     : <span className="badge badge-green risk-status-badge"><CheckCircle size={13} /> Sin riesgo</span>}
                 </div>
                 <div className="risk-action-row">
-                  {!isReadOnly && <button className="btn-secondary risk-action-button" onClick={() => navigate(rutaClinica(`/pacientes/${id}/riesgo`))}>
+                  {!isReadOnly && puedeEditarControles && <button className="btn-secondary risk-action-button" onClick={() => navigate(rutaClinica(`/pacientes/${id}/riesgo`))}>
                     <Pencil size={13} /> Editar
                   </button>}
-                  {!isReadOnly && <button className="btn-secondary risk-action-button" onClick={() => eliminarRegistro("¿Eliminar la ficha de riesgo?", rutaClinica(`/pacientes/${id}/riesgo`))}>
+                  {!isReadOnly && puedeEditarControles && <button className="btn-secondary risk-action-button" onClick={() => eliminarRegistro("¿Eliminar la ficha de riesgo?", rutaClinica(`/pacientes/${id}/riesgo`))}>
                     <Trash2 size={13} /> Eliminar
                   </button>}
                 </div>
@@ -1673,7 +1675,7 @@ export default function ExpedientePaciente() {
           {!exp.plan_parto ? (
             <div className="empty-state">
               No hay plan de parto registrado.
-              {!isReadOnly && <div style={{ marginTop: "1rem" }}>
+              {!isReadOnly && puedeGuardarPlan && <div style={{ marginTop: "1rem" }}>
                 <button className="btn-primary" onClick={() => navigate(rutaClinica(`/pacientes/${id}/plan-parto`))}>
                   Registrar plan de parto
                 </button>
@@ -1692,7 +1694,7 @@ export default function ExpedientePaciente() {
                   <p>Preparación, traslado y atención planificada para el parto.</p>
                 </div>
                 <div className="birth-plan-actions">
-                  {!isReadOnly && <button className="btn-secondary birth-plan-action" onClick={() => navigate(rutaClinica(`/pacientes/${id}/plan-parto`))}>
+                  {!isReadOnly && puedeGuardarPlan && <button className="btn-secondary birth-plan-action" onClick={() => navigate(rutaClinica(`/pacientes/${id}/plan-parto`))}>
                     <Pencil size={13} /> Editar
                   </button>}
                 </div>

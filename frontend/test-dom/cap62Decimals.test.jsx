@@ -11,7 +11,7 @@ const { ChatbotScreenProvider } = await import("../src/context/ChatbotScreenCont
 const api = (await import("../src/api/axios.js")).default;
 const FichaRiesgo = (await import("../src/pages/FichaRiesgo.jsx")).default;
 
-const USER = { id: 7, rol: "admin", permisos: ["controles.ver_vih"] };
+const USER = { id: 7, rol: "admin", permisos: ["pacientes.ver", "controles.crear", "controles.editar", "controles.ver_vih"] };
 const BASE_RESPONSE = {
   paciente: { id: 41, nombres: "Paciente", apellidos: "Decimal", fecha_nacimiento: "1995-01-01" },
   embarazo_seleccionado: { id: 91 },

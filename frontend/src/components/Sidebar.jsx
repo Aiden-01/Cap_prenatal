@@ -1,26 +1,16 @@
 ﻿import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { canViewHistory } from '../utils/historyAccess';
+import { availableModules } from '../utils/accessRules';
 import {
   LayoutDashboard, Users, UserPlus, BarChart3,
   Settings, LogOut, Menu, Moon, Sun, KeyRound, MapPin, MapPinned, History
 } from "lucide-react";
 
-const NAV = [
-  { label: "Inicio", path: "/dashboard", icon: LayoutDashboard, delay: 0 },
-  { label: "Pacientes",  path: "/pacientes", icon: Users,           delay: 50 },
-  { label: "Nueva",      path: "/nuevo",     icon: UserPlus,        delay: 100 },
-  { label: "Reportes",   path: "/reportes",  icon: BarChart3,       delay: 150 },
-  { label: "Mapa de Riesgo", path: "/mapa-riesgo", icon: MapPin,    delay: 200 },
-];
-
-const NAV_ADMIN = [
-  { label: "Usuarios", path: "/usuarios", icon: Settings, delay: 250 },
-];
-
-const NAV_DIRECTOR = [
-  { label: "Comunidades", path: "/comunidades", icon: MapPinned, delay: 250 },
-];
+const NAV_ICONS = {
+  '/dashboard': LayoutDashboard, '/pacientes': Users, '/nuevo': UserPlus,
+  '/reportes': BarChart3, '/mapa-riesgo': MapPin, '/usuarios': Settings,
+  '/comunidades': MapPinned, '/historial': History,
+};
 
 // Color fijo del sidebar — no depende del tema, siempre oscuro
 const SIDEBAR_BG = "#122033";
@@ -95,12 +85,9 @@ export default function Sidebar({
     window.setTimeout(() => setThemeSwitching(false), 520);
   };
 
-  const items = [
-    ...NAV,
-    ...(usuario?.rol === "director" ? NAV_DIRECTOR : []),
-    ...(usuario?.rol === "admin" || usuario?.rol === "director" ? NAV_ADMIN : []),
-    ...(canViewHistory(usuario) ? [{ label: 'Historial', path: '/historial', icon: History, delay: 300 }] : []),
-  ];
+  const items = availableModules(usuario).map((item, index) => ({
+    ...item, icon: NAV_ICONS[item.path], delay: index * 50,
+  }));
 
   return (
     <>

@@ -12,7 +12,7 @@ import NuevaPaciente from '../src/pages/NuevaPaciente.jsx';
 import Dashboard from '../src/pages/Dashboard.jsx';
 import Reportes from '../src/pages/Reportes.jsx';
 
-const auth = vi.hoisted(() => ({ usuario: { id: 73, permisos: ['pacientes.editar'] } }));
+const auth = vi.hoisted(() => ({ usuario: { id: 73, permisos: ['pacientes.ver', 'pacientes.editar', 'reportes.ver'] } }));
 vi.mock('../src/hooks/useAuth', () => ({ useAuth: () => auth }));
 const PATIENT = { id: 41, version: 7, no_expediente: 'SYN-DATE', nombres: 'Sintetica', apellidos: 'Prueba', pueblo: 'mestizo' };
 const toast = vi.fn();

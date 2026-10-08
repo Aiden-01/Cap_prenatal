@@ -150,8 +150,8 @@ test("reprogramar conserva original, agrega hija visible y cancelar conserva his
 
 test("permisos separan lectura pacientes.ver de edicion controles.editar", async () => {
   const dashboard = await read("src/pages/Dashboard.jsx");
-  assert.match(dashboard, /permisos\?\.includes\("pacientes\.ver"\)/);
-  assert.match(dashboard, /permisos\?\.includes\("controles\.editar"\)/);
+  assert.match(dashboard, /canAccess\(usuario, ACCESS\.patients\)/);
+  assert.match(dashboard, /canViewAppointments && hasPermission\(usuario, "controles\.editar"\)/);
   assert.match(dashboard, /canViewAppointments \? \(/);
   assert.match(dashboard, /canManageAppointments=\{canManageAppointments\}/);
 });

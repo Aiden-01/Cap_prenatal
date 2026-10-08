@@ -15,6 +15,8 @@ import {
   UsersRound,
 } from "lucide-react";
 import api from "../api/axios";
+import { useAuth } from "../hooks/useAuth";
+import { ACCESS, canAccess } from "../utils/accessRules";
 import { useGlobalToast } from "../context/ToastContext";
 import { isValidPregnancyId } from "../utils/pregnancyState";
 import { formatClinicalDate as formatDate, parseClinicalDate } from "../utils/gestationalAge";
@@ -107,6 +109,7 @@ function getFppInfo(paciente) {
 }
 
 export default function Pacientes() {
+  const { usuario } = useAuth();
   const [pacientes, setPacientes] = useState([]);
   const [total, setTotal] = useState(0);
   const [buscar, setBuscar] = useState("");
@@ -200,12 +203,13 @@ export default function Pacientes() {
             {total} paciente{total !== 1 ? "s" : ""} registrada{total !== 1 ? "s" : ""}
           </p>
         </div>
-        <button
+        {canAccess(usuario, ACCESS.newPatient) && (        <button
           className="btn-primary"
           onClick={() => navigate("/nuevo")}
           style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
           <UserPlus size={15} /> Nueva paciente
         </button>
+        )}
       </div>
 
       <div className="card patients-census-tools">
