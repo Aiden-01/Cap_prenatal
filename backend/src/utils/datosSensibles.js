@@ -12,6 +12,7 @@ function puedeVerVih(permisos = []) {
 
 function ocultarDatosVih(value, permisos = []) {
   if (puedeVerVih(permisos)) return value;
+  if (value instanceof Date) return new Date(value.getTime());
   if (Array.isArray(value)) return value.map((item) => ocultarDatosVih(item, permisos));
   if (!value || typeof value !== 'object') return value;
 
