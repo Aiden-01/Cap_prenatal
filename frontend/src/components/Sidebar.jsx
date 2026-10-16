@@ -163,7 +163,7 @@ export default function Sidebar({
         {/* NAV */}
         <nav className="sidebar-nav" style={{ flex: 1, padding: "0.75rem 0.5rem", overflowY: "auto" }}>
           {items.map(({ label, path, icon: Icon, delay }) => {
-            const isActive = location.pathname.startsWith(path);
+            const isActive = path === '/reportes' ? location.pathname === path : location.pathname.startsWith(path);
             return (
               <div key={path} style={{ position: "relative" }}>
                 <button
