@@ -158,8 +158,8 @@ function normalizeMissedAppointments(rows) {
   if (!Array.isArray(rows)) throw new TypeError('Resultado semanal invalido');
   return rows.map((row) => ({
     date: dateOnly(row.fecha_cita),
-    first_name: operationalText(row.primer_nombre, 80),
-    last_name: operationalText(row.primer_apellido, 80),
+    first_name: operationalText(row.nombres_completos ?? row.primer_nombre, 150),
+    last_name: operationalText(row.apellidos_completos ?? row.primer_apellido, 150),
     phone: operationalText(row.telefono, 32),
     community: operationalText(row.comunidad, 120),
     category: row.categoria === 'new' || row.categoria === 'previous_pending'
@@ -390,14 +390,14 @@ function createAutomatizacionesService({
       .filter((row) => row.fecha_proxima_cita)
       .map((row) => ({
         date: dateOnly(row.fecha_proxima_cita),
-        first_name: operationalText(row.primer_nombre, 80),
-        last_name: operationalText(row.primer_apellido, 80),
+        first_name: operationalText(row.nombres_completos ?? row.primer_nombre, 150),
+        last_name: operationalText(row.apellidos_completos ?? row.primer_apellido, 150),
         phone: operationalText(row.telefono, 32),
         community: operationalText(row.comunidad, 120),
       }))
       .sort((left, right) => left.date.localeCompare(right.date)
-        || left.last_name.localeCompare(right.last_name, 'es')
-        || left.first_name.localeCompare(right.first_name, 'es'));
+        || left.last_name.split(' ')[0].localeCompare(right.last_name.split(' ')[0], 'es')
+        || left.first_name.split(' ')[0].localeCompare(right.first_name.split(' ')[0], 'es'));
     const totalsByDate = new Map();
     for (const appointment of appointments) {
       totalsByDate.set(appointment.date, (totalsByDate.get(appointment.date) || 0) + 1);

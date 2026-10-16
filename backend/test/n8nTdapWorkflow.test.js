@@ -104,9 +104,9 @@ test('contrato listo conserva solo conteos, token, correo y fechas visibles DD-M
   assert.match(result.html, /24-08-2026 al 30-08-2026/);
   assert.match(result.html, /Nuevas pacientes que alcanzaron 20 semanas la semana pasada: 2/);
   assert.match(result.html, /Pacientes pendientes de Tdap actualmente: 4/);
-  assert.match(result.html, /Primer nombre/);
-  assert.match(result.html, /Primer apellido/);
-  assert.match(result.html, /Comunidad/);
+  assert.match(result.html, /Excel|ARCHIVO ADJUNTO/);
+
+
   assert.doesNotMatch(result.subject + result.html, /2026-08-(?:24|30|31)/);
   assert.doesNotMatch(
     result.html.toLowerCase(),
@@ -148,7 +148,7 @@ test('orquestacion acepta solo nuevas, solo pendientes y ambos con un unico corr
   );
 });
 
-test('correo muestra ambas listas con solo nombre, apellido y comunidad y adjunta base64 XLSX', () => {
+test('correo ejecutivo omite listas nominales y conserva base64 XLSX', () => {
   const base = runValidator(validPayload());
   const result = runEmailBuilder({
     ...base,
@@ -167,9 +167,9 @@ test('correo muestra ambas listas con solo nombre, apellido y comunidad y adjunt
   assert.equal(result.filename, 'Seguimiento_Tdap_El_Chal_31-08-2026.xlsx');
   assert.match(result.html, /Nuevas oportunidades Tdap/);
   assert.match(result.html, /Pendientes de Tdap/);
-  assert.match(result.html, /Primer nombre/);
-  assert.match(result.html, /Primer apellido/);
-  assert.match(result.html, /Comunidad &amp; Uno/);
+  assert.match(result.html, /Excel|ARCHIVO ADJUNTO/);
+
+  assert.doesNotMatch(result.html, /Comunidad &amp; Uno/);
   assert.doesNotMatch(
     result.html.toLowerCase(),
     /cui|expediente|tel[eé]fono|direcci[oó]n|fur|fpp|riesgo|diagn[oó]stico|laboratorio|vih/

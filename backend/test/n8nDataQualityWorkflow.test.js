@@ -146,7 +146,8 @@ test('correo usa DD-MM-YYYY y contiene solo categorias agregadas', () => {
   const result = runEmailBuilder(runValidator(validPayload()));
   assert.equal(result.subject, 'CAP Prenatal | Revisión semanal de calidad de datos');
   assert.match(result.html, /24-08-2026 al 30-08-2026/);
-  assert.match(result.html, /Total de incidencias:<\/strong> 3/);
+  // V2 keeps the same total in the KPI above its label.
+  assert.match(result.html, />03<\/p><p[^>]*>Total de incidencias<\/p>/);
   assert.match(result.html, /Controles prenatales con fecha futura/);
   assert.match(result.html, /Citas programadas en embarazos cerrados/);
   assert.match(result.html, /Este resumen no contiene datos de pacientes ni información clínica/);

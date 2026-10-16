@@ -9,9 +9,9 @@ function byName(name) {
   return node;
 }
 
-function runBuilder(payload) {
+async function runBuilder(payload) {
   const code = byName('Construir detalle operativo').parameters.jsCode;
-  return new Function('$json', code)(payload)[0].json;
+  return (await new Function('$json', 'require', code)(payload, name => { assert.equal(name, 'exceljs'); return require('exceljs'); }))[0].json;
 }
 
 function validPayload() {
@@ -73,7 +73,7 @@ test('consulta protegida solicita únicamente las citas de mañana', () => {
   assert.equal(request.parameters.options.redirect.redirect.followRedirects, false);
 });
 
-test('correo contiene un nombre, un apellido, teléfono y comunidad con HTML escapado', () => {
+test('correo ejecutivo excluye datos nominales y anuncia Excel completo', async () => {
   const payload = validPayload();
   payload.appointments[0] = {
     ...payload.appointments[0],
@@ -82,27 +82,30 @@ test('correo contiene un nombre, un apellido, teléfono y comunidad con HTML esc
     phone: '5555-0101',
     community: 'El "Chal"',
   };
-  const built = runBuilder(payload);
+  const built = await runBuilder(payload);
 
   assert.equal(built.subject, 'CAP Prenatal | Recordatorio de citas | 23-08-2026');
   assert.doesNotMatch(built.subject, /2026-08-23/);
-  assert.match(built.html, /&lt;Ana&gt; López &amp; Hijos/);
-  assert.match(built.html, /5555-0101/);
-  assert.match(built.html, /El &quot;Chal&quot;/);
+  assert.match(built.html, /Listado de pacientes/);
+  assert.match(built.html, /cita programada para el 23 de agosto de 2026/);
+  assert.doesNotMatch(built.html, /XLSX|Citas_programadas_|Detalle disponible en Excel/);
+  assert.doesNotMatch(built.html, /Ana|López|5555-0101|El &quot;Chal&quot;/);
+
+
   assert.doesNotMatch(built.html, /<Ana>|López & Hijos|El "Chal"/);
   assert.doesNotMatch(built.html.toLowerCase(), /cui|expediente|diagnóstico|diagnostico/);
 });
 
-test('constructor rechaza campos extra, conteos inconsistentes y controles', () => {
+test('constructor rechaza campos extra, conteos inconsistentes y controles', async () => {
   const extra = validPayload();
   extra.appointments[0].cui = 'dato prohibido';
-  assert.throws(() => runBuilder(extra), /CONTRACT_INVALID/);
+  await assert.rejects(() => runBuilder(extra), /CONTRACT_INVALID/);
 
   const mismatch = validPayload();
   mismatch.total = 2;
-  assert.throws(() => runBuilder(mismatch), /CONTRACT_INVALID/);
+  await assert.rejects(() => runBuilder(mismatch), /CONTRACT_INVALID/);
 
   const control = validPayload();
   control.appointments[0].community = 'El Chal\nOtra línea';
-  assert.throws(() => runBuilder(control), /CONTRACT_INVALID/);
+  await assert.rejects(() => runBuilder(control), /CONTRACT_INVALID/);
 });

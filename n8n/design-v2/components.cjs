@@ -1,0 +1,52 @@
+'use strict';
+
+// Presentation only: no API calls, eligibility rules, credentials or dispatch state.
+const TOKENS = Object.freeze({ green: '#0D756C', navy: '#11364C', background: '#EDF1F0', white: '#FFFFFF', text: '#24394A', muted: '#516576', line: '#DCE5E3' });
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+function formatDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error('Invalid presentation date');
+  const date = new Date(value + 'T00:00:00Z');
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new Error('Invalid presentation date');
+  return value.split('-').reverse().join('-');
+}
+const table = (body, style = '') => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;${style}">${body}</table>`;
+const section = body => `<tr><td class="pad" style="padding:0 32px 26px;">${body}</td></tr>`;
+function renderInstitutionalHeader(badge) {
+  return `<tr><td height="6" bgcolor="${TOKENS.green}" style="height:6px;line-height:6px;font-size:0;">&nbsp;</td></tr><tr><td class="pad" style="padding:28px 32px 23px;">${table(`<tr><td width="48" valign="middle">${table('<tr><td height="42" align="center" bgcolor="#0D756C" style="height:42px;border-radius:10px;color:#FFFFFF;font-size:12px;font-weight:bold;letter-spacing:1px;">CAP</td></tr>')}</td><td style="padding-left:12px;"><p style="margin:0 0 4px;color:#11364C;font-size:18px;font-weight:bold;">CAP Prenatal</p><p style="margin:0;color:#5D727C;font-size:10px;line-height:1.5;">CENTRO DE ATENCIÓN PERMANENTE · EL CHAL</p></td></tr>`)}</td></tr>${section(`<p style="margin:0;padding-top:14px;border-top:1px solid #E8EFED;color:#0D756C;font-size:10px;font-weight:bold;letter-spacing:1.3px;">${escapeHtml(badge)}</p>`)}`;
+}
+function renderReportHeading({ category, title, intro }) {
+  return section(`<p style="margin:0 0 12px;color:#0D756C;font-size:11px;font-weight:bold;letter-spacing:1.4px;">${escapeHtml(category)}</p><h1 style="margin:0 0 15px;color:#11364C;font-size:30px;line-height:1.2;letter-spacing:-.5px;">${escapeHtml(title)}</h1><p style="margin:0;color:#516576;font-size:14px;line-height:1.75;">${escapeHtml(intro)}</p>`);
+}
+function renderPeriodCard(label, text) {
+  return section(table(`<tr><td width="4" bgcolor="#0D756C" style="width:4px;font-size:1px;">&nbsp;</td><td style="padding:15px 18px;"><p style="margin:0 0 5px;color:#526E6B;font-size:10px;font-weight:bold;letter-spacing:1px;">${escapeHtml(label)}</p><p style="margin:0;color:#133F49;font-size:16px;font-weight:bold;line-height:1.5;">${escapeHtml(text)}</p></td></tr>`, 'background:#F2F7F6;border-radius:8px;'));
+}
+function renderKpiCard({ value, label, detail = '', tone = 'green' }) {
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error('Invalid KPI');
+  const palettes = { green: ['#FBFDFC', '#DCE8E6', '#0D756C'], amber: ['#FFFAF1', '#F3DFBC', '#925A07'], navy: ['#F2F6F8', '#D5E2E8', '#11364C'] };
+  const [background, border, color] = palettes[tone] || palettes.green;
+  return table(`<tr><td style="padding:19px 14px;"><p style="margin:0;color:${color};font-size:32px;font-weight:bold;line-height:1.1;">${value.toString().padStart(2, '0')}</p><p style="margin:10px 0 5px;color:${color};font-size:13px;font-weight:bold;line-height:1.5;overflow-wrap:anywhere;">${escapeHtml(label)}</p><p style="margin:0;color:#516576;font-size:11px;line-height:1.6;overflow-wrap:anywhere;">${escapeHtml(detail)}</p></td></tr>`, `background:${background};border:1px solid ${border};border-radius:9px;table-layout:fixed;`);
+}
+function renderKpiRow(cards) {
+  const width = (100 / cards.length).toFixed(2);
+  return section(table(`<tr>${cards.map(card => `<td class="kpi" width="${width}%" valign="top" style="width:${width}%;padding:0 4px 8px;">${renderKpiCard(card)}</td>`).join('')}</tr>`, 'table-layout:fixed;'));
+}
+function renderEmptyState(message) {
+  return table(`<tr><td style="padding:21px 18px;color:#516576;font-size:13px;line-height:1.7;">${escapeHtml(message)}</td></tr>`, 'border:1px dashed #CEDDDA;background:#FAFCFB;border-radius:8px;');
+}
+function renderDataTable({ title, columns, rows, empty = 'Sin registros para esta sección.' }) {
+  const heading = `<h2 style="margin:0 0 10px;color:#11364C;font-size:18px;line-height:1.4;">${escapeHtml(title)}</h2><p style="margin:0 0 14px;color:#516576;font-size:12px;line-height:1.6;">${rows.length} registro${rows.length === 1 ? '' : 's'} · Revisión exclusiva de personal autorizado.</p>`;
+  if (!rows.length) return section(heading + renderEmptyState(empty));
+  const th = columns.map(c => `<th scope="col" align="left" style="padding:12px 7px;color:#2F625E;font-size:11px;line-height:1.5;overflow-wrap:anywhere;word-wrap:break-word;">${escapeHtml(c.label)}</th>`).join('');
+  const body = rows.map(row => `<tr>${columns.map(c => `<td valign="top" style="padding:13px 7px;border-top:1px solid #E1E9E8;color:#334B57;font-size:12px;line-height:1.65;overflow-wrap:anywhere;word-wrap:break-word;">${escapeHtml(row[c.key])}</td>`).join('')}</tr>`).join('');
+  return section(heading + `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #E1E9E8;table-layout:fixed;"><caption style="text-align:left;font-size:0;line-height:0;color:#FFFFFF;">${escapeHtml(title)}</caption><thead><tr bgcolor="#EEF5F3">${th}</tr></thead><tbody>${body}</tbody></table>`);
+}
+function renderAttachmentNotice({ filename, detail }) {
+  return section(table(`<tr><td style="padding:21px;color:#FFFFFF;"><p style="margin:0 0 9px;color:#C5EAE5;font-size:10px;font-weight:bold;letter-spacing:1px;">XLSX · ARCHIVO ADJUNTO</p><p style="margin:0 0 6px;color:#FFFFFF;font-size:15px;font-weight:bold;">Detalle disponible en Excel</p><p style="margin:0;color:#D4E5E8;font-size:12px;line-height:1.7;">${escapeHtml(detail)}</p><p style="margin:12px 0 0;color:#D4E5E8;font-size:11px;line-height:1.6;overflow-wrap:anywhere;word-break:break-all;">${escapeHtml(filename)}</p></td></tr>`, 'background:#11364C;border-radius:10px;table-layout:fixed;'));
+}
+function renderInstitutionalFooter(aggregateOnly) {
+  return `<tr><td class="pad" bgcolor="#F8FAF9" style="padding:25px 32px 29px;border-top:1px solid #E7EEEE;"><p style="margin:0 0 9px;color:#174D52;font-size:12px;font-weight:bold;">CAP Prenatal · El Chal, Petén</p><p style="margin:0;color:#516576;font-size:11px;line-height:1.7;">Comunicación de uso interno para personal autorizado. Los datos incluidos deben manejarse con la debida confidencialidad.${aggregateOnly ? ' Este resumen no contiene datos nominales de pacientes ni información clínica.' : ''}</p><p style="margin:13px 0 0;color:#516576;font-size:10px;line-height:1.6;">Correo generado automáticamente por CAP Prenatal. No responda a este mensaje.</p></td></tr>`;
+}
+function renderEmailLayout({ subject, badge, preheader, heading, period, cards, content, aggregateOnly = false }) {
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${escapeHtml(subject)}</title><style>@media only screen and (max-width:620px){.pad{padding-left:16px!important;padding-right:16px!important}.kpi{display:block!important;width:100%!important;box-sizing:border-box!important;padding:0 0 12px!important}}</style></head><body style="margin:0;padding:0;background:#EDF1F0;color:#24394A;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;"><div style="display:none!important;visibility:hidden;max-height:0;overflow:hidden;font-size:1px;line-height:1px;">${escapeHtml(preheader)}</div>${table(`<tr><td align="center" style="padding:28px 10px;"><!--[if mso]><table role="presentation" width="660" cellpadding="0" cellspacing="0"><tr><td><![endif]--><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:660px;border:1px solid #DCE5E3;border-collapse:separate;background:#FFFFFF;border-radius:13px;">${renderInstitutionalHeader(badge)}${renderReportHeading(heading)}${renderPeriodCard(period.label, period.text)}${renderKpiRow(cards)}${content}${renderInstitutionalFooter(aggregateOnly)}</table><!--[if mso]></td></tr></table><![endif]--><p style="margin:18px 0 0;color:#516576;font-size:11px;line-height:1.6;">Maqueta V2 · Datos completamente ficticios · Sin envíos reales</p></td></tr>`)}</body></html>`;
+}
+module.exports = { TOKENS, escapeHtml, formatDate, renderInstitutionalHeader, renderReportHeading, renderPeriodCard, renderKpiCard, renderKpiRow, renderDataTable, renderEmptyState, renderAttachmentNotice, renderInstitutionalFooter, renderEmailLayout, section };
