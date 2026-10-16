@@ -4,6 +4,8 @@ import { useAuth } from "./hooks/useAuth";
 import Layout from "./components/Layout";
 import PrivateRoute from "./components/AccessRoute";
 import { ACCESS } from "./utils/accessRules";
+import { useLocation } from 'react-router-dom';
+import { safeReturn } from './utils/safeReturn';
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 
@@ -31,12 +33,17 @@ function LazyPage({ children }) {
   );
 }
 
-export default function App() {
+function LoginEntry() {
   const { usuario } = useAuth();
+  const location = useLocation();
+  return usuario ? <Navigate to={safeReturn(location.state?.returnTo)} replace /> : <Login />;
+}
+
+export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={usuario ? <Navigate to="/dashboard" /> : <Login />} />
+        <Route path="/login" element={<LoginEntry />} />
         <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
           <Route index element={<Navigate to="/dashboard" />} />
           <Route path="dashboard" element={<Dashboard />} />

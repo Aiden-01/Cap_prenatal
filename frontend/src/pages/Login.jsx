@@ -18,6 +18,7 @@ import api from "../api/axios";
 import { consumeAuthNotice, useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessage";
 import { useFieldErrors } from "../hooks/useFieldErrors";
+import { safeReturn } from "../utils/safeReturn";
 
 const FIELD_LABELS = {
   username: "Usuario",
@@ -45,7 +46,7 @@ export default function Login() {
     try {
       const { data } = await api.post("/auth/login", form);
       login(data.usuario);
-      navigate("/dashboard");
+      navigate(safeReturn(location.state?.returnTo));
     } catch (err) {
       const parsed = fieldErrors.setErrorsFromResponse(err, "Error al iniciar sesión");
       if (!Object.keys(parsed.errors).length) {

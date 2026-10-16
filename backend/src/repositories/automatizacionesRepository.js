@@ -16,6 +16,8 @@ function createAutomatizacionesRepository(db = pool) {
           cp.fecha_programada AS fecha_proxima_cita,
           SPLIT_PART(TRIM(p.nombres), ' ', 1) AS primer_nombre,
           SPLIT_PART(TRIM(p.apellidos), ' ', 1) AS primer_apellido,
+          TRIM(p.nombres) AS nombres_completos,
+          TRIM(p.apellidos) AS apellidos_completos,
           COALESCE(p.telefono, '') AS telefono,
           COALESCE(com.nombre, p.comunidad, '') AS comunidad
         FROM citas_prenatales cp
@@ -36,6 +38,8 @@ function createAutomatizacionesRepository(db = pool) {
         a.fecha_proxima_cita,
         a.primer_nombre,
         a.primer_apellido,
+        a.nombres_completos,
+        a.apellidos_completos,
         a.telefono,
         a.comunidad
       FROM bounds b
@@ -85,6 +89,8 @@ function createAutomatizacionesRepository(db = pool) {
          cp.fecha_programada AS fecha_cita,
          SPLIT_PART(TRIM(p.nombres), ' ', 1) AS primer_nombre,
          SPLIT_PART(TRIM(p.apellidos), ' ', 1) AS primer_apellido,
+         TRIM(p.nombres) AS nombres_completos,
+         TRIM(p.apellidos) AS apellidos_completos,
          COALESCE(p.telefono, '') AS telefono,
          COALESCE(com.nombre, p.comunidad, '') AS comunidad,
          CASE

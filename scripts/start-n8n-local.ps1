@@ -156,5 +156,19 @@ if ($installedVersion -ne $requiredN8nVersion) {
   throw "Version local de n8n no autorizada. Se requiere $requiredN8nVersion."
 }
 
+# Fixed local dependency: direct Code imports are restricted to exceljs only.
+$excelJsModules = Join-Path $repositoryRoot "backend\node_modules"
+$excelJsPackage = Join-Path $excelJsModules "exceljs\package.json"
+if (-not (Test-Path -LiteralPath $excelJsPackage -PathType Leaf)) {
+  throw "Falta ExcelJS 4.4.0 en backend/node_modules. No se instalara automaticamente."
+}
+if ((Get-Content -Raw -LiteralPath $excelJsPackage | ConvertFrom-Json).version -ne "4.4.0") {
+  throw "Version de ExcelJS no autorizada. Se requiere 4.4.0."
+}
+$env:NODE_PATH = $excelJsModules
+$env:NODE_FUNCTION_ALLOW_EXTERNAL = "exceljs"
+$env:NODE_FUNCTION_ALLOW_BUILTIN = ""
+$env:N8N_RUNNERS_INSECURE_MODE = "false"
+
 node $localN8nBin
 exit $LASTEXITCODE

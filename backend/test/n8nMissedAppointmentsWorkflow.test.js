@@ -11,7 +11,8 @@ function byName(name) {
 
 function runCode(name, payload) {
   const code = byName(name).parameters.jsCode;
-  return new Function('$json', code)(payload)[0].json;
+  const value = new Function('$json', 'require', code)(payload, name => { assert.equal(name, 'exceljs'); return require('exceljs'); });
+  return value && typeof value.then === 'function' ? value.then(items => items[0].json) : value[0].json;
 }
 
 function validPayload(overrides = {}) {
@@ -151,7 +152,7 @@ test('validador rechaza campos extra, estado no permitido, conteo y ventana inva
   })), /CONTRACT_INVALID/);
 });
 
-test('HTML escapa valores e incluye solo fecha, nombre, apellido, telefono y comunidad', () => {
+test('HTML ejecutivo excluye nombres y conserva período, indicadores y adjunto', async () => {
   const payload = validPayload();
   payload.appointments[0] = {
     ...payload.appointments[0],
@@ -161,20 +162,21 @@ test('HTML escapa valores e incluye solo fecha, nombre, apellido, telefono y com
     community: 'El "Chal"',
   };
   const validated = runCode('Validar contrato y reserva', payload);
-  const built = runCode('Construir mensaje operativo', validated);
+  const built = await runCode('Construir mensaje operativo', validated);
 
   assert.equal(
     built.subject,
     'CAP Prenatal | Seguimiento de inasistencias | 17-08-2026 al 23-08-2026'
   );
-  assert.match(built.html, /&lt;Ana&gt; López &amp; Hijos/);
-  assert.match(built.html, /El &quot;Chal&quot;/);
-  assert.match(built.html, /19-08-2026/);
-  assert.doesNotMatch(built.subject + built.html, /2026-08-(?:17|19|23)/);
+  assert.match(built.html, /ARCHIVO ADJUNTO/);
+  assert.doesNotMatch(built.html, /Ana|López|5555-0101|19-08-2026/);
+
+
+  assert.doesNotMatch(built.subject, /2026-08-(?:17|19|23)/);
   assert.match(built.html, /Nuevas inasistencias/);
   assert.doesNotMatch(built.html, /Pendientes de semanas anteriores/);
   assert.match(built.html, /ya reprogramados o con un control posterior no se incluyen/);
-  assert.match(built.html, /No responda a este correo/);
+  assert.match(built.html, /No responda a este (?:correo|mensaje)/);
   assert.doesNotMatch(built.html, /<Ana>|López & Hijos|El "Chal"/);
   assert.doesNotMatch(
     built.html.toLowerCase(),
@@ -183,7 +185,7 @@ test('HTML escapa valores e incluye solo fecha, nombre, apellido, telefono y com
   assert.equal(built.dispatch_token, 'a'.repeat(43));
 });
 
-test('HTML separa pendientes anteriores y omite la seccion sin registros', () => {
+test('resumen conserva pendientes anteriores aunque nuevas sea cero', async () => {
   const payload = validPayload({
     summary: { new: 0, previous_pending: 1, total: 1 },
     appointments: [{
@@ -195,19 +197,22 @@ test('HTML separa pendientes anteriores y omite la seccion sin registros', () =>
       category: 'previous_pending',
     }],
   });
-  const built = runCode(
+  const built = await runCode(
     'Construir mensaje operativo',
     runCode('Validar contrato y reserva', payload)
   );
-  assert.match(built.html, /Pendientes de semanas anteriores/);
+  assert.match(built.html, /Pendientes anteriores/);
   assert.doesNotMatch(built.html, /<h3[^>]*>Nuevas inasistencias/);
-  assert.match(built.html, /Pendientes anteriores:<\/strong> 1/);
+  // V2 renders the existing pending count inside its KPI card.
+  assert.match(built.html, />01<\/p><p[^>]*>Pendientes anteriores<\/p>/);
 });
 
 test('JSON versionado no incluye secretos, credenciales ni destinatarios reales', () => {
   const serialized = JSON.stringify(workflow);
   assert.match(serialized, /\.invalid/);
-  assert.doesNotMatch(serialized, /hercor-nexus\.com|yondani29@gmail\.com/);
+  const approvedLink = 'https://prenatal.hercor-nexus.com/reportes/seguimiento-inasistencias';
+  assert.ok(!serialized.includes(approvedLink));
+  assert.doesNotMatch(serialized.replace(approvedLink, ''), /hercor-nexus\.com|yondani29@gmail\.com/);
   assert.doesNotMatch(serialized, /\bre_[A-Za-z0-9_-]{8,}|N8N_ENCRYPTION_KEY|Bearer\s+\S+|password/i);
   assert.doesNotMatch(serialized, /cita_siguiente/);
 });

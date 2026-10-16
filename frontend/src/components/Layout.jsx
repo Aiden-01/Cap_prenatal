@@ -1,5 +1,7 @@
 ﻿import { Outlet, useNavigate } from "react-router-dom";
 import { useCallback, useState, useEffect } from "react";
+import { useLocation } from 'react-router-dom';
+import { safeReturn } from '../utils/safeReturn';
 import { Eye, EyeOff, KeyRound, Menu, X } from "lucide-react";
 import Sidebar from "./Sidebar";
 import Toast from "./Toast";
@@ -23,6 +25,7 @@ export default function Layout() {
   const { usuario, logout } = useAuth();
   const { toasts, toast }   = useToast();
   const navigate            = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen]   = useState(false);
   const [isMobile, setIsMobile]   = useState(window.innerWidth < 768);
@@ -55,9 +58,9 @@ export default function Layout() {
     logout({ reason: message, broadcastType, broadcastMetadata, localOnly });
     navigate("/login", {
       replace: true,
-      state: message ? { sessionMessage: message } : undefined,
+      state: message ? { sessionMessage: message, returnTo: safeReturn(location.pathname) } : undefined,
     });
-  }, [logout, navigate]);
+  }, [logout, navigate, location.pathname]);
 
   const handleLogout = useCallback(() => {
     api.post("/auth/logout", {}, { skipAuthRefresh: true, skipAuthRedirect: true }).catch(() => {});
