@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CAP Prenatal backup observation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "started_at", "finished_at", "schedule_slot", "destination_type", "event_type", "stage", "reason_code", "external_verified", "hash_match", "verification_method"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,96}$"},
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": ["string", "null"], "format": "date-time"},
+    "schedule_slot": {"type": "string", "format": "date-time"},
+    "destination_type": {"enum": ["gdrive", "external_hdd"]},
+    "event_type": {"enum": ["OK", "DUMP_FAILED", "TRANSFER_FAILED", "DESTINATION_UNAVAILABLE", "VERIFY_FAILED", "MISSED_BACKUP", "INCOMPLETE", "UNKNOWN"]},
+    "stage": {"enum": ["start", "dump", "local_validation", "mkdir", "transfer", "remote_hash", "hash_match", "finalize", "existence", "success", "cleanup", "end"]},
+    "reason_code": {"enum": ["NONE", "COMMAND_FAILED", "AUTH_FAILED", "NETWORK", "HASH_MISMATCH", "NO_START", "TIMEOUT", "EVIDENCE_MISSING", "CLEANUP_FAILED"]},
+    "external_verified": {"type": "boolean"},
+    "hash_match": {"type": "boolean"},
+    "verification_method": {"enum": ["sha256_readback_temp_then_move_and_lsf", "unproven"]}
+  },
+  "allOf": [{
+    "if": {"properties": {"external_verified": {"const": true}}},
+    "then": {"properties": {"hash_match": {"const": true}, "event_type": {"const": "OK"}, "verification_method": {"const": "sha256_readback_temp_then_move_and_lsf"}}}
+  }]
+}

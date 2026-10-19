@@ -1,0 +1,253 @@
+{
+  "name": "CAP Prenatal — Monitoreo de respaldos externos",
+  "active": false,
+  "activeVersionId": null,
+  "nodes": [
+    {
+      "id": "schedule",
+      "name": "Cada cinco minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Interfaz privada: vincular credencial Header Auth Authorization Bearer solo durante despliegue autorizado."
+    },
+    {
+      "id": "claim",
+      "name": "Reclamar alerta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8766/v1/claim",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "position": [
+        220,
+        0
+      ],
+      "notes": "Interfaz privada: vincular credencial Header Auth Authorization Bearer solo durante despliegue autorizado."
+    },
+    {
+      "id": "render",
+      "name": "Preparar alerta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "'use strict';\n\n// Presentation only: no API calls, eligibility rules, credentials or dispatch state.\nconst TOKENS = Object.freeze({ green: '#0D756C', navy: '#11364C', background: '#EDF1F0', white: '#FFFFFF', text: '#24394A', muted: '#516576', line: '#DCE5E3' });\nconst escapeHtml = value => String(value ?? '').replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c]);\nfunction formatDate(value) {\n  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) throw new Error('Invalid presentation date');\n  const date = new Date(value + 'T00:00:00Z');\n  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new Error('Invalid presentation date');\n  return value.split('-').reverse().join('-');\n}\nconst table = (body, style = '') => `<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;${style}\">${body}</table>`;\nconst section = body => `<tr><td class=\"pad\" style=\"padding:0 32px 26px;\">${body}</td></tr>`;\nfunction renderInstitutionalHeader(badge) {\n  return `<tr><td height=\"6\" bgcolor=\"${TOKENS.green}\" style=\"height:6px;line-height:6px;font-size:0;\">&nbsp;</td></tr><tr><td class=\"pad\" style=\"padding:28px 32px 23px;\">${table(`<tr><td width=\"48\" valign=\"middle\">${table('<tr><td height=\"42\" align=\"center\" bgcolor=\"#0D756C\" style=\"height:42px;border-radius:10px;color:#FFFFFF;font-size:12px;font-weight:bold;letter-spacing:1px;\">CAP</td></tr>')}</td><td style=\"padding-left:12px;\"><p style=\"margin:0 0 4px;color:#11364C;font-size:18px;font-weight:bold;\">CAP Prenatal</p><p style=\"margin:0;color:#5D727C;font-size:10px;line-height:1.5;\">CENTRO DE ATENCIÓN PERMANENTE · EL CHAL</p></td></tr>`)}</td></tr>${section(`<p style=\"margin:0;padding-top:14px;border-top:1px solid #E8EFED;color:#0D756C;font-size:10px;font-weight:bold;letter-spacing:1.3px;\">${escapeHtml(badge)}</p>`)}`;\n}\nfunction renderReportHeading({ category, title, intro }) {\n  return section(`<p style=\"margin:0 0 12px;color:#0D756C;font-size:11px;font-weight:bold;letter-spacing:1.4px;\">${escapeHtml(category)}</p><h1 style=\"margin:0 0 15px;color:#11364C;font-size:30px;line-height:1.2;letter-spacing:-.5px;\">${escapeHtml(title)}</h1><p style=\"margin:0;color:#516576;font-size:14px;line-height:1.75;\">${escapeHtml(intro)}</p>`);\n}\nfunction renderPeriodCard(label, text) {\n  return section(table(`<tr><td width=\"4\" bgcolor=\"#0D756C\" style=\"width:4px;font-size:1px;\">&nbsp;</td><td style=\"padding:15px 18px;\"><p style=\"margin:0 0 5px;color:#526E6B;font-size:10px;font-weight:bold;letter-spacing:1px;\">${escapeHtml(label)}</p><p style=\"margin:0;color:#133F49;font-size:16px;font-weight:bold;line-height:1.5;\">${escapeHtml(text)}</p></td></tr>`, 'background:#F2F7F6;border-radius:8px;'));\n}\nfunction renderKpiCard({ value, label, detail = '', tone = 'green' }) {\n  if (!Number.isSafeInteger(value) || value < 0) throw new Error('Invalid KPI');\n  const palettes = { green: ['#FBFDFC', '#DCE8E6', '#0D756C'], amber: ['#FFFAF1', '#F3DFBC', '#925A07'], navy: ['#F2F6F8', '#D5E2E8', '#11364C'] };\n  const [background, border, color] = palettes[tone] || palettes.green;\n  return table(`<tr><td style=\"padding:19px 14px;\"><p style=\"margin:0;color:${color};font-size:32px;font-weight:bold;line-height:1.1;\">${value.toString().padStart(2, '0')}</p><p style=\"margin:10px 0 5px;color:${color};font-size:13px;font-weight:bold;line-height:1.5;overflow-wrap:anywhere;\">${escapeHtml(label)}</p><p style=\"margin:0;color:#516576;font-size:11px;line-height:1.6;overflow-wrap:anywhere;\">${escapeHtml(detail)}</p></td></tr>`, `background:${background};border:1px solid ${border};border-radius:9px;table-layout:fixed;`);\n}\nfunction renderKpiRow(cards) {\n  const width = (100 / cards.length).toFixed(2);\n  return section(table(`<tr>${cards.map(card => `<td class=\"kpi\" width=\"${width}%\" valign=\"top\" style=\"width:${width}%;padding:0 4px 8px;\">${renderKpiCard(card)}</td>`).join('')}</tr>`, 'table-layout:fixed;'));\n}\nfunction renderEmptyState(message) {\n  return table(`<tr><td style=\"padding:21px 18px;color:#516576;font-size:13px;line-height:1.7;\">${escapeHtml(message)}</td></tr>`, 'border:1px dashed #CEDDDA;background:#FAFCFB;border-radius:8px;');\n}\nfunction renderDataTable({ title, columns, rows, empty = 'Sin registros para esta sección.' }) {\n  const heading = `<h2 style=\"margin:0 0 10px;color:#11364C;font-size:18px;line-height:1.4;\">${escapeHtml(title)}</h2><p style=\"margin:0 0 14px;color:#516576;font-size:12px;line-height:1.6;\">${rows.length} registro${rows.length === 1 ? '' : 's'} · Revisión exclusiva de personal autorizado.</p>`;\n  if (!rows.length) return section(heading + renderEmptyState(empty));\n  const th = columns.map(c => `<th scope=\"col\" align=\"left\" style=\"padding:12px 7px;color:#2F625E;font-size:11px;line-height:1.5;overflow-wrap:anywhere;word-wrap:break-word;\">${escapeHtml(c.label)}</th>`).join('');\n  const body = rows.map(row => `<tr>${columns.map(c => `<td valign=\"top\" style=\"padding:13px 7px;border-top:1px solid #E1E9E8;color:#334B57;font-size:12px;line-height:1.65;overflow-wrap:anywhere;word-wrap:break-word;\">${escapeHtml(row[c.key])}</td>`).join('')}</tr>`).join('');\n  return section(heading + `<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;border:1px solid #E1E9E8;table-layout:fixed;\"><caption style=\"text-align:left;font-size:0;line-height:0;color:#FFFFFF;\">${escapeHtml(title)}</caption><thead><tr bgcolor=\"#EEF5F3\">${th}</tr></thead><tbody>${body}</tbody></table>`);\n}\nfunction renderAttachmentNotice({ filename, detail }) {\n  return section(table(`<tr><td style=\"padding:21px;color:#FFFFFF;\"><p style=\"margin:0 0 9px;color:#C5EAE5;font-size:10px;font-weight:bold;letter-spacing:1px;\">XLSX · ARCHIVO ADJUNTO</p><p style=\"margin:0 0 6px;color:#FFFFFF;font-size:15px;font-weight:bold;\">Detalle disponible en Excel</p><p style=\"margin:0;color:#D4E5E8;font-size:12px;line-height:1.7;\">${escapeHtml(detail)}</p><p style=\"margin:12px 0 0;color:#D4E5E8;font-size:11px;line-height:1.6;overflow-wrap:anywhere;word-break:break-all;\">${escapeHtml(filename)}</p></td></tr>`, 'background:#11364C;border-radius:10px;table-layout:fixed;'));\n}\nfunction renderInstitutionalFooter(aggregateOnly) {\n  return `<tr><td class=\"pad\" bgcolor=\"#F8FAF9\" style=\"padding:25px 32px 29px;border-top:1px solid #E7EEEE;\"><p style=\"margin:0 0 9px;color:#174D52;font-size:12px;font-weight:bold;\">CAP Prenatal · El Chal, Petén</p><p style=\"margin:0;color:#516576;font-size:11px;line-height:1.7;\">Comunicación de uso interno para personal autorizado. Los datos incluidos deben manejarse con la debida confidencialidad.${aggregateOnly ? ' Este resumen no contiene datos nominales de pacientes ni información clínica.' : ''}</p><p style=\"margin:13px 0 0;color:#516576;font-size:10px;line-height:1.6;\">Correo generado automáticamente por CAP Prenatal. No responda a este mensaje.</p></td></tr>`;\n}\nfunction renderEmailLayout({ subject, badge, preheader, heading, period, cards, content, aggregateOnly = false }) {\n  return `<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"color-scheme\" content=\"light\"><title>${escapeHtml(subject)}</title><style>@media only screen and (max-width:620px){.pad{padding-left:16px!important;padding-right:16px!important}.kpi{display:block!important;width:100%!important;box-sizing:border-box!important;padding:0 0 12px!important}}</style></head><body style=\"margin:0;padding:0;background:#EDF1F0;color:#24394A;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;\"><div style=\"display:none!important;visibility:hidden;max-height:0;overflow:hidden;font-size:1px;line-height:1px;\">${escapeHtml(preheader)}</div>${table(`<tr><td align=\"center\" style=\"padding:28px 10px;\"><!--[if mso]><table role=\"presentation\" width=\"660\" cellpadding=\"0\" cellspacing=\"0\"><tr><td><![endif]--><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:100%;max-width:660px;border:1px solid #DCE5E3;border-collapse:separate;background:#FFFFFF;border-radius:13px;\">${renderInstitutionalHeader(badge)}${renderReportHeading(heading)}${renderPeriodCard(period.label, period.text)}${renderKpiRow(cards)}${content}${renderInstitutionalFooter(aggregateOnly)}</table><!--[if mso]></td></tr></table><![endif]--><p style=\"margin:18px 0 0;color:#516576;font-size:11px;line-height:1.6;\">Maqueta V2 · Datos completamente ficticios · Sin envíos reales</p></td></tr>`)}</body></html>`;\n}\n\n\nconst item = $input.first().json;\nif (item.alert === null) return [];\nconst recipientPattern=/^[A-Za-z0-9](?:[A-Za-z0-9_+.-]{0,62}[A-Za-z0-9])?@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;\nif (Object.keys(item).sort().join() !== ['alert','claim_id','idempotency_key','recipient'].sort().join() ||\n    typeof item.recipient !== 'string' || item.recipient.length>254 ||\n    /\\s/.test(item.recipient) || !recipientPattern.test(item.recipient) || item.recipient.split('@')[0].includes('..')) throw Error('ALERT_RECIPIENT_INVALID');\nconst a = item.alert;\nconst fields = ['event_id','incident_id','kind','event_type','reason_code','destination_type','created_at','incident_opened_at','last_verified_at'];\nif (!a || Object.keys(a).sort().join() !== fields.sort().join() ||\n    !/^[a-f0-9]{64}$/.test(a.event_id) || !/^[a-f0-9]{32}$/.test(a.incident_id) ||\n    !/^[a-f0-9]{32}$/.test(item.claim_id) || item.idempotency_key !== 'cap-backup-'+a.event_id ||\n    !['ALERTA','RECUPERADO'].includes(a.kind) || a.destination_type !== 'gdrive') throw Error('ALERT_CONTRACT_INVALID');\nconst causes = {NONE:'Copia externa verificada', COMMAND_FAILED:'Falló una etapa del respaldo', AUTH_FAILED:'No fue posible autenticar el acceso al destino', NETWORK:'No fue posible acceder al destino externo', HASH_MISMATCH:'La integridad de la copia no coincide', NO_START:'No se observó el inicio programado', TIMEOUT:'No se observó una finalización dentro del plazo', EVIDENCE_MISSING:'No existe evidencia suficiente para confirmar el resultado', CLEANUP_FAILED:'La copia se verificó, pero falló la limpieza local'};\nconst types = {OK:'Respaldo verificado',DUMP_FAILED:'Generación',TRANSFER_FAILED:'Transferencia',DESTINATION_UNAVAILABLE:'Acceso al destino',VERIFY_FAILED:'Verificación',MISSED_BACKUP:'Ejecución programada',UNKNOWN:'Observación no concluyente'};\nif (!Object.hasOwn(causes,a.reason_code) || !Object.hasOwn(types,a.event_type) ||\n    (a.kind==='RECUPERADO' && a.event_type!=='OK')) throw Error('ALERT_CONTRACT_INVALID');\nfunction date(value) {\n if (typeof value!=='string' || !/^\\d{4}-\\d{2}-\\d{2}T.*(?:Z|[+-]\\d{2}:\\d{2})$/.test(value) || Number.isNaN(Date.parse(value))) throw Error('ALERT_DATE_INVALID');\n return new Intl.DateTimeFormat('es-GT',{timeZone:'America/Guatemala',dateStyle:'long',timeStyle:'short'}).format(new Date(value))+' · Guatemala';\n}\nconst subject='[CAP Prenatal][RESPALDOS]['+a.kind+'] Google Drive';\nconst recovery=a.kind==='RECUPERADO';\nconst seen=date(a.created_at), last=a.last_verified_at===null?'Sin evidencia disponible':date(a.last_verified_at);\ndate(a.incident_opened_at);\nif (Date.parse(a.incident_opened_at)>Date.parse(a.created_at)) throw Error('ALERT_DATE_INVALID');\nconst duration=Math.ceil((Date.parse(a.created_at)-Date.parse(a.incident_opened_at))/60000);\nconst content=section(renderEmptyState(causes[a.reason_code]))+section('<p style=\"font-size:13px;line-height:1.7;color:#516576;\">'+escapeHtml(recovery?'Se confirmó una nueva copia externa válida. El incidente quedó resuelto.':'Revise el estado del respaldo y la conectividad del destino. No se ha confirmado una nueva copia externa válida para resolver este incidente.')+'</p><p style=\"font-size:12px;line-height:1.7;color:#516576;\">Última copia verificada: '+escapeHtml(last)+'</p><p style=\"font-size:11px;color:#5D727C;overflow-wrap:anywhere;\">Incidente: '+escapeHtml(a.incident_id)+'</p>');\nlet html=renderEmailLayout({subject,badge:'SUPERVISIÓN DE RESPALDOS',preheader:recovery?'Se recuperó la verificación del respaldo externo.':'Se requiere revisar el respaldo externo.',heading:{category:'OPERACIÓN / RESPALDOS',title:recovery?'Respaldo externo recuperado':'Alerta de respaldo externo',intro:'Destino supervisado: Google Drive. Comunicación técnica sin datos clínicos.'},period:{label:'FECHA DEL EVENTO',text:seen},cards:[{value:recovery?0:1,label:recovery?'Incidente resuelto':'Incidente pendiente',detail:recovery?'Duración: '+duration+' minutos':types[a.event_type],tone:recovery?'green':'amber'}],content,aggregateOnly:true});\nhtml=html.replace('Maqueta V2 · Datos completamente ficticios · Sin envíos reales','Supervisión técnica de respaldos · CAP Prenatal');\nif (/\\p{Extended_Pictographic}|\\p{Regional_Indicator}|\\u20e3/u.test(html)) throw Error('EMOJI_FORBIDDEN');\nreturn [{json:{event_id:a.event_id,claim_id:item.claim_id,idempotency_key:item.idempotency_key,recipient:item.recipient,subject,html}}];\n"
+      },
+      "position": [
+        440,
+        0
+      ],
+      "notes": "Interfaz privada: vincular credencial Header Auth Authorization Bearer solo durante despliegue autorizado."
+    },
+    {
+      "id": "send",
+      "name": "Enviar alerta por Resend",
+      "type": "n8n-nodes-resend.resend",
+      "typeVersion": 1,
+      "parameters": {
+        "authentication": "apiKey",
+        "resource": "email",
+        "operation": "send",
+        "from": "CAP Prenatal <citas@notificaciones.hercor-nexus.com>",
+        "to": "={{ $json.recipient }}",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.html }}",
+        "additionalOptions": {
+          "idempotencyKey": "={{ $json.idempotency_key }}"
+        }
+      },
+      "position": [
+        660,
+        0
+      ],
+      "retryOnFail": false,
+      "onError": "continueErrorOutput",
+      "notes": "Antes de importar en una fase autorizada: vincular Resend account 2. No adjuntos, CC, BCC ni reintentos del nodo."
+    },
+    {
+      "id": "accepted",
+      "name": "¿Resend aceptó el envío?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "provider-id-present",
+              "leftValue": "={{ typeof $json.id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test($json.id) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        880,
+        0
+      ],
+      "notes": "Interfaz privada: vincular credencial Header Auth Authorization Bearer solo durante despliegue autorizado."
+    },
+    {
+      "id": "ack",
+      "name": "Confirmar aceptación",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8766/v1/ack",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({event_id:$('Preparar alerta').first().json.event_id,claim_id:$('Preparar alerta').first().json.claim_id,provider_id:$json.id}) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "position": [
+        900,
+        -100
+      ],
+      "notes": "Interfaz privada: vincular credencial Header Auth Authorization Bearer solo durante despliegue autorizado."
+    },
+    {
+      "id": "uncertain",
+      "name": "Registrar resultado incierto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8766/v1/uncertain",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({event_id:$('Preparar alerta').first().json.event_id,claim_id:$('Preparar alerta').first().json.claim_id}) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "position": [
+        900,
+        100
+      ],
+      "notes": "Interfaz privada: vincular credencial Header Auth Authorization Bearer solo durante despliegue autorizado."
+    }
+  ],
+  "connections": {
+    "Cada cinco minutos": {
+      "main": [
+        [
+          {
+            "node": "Reclamar alerta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reclamar alerta": {
+      "main": [
+        [
+          {
+            "node": "Preparar alerta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar alerta": {
+      "main": [
+        [
+          {
+            "node": "Enviar alerta por Resend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar alerta por Resend": {
+      "main": [
+        [
+          {
+            "node": "¿Resend aceptó el envío?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar resultado incierto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Resend aceptó el envío?": {
+      "main": [
+        [
+          {
+            "node": "Confirmar aceptación",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar resultado incierto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Guatemala",
+    "executionTimeout": 60,
+    "saveManualExecutions": false,
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "callerPolicy": "none"
+  },
+  "tags": []
+}

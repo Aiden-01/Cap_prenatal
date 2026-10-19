@@ -1,0 +1,24 @@
+{
+  "success": [
+    "[INFO] Inicio backup CAP Prenatal",
+    "[INFO] Generando dump PostgreSQL...",
+    "[INFO] Validando estructura del dump local...",
+    "[INFO] SHA-256 local: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "[INFO] Preparando directorio cifrado en Google Drive...",
+    "[INFO] Subiendo copia cifrada temporal...",
+    "[INFO] Calculando SHA-256 remoto completo...",
+    "[INFO] SHA-256 remoto: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "[OK] Los hashes local y remoto coinciden.",
+    "[INFO] Confirmando archivo definitivo en Drive...",
+    "[INFO] Verificando existencia del archivo definitivo...",
+    "[OK] Backup cifrado y verificable almacenado correctamente.",
+    "[OK] Copia temporal local eliminada después de la verificación.",
+    "[INFO] Fin backup CAP Prenatal"
+  ],
+  "dump_failed": ["[INFO] Generando dump PostgreSQL...", "[ERROR] El backup de CAP Prenatal falló."],
+  "transfer_failed": ["[INFO] Subiendo copia cifrada temporal...", "[ERROR] El backup de CAP Prenatal falló."],
+  "authentication_failed": ["[INFO] Preparando directorio cifrado en Google Drive...", "invalid_grant", "[ERROR] El backup de CAP Prenatal falló."],
+  "network_failed": ["[INFO] Preparando directorio cifrado en Google Drive...", "network is unreachable", "[ERROR] El backup de CAP Prenatal falló."],
+  "hash_failed": ["[INFO] Calculando SHA-256 remoto completo...", "SHA-256 local: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "SHA-256 remoto: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "[ERROR] Los hashes SHA-256 no coinciden."],
+  "incomplete": ["[INFO] Generando dump PostgreSQL..."]
+}
