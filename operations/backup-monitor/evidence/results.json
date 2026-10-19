@@ -1,0 +1,51 @@
+{
+  "phase": "CPREN-91 local phase 2",
+  "pythonTests": 31,
+  "workflowTests": 9,
+  "failed": 0,
+  "runtimeN8nTested": false,
+  "provider": "simulated only",
+  "emailsSent": 0,
+  "ubuntuAccessed": false,
+  "servicesInstalled": false,
+  "workflowImported": false,
+  "branch": "codex/cpren91-backup-alerts",
+  "baseCommit": "8c36954172c3bbe998fdefb4ccd2435d2087e1ea",
+  "protectedFiles": [
+    {
+      "file": "n8n/workflows/recordatorio-citas-resend-v1.json",
+      "sha256": "8df5ae6b840dc053006dfde8a8f6bc2ff8c4460c352151b36fb06df5c104f7dd",
+      "unchanged": true
+    },
+    {
+      "file": "n8n/workflows/seguimiento-inasistencias-resend-v1.json",
+      "sha256": "c9da37991c27d8d32ad16c11dcf8468ce6c6011f49b614490d683b4d68670b4c",
+      "unchanged": true
+    },
+    {
+      "file": "n8n/workflows/seguimiento-tdap-el-chal-resend-v1.json",
+      "sha256": "12d3d0a38c8c6baef92875b350f631798920923a9630d785ad235911c0bddf28",
+      "unchanged": true
+    },
+    {
+      "file": "n8n/workflows/censo-primer-control-26-25-resend-v1.json",
+      "sha256": "b26cd4f0813127e76a26aa68c51b4f82684b05a912230466da1da07bfcde0b4b",
+      "unchanged": true
+    },
+    {
+      "file": "n8n/workflows/censo-primer-control-mes-cerrado-resend-v1.json",
+      "sha256": "567bf26393baa61f08fe00e35f72362f0ccfe68e52c79deff1364a5dfcc762c2",
+      "unchanged": true
+    },
+    {
+      "file": "n8n/workflows/watchdog-calidad-datos-resend-v1.json",
+      "sha256": "a19dd4527bc4faa7ac90b386b373dd5bf84221cc9e483f2947c2012ea7b40f7e",
+      "unchanged": true
+    },
+    {
+      "file": "n8n/design-v2/components.cjs",
+      "sha256": "9580f60bdddee0e568380ace4d9053c02c5556fd86806c8eb9c563377f8112d2",
+      "unchanged": true
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+PASS workflow is independent, inactive, unpublished and credential-free (1.0512ms)
+PASS only allowed network destinations and fixed unique recipient (0.9153ms)
+PASS provider success ACK and error uncertainty have separate branches (0.1761ms)
+PASS empty queue stops before Resend (1.0487ms)
+PASS both institutional messages are safe, deterministic and in Spanish (22.3875ms)
+PASS forged technical fields, extra data and missing timezones are rejected (3.3639ms)
+PASS synthetic transport preserves payload and idempotency across uncertain retry (2.0837ms)
+PASS six clinical JSONs and shared components equal origin/main byte-for-byte (432.1747ms)
+PASS new material has no emojis or executable transport helper (1.3873ms)
+INFO tests 9
+INFO suites 0
+INFO pass 9
+INFO fail 0
+INFO cancelled 0
+INFO skipped 0
+INFO todo 0
+INFO duration_ms 563.9992

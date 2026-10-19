@@ -1,0 +1,181 @@
+{
+  "base": "8c36954172c3bbe998fdefb4ccd2435d2087e1ea",
+  "redaction": "Historical pre-guard workflow recipient replaced with reserved test address; exact originals preserved privately. Phase 2/3 hashes remain historical.",
+  "files": [
+    {
+      "path": "n8n/workflows/monitoreo-respaldos-externos-v1.json",
+      "bytes": 20047,
+      "sha256": "ae830f69e4c0140ec22c49e86b3baab4094cc019b0a8bd761dbaba531ceaab01"
+    },
+    {
+      "path": "operations/backup-monitor/.gitignore",
+      "bytes": 63,
+      "sha256": "dcd1a8a2c753630f94de192a3622c0e56104375c6bbb66f5b69be00c3769737f"
+    },
+    {
+      "path": "operations/backup-monitor/README.md",
+      "bytes": 16303,
+      "sha256": "51faeb2674c80b931b0ef7f84311c04495bf5779c3c650ab10aef40f1101bc22"
+    },
+    {
+      "path": "operations/backup-monitor/build-workflow.cjs",
+      "bytes": 8417,
+      "sha256": "0d3131c9a540855a066a12270e9a3c512938d30f42470a43782f8ca0d4a71143"
+    },
+    {
+      "path": "operations/backup-monitor/event.schema.json",
+      "bytes": 1673,
+      "sha256": "bd16be600e79f8091c010f4e2d79016bf782ad04c52b6e5d15dd9082186bf846"
+    },
+    {
+      "path": "operations/backup-monitor/evidence/alert.html",
+      "bytes": 6003,
+      "sha256": "422ccbc65446426c7877954b258448cc211f7dbdf32a590fca9186a1b546762b"
+    },
+    {
+      "path": "operations/backup-monitor/evidence/manifest.json",
+      "bytes": 2695,
+      "sha256": "3b1ae9bde8765f7cdcceaea079f195d5bff02d2d75670d77049fdf0afd35827d"
+    },
+    {
+      "path": "operations/backup-monitor/evidence/python-tests.txt",
+      "bytes": 4032,
+      "sha256": "58e83cb08a3ab0ce065fe6e50a82a1aaa35c647dc656352a18959bebf19f2453"
+    },
+    {
+      "path": "operations/backup-monitor/evidence/recovery.html",
+      "bytes": 5932,
+      "sha256": "3a23db33beb42f1be1aef5bcf40875fdf3dc42cef4aefe60c77ec591f1bfeb49"
+    },
+    {
+      "path": "operations/backup-monitor/evidence/results.json",
+      "bytes": 1715,
+      "sha256": "78aa8226af3013de6d27f5f42309063c0e44e7bf8989181ac7a939ed43910bf0"
+    },
+    {
+      "path": "operations/backup-monitor/evidence/workflow-tests.txt",
+      "bytes": 840,
+      "sha256": "dc23967cb1ef6a9984cd09c0d8761dfb3da878bf9b4538622031f1994f8acb16"
+    },
+    {
+      "path": "operations/backup-monitor/fixtures/journal.json",
+      "bytes": 1712,
+      "sha256": "ae02b333394a21b1a0b5a605a77f454092109ff5a822a2a01eb8763174d9b63e"
+    },
+    {
+      "path": "operations/backup-monitor/monitor.py",
+      "bytes": 23571,
+      "sha256": "6813c590e115e05a3cb36751cdc0ae9b7c95681e167f3acaee0bd0b1feadae73"
+    },
+    {
+      "path": "operations/backup-monitor/phase3/LINUX-PERMISSIONS.md",
+      "bytes": 4067,
+      "sha256": "935af513c0f33821b395a465cd1f770c18f0395384c628e1053f95f3f6662609"
+    },
+    {
+      "path": "operations/backup-monitor/phase3/README.md",
+      "bytes": 13049,
+      "sha256": "81aa28da2af11fee7479fadda75ec32730b1cc5beea6111d78e3fce2f65260af"
+    },
+    {
+      "path": "operations/backup-monitor/phase3/audit.cjs",
+      "bytes": 6714,
+      "sha256": "dc689a56c6cd0989829fa71e7c207ae19d2b3b15297efc9f04eefa67dd416eb4"
+    },
+    {
+      "path": "operations/backup-monitor/phase3/evidence/git-review.json",
+      "bytes": 2327,
+      "sha256": "942f9781cea930c759e653bfe316d627806b59ad6840a26341ce50b90aaf91e8"
+    },
+    {
+      "path": "operations/backup-monitor/phase3/evidence/persistence.json",
+      "bytes": 1478,
+      "sha256": "10845be65270a6f962adad57f3e00b00bb1cacfded51b51d861e7d66867cb70c"
+    },
+    {
+      "path": "operations/backup-monitor/phase3/evidence/protected-files.json",
+      "bytes": 1690,
+      "sha256": "822d6ad244f1a6b2e3039c7ad888139562a48206a71275ffdc1b951c0155ca09"
+    },
+    {
+      "path": "operations/backup-monitor/phase3/evidence/python-regression.txt",
+      "bytes": 4032,
+      "sha256": "1c49e2a0d38b3e47c27a408bcdc8040b1aeb12df00f78401f017cc729eef5446"
+    },
+    {
+      "path": "operations/backup-monitor/phase3/evidence/runtime-results.json",
+      "bytes": 12987,
+      "sha256": "8b2f14d402262927952ed3f467145378385f9121d2d055ed1ca150edf6258d9a"
+    },
+    {
+      "path": "operations/backup-monitor/phase3/evidence/workflow-before-response-guard.json",
+      "bytes": 18133,
+      "sha256": "ecdb6b53b57cc747fd6205325de047bcabf2b0c7b2e4235457e7e45f0b82bfab"
+    },
+    {
+      "path": "operations/backup-monitor/phase3/evidence/workflow-regression.tap",
+      "bytes": 2059,
+      "sha256": "0666fc714d95b0101c294f264f1088ebe4e5ff84aa3ca87eec049daf2b48a195"
+    },
+    {
+      "path": "operations/backup-monitor/phase3/lab-services.py",
+      "bytes": 2624,
+      "sha256": "d3d0c4c3b1c41fea5cb892eec93eae8dfea55df167024f156d2035b78b4796c0"
+    },
+    {
+      "path": "operations/backup-monitor/phase3/network-guard.cjs",
+      "bytes": 4770,
+      "sha256": "b3419e12f3e98f9b1fb60bcf218134e443607a1b6260c0623788c48754cd895f"
+    },
+    {
+      "path": "operations/backup-monitor/phase3/run-cli.cjs",
+      "bytes": 2802,
+      "sha256": "1ce0485cc5f83de0ca74f0916621b639adcb13116f0dae26f876fed7ff7c3936"
+    },
+    {
+      "path": "operations/backup-monitor/phase3/runtime-test.py",
+      "bytes": 12085,
+      "sha256": "a12c776092eade52d5cfcb683f0350a4393d08a8345aa26551f41cbd564106da"
+    },
+    {
+      "path": "operations/backup-monitor/phase5a/README.md",
+      "bytes": 5828,
+      "sha256": "55aa0ce13158e61b4d6ee1dbd2f32f0ca80c6b1fcc293f74aa66e1af5e0fb7d1"
+    },
+    {
+      "path": "operations/backup-monitor/phase5a/audit.cjs",
+      "bytes": 4757,
+      "sha256": "8a45731a682f54fd615d06e54064fc0f0b8d63aa498104de6b933483001fa0db"
+    },
+    {
+      "path": "operations/backup-monitor/phase5a/results.json",
+      "bytes": 6390,
+      "sha256": "fb24187e81f377125b1f2d30608fa93c9447e43c1927bedc873a3283e2e31ca0"
+    },
+    {
+      "path": "operations/backup-monitor/schema.sql",
+      "bytes": 1086,
+      "sha256": "1219cc7626da40cc719dbbfa3ebe1ca2b6f25e30934a66744bfa68420e959070"
+    },
+    {
+      "path": "operations/backup-monitor/test_monitor.py",
+      "bytes": 15292,
+      "sha256": "71e7ba143809897fc8228a8a1d0ba94c534638e97652520bc8e837b09645d001"
+    },
+    {
+      "path": "operations/backup-monitor/test_recipient.py",
+      "bytes": 3892,
+      "sha256": "6f2827e82e15350e3003a9c769df54717870ea59d1000746bdb969a74cca546a"
+    },
+    {
+      "path": "operations/backup-monitor/verify.cjs",
+      "bytes": 3406,
+      "sha256": "febf12c761fd99c68c42ebe6a4d08b2c8791f7548e4ecafe8fc1b2a4df097403"
+    },
+    {
+      "path": "operations/backup-monitor/workflow.test.cjs",
+      "bytes": 7170,
+      "sha256": "0b6d12aaee156f0123459a4ab1595d2a0615b6575644a5465fa61daadb776627"
+    }
+  ]
+}

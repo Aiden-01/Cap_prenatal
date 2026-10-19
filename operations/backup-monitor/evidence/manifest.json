@@ -1,0 +1,82 @@
+[
+  {
+    "path": "operations/backup-monitor/.gitignore",
+    "bytes": 63,
+    "sha256": "dcd1a8a2c753630f94de192a3622c0e56104375c6bbb66f5b69be00c3769737f"
+  },
+  {
+    "path": "operations/backup-monitor/build-workflow.cjs",
+    "bytes": 7350,
+    "sha256": "b22bab869aa5a57c5c9f07553ddfb8d1317447c73e645ff37f99094b49b37fda"
+  },
+  {
+    "path": "operations/backup-monitor/event.schema.json",
+    "bytes": 1673,
+    "sha256": "bd16be600e79f8091c010f4e2d79016bf782ad04c52b6e5d15dd9082186bf846"
+  },
+  {
+    "path": "operations/backup-monitor/evidence/alert.html",
+    "bytes": 6003,
+    "sha256": "422ccbc65446426c7877954b258448cc211f7dbdf32a590fca9186a1b546762b"
+  },
+  {
+    "path": "operations/backup-monitor/evidence/python-tests.txt",
+    "bytes": 4032,
+    "sha256": "58e83cb08a3ab0ce065fe6e50a82a1aaa35c647dc656352a18959bebf19f2453"
+  },
+  {
+    "path": "operations/backup-monitor/evidence/recovery.html",
+    "bytes": 5932,
+    "sha256": "3a23db33beb42f1be1aef5bcf40875fdf3dc42cef4aefe60c77ec591f1bfeb49"
+  },
+  {
+    "path": "operations/backup-monitor/evidence/results.json",
+    "bytes": 1715,
+    "sha256": "78aa8226af3013de6d27f5f42309063c0e44e7bf8989181ac7a939ed43910bf0"
+  },
+  {
+    "path": "operations/backup-monitor/evidence/workflow-tests.txt",
+    "bytes": 823,
+    "sha256": "c4710ed0aea1ac2a32e26580ae51fd380add7c91365aeee6df8975eb4ae742ad"
+  },
+  {
+    "path": "operations/backup-monitor/fixtures/journal.json",
+    "bytes": 1712,
+    "sha256": "ae02b333394a21b1a0b5a605a77f454092109ff5a822a2a01eb8763174d9b63e"
+  },
+  {
+    "path": "operations/backup-monitor/monitor.py",
+    "bytes": 22112,
+    "sha256": "cfe42d05e3c827a65f631f96117b7e8f42b230d42eecc016ae91e803b2c7a3d3"
+  },
+  {
+    "path": "operations/backup-monitor/README.md",
+    "bytes": 13950,
+    "sha256": "d344d7d4d780468e3f4cac583fded4d55051179e7bcf6838781e52cbf506d822"
+  },
+  {
+    "path": "operations/backup-monitor/schema.sql",
+    "bytes": 1086,
+    "sha256": "1219cc7626da40cc719dbbfa3ebe1ca2b6f25e30934a66744bfa68420e959070"
+  },
+  {
+    "path": "operations/backup-monitor/test_monitor.py",
+    "bytes": 15099,
+    "sha256": "418de93f9fa9dfd92f682a56a165e7a4b0150401992192091ab3aac62951eac3"
+  },
+  {
+    "path": "operations/backup-monitor/verify.cjs",
+    "bytes": 3321,
+    "sha256": "8e2abc89600c853bf7be8e1ebbc825fd09542d691a19e6bdab4a53a962b08afc"
+  },
+  {
+    "path": "operations/backup-monitor/workflow.test.cjs",
+    "bytes": 5612,
+    "sha256": "a709ab4ed301497348556586d505f4025b6ad103d69377e4931425a0bfe8c5ff"
+  },
+  {
+    "path": "n8n/workflows/monitoreo-respaldos-externos-v1.json",
+    "bytes": 18130,
+    "sha256": "deebfa68207614ea87a1a8e8c8ac45ea044494e1ec0ccee715c0d2b491cfbb1e"
+  }
+]
