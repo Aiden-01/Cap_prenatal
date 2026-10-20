@@ -1,0 +1,75 @@
+{
+  "databases": [
+    {
+      "file": "monitor.sqlite",
+      "integrity": "ok",
+      "foreignKeyViolations": 0,
+      "runs": 7,
+      "incidents": 4,
+      "outbox": [
+        {
+          "state": "confirmed",
+          "manual_review": 0,
+          "n": 6
+        },
+        {
+          "state": "uncertain",
+          "manual_review": 1,
+          "n": 1
+        }
+      ]
+    },
+    {
+      "file": "missing-scheduled-run/monitor.sqlite",
+      "integrity": "ok",
+      "foreignKeyViolations": 0,
+      "runs": 1,
+      "incidents": 1,
+      "outbox": [
+        {
+          "state": "confirmed",
+          "manual_review": 0,
+          "n": 1
+        }
+      ]
+    },
+    {
+      "file": "incomplete-scheduled-run/monitor.sqlite",
+      "integrity": "ok",
+      "foreignKeyViolations": 0,
+      "runs": 2,
+      "incidents": 1,
+      "outbox": [
+        {
+          "state": "confirmed",
+          "manual_review": 0,
+          "n": 1
+        }
+      ]
+    }
+  ],
+  "n8n": {
+    "workflows": [
+      {
+        "id": "cpren91LabBadApi",
+        "active": 0,
+        "activeVersionId": null
+      },
+      {
+        "id": "cpren91LabV1",
+        "active": 0,
+        "activeVersionId": null
+      }
+    ],
+    "syntheticCredentialCount": 3,
+    "executions": 14,
+    "running": 0
+  },
+  "acceptedAckLost": {
+    "sameEventId": true,
+    "sameImmutablePayload": true,
+    "confirmedAfterRetry": true,
+    "firstAttemptRetained": true
+  },
+  "providerUniqueAcceptances": 8
+}

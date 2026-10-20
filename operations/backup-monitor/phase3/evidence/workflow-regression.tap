@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: workflow is independent, inactive, unpublished and credential-free
+ok 1 - workflow is independent, inactive, unpublished and credential-free
+  ---
+  duration_ms: 0.8903
+  type: 'test'
+  ...
+# Subtest: only allowed network destinations and fixed unique recipient
+ok 2 - only allowed network destinations and fixed unique recipient
+  ---
+  duration_ms: 1.0023
+  type: 'test'
+  ...
+# Subtest: provider success ACK and error uncertainty have separate branches
+ok 3 - provider success ACK and error uncertainty have separate branches
+  ---
+  duration_ms: 0.2189
+  type: 'test'
+  ...
+# Subtest: normal-output provider errors can never reach acceptance ACK
+ok 4 - normal-output provider errors can never reach acceptance ACK
+  ---
+  duration_ms: 4.0462
+  type: 'test'
+  ...
+# Subtest: empty queue stops before Resend
+ok 5 - empty queue stops before Resend
+  ---
+  duration_ms: 0.9405
+  type: 'test'
+  ...
+# Subtest: both institutional messages are safe, deterministic and in Spanish
+ok 6 - both institutional messages are safe, deterministic and in Spanish
+  ---
+  duration_ms: 20.1619
+  type: 'test'
+  ...
+# Subtest: forged technical fields, extra data and missing timezones are rejected
+ok 7 - forged technical fields, extra data and missing timezones are rejected
+  ---
+  duration_ms: 3.2283
+  type: 'test'
+  ...
+# Subtest: synthetic transport preserves payload and idempotency across uncertain retry
+ok 8 - synthetic transport preserves payload and idempotency across uncertain retry
+  ---
+  duration_ms: 2.0933
+  type: 'test'
+  ...
+# Subtest: six clinical JSONs and shared components equal origin/main byte-for-byte
+ok 9 - six clinical JSONs and shared components equal origin/main byte-for-byte
+  ---
+  duration_ms: 469.4756
+  type: 'test'
+  ...
+# Subtest: new material has no emojis or executable transport helper
+ok 10 - new material has no emojis or executable transport helper
+  ---
+  duration_ms: 1.785
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 604.0837

@@ -1,0 +1,38 @@
+# Reference only. Requires reviewed installation and cap-backup-monitor group.
+[Unit]
+Description=CAP Prenatal sanitized backup evidence publisher
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=oneshot
+User=root
+Group=cap-backup-monitor
+WorkingDirectory=/opt/cap-prenatal-backup-monitor
+ExecStart=/usr/bin/python3 -E -s -B /opt/cap-prenatal-backup-monitor/publisher.py
+UMask=0077
+RuntimeDirectory=cap-prenatal-backup-evidence
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+ReadWritePaths=/run/cap-prenatal-backup-evidence
+InaccessiblePaths=-/var/backups -/var/lib/postgresql -/var/lib/cap-prenatal-n8n -/etc/cap-prenatal-n8n -/etc/cap-prenatal-backup-monitor
+MemoryMax=128M
+TasksMax=8
+LimitNOFILE=64
+TimeoutStartSec=30
+StandardOutput=journal
+StandardError=journal

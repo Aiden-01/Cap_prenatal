@@ -1,0 +1,35 @@
+{
+  "phase": "CPREN-91 development finalization regressions",
+  "observedUtc": "2026-10-20T02:22:44.134888+00:00",
+  "python": {
+    "total": 67,
+    "passed": 65,
+    "skipped": 2,
+    "failed": 0
+  },
+  "node": {
+    "passed": 11,
+    "failed": 0
+  },
+  "generatorReproducible": true,
+  "platform": "Windows synthetic tests only",
+  "separateLinuxLabRequirement": "Cancelled explicitly by user; no VM/laboratory will be created",
+  "linuxValidation": "PENDING in an explicitly authorized controlled Ubuntu installation checkpoint; skipped tests are not passed",
+  "systemdValidation": "Static local checks only; no systemd-analyze or units executed",
+  "permissionDenial": "Simulated; no real UID/group/ACL modifications",
+  "fullDisk": "Simulated ENOSPC before replace and transaction error; no physical disk exhaustion",
+  "realSqliteTests": [
+    "isolated temporary WAL store",
+    "writer lock",
+    "corrupt SQLite sanitized CLI failure",
+    "restart/deduplication/recovery"
+  ],
+  "simulatedResend": true,
+  "exactWorkflowCodeVmAndRealLoopbackApiTested": true,
+  "realN8nExecutedInPhase7": false,
+  "emailsSent": 0,
+  "ubuntuAccessed": false,
+  "usersCreated": false,
+  "servicesInstalled": false,
+  "testingOnly": true
+}

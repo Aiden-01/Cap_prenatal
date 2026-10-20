@@ -1,0 +1,53 @@
+{
+  "branch": "codex/cpren91-backup-alerts",
+  "head": "8c36954172c3bbe998fdefb4ccd2435d2087e1ea",
+  "candidateFiles": [
+    "n8n/workflows/monitoreo-respaldos-externos-v1.json",
+    "operations/backup-monitor/.gitignore",
+    "operations/backup-monitor/README.md",
+    "operations/backup-monitor/build-workflow.cjs",
+    "operations/backup-monitor/event.schema.json",
+    "operations/backup-monitor/evidence/alert.html",
+    "operations/backup-monitor/evidence/manifest.json",
+    "operations/backup-monitor/evidence/python-tests.txt",
+    "operations/backup-monitor/evidence/recovery.html",
+    "operations/backup-monitor/evidence/results.json",
+    "operations/backup-monitor/evidence/workflow-tests.txt",
+    "operations/backup-monitor/fixtures/journal.json",
+    "operations/backup-monitor/monitor.py",
+    "operations/backup-monitor/phase3/LINUX-PERMISSIONS.md",
+    "operations/backup-monitor/phase3/README.md",
+    "operations/backup-monitor/phase3/audit.cjs",
+    "operations/backup-monitor/phase3/evidence/git-review.json",
+    "operations/backup-monitor/phase3/evidence/persistence.json",
+    "operations/backup-monitor/phase3/evidence/protected-files.json",
+    "operations/backup-monitor/phase3/evidence/python-regression.txt",
+    "operations/backup-monitor/phase3/evidence/runtime-results.json",
+    "operations/backup-monitor/phase3/evidence/workflow-before-response-guard.json",
+    "operations/backup-monitor/phase3/evidence/workflow-regression.tap",
+    "operations/backup-monitor/phase3/lab-services.py",
+    "operations/backup-monitor/phase3/network-guard.cjs",
+    "operations/backup-monitor/phase3/run-cli.cjs",
+    "operations/backup-monitor/phase3/runtime-test.py",
+    "operations/backup-monitor/schema.sql",
+    "operations/backup-monitor/test_monitor.py",
+    "operations/backup-monitor/verify.cjs",
+    "operations/backup-monitor/workflow.test.cjs"
+  ],
+  "excludedPatterns": [
+    "operations/backup-monitor/phase3/runtime/**",
+    "operations/backup-monitor/**/__pycache__/**",
+    "operations/backup-monitor/**/*.sqlite*",
+    "operations/backup-monitor/**/*.key"
+  ],
+  "existingPrivateCategoriesExcluded": [
+    ".n8n-local/",
+    "n8n/.env",
+    "backend/.env",
+    "node_modules/",
+    "backups/",
+    "tmp_*/"
+  ],
+  "productionCredentialsCopied": false,
+  "privateRuntimeExcluded": true
+}

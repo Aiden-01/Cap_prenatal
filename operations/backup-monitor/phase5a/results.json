@@ -1,0 +1,249 @@
+{
+  "phase": "CPREN-91 5A",
+  "base": "8c36954172c3bbe998fdefb4ccd2435d2087e1ea",
+  "python": {
+    "baseline": 31,
+    "newRecipientTests": 4,
+    "passed": 35,
+    "failed": 0,
+    "command": "python -B -m unittest discover -s operations/backup-monitor -p test*.py -v"
+  },
+  "node": {
+    "baseline": 10,
+    "newRecipientTests": 1,
+    "passed": 11,
+    "failed": 0,
+    "command": "node --test --test-reporter=tap operations/backup-monitor/workflow.test.cjs"
+  },
+  "native": {
+    "version": "2.34.4",
+    "labFolder": "run-0gn3_qcl",
+    "cases": [
+      {
+        "case": "empty-queue",
+        "success": true,
+        "nodes": [
+          "Cada cinco minutos",
+          "Reclamar alerta",
+          "Preparar alerta"
+        ]
+      },
+      {
+        "case": "transfer-alert",
+        "success": true,
+        "nodes": [
+          "Cada cinco minutos",
+          "Reclamar alerta",
+          "Preparar alerta",
+          "Enviar alerta por Resend",
+          "¿Resend aceptó el envío?",
+          "Confirmar aceptación"
+        ]
+      },
+      {
+        "case": "duplicate-failure",
+        "success": true,
+        "nodes": [
+          "Cada cinco minutos",
+          "Reclamar alerta",
+          "Preparar alerta"
+        ]
+      },
+      {
+        "case": "recovery",
+        "success": true,
+        "nodes": [
+          "Cada cinco minutos",
+          "Reclamar alerta",
+          "Preparar alerta",
+          "Enviar alerta por Resend",
+          "¿Resend aceptó el envío?",
+          "Confirmar aceptación"
+        ]
+      },
+      {
+        "case": "api-auth-denied",
+        "success": false,
+        "nodes": [
+          "Cada cinco minutos",
+          "Reclamar alerta"
+        ],
+        "errorNode": "Reclamar alerta"
+      },
+      {
+        "case": "provider-error",
+        "success": true,
+        "nodes": [
+          "Cada cinco minutos",
+          "Reclamar alerta",
+          "Preparar alerta",
+          "Enviar alerta por Resend",
+          "¿Resend aceptó el envío?",
+          "Registrar resultado incierto"
+        ]
+      },
+      {
+        "case": "accepted-ack-lost",
+        "success": false,
+        "nodes": [
+          "Cada cinco minutos",
+          "Reclamar alerta",
+          "Preparar alerta",
+          "Enviar alerta por Resend",
+          "¿Resend aceptó el envío?",
+          "Confirmar aceptación"
+        ],
+        "errorNode": "Confirmar aceptación"
+      },
+      {
+        "case": "expired-lease-retry",
+        "success": true,
+        "nodes": [
+          "Cada cinco minutos",
+          "Reclamar alerta",
+          "Preparar alerta",
+          "Enviar alerta por Resend",
+          "¿Resend aceptó el envío?",
+          "Confirmar aceptación"
+        ]
+      },
+      {
+        "case": "second-recovery",
+        "success": true,
+        "nodes": [
+          "Cada cinco minutos",
+          "Reclamar alerta",
+          "Preparar alerta",
+          "Enviar alerta por Resend",
+          "¿Resend aceptó el envío?",
+          "Confirmar aceptación"
+        ]
+      },
+      {
+        "case": "all-components-restarted",
+        "success": true,
+        "nodes": [
+          "Cada cinco minutos",
+          "Reclamar alerta",
+          "Preparar alerta",
+          "Enviar alerta por Resend",
+          "¿Resend aceptó el envío?",
+          "Confirmar aceptación"
+        ]
+      },
+      {
+        "case": "third-recovery",
+        "success": true,
+        "nodes": [
+          "Cada cinco minutos",
+          "Reclamar alerta",
+          "Preparar alerta",
+          "Enviar alerta por Resend",
+          "¿Resend aceptó el envío?",
+          "Confirmar aceptación"
+        ]
+      },
+      {
+        "case": "uncertain-after-safety-limit",
+        "success": true,
+        "nodes": [
+          "Cada cinco minutos",
+          "Reclamar alerta",
+          "Preparar alerta"
+        ]
+      },
+      {
+        "case": "missing-scheduled-run",
+        "success": true,
+        "nodes": [
+          "Cada cinco minutos",
+          "Reclamar alerta",
+          "Preparar alerta",
+          "Enviar alerta por Resend",
+          "¿Resend aceptó el envío?",
+          "Confirmar aceptación"
+        ]
+      },
+      {
+        "case": "incomplete-scheduled-run",
+        "success": true,
+        "nodes": [
+          "Cada cinco minutos",
+          "Reclamar alerta",
+          "Preparar alerta",
+          "Enviar alerta por Resend",
+          "¿Resend aceptó el envío?",
+          "Confirmar aceptación"
+        ]
+      }
+    ],
+    "simulatedUniqueMessages": 8,
+    "realEmails": 0,
+    "canonicalUnchanged": true,
+    "allWorkflowsInactiveUnpublished": true,
+    "executions": 14,
+    "runningNonDeleted": 0,
+    "executionLifecycleCounts": [
+      [
+        "running",
+        1,
+        14
+      ]
+    ],
+    "lifecycleNote": "CLI synthetic execution rows are soft-deleted with status running; no non-deleted running rows. CLI outputs and ledger verify completed scenarios. Processes ended and ports released.",
+    "fixturePortsReleased": true,
+    "guardFilesChecked": 31
+  },
+  "databases": [
+    {
+      "scenario": "monitor.sqlite",
+      "integrity": "ok",
+      "foreignKeyViolations": 0,
+      "syntheticRecipientPins": 6,
+      "outbox": [
+        [
+          "confirmed",
+          0,
+          6
+        ],
+        [
+          "uncertain",
+          1,
+          1
+        ]
+      ]
+    },
+    {
+      "scenario": "missing-scheduled-run/monitor.sqlite",
+      "integrity": "ok",
+      "foreignKeyViolations": 0,
+      "syntheticRecipientPins": 1,
+      "outbox": [
+        [
+          "confirmed",
+          0,
+          1
+        ]
+      ]
+    },
+    {
+      "scenario": "incomplete-scheduled-run/monitor.sqlite",
+      "integrity": "ok",
+      "foreignKeyViolations": 0,
+      "syntheticRecipientPins": 1,
+      "outbox": [
+        [
+          "confirmed",
+          0,
+          1
+        ]
+      ]
+    }
+  ],
+  "clinicalAndSharedSourcesUnchanged": true,
+  "historicalRecipientRedacted": true,
+  "historicalOriginalsPreservedPrivately": true,
+  "configurationInstalled": false,
+  "ubuntuAccessed": false,
+  "push": false
+}

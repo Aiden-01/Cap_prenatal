@@ -1,0 +1,637 @@
+{
+  "verdict": "PASS",
+  "n8nVersion": "2.34.4",
+  "cases": [
+    {
+      "case": "empty-queue",
+      "success": true,
+      "nodes": [
+        "Cada cinco minutos",
+        "Reclamar alerta",
+        "Preparar alerta"
+      ]
+    },
+    {
+      "case": "transfer-alert",
+      "success": true,
+      "nodes": [
+        "Cada cinco minutos",
+        "Reclamar alerta",
+        "Preparar alerta",
+        "Enviar alerta por Resend",
+        "¿Resend aceptó el envío?",
+        "Confirmar aceptación"
+      ]
+    },
+    {
+      "case": "duplicate-failure",
+      "success": true,
+      "nodes": [
+        "Cada cinco minutos",
+        "Reclamar alerta",
+        "Preparar alerta"
+      ]
+    },
+    {
+      "case": "recovery",
+      "success": true,
+      "nodes": [
+        "Cada cinco minutos",
+        "Reclamar alerta",
+        "Preparar alerta",
+        "Enviar alerta por Resend",
+        "¿Resend aceptó el envío?",
+        "Confirmar aceptación"
+      ]
+    },
+    {
+      "case": "api-auth-denied",
+      "success": false,
+      "nodes": [
+        "Cada cinco minutos",
+        "Reclamar alerta"
+      ],
+      "errorNode": "Reclamar alerta"
+    },
+    {
+      "case": "provider-error",
+      "success": true,
+      "nodes": [
+        "Cada cinco minutos",
+        "Reclamar alerta",
+        "Preparar alerta",
+        "Enviar alerta por Resend",
+        "¿Resend aceptó el envío?",
+        "Registrar resultado incierto"
+      ]
+    },
+    {
+      "case": "accepted-ack-lost",
+      "success": false,
+      "nodes": [
+        "Cada cinco minutos",
+        "Reclamar alerta",
+        "Preparar alerta",
+        "Enviar alerta por Resend",
+        "¿Resend aceptó el envío?",
+        "Confirmar aceptación"
+      ],
+      "errorNode": "Confirmar aceptación"
+    },
+    {
+      "case": "expired-lease-retry",
+      "success": true,
+      "nodes": [
+        "Cada cinco minutos",
+        "Reclamar alerta",
+        "Preparar alerta",
+        "Enviar alerta por Resend",
+        "¿Resend aceptó el envío?",
+        "Confirmar aceptación"
+      ]
+    },
+    {
+      "case": "second-recovery",
+      "success": true,
+      "nodes": [
+        "Cada cinco minutos",
+        "Reclamar alerta",
+        "Preparar alerta",
+        "Enviar alerta por Resend",
+        "¿Resend aceptó el envío?",
+        "Confirmar aceptación"
+      ]
+    },
+    {
+      "case": "all-components-restarted",
+      "success": true,
+      "nodes": [
+        "Cada cinco minutos",
+        "Reclamar alerta",
+        "Preparar alerta",
+        "Enviar alerta por Resend",
+        "¿Resend aceptó el envío?",
+        "Confirmar aceptación"
+      ]
+    },
+    {
+      "case": "third-recovery",
+      "success": true,
+      "nodes": [
+        "Cada cinco minutos",
+        "Reclamar alerta",
+        "Preparar alerta",
+        "Enviar alerta por Resend",
+        "¿Resend aceptó el envío?",
+        "Confirmar aceptación"
+      ]
+    },
+    {
+      "case": "uncertain-after-safety-limit",
+      "success": true,
+      "nodes": [
+        "Cada cinco minutos",
+        "Reclamar alerta",
+        "Preparar alerta"
+      ]
+    },
+    {
+      "case": "missing-scheduled-run",
+      "success": true,
+      "nodes": [
+        "Cada cinco minutos",
+        "Reclamar alerta",
+        "Preparar alerta",
+        "Enviar alerta por Resend",
+        "¿Resend aceptó el envío?",
+        "Confirmar aceptación"
+      ]
+    },
+    {
+      "case": "incomplete-scheduled-run",
+      "success": true,
+      "nodes": [
+        "Cada cinco minutos",
+        "Reclamar alerta",
+        "Preparar alerta",
+        "Enviar alerta por Resend",
+        "¿Resend aceptó el envío?",
+        "Confirmar aceptación"
+      ]
+    }
+  ],
+  "simulatedUniqueMessages": 8,
+  "realEmails": 0,
+  "allWorkflowsInactiveUnpublished": true,
+  "canonicalUnchanged": true,
+  "guards": [
+    {
+      "file": "accepted-ack-lost-runner.guard.json",
+      "events": [
+        {
+          "kind": "loopback",
+          "port": 18869
+        }
+      ]
+    },
+    {
+      "file": "accepted-ack-lost.guard.json",
+      "events": [
+        {
+          "kind": "guarded-javascript-task-runner"
+        },
+        {
+          "kind": "python-probe-denied",
+          "blocked": true
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        },
+        {
+          "kind": "resend-redirected-to-mock"
+        },
+        {
+          "kind": "loopback",
+          "port": 18867
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        }
+      ]
+    },
+    {
+      "file": "all-components-restarted-runner.guard.json",
+      "events": [
+        {
+          "kind": "loopback",
+          "port": 18869
+        }
+      ]
+    },
+    {
+      "file": "all-components-restarted.guard.json",
+      "events": [
+        {
+          "kind": "guarded-javascript-task-runner"
+        },
+        {
+          "kind": "python-probe-denied",
+          "blocked": true
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        },
+        {
+          "kind": "resend-redirected-to-mock"
+        },
+        {
+          "kind": "loopback",
+          "port": 18867
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        }
+      ]
+    },
+    {
+      "file": "api-auth-denied-runner.guard.json",
+      "events": []
+    },
+    {
+      "file": "api-auth-denied.guard.json",
+      "events": [
+        {
+          "kind": "guarded-javascript-task-runner"
+        },
+        {
+          "kind": "python-probe-denied",
+          "blocked": true
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        }
+      ]
+    },
+    {
+      "file": "bootstrap.guard.json",
+      "events": []
+    },
+    {
+      "file": "credentials.guard.json",
+      "events": []
+    },
+    {
+      "file": "duplicate-failure-runner.guard.json",
+      "events": [
+        {
+          "kind": "loopback",
+          "port": 18869
+        }
+      ]
+    },
+    {
+      "file": "duplicate-failure.guard.json",
+      "events": [
+        {
+          "kind": "guarded-javascript-task-runner"
+        },
+        {
+          "kind": "python-probe-denied",
+          "blocked": true
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        }
+      ]
+    },
+    {
+      "file": "empty-queue-runner.guard.json",
+      "events": [
+        {
+          "kind": "loopback",
+          "port": 18869
+        }
+      ]
+    },
+    {
+      "file": "empty-queue.guard.json",
+      "events": [
+        {
+          "kind": "guarded-javascript-task-runner"
+        },
+        {
+          "kind": "python-probe-denied",
+          "blocked": true
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        }
+      ]
+    },
+    {
+      "file": "expired-lease-retry-runner.guard.json",
+      "events": [
+        {
+          "kind": "loopback",
+          "port": 18869
+        }
+      ]
+    },
+    {
+      "file": "expired-lease-retry.guard.json",
+      "events": [
+        {
+          "kind": "guarded-javascript-task-runner"
+        },
+        {
+          "kind": "python-probe-denied",
+          "blocked": true
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        },
+        {
+          "kind": "resend-redirected-to-mock"
+        },
+        {
+          "kind": "loopback",
+          "port": 18867
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        }
+      ]
+    },
+    {
+      "file": "import.guard.json",
+      "events": []
+    },
+    {
+      "file": "incomplete-scheduled-run-runner.guard.json",
+      "events": [
+        {
+          "kind": "loopback",
+          "port": 18869
+        }
+      ]
+    },
+    {
+      "file": "incomplete-scheduled-run.guard.json",
+      "events": [
+        {
+          "kind": "guarded-javascript-task-runner"
+        },
+        {
+          "kind": "python-probe-denied",
+          "blocked": true
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        },
+        {
+          "kind": "resend-redirected-to-mock"
+        },
+        {
+          "kind": "loopback",
+          "port": 18867
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        }
+      ]
+    },
+    {
+      "file": "missing-scheduled-run-runner.guard.json",
+      "events": [
+        {
+          "kind": "loopback",
+          "port": 18869
+        }
+      ]
+    },
+    {
+      "file": "missing-scheduled-run.guard.json",
+      "events": [
+        {
+          "kind": "guarded-javascript-task-runner"
+        },
+        {
+          "kind": "python-probe-denied",
+          "blocked": true
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        },
+        {
+          "kind": "resend-redirected-to-mock"
+        },
+        {
+          "kind": "loopback",
+          "port": 18867
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        }
+      ]
+    },
+    {
+      "file": "provider-error-runner.guard.json",
+      "events": [
+        {
+          "kind": "loopback",
+          "port": 18869
+        }
+      ]
+    },
+    {
+      "file": "provider-error.guard.json",
+      "events": [
+        {
+          "kind": "guarded-javascript-task-runner"
+        },
+        {
+          "kind": "python-probe-denied",
+          "blocked": true
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        },
+        {
+          "kind": "resend-redirected-to-mock"
+        },
+        {
+          "kind": "loopback",
+          "port": 18867
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        }
+      ]
+    },
+    {
+      "file": "recovery-runner.guard.json",
+      "events": [
+        {
+          "kind": "loopback",
+          "port": 18869
+        }
+      ]
+    },
+    {
+      "file": "recovery.guard.json",
+      "events": [
+        {
+          "kind": "guarded-javascript-task-runner"
+        },
+        {
+          "kind": "python-probe-denied",
+          "blocked": true
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        },
+        {
+          "kind": "resend-redirected-to-mock"
+        },
+        {
+          "kind": "loopback",
+          "port": 18867
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        }
+      ]
+    },
+    {
+      "file": "second-recovery-runner.guard.json",
+      "events": [
+        {
+          "kind": "loopback",
+          "port": 18869
+        }
+      ]
+    },
+    {
+      "file": "second-recovery.guard.json",
+      "events": [
+        {
+          "kind": "guarded-javascript-task-runner"
+        },
+        {
+          "kind": "python-probe-denied",
+          "blocked": true
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        },
+        {
+          "kind": "resend-redirected-to-mock"
+        },
+        {
+          "kind": "loopback",
+          "port": 18867
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        }
+      ]
+    },
+    {
+      "file": "third-recovery-runner.guard.json",
+      "events": [
+        {
+          "kind": "loopback",
+          "port": 18869
+        }
+      ]
+    },
+    {
+      "file": "third-recovery.guard.json",
+      "events": [
+        {
+          "kind": "guarded-javascript-task-runner"
+        },
+        {
+          "kind": "python-probe-denied",
+          "blocked": true
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        },
+        {
+          "kind": "resend-redirected-to-mock"
+        },
+        {
+          "kind": "loopback",
+          "port": 18867
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        }
+      ]
+    },
+    {
+      "file": "transfer-alert-runner.guard.json",
+      "events": [
+        {
+          "kind": "loopback",
+          "port": 18869
+        }
+      ]
+    },
+    {
+      "file": "transfer-alert.guard.json",
+      "events": [
+        {
+          "kind": "guarded-javascript-task-runner"
+        },
+        {
+          "kind": "python-probe-denied",
+          "blocked": true
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        },
+        {
+          "kind": "resend-redirected-to-mock"
+        },
+        {
+          "kind": "loopback",
+          "port": 18867
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        }
+      ]
+    },
+    {
+      "file": "uncertain-after-safety-limit-runner.guard.json",
+      "events": [
+        {
+          "kind": "loopback",
+          "port": 18869
+        }
+      ]
+    },
+    {
+      "file": "uncertain-after-safety-limit.guard.json",
+      "events": [
+        {
+          "kind": "guarded-javascript-task-runner"
+        },
+        {
+          "kind": "python-probe-denied",
+          "blocked": true
+        },
+        {
+          "kind": "loopback",
+          "port": 18866
+        }
+      ]
+    }
+  ],
+  "labFolder": "run-4n3xwje4"
+}

@@ -1,0 +1,10 @@
+__pycache__/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.key
+runtime/
+# Private operational audit metadata/scripts; preserved locally, not release inputs.
+/phase6/
+# Cancelled VM proposal and machine inventory; preserved as local history.
+/phase8/
