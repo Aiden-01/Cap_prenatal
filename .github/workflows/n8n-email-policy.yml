@@ -1,0 +1,14 @@
+name: n8n email sender policy
+on: [push, pull_request]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test backend/test/n8nEmailSenders.test.js backend/test/n8nRecipients.test.js backend/test/n8nSchedules.test.js operations/backup-monitor/workflow.test.cjs
+      - run: node operations/backup-monitor/build-workflow.cjs --check

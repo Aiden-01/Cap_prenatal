@@ -1,5 +1,46 @@
 # Resend en CAP Prenatal
 
+## Política oficial de remitentes (CPREN-92)
+
+La fuente de verdad es [`../n8n/email-senders.json`](../n8n/email-senders.json).
+La categoría depende del propósito y público del mensaje:
+
+| Categoría | Identidad de producción | Workflows |
+| --- | --- | --- |
+| `CLINICAL_INSTITUTIONAL` | `CAP Prenatal <citas@notificaciones.hercor-nexus.com>` | Citas, inasistencias, ambos censos, Tdap y calidad de datos del servicio |
+| `TECHNICAL` | `CAP Prenatal - Sistema <sistema@notificaciones.hercor-nexus.com>` | Monitoreo de respaldos externos; infraestructura, seguridad y mantenimiento técnico |
+
+Se conserva el dominio y la credencial existentes. No crear buzones de recepción
+ni otra cuenta Resend. Los seis institucionales conservan el placeholder de
+`citas@notificaciones.example.invalid` en Git; el preparador lo convierte al
+remitente oficial. El monitor versiona la identidad técnica oficial y conserva
+`={{ $json.recipient }}`: el servicio privado entrega el destinatario validado.
+
+Para registrar un futuro workflow:
+
+1. Añadir su nombre de archivo y categoría explícita a `workflows` del manifiesto.
+2. Usar exactamente `from` o `placeholder` de su identidad en todos sus nodos
+   comunitarios Resend o el campo literal `from` del HTTP Request Resend.
+3. Registrar en `WORKFLOWS` de `scripts/render-n8n-workflows.js` su variable de
+   destinatario privado; usar `.invalid` en la plantilla. El modo `null` es
+   exclusivo del monitor actual con destinatario proporcionado por su API privada.
+4. Ejecutar el preparador y `node --test backend/test/n8nEmailSenders.test.js`
+   y ampliar las regresiones al nuevo inventario. Revisar la salida ignorada por
+   Git antes de importar; preparar no autoriza publicación o activación.
+
+El preparador inspecciona todos los JSON de `n8n/workflows` antes de escribir:
+rechaza correos sin categoría, identidades contrarias al rol, dominios ajenos
+y transportes no soportados. No corrige silenciosamente remitentes erróneos.
+La referencia SMTP retirada tiene una excepción fija por hash, nunca se renderiza
+y cualquier cambio exige revisión explícita. GitHub Actions ejecuta esta validación
+y las regresiones en cada push y PR. Credenciales y destinatarios privados quedan
+fuera de Git; nunca pasar el entorno completo a los JSON.
+
+El cambio productivo de CPREN-91 requiere merge confirmado, verificación del
+dominio y respaldo consistente previo. Actualizar solo `from` del ID existente
+`wFLzkGT1c5qV5bcu` mediante n8n nativo y comprobar continuidad; conservar las seis
+institucionales inactivas y sin publicar. No ejecutar pruebas de envío adicionales.
+
 Guía para instalar el nodo, verificar el dominio, crear la credencial y probar
 correo sin exponer secretos o datos clínicos. El recorrido actual es CAP Prenatal
 → Express (API de automatizaciones) → n8n → Resend. La operación general de n8n está

@@ -5,7 +5,7 @@ const test = require('node:test');
 
 const directory = path.resolve(__dirname, '../../n8n/workflows');
 
-test('CPREN-23: todos los schedules versionados quedan inactivos a las 08:00 Guatemala', () => {
+test('CPREN-23/91: agendas institucionales 08:00 y monitor técnico cada cinco minutos', () => {
   const files = fs.readdirSync(directory).filter((file) => file.endsWith('.json'));
   assert.ok(files.length > 0);
   let schedules = 0;
@@ -18,6 +18,12 @@ test('CPREN-23: todos los schedules versionados quedan inactivos a las 08:00 Gua
       assert.equal(workflow.settings.timezone, 'America/Guatemala', file);
       const rules = node.parameters.rule.interval;
       assert.ok(rules.length > 0, file);
+      if (file === 'monitoreo-respaldos-externos-v1.json') {
+        assert.deepEqual(rules, [{ field: 'minutes', minutesInterval: 5 }]);
+        assert.equal(node.name, 'Cada cinco minutos');
+        schedules += 1;
+        continue;
+      }
       for (const rule of rules) {
         assert.ok(['days', 'weeks', 'months'].includes(rule.field), `${file}: revisar frecuencia nueva`);
         assert.equal(rule.triggerAtHour, 8, file);

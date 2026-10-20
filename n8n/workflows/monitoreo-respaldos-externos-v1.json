@@ -70,7 +70,7 @@
         "authentication": "apiKey",
         "resource": "email",
         "operation": "send",
-        "from": "CAP Prenatal <citas@notificaciones.hercor-nexus.com>",
+        "from": "CAP Prenatal - Sistema <sistema@notificaciones.hercor-nexus.com>",
         "to": "={{ $json.recipient }}",
         "subject": "={{ $json.subject }}",
         "html": "={{ $json.html }}",

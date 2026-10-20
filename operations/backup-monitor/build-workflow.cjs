@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const root = path.resolve(__dirname, '../..');
+const { policy } = require('../../scripts/n8n-email-policy');
 const components = fs.readFileSync(path.join(root, 'n8n/design-v2/components.cjs'), 'utf8').split('module.exports =')[0];
 const buildMail = String.raw`
 const item = $input.first().json;
@@ -45,7 +46,7 @@ const nodes=[
  node('schedule','Cada cinco minutos','n8n-nodes-base.scheduleTrigger',1.3,{rule:{interval:[{field:'minutes',minutesInterval:5}]}},[0,0]),
  http('claim','Reclamar alerta','claim','{}',[220,0]),
  node('render','Preparar alerta','n8n-nodes-base.code',2,{jsCode:components+'\n'+buildMail},[440,0]),
- node('send','Enviar alerta por Resend','n8n-nodes-resend.resend',1,{authentication:'apiKey',resource:'email',operation:'send',from:'CAP Prenatal <citas@notificaciones.hercor-nexus.com>',to:'={{ $json.recipient }}',subject:'={{ $json.subject }}',html:'={{ $json.html }}',additionalOptions:{idempotencyKey:'={{ $json.idempotency_key }}'}},[660,0],{retryOnFail:false,onError:'continueErrorOutput'}),
+ node('send','Enviar alerta por Resend','n8n-nodes-resend.resend',1,{authentication:'apiKey',resource:'email',operation:'send',from:policy.identities[policy.workflows['monitoreo-respaldos-externos-v1.json']].from,to:'={{ $json.recipient }}',subject:'={{ $json.subject }}',html:'={{ $json.html }}',additionalOptions:{idempotencyKey:'={{ $json.idempotency_key }}'}},[660,0],{retryOnFail:false,onError:'continueErrorOutput'}),
  node('accepted','¿Resend aceptó el envío?','n8n-nodes-base.if',2.2,{conditions:{options:{caseSensitive:true,leftValue:'',typeValidation:'strict',version:2},conditions:[{id:'provider-id-present',leftValue:"={{ typeof $json.id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test($json.id) }}",rightValue:true,operator:{type:'boolean',operation:'true',singleValue:true}}],combinator:'and'},options:{}},[880,0]),
  http('ack','Confirmar aceptación','ack',`={{ JSON.stringify({event_id:$('Preparar alerta').first().json.event_id,claim_id:$('Preparar alerta').first().json.claim_id,provider_id:$json.id}) }}`,[900,-100]),
  http('uncertain','Registrar resultado incierto','uncertain',`={{ JSON.stringify({event_id:$('Preparar alerta').first().json.event_id,claim_id:$('Preparar alerta').first().json.claim_id}) }}`,[900,100]),
