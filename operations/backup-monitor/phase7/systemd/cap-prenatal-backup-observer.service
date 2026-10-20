@@ -1,0 +1,41 @@
+# Reference only; the shared account and code do not exist in production yet.
+[Unit]
+Description=CAP Prenatal backup evidence observer
+After=cap-prenatal-backup-evidence.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=cap-backup-monitor
+Group=cap-backup-monitor
+WorkingDirectory=/opt/cap-prenatal-backup-monitor
+ExecStart=/usr/bin/python3 -E -s -B /opt/cap-prenatal-backup-monitor/monitor.py observe --db /var/lib/cap-prenatal-backup-monitor/monitor.sqlite --snapshot
+StateDirectory=cap-prenatal-backup-monitor
+StateDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=10s
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+ReadOnlyPaths=-/run/cap-prenatal-backup-evidence
+ReadWritePaths=/var/lib/cap-prenatal-backup-monitor
+InaccessiblePaths=-/var/backups -/var/lib/postgresql -/var/lib/cap-prenatal-n8n -/etc/cap-prenatal-n8n -/var/log/journal -/run/log/journal
+MemoryMax=128M
+TasksMax=8
+LimitNOFILE=128
+
+[Install]
+WantedBy=multi-user.target

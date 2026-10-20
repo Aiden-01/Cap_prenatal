@@ -9,7 +9,6 @@ import os
 from pathlib import Path
 import re
 import sqlite3
-import subprocess
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -285,33 +284,46 @@ class Store:
 
 
 def read_systemd(now):
-    """Fixed read-only commands. No shell, rclone, dumps, credentials or network."""
-    if os.name != "posix":
-        raise RuntimeError("systemd reader requires an authorized Linux host")
-    since = iso(now - 7 * 86400)
-    journal = subprocess.run(["journalctl", "--unit=" + UNIT, "--since=" + since,
-                              "--no-pager", "--output=json"], capture_output=True, text=True, timeout=30, check=True)
-    props = subprocess.run(["systemctl", "show", UNIT, "--property=InvocationID,Result,ExecMainStatus,ActiveState,SubState"],
-                           capture_output=True, text=True, timeout=10, check=True)
-    state = dict(line.split("=", 1) for line in props.stdout.splitlines() if "=" in line)
-    grouped = {}
-    for line in journal.stdout.splitlines():
-        entry = json.loads(line)
-        invocation = entry.get("_SYSTEMD_INVOCATION_ID")
-        if not invocation:
-            continue
-        stamp = int(entry["__REALTIME_TIMESTAMP"]) / 1e6
-        run = grouped.setdefault(invocation, {"start": stamp, "last": stamp, "messages": []})
-        run["last"] = stamp
-        run["messages"].append(entry.get("MESSAGE", ""))
-    events = []
-    for ident, run in sorted(grouped.items(), key=lambda pair: pair[1]["start"]):
-        complete = any("Fin backup CAP" in m or "[ERROR]" in m for m in run["messages"])
-        current_finished = ident == state.get("InvocationID") and state.get("ActiveState") in ("inactive", "failed")
-        code = int(state["ExecMainStatus"]) if current_finished else None
-        event = normalize(ident, run["start"], run["messages"], run["last"] if complete or current_finished else None, code)
-        events.append(event)
-    return events
+    """Compatibility name only: now consumes the protected snapshot, never journald."""
+    from evidence_snapshot import read_snapshot
+    return read_snapshot(now)
+
+
+def observe_snapshot(store, now, reader=read_systemd, start_grace=5, finish_grace=35):
+    """Validate the entire snapshot before applying evidence or checking a schedule."""
+    from evidence_snapshot import timestamp, validate_snapshot
+    snapshot = validate_snapshot(reader(now), now)
+    generated = timestamp(snapshot['generated_at'])
+    previous = store.get('publisher_generated_at')
+    if previous is not None and generated < float(previous):
+        raise ValueError('OBSERVATION_UNAVAILABLE')
+    for execution in snapshot['executions']:
+        store.apply(execution['event'], now)
+    unit = snapshot['unit']
+    slot = slot_for(now)
+    # No claim of complete historical retention. Never infer missing old jobs from gaps.
+    # A fresh, stable systemd latest-start predating the current slot is independent
+    # negative evidence for this slot, not an inference from an empty/rotated journal.
+    if unit['started_at'] is not None and timestamp(unit['started_at']) < slot:
+        store._check_slot(now, slot, start_grace, finish_grace)
+    elif unit['active_state'] == 'active':
+        current = next((x for x in snapshot['executions'] if x['event']['run_id'] == unit['run_id']), None)
+        if current and current['proof']['start'] and current['event']['event_type'] == 'INCOMPLETE':
+            store._check_slot(now, slot, start_grace, finish_grace)
+    with store.tx():
+        store.put('publisher_generated_at', generated)
+        store.put('evidence_history_status', snapshot['window']['history_status'])
+        if previous is not None and float(previous) < timestamp(snapshot['window']['start_at']):
+            store.put('evidence_history_gap', 'REVIEW_REQUIRED')
+        store.put('observer_last_ok', now)
+        store.put('observer_status', 'OK')
+
+
+def observation_unavailable(store, now):
+    # Source failure is not proof of a failed/missed backup. Preserve incidents/outbox.
+    with store.tx():
+        store.put('observer_status', 'OBSERVATION_UNAVAILABLE')
+        store.put('observer_last_error_at', now)
 
 
 def server(db_path, auth_token, port=8766):
@@ -378,7 +390,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=["observe", "serve"])
     parser.add_argument("--db", required=True)
-    parser.add_argument("--systemd", action="store_true", help="Explicit opt-in for real read-only collector")
+    parser.add_argument("--snapshot", action="store_true", help="Read fixed protected evidence snapshot, never journal")
     parser.add_argument("--fixture", type=Path)
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--interval", type=int, default=300)
@@ -395,24 +407,27 @@ def main():
     if args.mode == "serve":
         server(str(path), os.environ.get("CAP_BACKUP_MONITOR_TOKEN", "")).serve_forever()
         return
-    if bool(args.fixture) == args.systemd:
-        parser.error("Select exactly one input: --fixture or --systemd")
+    if bool(args.fixture) == args.snapshot:
+        parser.error("Select exactly one input: --fixture or --snapshot")
     with contextlib.closing(Store(str(path))) as store:
         while True:
             tick = time.monotonic()
             now = time.time()
             try:
-                events = json.loads(args.fixture.read_text()) if args.fixture else read_systemd(now)
-                for event in events:
-                    store.apply(event, now)
-                store.check_schedule(now, args.start_grace, args.finish_grace)
-                with store.tx():
-                    store.put("observer_last_ok", now)
+                if args.snapshot:
+                    observe_snapshot(store, now, start_grace=args.start_grace, finish_grace=args.finish_grace)
+                else:
+                    # Existing isolated fixtures remain supported; never used by proposed units.
+                    events = json.loads(args.fixture.read_text())
+                    for event in events:
+                        store.apply(event, now)
+                    store.check_schedule(now, args.start_grace, args.finish_grace)
+                    with store.tx():
+                        store.put("observer_last_ok", now)
             except Exception:
                 # Fail visibly without leaking journal contents or secrets. A failed read is not a missing job.
                 try:
-                    unavailable = normalize("observer_" + str(int(slot_for(now))), now, [], finished=now)
-                    store.apply(unavailable, now)
+                    observation_unavailable(store, now)
                 except Exception:
                     pass
                 print("OBSERVATION_UNAVAILABLE", flush=True)
@@ -424,4 +439,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        print('MONITOR_STATE_UNAVAILABLE', flush=True)
+        raise SystemExit(1)

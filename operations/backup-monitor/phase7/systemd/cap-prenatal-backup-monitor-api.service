@@ -1,0 +1,42 @@
+# Reference only. EnvironmentFile must be root-owned 0600, outside Git.
+[Unit]
+Description=CAP Prenatal private backup monitor API
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=cap-backup-monitor
+Group=cap-backup-monitor
+WorkingDirectory=/opt/cap-prenatal-backup-monitor
+EnvironmentFile=/etc/cap-prenatal-backup-monitor/api.env
+ExecStart=/usr/bin/python3 -E -s -B /opt/cap-prenatal-backup-monitor/monitor.py serve --db /var/lib/cap-prenatal-backup-monitor/monitor.sqlite
+StateDirectory=cap-prenatal-backup-monitor
+StateDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=10s
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+# n8n must share host loopback; a private network namespace would break connectivity.
+PrivateNetwork=no
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET
+IPAddressDeny=any
+IPAddressAllow=localhost
+ReadWritePaths=/var/lib/cap-prenatal-backup-monitor
+InaccessiblePaths=-/var/backups -/var/lib/postgresql -/var/lib/cap-prenatal-n8n -/etc/cap-prenatal-n8n -/var/log/journal -/run/log/journal
+MemoryMax=128M
+TasksMax=32
+LimitNOFILE=128
+
+[Install]
+WantedBy=multi-user.target

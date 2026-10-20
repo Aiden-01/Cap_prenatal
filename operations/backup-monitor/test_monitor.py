@@ -208,16 +208,11 @@ class MonitorTests(unittest.TestCase):
         self.assertNotIn('mount', Path(__file__).with_name('monitor.py').read_text().split('def main')[0])
 
     def test_systemd_reader_has_only_fixed_read_commands(self):
-        records=[]
-        for n,m in enumerate(FIXTURES['success']):
-            records.append(json.dumps({'_SYSTEMD_INVOCATION_ID':'abc123','__REALTIME_TIMESTAMP':str(int((SLOT+n)*1e6)),'MESSAGE':m}))
-        class Result:
-            def __init__(self, text): self.stdout=text
-        with patch('monitor.os.name','posix'), patch('monitor.subprocess.run',side_effect=[Result('\n'.join(records)),Result('InvocationID=abc123\nExecMainStatus=0\nActiveState=inactive\nSubState=dead\nResult=success')]) as run:
-            events=read_systemd(SLOT+60)
-            self.assertTrue(events[0]['external_verified'])
-            self.assertEqual([call.args[0][0] for call in run.call_args_list], ['journalctl','systemctl'])
-            self.assertTrue(all(not call.kwargs.get('shell') for call in run.call_args_list))
+        # Phase 7 intentionally retires direct journal access by this compatibility reader.
+        with patch('evidence_snapshot.read_snapshot',return_value={'synthetic':'snapshot'}) as reader:
+            self.assertEqual(read_systemd(SLOT+60), {'synthetic':'snapshot'})
+            reader.assert_called_once_with(SLOT+60)
+        self.assertNotIn('subprocess.run', Path(__file__).with_name('monitor.py').read_text())
 
     def test_local_api_auth_shape_and_no_arbitrary_routes(self):
         token='synthetic-test-only-not-a-real-secret-123456'

@@ -1,0 +1,13 @@
+# Reference only; never enabled by this phase.
+[Unit]
+Description=CAP Prenatal evidence publication interval
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=60s
+AccuracySec=1s
+RandomizedDelaySec=0
+Unit=cap-prenatal-backup-evidence.service
+
+[Install]
+WantedBy=timers.target
