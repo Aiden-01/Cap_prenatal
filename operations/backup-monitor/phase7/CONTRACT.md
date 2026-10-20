@@ -23,6 +23,8 @@ El snapshot no exporta mensajes, nombres de archivos/dumps, checksums, cursores 
 
 ## Límites y frescura
 
+Compatibilidad journalctl255: se admiten además `__SEQNUM` (cadena decimal canónica ASCII de uint64,0–18446744073709551615) y `__SEQNUM_ID` (cadena de32 dígitos hexadecimales en minúscula). Son metadatos opcionales para conservar entradas/versiones sin esos campos; si aparecen, se validan antes de descartar el registro del manager o derivar eventos. No se aceptan números JSON, arrays, objetos, null, signos, espacios, desbordamientos o IDs de otro formato. No entran en snapshot/eventos ni cambian su contrato. Otros campos desconocidos siguen rechazados. Formato contrastado con el [serializador oficial de systemd v255](https://github.com/systemd/systemd/blob/v255/src/shared/logs-show.c#L1027) y [sd_journal_get_seqnum](https://www.freedesktop.org/software/systemd/man/latest/sd_journal_get_seqnum.html).
+
 - Consulta fija a cap-prenatal-backup.service; dos lecturas de metadatos iguales, antes/después del journal. Si cambian, no se reemplaza el snapshot anterior.
 - Deadline global del colector25s, con kill/wait de hijo al agotarse; unidad propuesta TimeoutStartSec30s. Sin shell, stdin ni stderr crudos, entorno del subproceso mínimo y ejecutables absolutos.
 - Journal máximo2MiB,4096 registros y16KiB por línea; se solicita4097 para detectar truncamiento por cantidad. Sobrepasar un límite falla, no recorta silenciosamente.
