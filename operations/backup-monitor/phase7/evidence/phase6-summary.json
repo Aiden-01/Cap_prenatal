@@ -1,0 +1,24 @@
+{
+  "phase": "CPREN-91 read-only phase 6 historical summary",
+  "observedUtc": "2026-10-20T01:30:53.085270+00:00",
+  "readOnly": true,
+  "rawOperationalEvidencePublished": false,
+  "platform": {
+    "ubuntu": "24.04",
+    "systemdMajor": 255,
+    "python": "Python 3.12.3",
+    "n8n": "2.34.4"
+  },
+  "backupDailyGuatemalaHour": 2,
+  "capN8nJournalReadAllowed": false,
+  "capN8nSystemdMetadataReadable": true,
+  "port8766WasUnused": true,
+  "nginx8766ReferenceObserved": false,
+  "serviceStateAndConfigurationUnchangedAcrossAudit": true,
+  "limitations": [
+    "Historical observations only; repeat preflight before future installation",
+    "No secrets, operational SQLite or dump contents read",
+    "AWS perimeter and effective rclone/dump paths not established"
+  ],
+  "currentDecision": "User cancelled additional Linux laboratory; real Linux checks remain pending in an explicitly authorized controlled installation window"
+}

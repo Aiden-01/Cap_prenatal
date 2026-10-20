@@ -1,0 +1,107 @@
+[
+  {
+    "path": "operations/backup-monitor/.gitignore",
+    "bytes": 241,
+    "sha256": "ba139449733b6939e4a5c860bd7ab38deb23c0ac98a5c80b21c331f03a8b85b8"
+  },
+  {
+    "path": "operations/backup-monitor/DEPLOYMENT.md",
+    "bytes": 17176,
+    "sha256": "3ffd94f20142db21280262cae8c40b5fde3620841dd8fd6b918404b204095b1f"
+  },
+  {
+    "path": "operations/backup-monitor/README.md",
+    "bytes": 17035,
+    "sha256": "d3cf29f802497acc62c1db1c82ba56eae23ea7d444d1f0512fd19b452c638f2d"
+  },
+  {
+    "path": "operations/backup-monitor/evidence_snapshot.py",
+    "bytes": 9590,
+    "sha256": "63a802db4743ca94609c5e730847a9b1355bef81f84f1885293dba7f541492d1"
+  },
+  {
+    "path": "operations/backup-monitor/monitor.py",
+    "bytes": 24336,
+    "sha256": "a40240444135d6e38dc05af9726a8841527621afd3b0066206f82ee8a1efe760"
+  },
+  {
+    "path": "operations/backup-monitor/phase7/CONTRACT.md",
+    "bytes": 6972,
+    "sha256": "035e712dd43c672be8c675194496ed89d640a4238b11e6640d97d574c4d6d707"
+  },
+  {
+    "path": "operations/backup-monitor/phase7/README.md",
+    "bytes": 11182,
+    "sha256": "b61f0aa5fb627a4db1a60f1deaed01b989460a460d447444016b849295a858a7"
+  },
+  {
+    "path": "operations/backup-monitor/phase7/evidence/checks.json",
+    "bytes": 1691,
+    "sha256": "f1a809cd217ee580d14d182c0891d4efebc70f3939be9e51e3074d14029f4a42"
+  },
+  {
+    "path": "operations/backup-monitor/phase7/evidence/generator.txt",
+    "bytes": 61,
+    "sha256": "63bc78fc1034d5d5465ce924f8be1de379cecea99087c4117cca28df848c13b6"
+  },
+  {
+    "path": "operations/backup-monitor/phase7/evidence/node-tests.tap",
+    "bytes": 2365,
+    "sha256": "bd635ce2528d7ce6cce5b8cc6cd5751aead42469e315c8874fa1d02bba5f8daa"
+  },
+  {
+    "path": "operations/backup-monitor/phase7/evidence/phase6-summary.json",
+    "bytes": 956,
+    "sha256": "79d757da8ac33fa184703aab265c010b4522ea55249d722ecf12a25d65610cb4"
+  },
+  {
+    "path": "operations/backup-monitor/phase7/evidence/python-tests.txt",
+    "bytes": 9252,
+    "sha256": "a16978820514f550bcaf961885c1bb3625fab70dc1488d8b6fd20882fc9d9b6d"
+  },
+  {
+    "path": "operations/backup-monitor/phase7/evidence/results.json",
+    "bytes": 1267,
+    "sha256": "9fbf3d2c160a79501d1c224c36f6ea00e167243bb6e24020635a9d2f28cae9cb"
+  },
+  {
+    "path": "operations/backup-monitor/phase7/systemd/cap-prenatal-backup-evidence.service",
+    "bytes": 1090,
+    "sha256": "2270c80758070202b107c3140e9db9b87e1d1951bb3b6805194c7c191beeefae"
+  },
+  {
+    "path": "operations/backup-monitor/phase7/systemd/cap-prenatal-backup-evidence.timer",
+    "bytes": 266,
+    "sha256": "6fd45965c0f8f3841c932f14f0aaf4b5e182138f24d7e478491be307ca5710b7"
+  },
+  {
+    "path": "operations/backup-monitor/phase7/systemd/cap-prenatal-backup-monitor-api.service",
+    "bytes": 1304,
+    "sha256": "436c5784536ff0c9b729c4193507f4df000b63c8d9deeb0b62958058bc01dbbf"
+  },
+  {
+    "path": "operations/backup-monitor/phase7/systemd/cap-prenatal-backup-observer.service",
+    "bytes": 1237,
+    "sha256": "3158c73f9af6b6db95cc694a051fab65b66088a808e6fac0ae44fb7c009121f5"
+  },
+  {
+    "path": "operations/backup-monitor/phase7/verify.cjs",
+    "bytes": 6894,
+    "sha256": "85d2581f330a24b9ffd50177296432ef8ef0778b895c01e7b177a7057cf7bde1"
+  },
+  {
+    "path": "operations/backup-monitor/publisher.py",
+    "bytes": 9990,
+    "sha256": "984a2aef021d36dd3f4a6a65f66ecfe8e6089dfbc4ff4872cf5cf36308f4d335"
+  },
+  {
+    "path": "operations/backup-monitor/test_monitor.py",
+    "bytes": 14900,
+    "sha256": "3f394377dc8095c418aeb167dbc989f46f3032368f8c5311003ab42b4d6a6632"
+  },
+  {
+    "path": "operations/backup-monitor/test_snapshot.py",
+    "bytes": 21569,
+    "sha256": "f06c275fd2dc41b0b47802860ecc9c2592938335503b7fb485e88101bc7e570e"
+  }
+]

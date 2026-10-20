@@ -1,14 +1,16 @@
 # CPREN-91 — Fase 2: monitor local de respaldos
 
+Estado vigente: desarrollo con publicador/snapshot y propuestas systemd listo para revisión en PR Draft. El usuario canceló crear otro laboratorio; las verificaciones Linux pendientes pasan al checkpoint autorizado del [procedimiento directo](DEPLOYMENT.md), sin declarar completadas las dos pruebas POSIX omitidas. No se ha instalado ni activado nada. Las secciones y resultados históricos de Fases2/3 se conservan identificados como tales.
+
 Implementación local para revisión. **No instalada en Ubuntu, sin importaciones n8n, activaciones ni correos reales.** No modifica los seis workflows clínicos, los respaldos, rclone ni servicios existentes. No utiliza Docker ni dependencias Python adicionales.
 
 ## Arquitectura implementada
 
-`systemd/journald (lectura) → observador Python → SQLite exclusiva → API loopback → workflow n8n → Resend → ACK`
+`systemd/journald (lectura) → publicador restringido → snapshot sanitizado → observador Python → SQLite exclusiva → API loopback → workflow n8n → Resend → ACK`
 
 Dos procesos independientes: `observe` registra resultados aunque n8n esté detenido; `serve` expone solamente reclamación y confirmación. Ambos usan `monitor.sqlite`, nunca PostgreSQL clínico ni la base interna de n8n. Los procesos de pruebas locales terminan al finalizar los tests. Importar `monitor.py` no inicia procesos ni servidores.
 
-El lector Linux ejecuta únicamente `journalctl --unit=cap-prenatal-backup.service` y `systemctl show` con argumentos fijos, sin shell. No ejecuta el script de respaldo ni rclone, ni abre dumps o sus credenciales. Este lector se comprobó mediante respuestas simuladas de subprocess, **no mediante ejecución real en Ubuntu durante Fase 2**.
+En la implementación local de Fase7, únicamente el publicador independiente consulta `journalctl --unit=cap-prenatal-backup.service` y `systemctl show`, con argumentos fijos y límites, sin shell. El observador usa `--snapshot`, no `--systemd`, y ya no consulta journald. No se ejecuta el script de respaldo ni rclone, ni se abren dumps o credenciales. El lector directo descrito en las evidencias de Fase2 es histórico. La frontera de permisos y validación Linux siguen pendientes; consultar `phase7/README.md` y `phase7/CONTRACT.md` para el estado actual y sus límites.
 
 La fuente auditada en Fase 1 es un respaldo diario a las **02:00 America/Guatemala**. El proceso de observación tiene una cadencia inicial de 300 segundos; `--interval`, `--start-grace` (5 minutos) y `--finish-grace` (35 minutos) son configurables. No altera el timer original. Guatemala usa UTC−06, independiente de la zona horaria de Windows; se prueban cambios de mes y año.
 
