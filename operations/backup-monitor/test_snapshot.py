@@ -306,6 +306,41 @@ class PublisherTests(unittest.TestCase):
         self.assertTrue(result['executions'][0]['event']['external_verified'])
         self.assertNotIn('__CURSOR',json.dumps(result))
 
+    def test_sequence_metadata_validated_and_discarded(self):
+        unit=snapshot()['unit']
+        expected=publisher.build_snapshot(raw_records(baseline.FIXTURES['success']),unit,SLOT+60,SLOT+60)
+        for extra in [{'__SEQNUM':'0'}, {'__SEQNUM':str(2**64-1)},
+                      {'__SEQNUM_ID':'0123456789abcdef'*2},
+                      {'__SEQNUM':'123','__SEQNUM_ID':'0123456789abcdef'*2}]:
+            with self.subTest(fields=sorted(extra)):
+                actual=publisher.build_snapshot(raw_records(baseline.FIXTURES['success'],extra=extra),unit,SLOT+60,SLOT+60)
+                self.assertEqual(actual,expected)
+                self.assertNotIn('__SEQNUM',json.dumps(actual))
+
+    def test_invalid_sequence_metadata_rejected(self):
+        unit=snapshot()['unit']
+        invalid={
+            '__SEQNUM':[None,True,1,1.0,[],{},'', '-1','+1','01','1.0','1e2',' 1','1\n',
+                        '\u0661',str(2**64),'9'*21],
+            '__SEQNUM_ID':[None,True,1,[],{},'', 'a'*31,'a'*33,'A'*32,'g'*32,
+                           '01234567-89ab-cdef-0123-456789abcdef','a'*32+'\n'],
+        }
+        for field,values in invalid.items():
+            for value in values:
+                with self.subTest(field=field,value=value):
+                    with self.assertRaisesRegex(ValueError,'JOURNAL_SHAPE_INVALID'):
+                        publisher.build_snapshot(raw_records(baseline.FIXTURES['success'],extra={field:value}),unit,SLOT+60,SLOT+60)
+
+    def test_sequence_metadata_does_not_allow_unknown_or_duplicate_fields(self):
+        unit=snapshot()['unit']
+        for extra in [{'__SEQNUM':'1','__SEQNUM_ID':'b'*32,'__UNKNOWN':'synthetic'},
+                      {'__SEQNUM':'1','__SEQNUM_ID':{'unexpected':'structure'}}]:
+            with self.assertRaisesRegex(ValueError,'JOURNAL_SHAPE_INVALID'):
+                publisher.build_snapshot(raw_records(baseline.FIXTURES['success'],extra=extra),unit,SLOT+60,SLOT+60)
+        raw=raw_records(baseline.FIXTURES['success'],extra={'__SEQNUM':'1'})
+        raw=raw.replace(b'"__SEQNUM": "1"',b'"__SEQNUM": "1", "__SEQNUM": "2"',1)
+        with self.assertRaises(ValueError):publisher.build_snapshot(raw,unit,SLOT+60,SLOT+60)
+
     def test_manager_messages_without_invocation_cannot_verify_backup(self):
         unit=snapshot()['unit']
         manager=json.dumps({'__REALTIME_TIMESTAMP':str(int((SLOT+20)*1e6)),

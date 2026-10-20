@@ -93,7 +93,8 @@ def build_snapshot(raw, unit, cutoff, generated):
     groups = {}
     fields = {'__REALTIME_TIMESTAMP', 'MESSAGE'}
     # journalctl JSON may always emit these metadata fields even with --output-fields.
-    allowed = fields | {'_SYSTEMD_INVOCATION_ID', '__CURSOR', '__MONOTONIC_TIMESTAMP', '_BOOT_ID'}
+    allowed = fields | {'_SYSTEMD_INVOCATION_ID', '__CURSOR', '__MONOTONIC_TIMESTAMP', '_BOOT_ID',
+                        '__SEQNUM', '__SEQNUM_ID'}
     for line in raw.splitlines():
         if len(line) > MAX_LINE:
             raise ValueError('COLLECTOR_LIMIT')
@@ -101,6 +102,13 @@ def build_snapshot(raw, unit, cutoff, generated):
         if not isinstance(record, dict) or not fields <= set(record) <= allowed:
             raise ValueError('JOURNAL_SHAPE_INVALID')
         if any(not isinstance(v, str) or len(v) > 512 for k, v in record.items() if k not in fields):
+            raise ValueError('JOURNAL_SHAPE_INVALID')
+        # systemd 255 serializes uint64 sequence numbers as decimal strings and
+        # sd_id128 IDs as 32 lowercase hex characters. Validate, then discard.
+        if '__SEQNUM' in record and (not re.fullmatch(r'(?:0|[1-9][0-9]{0,19})', record['__SEQNUM'])
+                                     or int(record['__SEQNUM']) > 2**64 - 1):
+            raise ValueError('JOURNAL_SHAPE_INVALID')
+        if '__SEQNUM_ID' in record and not re.fullmatch(r'[0-9a-f]{32}', record['__SEQNUM_ID']):
             raise ValueError('JOURNAL_SHAPE_INVALID')
         ident, message, stamp = record.get('_SYSTEMD_INVOCATION_ID'), record['MESSAGE'], record['__REALTIME_TIMESTAMP']
         if not isinstance(message, str) or not isinstance(stamp, str) or not re.fullmatch(r'\d{1,20}', stamp):
