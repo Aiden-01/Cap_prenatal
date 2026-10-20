@@ -1,5 +1,29 @@
 # Artefactos n8n de CAP Prenatal
 
+## Remitentes oficiales y registro de futuros workflows
+
+[`email-senders.json`](email-senders.json) declara las dos identidades y la
+categoría explícita de cada uno de los siete workflows Resend. Los seis
+institucionales, incluido calidad de datos, se preparan como
+`CAP Prenatal <citas@notificaciones.hercor-nexus.com>`; el monitor de respaldos
+como `CAP Prenatal - Sistema <sistema@notificaciones.hercor-nexus.com>`.
+El propósito y el público determinan la categoría.
+
+Para añadir un envío, registrar archivo/categoría en ese manifiesto y la variable
+del destinatario privado en `WORKFLOWS` de `scripts/render-n8n-workflows.js`.
+Usar el `placeholder` de la identidad y destinatario `.invalid` en la plantilla;
+añadir regresiones y ejecutar el preparador `production-host` y las pruebas de
+`backend/test/n8nEmailSenders.test.js`. Los nodos Resend y HTTP Request a Resend
+deben declarar exactamente el remitente del rol. El preparador recorre todos
+los JSON y falla antes de escribir si hay correo sin clasificar o identidad
+inconsistente. La referencia SMTP retirada se excluye por hash fijo.
+
+El preparador genera siete archivos. El monitor conserva su destinatario dinámico
+validado por la API privada y sus URLs existentes. Esta salida sirve para revisar;
+no reimportar el monitor activo como una copia. Los seis institucionales conservan
+sus placeholders en Git. No crear cuentas ni buzones y conservar la credencial
+actual. Detalles en [`../docs/RESEND.md`](../docs/RESEND.md#política-oficial-de-remitentes-cpren-92).
+
 Este directorio contiene configuración de ejemplo, workflows importables y
 plantillas. No contiene SQLite, credenciales, ejecuciones, API keys ni datos
 clínicos. Los seis JSON Resend versionados usan `responsable@example.invalid`;
@@ -23,9 +47,10 @@ heredado es solo una referencia y no se importa a producción.
 | `workflows/seguimiento-inasistencias-resend-v1.json` | Inasistencias nuevas de la semana anterior y pendientes anteriores sin seguimiento | Lunes 08:00 | No envía |
 | `workflows/seguimiento-tdap-el-chal-resend-v1.json` | Nuevas oportunidades y pendientes Tdap de El Chal, en un XLSX de dos hojas | Lunes 08:00 | No envía |
 | `workflows/watchdog-calidad-datos-resend-v1.json` | Invariantes objetivas resumidas por categoría | Lunes 08:00 | No envía |
+| `workflows/monitoreo-respaldos-externos-v1.json` | Monitor técnico de respaldos externos (CPREN-91) | Consultar cola cada cinco minutos | No envía |
 | `workflows/proximas-citas-v1.json` | Diseño SMTP heredado y endurecido | Diario 08:00 | No envía |
 
-Los seis primeros son el camino Resend actual. El último es un diseño SMTP
+Los siete primeros son el camino Resend actual. El último es un diseño SMTP
 heredado y no debe importarse para la operación nueva; se conserva como
 referencia cubierta por pruebas hasta autorizar su retiro.
 
@@ -63,7 +88,7 @@ Todos los JSON:
 
 ## Estado de los archivos versionados
 
-Los siete JSON están `active=false` y no incluyen IDs de credenciales. Esta
+Los ocho JSON están `active=false` y no incluyen IDs de credenciales. Esta
 propiedad del repositorio no confirma el estado de ninguna instancia local.
 
 ## Preparar el entorno
@@ -323,8 +348,9 @@ nodo Resend hasta que exista un destinatario de prueba autorizado.
 ## Seguridad antes de exportar
 
 - eliminar referencias a IDs/nombres de credenciales;
-- retirar cualquier destinatario concreto y restaurar direcciones de ejemplo
-  `.invalid` para remitente y destinatario;
+- retirar cualquier destinatario concreto y restaurar `.invalid`; el monitor
+  conserva su expresión de destinatario privado. Para el remitente usar exactamente
+  la identidad oficial o su placeholder declarado en `email-senders.json`;
 - eliminar `pinData` y resultados de ejecución;
 - no incluir exports de `.n8n-local/`;
 - buscar direcciones reales, API keys, dominios internos no públicos y datos de

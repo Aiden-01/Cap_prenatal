@@ -1,0 +1,21 @@
+{
+  "identities": {
+    "CLINICAL_INSTITUTIONAL": {
+      "from": "CAP Prenatal <citas@notificaciones.hercor-nexus.com>",
+      "placeholder": "CAP Prenatal <citas@notificaciones.example.invalid>"
+    },
+    "TECHNICAL": {
+      "from": "CAP Prenatal - Sistema <sistema@notificaciones.hercor-nexus.com>",
+      "placeholder": "CAP Prenatal - Sistema <sistema@notificaciones.example.invalid>"
+    }
+  },
+  "workflows": {
+    "recordatorio-citas-resend-v1.json": "CLINICAL_INSTITUTIONAL",
+    "seguimiento-inasistencias-resend-v1.json": "CLINICAL_INSTITUTIONAL",
+    "censo-primer-control-26-25-resend-v1.json": "CLINICAL_INSTITUTIONAL",
+    "censo-primer-control-mes-cerrado-resend-v1.json": "CLINICAL_INSTITUTIONAL",
+    "seguimiento-tdap-el-chal-resend-v1.json": "CLINICAL_INSTITUTIONAL",
+    "watchdog-calidad-datos-resend-v1.json": "CLINICAL_INSTITUTIONAL",
+    "monitoreo-respaldos-externos-v1.json": "TECHNICAL"
+  }
+}

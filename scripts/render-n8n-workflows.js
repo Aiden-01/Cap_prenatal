@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { applyEmailPolicy, validateDirectory } = require('./n8n-email-policy');
 
 const ROOT = path.resolve(__dirname, '..');
 const WORKFLOWS = Object.freeze({
@@ -9,6 +10,7 @@ const WORKFLOWS = Object.freeze({
   'censo-primer-control-mes-cerrado-resend-v1.json': 'CAP_NOTIFICATION_RECIPIENT',
   'seguimiento-tdap-el-chal-resend-v1.json': 'CAP_TDAP_RECIPIENT',
   'watchdog-calidad-datos-resend-v1.json': 'CAP_WATCHDOG_RECIPIENT',
+  'monitoreo-respaldos-externos-v1.json': null,
 });
 const BASE_URL = 'http://backend:3001';
 const PROFILES = Object.freeze({
@@ -29,9 +31,17 @@ function recipientFor(name, environment) {
 
 function renderWorkflow(workflow, filename, profile, environment = {}) {
   if (!Object.hasOwn(PROFILES, profile)) throw new Error('Perfil inválido');
+  applyEmailPolicy(workflow, filename);
   const variable = WORKFLOWS[filename];
-  if (!variable) throw new Error('Workflow no permitido');
+  if (!Object.hasOwn(WORKFLOWS, filename)) throw new Error('Workflow no permitido');
   const rendered = structuredClone(workflow);
+  applyEmailPolicy(rendered, filename, true);
+  if (variable === null) {
+    if (rendered.active !== false || rendered.nodes.find(node => node.type === 'n8n-nodes-resend.resend')?.parameters.to !== '={{ $json.recipient }}') {
+      throw new Error(`Workflow técnico inconsistente: ${filename}`);
+    }
+    return rendered;
+  }
   const backend = PROFILES[profile];
   const recipient = recipientFor(variable, environment);
   let requests = 0;
@@ -71,6 +81,7 @@ function main() {
     throw new Error('Uso: node scripts/render-n8n-workflows.js production-host|local');
   }
   const output = path.join(ROOT, 'n8n', 'generated', profile);
+  validateDirectory(path.join(ROOT, 'n8n', 'workflows'));
   const rendered = Object.keys(WORKFLOWS).map((filename) => {
     const input = JSON.parse(fs.readFileSync(path.join(ROOT, 'n8n', 'workflows', filename), 'utf8'));
     return [filename, renderWorkflow(input, filename, profile, process.env)];

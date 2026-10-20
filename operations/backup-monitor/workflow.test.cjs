@@ -63,10 +63,14 @@ test('synthetic transport preserves payload and idempotency across uncertain ret
  assert.equal(fakeProvider(execute(item('ALERTA'))[0].json),fakeProvider(execute(item('ALERTA'))[0].json));
  assert.equal(accepted,1);
 });
-test('six clinical JSONs and shared components equal origin/main byte-for-byte',()=>{
+test('six clinical JSONs preserve the CPREN-91 baseline except sender policy',()=>{
  const paths=['recordatorio-citas-resend-v1.json','seguimiento-inasistencias-resend-v1.json','seguimiento-tdap-el-chal-resend-v1.json','censo-primer-control-26-25-resend-v1.json','censo-primer-control-mes-cerrado-resend-v1.json','watchdog-calidad-datos-resend-v1.json'].map(p=>'n8n/workflows/'+p).concat('n8n/design-v2/components.cjs');
- const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
- for(const p of paths)assert.equal(sha(fs.readFileSync(path.join(root,p))),sha(cp.execFileSync('git',['show','origin/main:'+p],{cwd:root})),p);
+ const normalize=(p,b)=>{
+  if(!p.endsWith('.json'))return b.toString();
+  const w=JSON.parse(b);for(const n of w.nodes)if(n.type==='n8n-nodes-resend.resend')delete n.parameters.from;
+  return JSON.stringify(w);
+ };
+ for(const p of paths)assert.equal(normalize(p,fs.readFileSync(path.join(root,p))),normalize(p,cp.execFileSync('git',['show','7722601d20bbd09584f8c4577b5e9cbe79c3398e:'+p],{cwd:root})),p);
 });
 test('new material has no emojis or executable transport helper',()=>{
  for(const name of ['monitor.py','build-workflow.cjs','schema.sql']){

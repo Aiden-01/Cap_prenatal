@@ -191,7 +191,7 @@
     {
       "parameters": {
         "authentication": "apiKey",
-        "from": "CAP Prenatal <censo@notificaciones.example.invalid>",
+        "from": "CAP Prenatal <citas@notificaciones.example.invalid>",
         "to": "responsable@example.invalid",
         "subject": "={{ $json.subject }}",
         "html": "={{ $json.html }}",
@@ -210,7 +210,7 @@
     {
       "parameters": {
         "authentication": "apiKey",
-        "from": "CAP Prenatal <censo@notificaciones.example.invalid>",
+        "from": "CAP Prenatal <citas@notificaciones.example.invalid>",
         "to": "responsable@example.invalid",
         "subject": "={{ $node[\"Validar y preparar correo\"].json.subject }}",
         "html": "={{ $node[\"Validar y preparar correo\"].json.html }}",
