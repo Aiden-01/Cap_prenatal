@@ -139,3 +139,50 @@ tmp_*.csv
 # Respaldos anidados; las pruebas portables no dependen de estas copias privadas.
 /n8n/design-v2/operational/**/backups/
 /n8n/design-v2/operational/**/private-backups/
+
+# CPREN-89/93: GitHub es publico; respaldos y bases operativas son privados.
+# Estas reglas no retiran fixtures ya versionados ni excluyen SQL fuente general.
+*.dump
+*.dump.*
+*.pgdump
+*.pgdump.*
+*.backup
+*.backup.*
+*.bak
+*.bkp
+*.sql.gz
+*.sql.bz2
+*.sql.xz
+*.sql.zst
+*.sql.zip
+*.sqlite
+*.sqlite3
+*.db
+*.sqlite-*
+*.sqlite3-*
+*.db-wal
+*.db-shm
+*.db-journal
+*.aes256gcm
+*.aes
+*.aes256
+*.enc
+*.gpg
+*.age
+
+# Contratos, instrucciones de recuperacion y evidencia confidencial.
+*.private.*
+*.private
+*.confidential.*
+*.confidential
+**/private-evidence/
+**/confidential-evidence/
+**/private-recovery/
+**/approval-private/
+
+# CPREN-93 finalizada: SQL historicos y pruebas solo en custodia privada.
+# Mantener visible el README publico y no ocultar futuros SQL por extension.
+/operations/data-cleanup/cpren93-cleanup.sql
+/operations/data-cleanup/cpren93-cleanup.production.sql
+/operations/data-cleanup/cpren93-cleanup.test.cjs
+/operations/data-cleanup/cpren93-production.test.cjs
