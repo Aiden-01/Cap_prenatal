@@ -85,6 +85,10 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       assert.equal((await db.query("SELECT count(*)::int n FROM permisos WHERE codigo LIKE 'notas_evolucion.%' OR codigo LIKE 'notas_enfermeria.%' OR codigo LIKE 'ordenes_medicas.%'")).rows[0].n, 10);
       await assert.rejects(db.query("UPDATE cargos_personal SET clasificacion_profesional='doctor' WHERE id=1"), { code: '23514' });
     });
+    // La API actual protege también las referencias históricas de notas clínicas.
+    const notasFilename = '026_notas_clinicas.sql';
+    await applyMigration({ db, filename: notasFilename,
+      sql: fs.readFileSync(path.join(__dirname, '../src/db/migrations', notasFilename), 'utf8') });
     const tokens = {};
     const jwtConfig = getJwtConfig();
     for (const id of [1, 2, 3]) {

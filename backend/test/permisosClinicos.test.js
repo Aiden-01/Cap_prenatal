@@ -85,7 +85,7 @@ test('seed repetido después de ampliar catálogo tampoco concede facultades cl�
 test('025 es aditiva y la única concesión automática conserva la gestión administrativa', () => {
   const migration = fs.readFileSync(path.join(__dirname, '../src/db/migrations/025_permisos_autoria_clinica.sql'), 'utf8');
   const schema = fs.readFileSync(path.join(__dirname, '../src/db/schema.sql'), 'utf8').replaceAll('\r\n', '\n');
-  assert.equal(schema.slice(schema.indexOf('-- CPREN-117:')).trim(), migration.replaceAll('\r\n', '\n').trim());
+  assert.equal(schema.slice(schema.indexOf('-- CPREN-117:'), schema.indexOf('-- CPREN-118:')).trim(), migration.replaceAll('\r\n', '\n').trim());
   const codigo = migration.replace(/--[^\n]*/g, '');
   assert.doesNotMatch(codigo, /\b(?:DELETE|DROP|TRUNCATE|UPDATE)\b/i);
   const insertCatalogo = codigo.slice(0, codigo.indexOf('INSERT INTO usuario_permisos'));

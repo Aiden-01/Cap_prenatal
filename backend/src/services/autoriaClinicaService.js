@@ -55,25 +55,19 @@ async function resolverResponsable({ responsable, actor, politica, db, repositor
   return snapshotUsuario(persona);
 }
 
-// Solo prepara identidades, sin guardar documentos ni conferir firma/acreditación.
-// El futuro servicio debe llamarlo dentro de SU transacción y auditar la escritura.
-async function prepararAutoriaClinica({ tipoDocumento, accion, responsable, req, db, dependencies = {} }) {
-  const politica = Object.hasOwn(POLITICAS, tipoDocumento) ? POLITICAS[tipoDocumento] : null;
-  const acciones = politica ? [politica.captura, 'finalizar_captura', ...(tipoDocumento === 'orden_medica' ? ['emitir'] : [])] : [];
-  if (!acciones.includes(accion)) throw error(400, 'ACCION_CLINICA_INVALIDA', 'Acción o documento no soportado');
+// Punto compartido: los servicios clínicos mantienen estos bloqueos hasta escribir
+// y auditar. También permite conservar un responsable histórico sin reatribuirlo.
+async function conContextoClinico({ req, db, dependencies = {} }, ejecutar) {
   if (!Number.isInteger(req?.usuario?.id) || !req?.authSession?.id
     || String(req.authSession.usuario_id) !== String(req.usuario.id)) {
     throw error(401, 'AUTHENTICATION_REQUIRED', 'Autenticación requerida');
-  }
-  if (accion === 'finalizar_captura' && responsable !== undefined) {
-    throw error(400, 'RESPONSABLE_NO_MODIFICABLE', 'Finalizar captura no modifica al responsable');
   }
   const permisosRepo = dependencies.permisosRepository || permisosRepository;
   const repository = dependencies.profesionalesRepository || profesionalesRepository;
   const sessions = dependencies.authSessionsRepository || authSessionsRepository;
   const config = dependencies.getSessionConfig || getSessionConfig;
   const now = dependencies.clock || (() => new Date());
-  const preparar = async (client) => {
+  const autorizar = async (client) => {
     // Igual orden que los cambios de rol/permisos: usuario antes de sesión.
     // SHARE serializa la decisión con bloqueo UPDATE/revocación de permisos.
     const actor = await repository.obtenerActor(req.usuario.id, client);
@@ -83,6 +77,22 @@ async function prepararAutoriaClinica({ tipoDocumento, accion, responsable, req,
       throw error(401, 'AUTHENTICATION_REQUIRED', 'La sesión ya no está activa');
     }
     const permisos = await permisosRepo.listarCodigosPorUsuario(actor.id, client);
+    return ejecutar({ actor, permisos, db: client });
+  };
+  return db ? autorizar(db) : permisosRepo.enTransaccion(autorizar);
+}
+
+// Solo prepara identidades, sin guardar documentos ni conferir firma/acreditación.
+// El servicio llamador comparte SU transacción para persistencia y auditoría.
+async function prepararAutoriaClinica({ tipoDocumento, accion, responsable, req, db, dependencies = {} }) {
+  const politica = Object.hasOwn(POLITICAS, tipoDocumento) ? POLITICAS[tipoDocumento] : null;
+  const acciones = politica ? [politica.captura, 'finalizar_captura', ...(tipoDocumento === 'orden_medica' ? ['emitir'] : [])] : [];
+  if (!acciones.includes(accion)) throw error(400, 'ACCION_CLINICA_INVALIDA', 'Acción o documento no soportado');
+  const repository = dependencies.profesionalesRepository || profesionalesRepository;
+  return conContextoClinico({ req, db, dependencies }, async ({ actor, permisos, db: client }) => {
+    if (accion === 'finalizar_captura' && responsable !== undefined) {
+      throw error(400, 'RESPONSABLE_NO_MODIFICABLE', 'Finalizar captura no modifica al responsable');
+    }
     if (!permisos.includes(`${politica.prefijo}.${accion}`)) {
       throw error(403, 'PERMISO_REQUERIDO', 'Permiso requerido');
     }
@@ -96,8 +106,7 @@ async function prepararAutoriaClinica({ tipoDocumento, accion, responsable, req,
       return { ...comun, responsable: identidad, emisor_usuario_id: actor.id };
     }
     return { ...comun, responsable: identidad, capturista_usuario_id: actor.id };
-  };
-  return db ? preparar(db) : permisosRepo.enTransaccion(preparar);
+  });
 }
 
-module.exports = { POLITICAS, PERMISOS_DIRECTORIO, prepararAutoriaClinica };
+module.exports = { POLITICAS, PERMISOS_DIRECTORIO, prepararAutoriaClinica, conContextoClinico };

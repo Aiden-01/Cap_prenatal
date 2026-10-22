@@ -2,6 +2,16 @@
 
 Motor: PostgreSQL.
 
+CPREN-118 añade `026_notas_clinicas.sql` y la tabla única `notas_clinicas` para
+nota_evolucion y nota_enfermeria. Expediente obligatorio, embarazo/control
+opcionales con FKs compuestas RESTRICT, responsable histórico JSONB, capturista
+original, finalizador, fecha/hora clínicas, borrador/captura_finalizada y versión.
+Índice parcial protege principal por control/tipo; UUID y huella internos cubren
+idempotencia. Trigger impide borrar notas o sobrescribir finalizadas y preserva
+contexto/capturista. No modifica controles/citas ni genera notas históricas.
+Schema y compatibilidad requieren 026 con checksum; solo se verifica en clústeres
+temporales. [Modelo y decisiones](CPREN_118_MODELO_NOTAS_CLINICAS.md#migración-026-e-integridad).
+
 CPREN-117 añade `025_permisos_autoria_clinica.sql`: diez permisos clínicos sin
 concesión automática, un permiso de gestión de catálogos con conservación de
 capacidad admin/director y `cargos_personal.clasificacion_profesional` controlada

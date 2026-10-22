@@ -160,6 +160,33 @@ const DEFAULT_FREE_TEXT_PATTERNS = Object.freeze([
 
 const BASE_CONTEXTUAL_RULES = Object.freeze([
   Object.freeze({
+    categories: ['clinica'], entities: ['nota_clinica'],
+    events: ['crear', 'actualizar', 'finalizar_captura'],
+    fields: ['resultado'], valueType: AUDIT_VALUE_TYPES.CONTROLLED_CODE,
+  }),
+  Object.freeze({
+    categories: ['clinica'], entities: ['nota_clinica'],
+    events: ['crear', 'actualizar', 'finalizar_captura'],
+    fields: ['tipo_nota'], valueType: AUDIT_VALUE_TYPES.ENUM,
+    allowedValues: ['nota_evolucion', 'nota_enfermeria'],
+  }),
+  Object.freeze({
+    categories: ['clinica'], entities: ['nota_clinica'],
+    events: ['crear', 'actualizar', 'finalizar_captura'],
+    fields: ['estado_nota'], valueType: AUDIT_VALUE_TYPES.ENUM,
+    allowedValues: ['borrador', 'captura_finalizada'],
+  }),
+  Object.freeze({
+    categories: ['clinica'], entities: ['nota_clinica'],
+    events: ['crear', 'actualizar', 'finalizar_captura'],
+    fields: ['version', 'capturista_usuario_id', 'finalizador_usuario_id', 'responsable_usuario_id'],
+    valueType: AUDIT_VALUE_TYPES.NON_NEGATIVE_INTEGER,
+  }),
+  Object.freeze({
+    categories: ['clinica'], entities: ['nota_clinica'],
+    events: ['actualizar'], fields: ['responsable_cambiado'], valueType: AUDIT_VALUE_TYPES.BOOLEAN,
+  }),
+  Object.freeze({
     categories: ['catalogos'],
     entities: ['cargo_personal'],
     events: ['crear', 'actualizar'],

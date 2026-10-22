@@ -15,6 +15,8 @@ const USUARIO_TIENE_HISTORIAL_SQL = `(
   OR EXISTS (SELECT 1 FROM morbilidad_embarazo m WHERE m.registrado_por = u.id OR m.updated_by = u.id)
   OR EXISTS (SELECT 1 FROM fichas_riesgo_obstetrico f WHERE f.registrado_por = u.id OR f.updated_by = u.id)
   OR EXISTS (SELECT 1 FROM planes_parto pp WHERE pp.registrado_por = u.id OR pp.updated_by = u.id)
+  OR EXISTS (SELECT 1 FROM notas_clinicas nc WHERE nc.capturista_usuario_id = u.id
+    OR nc.responsable_usuario_id = u.id OR nc.finalizador_usuario_id = u.id)
   OR EXISTS (
     SELECT 1 FROM auditoria_eventos ae
     WHERE ae.usuario_id = u.id

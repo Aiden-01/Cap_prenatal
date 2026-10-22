@@ -1,5 +1,23 @@
 # Resumen de API
 
+## Notas clínicas narrativas (CPREN-118)
+
+`/api/pacientes/:pacienteId/notas-clinicas`: GET listado y POST borrador;
+`/:notaId`: GET detalle y PUT borrador versionado; `/:notaId/finalizar`: POST
+con `{version}` para cierre administrativo. Exigen pacientes.ver y el permiso
+ver/registrar/finalizar_captura del tipo real (nota_evolucion o nota_enfermeria).
+Registrar/finalizar no conceden lectura. Escrituras con CSRF y auditoría privada
+obligatoria; no hay DELETE ni edición de finalizadas.
+
+POST requiere responsable CPREN-117 y clave_idempotencia UUID; un reintento
+idéntico devuelve 200 sin duplicar. Notas independientes sin embarazo/control
+permitidas; control existente deriva embarazo si se omite. Principal única por
+control/tipo; adicionales con es_principal=false. GET listado admite tipo,
+embarazo_id, control_prenatal_id, estado, pagina y limite (máximo 50), sin narrativa.
+Detalle devuelve contenido solo con ver; escrituras/replay confirman metadatos
+mínimos. Fecha/hora clínicas civiles separadas de instantes técnicos.
+[Contrato completo, ejemplos y errores](CPREN_118_MODELO_NOTAS_CLINICAS.md#contratos-rest).
+
 ## Permisos clínicos y directorio (CPREN-117)
 
 GET `/api/profesionales` ofrece un directorio mínimo y paginado para seleccionar

@@ -100,6 +100,10 @@ test('CPREN-117: permisos, autoría y directorio en PostgreSQL temporal propio',
       await assert.rejects(db.query("UPDATE cargos_personal SET clasificacion_profesional='medico_inventado' WHERE id=(SELECT min(id) FROM cargos_personal)"), { code: '23514' });
     });
 
+    // El listado administrativo actual incluye referencias históricas de notas.
+    const notasFilename = '026_notas_clinicas.sql';
+    await applyMigration({ db, filename: notasFilename,
+      sql: fs.readFileSync(path.join(__dirname, '../src/db/migrations', notasFilename), 'utf8') });
     const cargos = {};
     for (const [key, nombre, clasificacion] of [
       ['medico', 'Atención médica sintética', 'medico'], ['ae', 'AE sintético', 'enfermeria_ae'],
@@ -335,7 +339,8 @@ test('CPREN-117: permisos, autoría y directorio en PostgreSQL temporal propio',
       await assert.rejects(service.reemplazarPermisosUsuario({ usuarioId: 3, codigos: ['ordenes_medicas.ver'], req: await reqFor(1),
         dependencies: { registrarEventoPrivado: async () => { throw new Error('synthetic audit unavailable'); } } }), /synthetic audit unavailable/);
       assert.deepEqual(await snapshot(), before);
-      assert.equal((await db.query("SELECT to_regclass('notas_clinicas') AS notas,to_regclass('ordenes_medicas') AS ordenes")).rows[0].notas, null);
+      assert.equal((await db.query('SELECT count(*)::integer AS total FROM notas_clinicas')).rows[0].total, 0,
+        'La política de CPREN-117 no persiste notas aun cuando 026 ya incorpora su tabla');
       assert.equal((await db.query("SELECT to_regclass('ordenes_medicas') AS ordenes")).rows[0].ordenes, null);
     });
     await t.test('usuarios inactivos, sesiones revocadas y cargo inactivo no pueden operar ni atribuirse autoría', async () => {

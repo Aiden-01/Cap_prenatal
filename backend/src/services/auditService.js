@@ -81,6 +81,7 @@ const PRIVATE_TABLES = Object.freeze({
   paciente: 'pacientes',
   embarazo: 'embarazos',
   control_prenatal: 'controles_prenatales',
+  nota_clinica: 'notas_clinicas',
   cita_prenatal: 'citas_prenatales',
   riesgo_obstetrico: 'fichas_riesgo_obstetrico',
   vacuna: 'vacunas_paciente',

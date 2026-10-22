@@ -29,6 +29,7 @@ const riesgoRouter       = require('./riesgo');
 const morbilidadRouter   = require('./morbilidad');
 const vacunasRouter      = require('./vacunas');
 const pdfRouter          = require('./pdf');
+const { createNotasClinicasRouter } = require('./notasClinicas');
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -51,6 +52,7 @@ router.use('/:pacienteId/citas', validateParams(pacienteIdParam), citasRouter);
 router.use('/:pacienteId/riesgo', validateParams(pacienteIdParam), riesgoRouter);
 router.use('/:pacienteId/morbilidad', validateParams(pacienteIdParam), morbilidadRouter);
 router.use('/:pacienteId/vacunas', validateParams(pacienteIdParam), vacunasRouter);
+router.use('/:pacienteId/notas-clinicas', validateParams(pacienteIdParam), createNotasClinicasRouter());
 router.use('/:pacienteId',             pdfRouter);
 
 module.exports = router;
