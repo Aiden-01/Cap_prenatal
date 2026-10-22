@@ -2,6 +2,13 @@
 
 Motor: PostgreSQL.
 
+CPREN-115 agrega `cargos_personal` y `especialidades_personal` mediante la
+migración aditiva `023_catalogos_profesionales.sql`, sincronizada con schema.sql.
+Incluye claves únicas normalizadas por mayúsculas, diacríticos y espacios,
+estado lógico y fechas. No agrega campos a usuarios ni modifica roles.
+Requiere UTF8 y PostgreSQL >= 13. Diseño y validación aislada:
+[Catálogos profesionales](CPREN_115_CATALOGOS_PROFESIONALES.md#base-de-datos).
+
 Schema principal:
 
 ```text

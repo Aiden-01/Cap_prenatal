@@ -160,6 +160,20 @@ const DEFAULT_FREE_TEXT_PATTERNS = Object.freeze([
 
 const BASE_CONTEXTUAL_RULES = Object.freeze([
   Object.freeze({
+    categories: ['catalogos'],
+    entities: ['cargo_personal', 'especialidad_personal'],
+    events: ['cambiar_estado'],
+    fields: ['activo'],
+    valueType: AUDIT_VALUE_TYPES.BOOLEAN,
+  }),
+  Object.freeze({
+    categories: ['catalogos'],
+    entities: ['cargo_personal', 'especialidad_personal'],
+    events: ['crear', 'actualizar', 'cambiar_estado'],
+    fields: ['resultado'],
+    valueType: AUDIT_VALUE_TYPES.CONTROLLED_CODE,
+  }),
+  Object.freeze({
     categories: ['clinica'],
     entities: [
       'paciente',

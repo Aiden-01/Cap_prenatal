@@ -1,5 +1,13 @@
 # Resumen de API
 
+## Catálogos profesionales (CPREN-115)
+
+`/api/catalogos/cargos` y `/api/catalogos/especialidades`: GET listado e ID,
+POST creación, PUT edición y PATCH `/:id/desactivar` o `/:id/reactivar`.
+Lecturas autenticadas; escrituras para admin/director y con CSRF.
+Listado paginado `{ data, total }`, filtro `estado=activos|inactivos|todos`.
+Contrato, ejemplos y errores: [Catálogos profesionales](CPREN_115_CATALOGOS_PROFESIONALES.md#api).
+
 Base local:
 
 ```text

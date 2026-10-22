@@ -51,6 +51,7 @@ const PRIVATE_ACTIONS = new Set([
 ]);
 
 const PRIVATE_MODULES = Object.freeze({
+  catalogos: 'catalogos',
   autenticacion: 'autenticacion',
   seguridad: 'autenticacion',
   usuarios: 'usuarios',
@@ -64,6 +65,8 @@ const PRIVATE_MODULES = Object.freeze({
 });
 
 const PRIVATE_TABLES = Object.freeze({
+  cargo_personal: 'cargos_personal',
+  especialidad_personal: 'especialidades_personal',
   usuario: 'usuarios',
   usuario_permisos: 'usuario_permisos',
   sesion: 'auth_sessions',

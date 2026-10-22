@@ -220,6 +220,7 @@ test('la lista requerida es explicita y cada checksum procede del archivo versio
     '020_retirar_permiso_pacientes_eliminar.sql',
     '021_integridad_paciente_embarazo.sql',
     '022_pacientes_version.sql',
+    '023_catalogos_profesionales.sql',
   ]);
   assert.equal(REQUIRED_STATE.every(({ checksum }) => /^[a-f0-9]{64}$/.test(checksum)), true);
 });
