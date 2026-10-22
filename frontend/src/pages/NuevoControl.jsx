@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
@@ -38,6 +38,8 @@ import {
   prenatalControlEditPath,
 } from "../utils/prenatalControlAccess";
 import "./nuevo-control.css";
+import { puedeLeerNotas, seguimientoNotasPath } from "../utils/seguimientoNotas";
+import "./seguimiento-notas.css";
 
 // ─── HELPERS ────────────────────────────────────────────────
 function Field({ label, children, col, error, htmlFor }) {
@@ -391,6 +393,10 @@ export default function NuevoControl({ consultationOnly = false }) {
   const puedeVerVih = usuario?.permisos?.includes("controles.ver_vih");
   const puedeCapturarVih = !controlId || puedeVerVih;
   const [loading, setLoading] = useState(false);
+  const submitLock = useRef(false);
+  const [savedControl, setSavedControl] = useState(null);
+  const savedHeading = useRef(null);
+  useEffect(() => { if (savedControl) savedHeading.current?.focus(); }, [savedControl]);
   const [loadingData, setLoadingData] = useState(true);
   const [tab, setTab]         = useState("general");
   useEffect(() => {
@@ -555,6 +561,7 @@ export default function NuevoControl({ consultationOnly = false }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitLock.current || savedControl) return;
     if (!puedeGuardar) {
       toast("Este control es de solo lectura", "error");
       return;
@@ -563,6 +570,7 @@ export default function NuevoControl({ consultationOnly = false }) {
       toast("Selecciona un embarazo antes de guardar el control", "error");
       return;
     }
+    submitLock.current = true;
     setLoading(true);
     setFieldErrors({});
     let payload = {
@@ -585,10 +593,11 @@ export default function NuevoControl({ consultationOnly = false }) {
       if (editando) {
         await api.put(`/pacientes/${id}/controles/${controlId}`, payload, { params: { embarazo_id: embarazoId } });
       } else {
-        await api.post(`/pacientes/${id}/controles`, payload, { params: { embarazo_id: embarazoId } });
+        const response = await api.post(`/pacientes/${id}/controles`, payload, { params: { embarazo_id: embarazoId } });
+        setSavedControl({ id: response.data?.id });
       }
       toast(editando ? "Control actualizado exitosamente" : "Control registrado exitosamente", "success");
-      setTimeout(() => navigate(expedientePath), 800);
+      if (editando) setTimeout(() => navigate(expedientePath), 800);
     } catch (err) {
       const parsedFieldErrors = getFieldErrors(err);
       const nextFieldErrors = Object.keys(parsedFieldErrors).length
@@ -604,8 +613,19 @@ export default function NuevoControl({ consultationOnly = false }) {
         fieldLabel ? `${fieldLabel}: ${nextFieldErrors[firstErrorField]}` : getErrorMessage(err, "Error al guardar"),
         "error"
       );
-    } finally { setLoading(false); }
+    } finally { submitLock.current = false; setLoading(false); }
   };
+
+  if (savedControl) {
+    const path = seguimientoNotasPath({ pacienteId: id, embarazoId, controlId: savedControl.id });
+    return <section className="card control-save-confirmation" aria-labelledby="control-guardado">
+      <h1 id="control-guardado" ref={savedHeading} tabIndex={-1}>Control registrado exitosamente</h1>
+      <p role="status">{path ? `Control ${savedControl.id} guardado.` : 'Control guardado. Recupera su identificación desde el expediente.'}</p>
+      <p>El control y la cita siguiente se conservan aunque no completes una nota ahora.</p>
+      {path && puedeLeerNotas(usuario) && <button type="button" className="btn-primary" onClick={() => navigate(path)}>Consultar seguimiento de notas</button>}
+      <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>Volver al expediente sin completar una nota</button>
+    </section>;
+  }
 
   return (
     <ClinicalWorkflowShell

@@ -14,6 +14,7 @@ const {
 } = require('../validations/controles.schemas');
 
 const router = express.Router({ mergeParams: true });
+router.use(require('./seguimientoNotas').createSeguimientoNotasRouter());
 
 // Plan de parto (1 por embarazo activo)
 router.get('/plan-parto', verificarPermiso('pacientes.ver'), planPartoController.obtenerPlanParto);

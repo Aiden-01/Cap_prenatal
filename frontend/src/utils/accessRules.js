@@ -6,6 +6,7 @@ export const ACCESS = {
   editPatient: { all: ['pacientes.ver', 'pacientes.editar'] },
   newControl: { all: ['pacientes.ver', 'controles.crear'] },
   editControl: { all: ['pacientes.ver', 'controles.editar'] },
+  noteFollowup: { all: ['pacientes.ver'], any: ['notas_evolucion.ver', 'notas_enfermeria.ver'] },
   riskForm: { all: ['pacientes.ver'], any: ['controles.crear', 'controles.editar'] },
   planForm: { all: ['pacientes.ver', 'controles.crear', 'controles.editar'] },
   reports: { all: ['reportes.ver'] },

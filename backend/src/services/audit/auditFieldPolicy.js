@@ -159,6 +159,13 @@ const DEFAULT_FREE_TEXT_PATTERNS = Object.freeze([
 ]);
 
 const BASE_CONTEXTUAL_RULES = Object.freeze([
+  Object.freeze({ categories: ['clinica'], entities: ['control_prenatal'],
+    events: ['seguimiento_nota_confirmado'], fields: ['resultado'], valueType: AUDIT_VALUE_TYPES.CONTROLLED_CODE }),
+  Object.freeze({ categories: ['clinica'], entities: ['control_prenatal'],
+    events: ['seguimiento_nota_confirmado'], fields: ['version'], valueType: AUDIT_VALUE_TYPES.NON_NEGATIVE_INTEGER }),
+  Object.freeze({ categories: ['clinica'], entities: ['control_prenatal'],
+    events: ['seguimiento_nota_confirmado'], fields: ['tipo_nota'], valueType: AUDIT_VALUE_TYPES.ENUM,
+    allowedValues: ['nota_evolucion', 'nota_enfermeria'] }),
   Object.freeze({
     categories: ['clinica'], entities: ['nota_clinica'],
     events: ['crear', 'actualizar', 'finalizar_captura'],

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { ACCESS, canAccess } from "../utils/accessRules";
@@ -1337,6 +1337,7 @@ export default function ExpedientePaciente() {
             </div>
           )}
           <TimelineControles
+            usuario={usuario}
             pacienteId={id}
             embarazoId={embarazoSeleccionado?.id}
             controles={exp.controles_prenatales}

@@ -15,6 +15,10 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { isValidPregnancyId } from "../utils/pregnancyState";
+import { useSeguimientoNotas } from '../hooks/useSeguimientoNotas';
+import { seguimientoNotasPath } from '../utils/seguimientoNotas';
+import SeguimientoNotaEstado from './SeguimientoNotaEstado';
+import '../pages/seguimiento-notas.css';
 import {
   canCreatePrenatalControl,
   canConsultPrenatalControl,
@@ -70,7 +74,7 @@ function DetailItem({ label, value }) {
   );
 }
 
-function ControlRow({ control, index, pacienteId, embarazoId, puedeConsultarControles, isOpen, onToggle }) {
+function ControlRow({ control, index, pacienteId, embarazoId, puedeConsultarControles, isOpen, onToggle, seguimiento }) {
   const navigate = useNavigate();
   const observaciones = control.observaciones || control.impresion_clinica;
   const numeroControl = control.numero_control ?? index + 1;
@@ -123,6 +127,14 @@ function ControlRow({ control, index, pacienteId, embarazoId, puedeConsultarCont
         </div>
       </div>
 
+      {seguimiento && <div className="prenatal-document-followup">
+        <SeguimientoNotaEstado seguimiento={seguimiento} />
+        {(seguimiento.elegible || seguimiento.documentos.length > 0) && <button type="button" className="btn-secondary"
+          onClick={() => navigate(seguimientoNotasPath({ pacienteId, embarazoId, controlId: control.id }))}>
+          Seguimiento de notas del control {numeroControl}
+        </button>}
+      </div>}
+
       {isOpen && (
         <div className="prenatal-observation-panel">
           <div className="prenatal-observation-note">
@@ -154,9 +166,12 @@ export default function TimelineControles({
   puedeConsultar = false,
   puedeCrear = false,
   estadoEmbarazo,
+  usuario,
 }) {
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState(null);
+  const seguimiento = useSeguimientoNotas({ pacienteId, embarazoId,
+    controlesIds: Array.isArray(controles) ? controles.map(control => control.id) : [], usuario });
   const hasEmbarazoId = isValidPregnancyId(embarazoId);
   const puedeRegistrar = canCreatePrenatalControl({
     canWrite: puedeCrear,
@@ -193,6 +208,9 @@ export default function TimelineControles({
           <p>Seguimiento y monitoreo de controles prenatales</p>
         </div>
       </div>
+      {seguimiento.loading && <p role="status">Cargando seguimiento documental…</p>}
+      {seguimiento.error && <div role="alert"><p>No se pudo consultar el seguimiento documental.</p>
+        <button type="button" className="btn-secondary" onClick={seguimiento.retry}>Reintentar seguimiento</button></div>}
       <div className="prenatal-controls-table">
         <div className="prenatal-controls-head" aria-hidden="true">
           <span></span>
@@ -210,6 +228,7 @@ export default function TimelineControles({
           <ControlRow
             key={control.id}
             control={control}
+            seguimiento={seguimiento.data.find(item => item.control_prenatal_id === Number(control.id))}
             index={index}
             pacienteId={pacienteId}
             embarazoId={embarazoId}

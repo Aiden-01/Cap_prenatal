@@ -1,0 +1,21 @@
+.seguimiento-notas-form fieldset {
+  border: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+  max-width: 44rem;
+  min-width: 0;
+}
+.seguimiento-notas-form label { display: grid; gap: .4rem; }
+.seguimiento-notas-form input, .seguimiento-notas-form select {
+  width: 100%;
+  min-width: 0;
+  padding: .65rem;
+  border: 1px solid var(--border);
+  border-radius: .5rem;
+  background: var(--surface);
+  color: var(--text);
+}
+.prenatal-document-followup { padding: .6rem 1rem; border-top: 1px solid var(--border); }
+.prenatal-document-followup p { margin: .3rem 0; }
+.control-save-confirmation { padding: 1.5rem; display: grid; gap: 1rem; }

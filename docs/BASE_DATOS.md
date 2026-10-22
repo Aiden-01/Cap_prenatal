@@ -481,3 +481,27 @@ npm run test:vistas-bi
 5. Si el cambio afecta reportes o PDF, validar documentos generados.
 6. Si el cambio afecta BI, actualizar vistas y pruebas.
 
+
+
+## Seguimiento documental — CPREN-119 / migración 027
+
+`027_seguimiento_notas_controles.sql` añade `controles_seguimiento_notas`
+(elegibilidad, contexto y contador interno) y `controles_notas_requeridas`
+(confirmación por tipo, snapshot profesional, actor y fecha). No ejecuta backfill.
+El trigger `AFTER INSERT` de controles crea exclusivamente el marcador del control
+nuevo; un UPDATE o la rama UPDATE del UPSERT no activa históricos. No crea notas.
+
+La PK `(control_prenatal_id,tipo)` evita duplicados y el trigger de confirmaciones
+impide reemplazos por UPDATE. Se conservan FKs paciente/embarazo/control y las
+reglas de notas de 026. El estado pendiente se obtiene de la confirmación sin
+principal; borrador/finalizada se consultan desde `notas_clinicas`, sin duplicarlos.
+El contador se actualiza por CAS bajo bloqueo, en la transacción de la confirmación
+y su auditoría privada. No se publican versiones globales entre tipos.
+
+Los metadatos de seguimiento se eliminan en cascada únicamente al borrar el control
+mediante el flujo autorizado y auditado existente. No son notas clínicas; cualquier
+nota real conserva la prohibición de borrado y sus FKs RESTRICT de 026. Este diseño
+preserva la eliminación previa de controles sin notas ni citas. No hay DELETE HTTP
+para quitar confirmaciones individuales. Se mantienen las restricciones previas de
+citas y notas. Esquema de instalación y compatibilidad por checksum incluyen 027.
+No se ejecutó ninguna migración contra bases persistentes.

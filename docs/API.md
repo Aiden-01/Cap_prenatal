@@ -757,3 +757,41 @@ Estados y errores de idempotencia siguen el patrón de inasistencias:
 El resolver Tdap exige la confirmación literal
 `REINTENTAR_SEGUIMIENTO_TDAP_EL_CHAL` y los mismos pares coherentes de
 resolución/motivo que inasistencias.
+
+
+## Seguimiento documental de controles (CPREN-119)
+
+`GET /api/pacientes/:pacienteId/controles/seguimiento-notas?embarazo_id=11&controles_ids=101,102`
+consulta hasta 100 IDs del mismo contexto. Exige sesión vigente, `pacientes.ver`
+y lectura de al menos un tipo de nota. Devuelve `data` y `tipos_autorizados`;
+cada elemento contiene `control_prenatal_id`, `elegible` y `documentos` con el
+estado real de las notas principales autorizadas. Sin narrativa ni información
+de tipos no autorizados. La ausencia de documentos en un control elegible significa
+que falta determinar el tipo dentro del ámbito autorizado, no que no existan notas
+privadas. Un control histórico sin nota no se convierte en pendiente.
+
+`POST /api/pacientes/:pacienteId/controles/:id/seguimiento-notas` confirma un tipo
+con el contrato sintético:
+
+```json
+{
+  "embarazo_id": 11,
+  "version": 1,
+  "tipo": "nota_evolucion",
+  "responsable": { "tipo": "usuario", "usuario_id": 2 }
+}
+```
+
+Exige lectura y registro del tipo, CSRF, contexto real y embarazo editable.
+`version: 1` representa la precondición de tipo aún no confirmado; las decisiones
+son aditivas e inmutables por `(control,tipo)`. Repetir la misma identidad responde
+200 con `reutilizada:true`; cambiarla responde 409. El contador global de cambios
+es interno y no se expone, para no revelar actividad de tipos ocultos. Se admiten
+identidades `autenticado`, `usuario` y `externo` de CPREN-117. Actor y auditoría
+provienen del servidor. No crea notas, controles ni citas.
+
+El guardado de control mantiene su respuesta plana 201 con ID real. La elegibilidad
+se registra solo en inserciones nuevas mediante 027; no depende de la consulta
+posterior. La ruta frontend válida es
+`/pacientes/:id/controles/:controlId/seguimiento-notas?embarazo_id=:embarazoId`.
+El editor y PDF permanecen pendientes de CPREN-120.

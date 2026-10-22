@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { useAuth } from "./hooks/useAuth";
 import Layout from "./components/Layout";
@@ -13,6 +13,7 @@ const Pacientes = lazy(() => import("./pages/Pacientes"));
 const NuevaPaciente = lazy(() => import("./pages/NuevaPaciente"));
 const ExpedientePaciente = lazy(() => import("./pages/ExpedientePaciente"));
 const NuevoControl = lazy(() => import("./pages/NuevoControl"));
+const SeguimientoNotasControl = lazy(() => import("./pages/SeguimientoNotasControl"));
 const FichaRiesgo = lazy(() => import("./pages/FichaRiesgo"));
 const PlanPartoForm = lazy(() => import("./pages/PlanPartoForm"));
 const PuerperioForm = lazy(() => import("./pages/PuerperioForm"));
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="pacientes/:id/controles/nuevo" element={<PrivateRoute access={ACCESS.newControl}><LazyPage><NuevoControl /></LazyPage></PrivateRoute>} />
           <Route path="pacientes/:id/controles/:controlId" element={<PrivateRoute access={ACCESS.patients}><LazyPage><NuevoControl consultationOnly /></LazyPage></PrivateRoute>} />
           <Route path="pacientes/:id/controles/:controlId/editar" element={<PrivateRoute access={ACCESS.editControl}><LazyPage><NuevoControl /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes/:id/controles/:controlId/seguimiento-notas" element={<PrivateRoute access={ACCESS.noteFollowup}><LazyPage><SeguimientoNotasControl /></LazyPage></PrivateRoute>} />
           <Route path="pacientes/:id/riesgo" element={<PrivateRoute access={ACCESS.riskForm}><LazyPage><FichaRiesgo /></LazyPage></PrivateRoute>} />
           <Route path="pacientes/:id/plan-parto" element={<PrivateRoute access={ACCESS.planForm}><LazyPage><PlanPartoForm /></LazyPage></PrivateRoute>} />
           <Route path="pacientes/:id/puerperio/nuevo" element={<PrivateRoute access={ACCESS.planForm}><LazyPage><PuerperioForm /></LazyPage></PrivateRoute>} />

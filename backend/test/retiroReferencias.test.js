@@ -229,7 +229,7 @@ test('el backend exige el registro exitoso de 008 a 015 antes de escuchar', asyn
   assert.deepEqual(successCalls[1].params, [REQUIRED_MIGRATIONS]);
 });
 
-test('schema final declara 20 tablas operativas y dos tablas tecnicas', () => {
+test('schema final declara 22 tablas operativas y dos tablas tecnicas', () => {
   const schema = fs.readFileSync(path.join(SOURCE_ROOT, 'db/schema.sql'), 'utf8');
   const tables = [...schema.matchAll(
     /^CREATE TABLE IF NOT EXISTS\s+([a-z_][a-z0-9_]*)\s*\(/gim
@@ -238,8 +238,10 @@ test('schema final declara 20 tablas operativas y dos tablas tecnicas', () => {
   const operational = tables.filter((tableName) => !technical.has(tableName));
 
   assert.equal(new Set(tables).size, tables.length);
-  assert.equal(tables.length, 22);
-  assert.equal(operational.length, 20);
+  assert.equal(tables.length, 24);
+  assert.equal(operational.length, 22);
+  assert.equal(tables.includes('controles_seguimiento_notas'), true);
+  assert.equal(tables.includes('controles_notas_requeridas'), true);
   assert.equal(tables.includes('notas_clinicas'), true);
   assert.equal(tables.includes('cargos_personal'), true);
   assert.equal(tables.includes('especialidades_personal'), true);
