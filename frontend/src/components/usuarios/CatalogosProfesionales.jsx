@@ -5,8 +5,19 @@ import { useGlobalToast } from '../../context/ToastContext';
 import { getErrorMessage } from '../../utils/errorMessage';
 import AdminDialog from './AdminDialog';
 
+const CLASIFICACIONES_PROFESIONALES = [
+  ['sin_clasificar', 'Sin clasificar'],
+  ['medico', 'Médico'],
+  ['enfermeria_ae', 'Enfermería — AE'],
+  ['enfermeria_ep', 'Enfermería — EP'],
+  ['no_clinico', 'No clínico'],
+];
+
+const clasificacionLabel = value => CLASIFICACIONES_PROFESIONALES.find(([codigo]) => codigo === value)?.[1] || 'Sin clasificar';
+
 function CatalogoEditor({ tipo, item, onClose, onSaved }) {
-  const [form, setForm] = useState({ nombre: item?.nombre || '', codigo: item?.codigo || '', descripcion: item?.descripcion || '' });
+  const [form, setForm] = useState({ nombre: item?.nombre || '', codigo: item?.codigo || '', descripcion: item?.descripcion || '',
+    ...(tipo === 'cargos' ? { clasificacion_profesional: item?.clasificacion_profesional || 'sin_clasificar' } : {}) });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const pending = useRef(false);
@@ -30,6 +41,13 @@ function CatalogoEditor({ tipo, item, onClose, onSaved }) {
         {campo === 'descripcion' ? <textarea className="input-field" id={`catalogo-${campo}`} maxLength={500} value={form[campo]} disabled={saving} onChange={e => setForm({ ...form, [campo]: e.target.value })} />
           : <input className="input-field" id={`catalogo-${campo}`} required={campo === 'nombre'} maxLength={campo === 'nombre' ? 150 : 40} value={form[campo]} disabled={saving} onChange={e => setForm({ ...form, [campo]: e.target.value })} />}
       </div>)}
+      {tipo === 'cargos' && <div className="form-group">
+        <label className="input-label" htmlFor="catalogo-clasificacion">Clasificación profesional</label>
+        <select className="input-field" id="catalogo-clasificacion" aria-describedby="catalogo-clasificacion-help" value={form.clasificacion_profesional} disabled={saving} onChange={e => setForm({ ...form, clasificacion_profesional: e.target.value })}>
+          {CLASIFICACIONES_PROFESIONALES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+        <p id="catalogo-clasificacion-help">Clasifica el cargo para validar la coherencia del responsable clínico. No acredita colegiación ni habilitación legal y no concede permisos. Confirma la clasificación del cargo antes de cambiarla; no se deduce de su nombre.</p>
+      </div>}
       {error && <div role="alert" className="error-box">{error}</div>}
       <div className="action-row"><button type="button" className="btn-secondary" disabled={saving} onClick={onClose}>Cancelar</button><button className="btn-primary" disabled={saving}>{saving ? 'Guardando…' : 'Guardar catálogo'}</button></div>
     </form>
@@ -79,7 +97,7 @@ export default function CatalogosProfesionales({ onClose }) {
     {result.error && <div role="alert" className="error-box">{result.error} <button className="btn-secondary" onClick={refresh}>Reintentar</button></div>}
     {result.loading ? <p role="status">Cargando catálogo…</p> : <>
       <ul className="catalogos-list">{result.data.map(item => <li key={item.id}>
-        <div className="catalogo-copy"><strong>{item.nombre}</strong><span>{item.codigo || 'Sin código'} · {item.activo ? 'Activo' : 'Inactivo'}</span>{item.descripcion && <p>{item.descripcion}</p>}</div>
+        <div className="catalogo-copy"><strong>{item.nombre}</strong><span>{item.codigo || 'Sin código'} · {item.activo ? 'Activo' : 'Inactivo'}</span>{query.tipo === 'cargos' && <span>Clasificación: {clasificacionLabel(item.clasificacion_profesional)}</span>}{item.descripcion && <p>{item.descripcion}</p>}</div>
         <div className="action-row"><button className="btn-secondary btn-compact" aria-label={`Editar ${item.nombre}`} onClick={() => setEditor({ item })}>Editar</button><button className="btn-secondary btn-compact" aria-label={`${item.activo ? 'Desactivar' : 'Reactivar'} ${item.nombre}`} disabled={saving} onClick={() => item.activo ? setConfirm(item) : cambiarEstado(item)}>{item.activo ? 'Desactivar' : 'Reactivar'}</button></div>
       </li>)}</ul>
       {!result.data.length && !result.error && <p>No hay elementos con estos filtros.</p>}

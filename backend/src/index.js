@@ -102,6 +102,7 @@ app.use('/api/reportes', reportesRoutes);
 app.use('/api/mapa', mapaRoutes);
 app.use('/api/comunidades', comunidadesRoutes);
 app.use('/api/catalogos', require('./routes/catalogos').createCatalogosRouter());
+app.use('/api/profesionales', require('./routes/profesionales').createProfesionalesRouter());
 app.use('/api/chatbot', chatbotRoutes);
 
 app.get('/api/health', (_, res) => res.json({

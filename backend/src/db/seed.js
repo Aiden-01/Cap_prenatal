@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const pool = require('./pool');
 const { diagnosticCode } = require('../utils/safeErrorLog');
+const { PREFIJOS_CLINICOS } = require('../security/clinicalPermissions');
 const {
   loadEnvironmentFile,
   validateSeedConfig,
@@ -73,8 +74,9 @@ async function seed({
       FROM usuarios u
       JOIN roles r ON r.id = u.rol_id
       JOIN permisos p ON (
-        r.nombre = 'director'
+        (r.nombre = 'director' AND NOT (p.codigo LIKE ANY($1::text[])))
         OR (r.nombre = 'admin' AND p.codigo IN (
+          'catalogos_profesionales.gestionar',
           'pacientes.crear',
           'pacientes.ver',
           'pacientes.editar',
@@ -93,7 +95,7 @@ async function seed({
         ))
       )
       ON CONFLICT (usuario_id, permiso_id) DO NOTHING
-    `);
+    `, [PREFIJOS_CLINICOS.map(prefijo => `${prefijo}%`)]);
 
     await client.query('COMMIT');
     logger.log(accountCreated

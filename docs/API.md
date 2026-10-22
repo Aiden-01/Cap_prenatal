@@ -1,5 +1,22 @@
 # Resumen de API
 
+## Permisos clínicos y directorio (CPREN-117)
+
+GET `/api/profesionales` ofrece un directorio mínimo y paginado para seleccionar
+responsables, separado de la API administrativa de usuarios. Exige sesión activa
+y permiso funcional de registrar/transcribir/finalizar/emitir; el rol o permiso
+de solo consulta de documentos es insuficiente. Query: `buscar`, `pagina`,
+`limite` (máximo 50) y `clasificacion_profesional` médico/AE/EP. Respuesta
+`{ data, total, pagina, limite }`, sin username, rol, permisos ni sesiones.
+Solo usuarios/cargos activos clasificados; director oculto para otros roles.
+
+POST/PUT de cargos aceptan `clasificacion_profesional` opcional: `sin_clasificar`,
+`medico`, `enfermeria_ae`, `enfermeria_ep`, `no_clinico`. Omitir conserva en
+edición. No aplica a especialidades ni acredita habilitación legal.
+Los diez permisos clínicos no se conceden automáticamente a ningún rol.
+Administración de permisos conserva su restricción a director.
+[Matriz, contratos y política reutilizable](CPREN_117_PERMISOS_AUTORIA_CLINICA.md).
+
 ## Perfiles profesionales de usuarios (CPREN-116)
 
 POST/PUT de usuarios aceptan cargo_id y especialidad_id opcionales. En PUT,
@@ -14,7 +31,9 @@ Catálogos admiten `buscar` por nombre/código antes de paginar.
 
 `/api/catalogos/cargos` y `/api/catalogos/especialidades`: GET listado e ID,
 POST creación, PUT edición y PATCH `/:id/desactivar` o `/:id/reactivar`.
-Lecturas autenticadas; escrituras para admin/director y con CSRF.
+Lecturas autenticadas; escrituras para admin/director con
+`catalogos_profesionales.gestionar` y CSRF desde CPREN-117. La 025 preserva esa
+capacidad en cuentas administrativas existentes; nuevas altas reciben el valor inicial.
 Listado paginado `{ data, total }`, filtro `estado=activos|inactivos|todos`.
 Contrato, ejemplos y errores: [Catálogos profesionales](CPREN_115_CATALOGOS_PROFESIONALES.md#api).
 

@@ -1,9 +1,11 @@
 const pool = require('../db/pool');
 const { diagnosticCode } = require('../utils/safeErrorLog');
+const { filtrarPermisosAutomaticos, PERMISO_GESTION_CATALOGOS, PREFIJOS_CLINICOS } = require('../security/clinicalPermissions');
 
 const PERMISOS_POR_ROL = {
   director: null,
   admin: [
+    PERMISO_GESTION_CATALOGOS,
     'pacientes.crear',
     'pacientes.ver',
     'pacientes.editar',
@@ -23,7 +25,7 @@ const PERMISOS_POR_ROL = {
 };
 
 function codigosPorRol(rol) {
-  return PERMISOS_POR_ROL[rol] === null ? null : [...(PERMISOS_POR_ROL[rol] || [])];
+  return PERMISOS_POR_ROL[rol] === null ? null : filtrarPermisosAutomaticos(PERMISOS_POR_ROL[rol] || []);
 }
 
 async function listarCatalogo(db = pool) {
@@ -125,9 +127,9 @@ async function asignarPermisosIniciales({ usuarioId, rol, otorgadoPor = null }, 
   const codigos = codigosPorRol(rol);
   const params = [usuarioId, otorgadoPor];
   const where = codigos === null
-    ? ''
+    ? 'WHERE NOT (p.codigo LIKE ANY($3::text[]))'
     : 'WHERE p.codigo = ANY($3::text[])';
-  if (codigos !== null) params.push(codigos);
+  params.push(codigos === null ? PREFIJOS_CLINICOS.map(prefijo => `${prefijo}%`) : codigos);
 
   await db.query(
     `INSERT INTO usuario_permisos (usuario_id, permiso_id, otorgado_por)
@@ -145,7 +147,7 @@ async function reemplazarPermisosPorRol({ usuarioId, rol, otorgadoPor = null }) 
     const catalogo = await listarCatalogo();
     return reemplazarPermisosUsuario({
       usuarioId,
-      codigos: catalogo.map((permiso) => permiso.codigo),
+      codigos: filtrarPermisosAutomaticos(catalogo.map((permiso) => permiso.codigo)),
       otorgadoPor,
     });
   }

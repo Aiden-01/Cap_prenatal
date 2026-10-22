@@ -78,6 +78,8 @@ test('HTTP: autenticación real sin token; roles, CSRF, validación y rutas de a
   app.use('/api', csrfMiddleware);
   app.use('/api/catalogos', createCatalogosRouter({ services, authenticate: (req, _res, next) => {
     req.usuario = { id: 3, rol: req.headers['x-test-rol'] }; next();
+  }, loadPermissions: (req, _res, next) => {
+    req.usuario.permisos = req.headers['x-test-sin-permiso'] ? [] : ['catalogos_profesionales.gestionar']; next();
   } }));
   app.use(errorHandler);
   const server = app.listen(0, '127.0.0.1');
@@ -103,6 +105,12 @@ test('HTTP: autenticación real sin token; roles, CSRF, validación y rutas de a
     assert.equal((await send(base, 'POST', {})).status, 400);
     assert.equal((await send(base + '/-1')).status, 400);
     assert.equal((await send(base + '?limite=0')).status, 400);
+    const noPermission = await fetch(`http://127.0.0.1:${server.address().port}${base}`, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-test-rol': 'director',
+        'x-test-sin-permiso': '1', cookie: `${CSRF_COOKIE_NAME}=test`, 'x-csrf-token': 'test' },
+      body: JSON.stringify({ nombre: 'Sin autorización' }),
+    });
+    assert.equal(noPermission.status, 403, 'el rol administrativo no evita la revocación granular');
     for (const rol of ['admin', 'director']) {
       assert.equal((await send(base, 'POST', { nombre: 'Cargo' }, rol)).status, 201);
       assert.equal((await send(base + '/1', 'PUT', { nombre: 'Editado' }, rol)).status, 200);

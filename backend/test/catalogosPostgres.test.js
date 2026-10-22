@@ -59,6 +59,12 @@ test('CPREN-115: migración, HTTP, integridad, auditoría y concurrencia en clú
       assert.equal((await db.query("SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name='usuarios' AND column_name IN ('cargo_id','especialidad_id')")).rows[0].n, 0);
     });
 
+    // La regresión 023 anterior se comprueba antes; la API actual requiere 024/025.
+    for (const posterior of ['024_usuarios_perfiles_profesionales.sql', '025_permisos_autoria_clinica.sql']) {
+      await applyMigration({ db, filename: posterior,
+        sql: fs.readFileSync(path.join(__dirname, '../src/db/migrations', posterior), 'utf8') });
+    }
+
     // API real con servicios/repositorios/auditoría reales; identidad sintética.
     const services = Object.fromEntries(['cargos', 'especialidades'].map(tipo => [tipo,
       createCatalogosService(tipo, { repository: createCatalogosRepository(tipo, db) })]));
@@ -66,6 +72,12 @@ test('CPREN-115: migración, HTTP, integridad, auditoría y concurrencia en clú
     app.use(express.json());
     app.use('/api/catalogos', createCatalogosRouter({ services, authenticate: (req, _res, next) => {
       req.usuario = { id: 1, rol: 'director' }; next();
+    }, loadPermissions: async (req, _res, next) => {
+      try {
+        const result = await db.query(`SELECT p.codigo FROM usuario_permisos up
+          JOIN permisos p ON p.id=up.permiso_id WHERE up.usuario_id=$1`, [req.usuario.id]);
+        req.usuario.permisos = result.rows.map(row => row.codigo); next();
+      } catch (error) { next(error); }
     } }));
     app.use(errorHandler);
     server = app.listen(0, '127.0.0.1');

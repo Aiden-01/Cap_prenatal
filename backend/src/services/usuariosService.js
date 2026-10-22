@@ -6,6 +6,7 @@ const auditService = require('./auditService');
 const sessionService = require('./sessionService');
 const authSessionsRepository = require('../repositories/authSessionsRepository');
 const { HttpError } = require('../utils/httpError');
+const { filtrarPermisosAutomaticos } = require('../security/clinicalPermissions');
 
 async function listarUsuarios(req) {
   return usuariosRepository.listar({ actorRol: req.usuario.rol });
@@ -278,6 +279,7 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
           const catalogo = await permisosRepo.listarCatalogo(db);
           codigos = catalogo.map((permiso) => permiso.codigo);
         }
+        codigos = filtrarPermisosAutomaticos(codigos);
 
         await permisosLogic.reemplazarPermisosEnTransaccion({
           usuarioId: id,

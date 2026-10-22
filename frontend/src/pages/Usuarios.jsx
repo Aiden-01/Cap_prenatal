@@ -15,6 +15,7 @@ import CatalogosProfesionales from '../components/usuarios/CatalogosProfesionale
 import '../components/usuarios/profesionales.css';
 
 import { requiresVihConfirmation } from "../utils/permissionConfirmation";
+import { hasPermission } from "../utils/accessRules";
 
 const INIT = { nombre_completo: "", username: "", password: "", rol: "personal_salud", cargo_id: null, especialidad_id: null };
 
@@ -80,6 +81,73 @@ const PERMISSION_UI = {
     section: "reportes",
     Icon: FileDown,
   },
+  "notas_evolucion.ver": {
+    label: "Consultar notas de evolución médica",
+    description: "Consultar documentos de evolución médica según el acceso autorizado.",
+    section: "notas_evolucion",
+    Icon: Eye,
+  },
+  "notas_evolucion.registrar": {
+    label: "Registrar notas de evolución médica",
+    description: "Capturar la nota del médico responsable. El capturista puede ser otra persona y no adquiere su autoría clínica.",
+    section: "notas_evolucion",
+    Icon: Pencil,
+  },
+  "notas_evolucion.finalizar_captura": {
+    label: "Finalizar captura de evolución médica",
+    description: "Cerrar administrativamente el registro. No equivale a firmar, validar clínicamente ni emitir una prescripción.",
+    section: "notas_evolucion",
+    Icon: CheckCircle2,
+  },
+  "notas_enfermeria.ver": {
+    label: "Consultar notas de evolución de enfermería",
+    description: "Consultar documentos de evolución de enfermería según el acceso autorizado.",
+    section: "notas_enfermeria",
+    Icon: Eye,
+  },
+  "notas_enfermeria.registrar": {
+    label: "Registrar notas de evolución de enfermería",
+    description: "Capturar la nota del responsable AE o EP. El capturista puede ser otra persona y no adquiere su autoría clínica.",
+    section: "notas_enfermeria",
+    Icon: Pencil,
+  },
+  "notas_enfermeria.finalizar_captura": {
+    label: "Finalizar captura de evolución de enfermería",
+    description: "Cerrar administrativamente el registro. No equivale a firmar, validar clínicamente ni emitir una prescripción.",
+    section: "notas_enfermeria",
+    Icon: CheckCircle2,
+  },
+  "ordenes_medicas.ver": {
+    label: "Consultar órdenes médicas",
+    description: "Consultar órdenes médicas según el acceso autorizado.",
+    section: "ordenes_medicas",
+    Icon: Eye,
+  },
+  "ordenes_medicas.transcribir": {
+    label: "Transcribir órdenes médicas",
+    description: "Capturar indicaciones del médico responsable sin asumir su identidad ni adquirir permiso para emitir órdenes.",
+    section: "ordenes_medicas",
+    Icon: Pencil,
+  },
+  "ordenes_medicas.finalizar_captura": {
+    label: "Finalizar captura de órdenes médicas",
+    description: "Cerrar administrativamente la captura. No equivale a firmar, validar clínicamente ni emitir una prescripción.",
+    section: "ordenes_medicas",
+    Icon: CheckCircle2,
+  },
+  "ordenes_medicas.emitir": {
+    label: "Emitir órdenes médicas",
+    description: "Facultad reservada al médico autorizado. El permiso y la clasificación del cargo no acreditan por sí solos habilitación legal.",
+    section: "ordenes_medicas",
+    Icon: Stethoscope,
+    sensitive: true,
+  },
+  "catalogos_profesionales.gestionar": {
+    label: "Gestionar catálogos profesionales",
+    description: "Administrar cargos, su clasificación profesional y especialidades. Requiere además un rol administrativo autorizado.",
+    section: "catalogos_profesionales",
+    Icon: BadgeCheck,
+  },
 };
 
 const PERMISSION_SECTIONS = [
@@ -113,6 +181,30 @@ const PERMISSION_SECTIONS = [
     title: "Historial de actividad",
     description: "Registro de acciones realizadas en el sistema.",
     Icon: ShieldCheck,
+  },
+  {
+    id: "notas_evolucion",
+    title: "Notas de evolución médica",
+    description: "La autoría corresponde al médico responsable; capturar y finalizar son acciones diferenciadas.",
+    Icon: Stethoscope,
+  },
+  {
+    id: "notas_enfermeria",
+    title: "Notas de evolución de enfermería",
+    description: "La autoría corresponde al AE o EP responsable; capturar y finalizar son acciones diferenciadas.",
+    Icon: Users,
+  },
+  {
+    id: "ordenes_medicas",
+    title: "Órdenes médicas",
+    description: "Transcribir o finalizar la captura no autoriza a emitir indicaciones médicas.",
+    Icon: Stethoscope,
+  },
+  {
+    id: "catalogos_profesionales",
+    title: "Catálogos profesionales",
+    description: "Administración de cargos y especialidades; no concede autoría clínica.",
+    Icon: BadgeCheck,
   },
 ];
 
@@ -342,7 +434,7 @@ function ModalPermisos({
           </div>
           <div className="permissions-modal-guidance">
             <Info size={15} />
-            <span>Selecciona solo las acciones necesarias. Los permisos sensibles deben asignarse únicamente a personal autorizado.</span>
+            <span>Selecciona solo las acciones necesarias. Los permisos sensibles deben asignarse únicamente a personal autorizado. Conceder un permiso no acredita la profesión ni la habilitación legal de la persona.</span>
           </div>
         </div>
 
@@ -464,6 +556,8 @@ export default function Usuarios() {
   const toast        = useGlobalToast();
   const { usuario: yo, refreshUsuario } = useAuth();
   const esDirector = yo?.rol === "director";
+  const puedeGestionarCatalogos = ["admin", "director"].includes(yo?.rol)
+    && hasPermission(yo, "catalogos_profesionales.gestionar");
 
   const cargar = () => {
     setUsuariosLoading(true); setUsuariosError('');
@@ -663,10 +757,10 @@ export default function Usuarios() {
             <UserPlus size={16} />
             Nuevo usuario
           </button>
-          <button type="button" className="btn-secondary" onClick={() => setCatalogosOpen(true)}>Catálogos profesionales</button>
+          {puedeGestionarCatalogos && <button type="button" className="btn-secondary" onClick={() => setCatalogosOpen(true)}>Catálogos profesionales</button>}
         </div>
 
-        {catalogosOpen ? <CatalogosProfesionales onClose={() => setCatalogosOpen(false)} /> : <div
+        {catalogosOpen && puedeGestionarCatalogos ? <CatalogosProfesionales onClose={() => setCatalogosOpen(false)} /> : <div
           className="usuarios-grid"
         >
           {/* ── Tabla de usuarios ── */}

@@ -62,6 +62,29 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       await assert.rejects(db.query('UPDATE usuarios SET cargo_id=99999 WHERE id=3'), { code: '23503' });
       await assert.rejects(db.query('UPDATE usuarios SET especialidad_id=99999 WHERE id=3'), { code: '23503' });
     });
+    await t.test('025 conserva permisos previos, no concede clínicos y clasifica conservadoramente', async () => {
+      await db.query(`INSERT INTO usuario_permisos(usuario_id,permiso_id)
+        SELECT u.id,p.id FROM usuarios u CROSS JOIN permisos p WHERE p.codigo='controles.ver_vih'`);
+      const before = (await db.query('SELECT * FROM usuario_permisos ORDER BY id')).rows;
+      const filename = '025_permisos_autoria_clinica.sql';
+      const sql = fs.readFileSync(path.join(__dirname, '../src/db/migrations', filename), 'utf8');
+      const client = await db.connect();
+      try {
+        assert.equal(await applyMigration({ db: client, filename, sql }), true);
+        assert.equal(await applyMigration({ db: client, filename, sql }), false);
+        await client.query(sql);
+      } finally { client.release(); }
+      const grants = (await db.query(`SELECT up.*, p.codigo FROM usuario_permisos up
+        JOIN permisos p ON p.id=up.permiso_id ORDER BY up.id`)).rows;
+      assert.equal(grants.length, before.length + 2);
+      assert.deepEqual(grants.filter(row => before.some(previous => previous.id === row.id))
+        .map(({ codigo: _codigo, ...row }) => row), before);
+      assert.ok(grants.filter(row => !before.some(previous => previous.id === row.id))
+        .every(row => row.codigo === 'catalogos_profesionales.gestionar'));
+      assert.equal((await db.query("SELECT count(*)::int n FROM cargos_personal WHERE clasificacion_profesional<>'sin_clasificar'")).rows[0].n, 0);
+      assert.equal((await db.query("SELECT count(*)::int n FROM permisos WHERE codigo LIKE 'notas_evolucion.%' OR codigo LIKE 'notas_enfermeria.%' OR codigo LIKE 'ordenes_medicas.%'")).rows[0].n, 10);
+      await assert.rejects(db.query("UPDATE cargos_personal SET clasificacion_profesional='doctor' WHERE id=1"), { code: '23514' });
+    });
     const tokens = {};
     const jwtConfig = getJwtConfig();
     for (const id of [1, 2, 3]) {

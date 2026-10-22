@@ -156,3 +156,47 @@ test('contraer, buscar y expandir conserva selección, contadores y códigos al 
     permisos: ['pacientes.ver', 'auditoria.ver'],
   }));
 });
+
+test('grupos clínicos distinguen consulta, captura, cierre y emisión conservando códigos', async () => {
+  const permisos = [
+    ['notas_evolucion.ver', 'Consultar notas de evolución médica'],
+    ['notas_evolucion.registrar', 'Registrar notas de evolución médica'],
+    ['notas_evolucion.finalizar_captura', 'Finalizar captura de evolución médica'],
+    ['notas_enfermeria.ver', 'Consultar notas de evolución de enfermería'],
+    ['notas_enfermeria.registrar', 'Registrar notas de evolución de enfermería'],
+    ['notas_enfermeria.finalizar_captura', 'Finalizar captura de evolución de enfermería'],
+    ['ordenes_medicas.ver', 'Consultar órdenes médicas'],
+    ['ordenes_medicas.transcribir', 'Transcribir órdenes médicas'],
+    ['ordenes_medicas.finalizar_captura', 'Finalizar captura de órdenes médicas'],
+    ['ordenes_medicas.emitir', 'Emitir órdenes médicas'],
+    ['catalogos_profesionales.gestionar', 'Gestionar catálogos profesionales'],
+  ];
+  api.get.mockImplementation(url => Promise.resolve({ data: url === '/usuarios'
+    ? [{ id: 2, rol: 'personal_salud', activo: true, nombre_completo: 'Objetivo', username: 'objetivo' }]
+    : url === '/permisos' ? permisos.map(([codigo]) => ({ codigo, categoria: 'db' })) : [] }));
+  api.put.mockResolvedValue({ data: [] });
+  render(<Usuarios />);
+  fireEvent.click(await screen.findByTitle('Gestionar permisos'));
+  await screen.findByText('Consultar notas de evolución médica');
+  expect(screen.getAllByRole('checkbox')).toHaveLength(11);
+  for (const titulo of ['Notas de evolución médica', 'Notas de evolución de enfermería', 'Órdenes médicas', 'Catálogos profesionales']) {
+    expect(screen.getByRole('button', { name: new RegExp(titulo) })).toBeTruthy();
+  }
+  for (const [, label] of permisos) expect(screen.getByText(label)).toBeTruthy();
+  for (const label of ['Finalizar captura de evolución médica', 'Finalizar captura de evolución de enfermería', 'Finalizar captura de órdenes médicas']) {
+    expect(screen.getByText(label).closest('label').textContent).toContain('No equivale a firmar, validar clínicamente ni emitir una prescripción.');
+  }
+  const emitir = screen.getByText('Emitir órdenes médicas').closest('label');
+  expect(emitir.textContent).toContain('Facultad reservada al médico autorizado');
+  expect(emitir.textContent).toContain('no acreditan por sí solos habilitación legal');
+  expect(emitir.textContent).toContain('Acceso restringido');
+  expect(screen.getByText('Transcribir órdenes médicas').closest('label').textContent).toContain('sin asumir su identidad ni adquirir permiso para emitir');
+  expect(screen.getByRole('dialog').textContent).toContain('Conceder un permiso no acredita la profesión ni la habilitación legal');
+
+  fireEvent.click(screen.getByText('Transcribir órdenes médicas').closest('label').querySelector('input'));
+  fireEvent.click(screen.getByText('Finalizar captura de órdenes médicas').closest('label').querySelector('input'));
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  await waitFor(() => expect(api.put).toHaveBeenCalledWith('/usuarios/2/permisos', {
+    permisos: ['ordenes_medicas.transcribir', 'ordenes_medicas.finalizar_captura'],
+  }));
+});

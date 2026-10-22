@@ -2,10 +2,19 @@
 
 Motor: PostgreSQL.
 
+CPREN-117 añade `025_permisos_autoria_clinica.sql`: diez permisos clínicos sin
+concesión automática, un permiso de gestión de catálogos con conservación de
+capacidad admin/director y `cargos_personal.clasificacion_profesional` controlada
+por CHECK, NOT NULL y default `sin_clasificar`. No infiere profesiones ni cambia
+roles, permisos anteriores, usuarios o migraciones 023/024. No crea tablas de
+notas/órdenes. El SQL aditivo se replica al final de schema.sql; el arranque
+requiere 025 con checksum. Solo se verifica en PostgreSQL temporal aislado.
+[Decisiones y contratos](CPREN_117_PERMISOS_AUTORIA_CLINICA.md).
+
 CPREN-116 agrega cargo_id y especialidad_id nullable a usuarios mediante
 `024_usuarios_perfiles_profesionales.sql`, con FK ON DELETE RESTRICT e índices.
 Los registros existentes comienzan con NULL, sin backfill ni cambios de permisos.
-El esquema inicial y compatibilidad de arranque incluyen 024.
+El esquema inicial y compatibilidad de arranque incluyen 024, seguida de 025.
 [Migración, concurrencia y pruebas](CPREN_116_PERFILES_PROFESIONALES.md#migración-024).
 
 CPREN-115 agrega `cargos_personal` y `especialidades_personal` mediante la

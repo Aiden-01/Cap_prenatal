@@ -160,6 +160,14 @@ const DEFAULT_FREE_TEXT_PATTERNS = Object.freeze([
 
 const BASE_CONTEXTUAL_RULES = Object.freeze([
   Object.freeze({
+    categories: ['catalogos'],
+    entities: ['cargo_personal'],
+    events: ['crear', 'actualizar'],
+    fields: ['clasificacion_profesional'],
+    valueType: AUDIT_VALUE_TYPES.ENUM,
+    allowedValues: ['sin_clasificar', 'medico', 'enfermeria_ae', 'enfermeria_ep', 'no_clinico'],
+  }),
+  Object.freeze({
     categories: ['usuarios'],
     entities: ['usuario'],
     events: ['usuario_creado', 'perfil_profesional_actualizado'],

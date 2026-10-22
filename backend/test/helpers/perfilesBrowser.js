@@ -38,7 +38,7 @@ async function verificarPerfilesBrowser({ apiPort, token, t }) {
       { name: 'cap_prenatal_csrf', value: 'test', url: base });
     await page.evaluateOnNewDocument(() => localStorage.setItem('usuario', JSON.stringify({
       id: 1, nombre_completo: 'Director sintético', username: 'dir_test', rol: 'director',
-      activo: true, permisos: [], lastActivityAt: new Date().toISOString(),
+      activo: true, permisos: ['catalogos_profesionales.gestionar'], lastActivityAt: new Date().toISOString(),
     })));
     await page.setViewport({ width: 1440, height: 1000 });
     await page.goto(`${base}/usuarios`, { waitUntil: 'networkidle0' });
