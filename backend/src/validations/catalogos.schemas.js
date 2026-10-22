@@ -17,6 +17,7 @@ const catalogoIdSchema = z.object({
   id: z.string().regex(/^[1-9]\d*$/).transform(Number).pipe(z.number().int().max(2147483647)),
 }).strict();
 const catalogoListSchema = z.object({
+  buscar: z.string().trim().max(150).default(''),
   estado: z.enum(['activos', 'inactivos', 'todos']).default('activos'),
   pagina: z.coerce.number().int().min(1).max(100000).default(1),
   limite: z.coerce.number().int().min(1).max(100).default(20),

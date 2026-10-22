@@ -1,5 +1,15 @@
 # Resumen de API
 
+## Perfiles profesionales de usuarios (CPREN-116)
+
+POST/PUT de usuarios aceptan cargo_id y especialidad_id opcionales. En PUT,
+omitir conserva y NULL retira la asignación. GET `/usuarios/:id` y listado
+incluyen IDs, nombres y estado de ambas referencias mediante joins, sin hash.
+Solo admin/director; las protecciones de cuentas director y CSRF se conservan.
+Nueva asignación requiere catálogo activo; la histórica inactiva puede mantenerse.
+Catálogos admiten `buscar` por nombre/código antes de paginar.
+[Contrato y decisiones](CPREN_116_PERFILES_PROFESIONALES.md#contratos-api).
+
 ## Catálogos profesionales (CPREN-115)
 
 `/api/catalogos/cargos` y `/api/catalogos/especialidades`: GET listado e ID,

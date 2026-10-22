@@ -1,0 +1,22 @@
+.perfil-fields { display: grid; gap: 1rem; }
+.perfil-fields select, .catalogos-controls select, .catalogos-controls input { width: 100%; }
+.perfil-modal { width: min(100% - 2rem, 520px); max-height: 90dvh; overflow-y: auto; }
+.perfil-modal form { display: grid; gap: 1rem; margin-top: 1rem; }
+.perfil-modal input, .perfil-modal textarea { width: 100%; }
+.perfil-modal .action-row { justify-content: flex-end; }
+.usuario-profesion { color: var(--text-muted); font-size: .77rem; margin-top: .25rem; overflow-wrap: anywhere; }
+.catalogos-heading, .catalogos-pagination { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.catalogos-controls { display: grid; grid-template-columns: 1fr 2fr 1fr auto; align-items: end; gap: 1rem; margin: 1rem 0; }
+.catalogos-controls label { display: grid; gap: .4rem; font-size: .85rem; }
+.catalogos-list { list-style: none; padding: 0; margin: 0 0 1rem; }
+.catalogos-list li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.catalogo-copy { min-width: 0; overflow-wrap: anywhere; }
+.catalogo-copy span { display: block; font-size: .8rem; color: var(--text-muted); }
+.catalogo-copy p { white-space: pre-wrap; }
+.catalogos-list .action-row { flex-shrink: 0; }
+@media (max-width: 760px) {
+  .catalogos-controls { grid-template-columns: 1fr; }
+  .catalogos-list li { align-items: stretch; flex-direction: column; }
+  .catalogos-list .action-row { flex-wrap: wrap; }
+  .catalogos-pagination { justify-content: center; font-size: .8rem; }
+}

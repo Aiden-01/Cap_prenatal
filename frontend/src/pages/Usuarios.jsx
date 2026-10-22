@@ -9,10 +9,14 @@ import { useAuth } from "../hooks/useAuth";
 import { useGlobalToast } from "../context/ToastContext";
 import { getErrorMessage } from "../utils/errorMessage";
 import { useFieldErrors } from "../hooks/useFieldErrors";
+import PerfilProfesionalFields from '../components/usuarios/PerfilProfesionalFields';
+import ModalPerfilProfesional from '../components/usuarios/ModalPerfilProfesional';
+import CatalogosProfesionales from '../components/usuarios/CatalogosProfesionales';
+import '../components/usuarios/profesionales.css';
 
 import { requiresVihConfirmation } from "../utils/permissionConfirmation";
 
-const INIT = { nombre_completo: "", username: "", password: "", rol: "personal_salud" };
+const INIT = { nombre_completo: "", username: "", password: "", rol: "personal_salud", cargo_id: null, especialidad_id: null };
 
 const PERMISSION_UI = {
   "auditoria.ver": {
@@ -130,6 +134,8 @@ const FIELD_LABELS = {
   username: "Usuario",
   password: "Contrasena",
   rol: "Rol",
+  cargo_id: 'Cargo laboral',
+  especialidad_id: 'Especialidad',
 };
 
 function inferUsuarioFieldErrors(err) {
@@ -432,11 +438,17 @@ function ModalPermisos({
 
 export default function Usuarios() {
   const [usuarios, setUsuarios]         = useState([]);
+  const [usuariosLoading, setUsuariosLoading] = useState(true);
+  const [usuariosError, setUsuariosError] = useState('');
   const [form, setForm]                 = useState(INIT);
   const [loading, setLoading]           = useState(false);
   const [ultimoCreado, setUltimoCreado] = useState(null);
   const [aEliminar, setAEliminar]       = useState(null); // usuario seleccionado para eliminar
   const [formOpen, setFormOpen]         = useState(false);
+  const [perfilUsuario, setPerfilUsuario] = useState(null);
+  const [catalogosOpen, setCatalogosOpen] = useState(false);
+  const [createReady, setCreateReady] = useState(false);
+  const createPending = useRef(false);
   const [permisosUsuario, setPermisosUsuario] = useState(null);
   const [catalogoPermisos, setCatalogoPermisos] = useState([]);
   const [permisosSeleccionados, setPermisosSeleccionados] = useState([]);
@@ -453,10 +465,21 @@ export default function Usuarios() {
   const { usuario: yo, refreshUsuario } = useAuth();
   const esDirector = yo?.rol === "director";
 
-  const cargar = () =>
-    api.get("/usuarios").then(({ data }) => setUsuarios(data)).catch(console.error);
+  const cargar = () => {
+    setUsuariosLoading(true); setUsuariosError('');
+    return api.get('/usuarios').then(({ data }) => setUsuarios(data))
+      .catch(err => setUsuariosError(getErrorMessage(err, 'No se pudieron cargar los usuarios')))
+      .finally(() => setUsuariosLoading(false));
+  };
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    api.get('/usuarios', { signal: controller.signal })
+      .then(({ data }) => { if (!controller.signal.aborted) setUsuarios(data); })
+      .catch(err => { if (!controller.signal.aborted) setUsuariosError(getErrorMessage(err, 'No se pudieron cargar los usuarios')); })
+      .finally(() => { if (!controller.signal.aborted) setUsuariosLoading(false); });
+    return () => controller.abort();
+  }, []);
 
   const usuariosFiltrados = useMemo(() => {
     const termino = busqueda.trim().toLowerCase();
@@ -479,6 +502,9 @@ export default function Usuarios() {
 
   const handleCrear = async (e) => {
     e.preventDefault();
+    if (createPending.current || !createReady) return;
+    if (!form.cargo_id) { toast('Selecciona un cargo laboral', 'error'); return; }
+    createPending.current = true;
     setLoading(true);
     setUltimoCreado(null);
     fieldErrors.clearFieldErrors();
@@ -491,6 +517,7 @@ export default function Usuarios() {
     } catch (err) {
       toast(fieldErrors.setErrorsFromResponse(err, "Error al crear usuario").message, "error");
     } finally {
+      createPending.current = false;
       setLoading(false);
     }
   };
@@ -501,7 +528,7 @@ export default function Usuarios() {
       return;
     }
     try {
-      await api.put(`/usuarios/${u.id}`, { ...u, activo: !u.activo });
+      await api.put(`/usuarios/${u.id}`, { activo: !u.activo });
       cargar();
       // Toast sin emojis — texto plano
       toast(
@@ -586,6 +613,7 @@ export default function Usuarios() {
 
   return (
     <>
+      {perfilUsuario && <ModalPerfilProfesional key={perfilUsuario.id} usuario={perfilUsuario} onClose={() => setPerfilUsuario(null)} onSaved={cargar} />}
       {/* Modal confirmacion eliminar */}
       <ModalEliminar
         usuario={aEliminar}
@@ -630,14 +658,15 @@ export default function Usuarios() {
           <button
             type="button"
             className="user-create-minimal"
-            onClick={() => setFormOpen(true)}
+            onClick={() => { setCreateReady(false); setFormOpen(true); setCatalogosOpen(false); }}
           >
             <UserPlus size={16} />
             Nuevo usuario
           </button>
+          <button type="button" className="btn-secondary" onClick={() => setCatalogosOpen(true)}>Catálogos profesionales</button>
         </div>
 
-        <div
+        {catalogosOpen ? <CatalogosProfesionales onClose={() => setCatalogosOpen(false)} /> : <div
           className="usuarios-grid"
         >
           {/* ── Tabla de usuarios ── */}
@@ -695,6 +724,8 @@ export default function Usuarios() {
             </div>
 
             <div className="tabla-wrapper">
+              {usuariosLoading && <p role="status">Cargando usuarios…</p>}
+              {usuariosError && <div role="alert" className="error-box">{usuariosError} <button className="btn-secondary" onClick={cargar}>Reintentar</button></div>}
               <table className="tabla">
                 <thead>
                   <tr>
@@ -725,6 +756,10 @@ export default function Usuarios() {
                             <div>
                               <div style={{ fontWeight: 500, fontSize: "0.88rem" }}>
                                 {u.nombre_completo}
+                              </div>
+                              <div className="usuario-profesion">
+                                {u.cargo_nombre || 'Sin cargo asignado'}{u.cargo_activo === false ? ' (inactivo)' : ''}
+                                {u.especialidad_nombre && <> · {u.especialidad_nombre}{u.especialidad_activa === false ? ' (inactiva)' : ''}</>}
                               </div>
                               {esSelf && (
                                 <div style={{ fontSize: "0.72rem", color: "var(--primary)" }}>
@@ -764,6 +799,7 @@ export default function Usuarios() {
                         </td>
                         <td>
                           <div className="table-actions">
+                            <button className="btn-secondary btn-compact" onClick={() => setPerfilUsuario(u)} title={`Editar perfil profesional de ${u.nombre_completo}`}><Pencil size={13} /> Perfil</button>
                             {/* Activar / Desactivar */}
                             <button
                               className={`btn-secondary btn-compact ${!u.activo ? "btn-reactivar" : ""}`}
@@ -803,7 +839,7 @@ export default function Usuarios() {
                     );
                   })}
 
-                  {usuariosFiltrados.length === 0 && (
+                  {!usuariosLoading && !usuariosError && usuariosFiltrados.length === 0 && (
                     <tr>
                       <td colSpan={6} style={{
                         textAlign: "center",
@@ -860,12 +896,13 @@ export default function Usuarios() {
                 </div>
               )}
               <div className="form-group">
-                <label className="input-label">Nombre completo</label>
+                <label className="input-label" htmlFor="usuario-create-nombre">Nombre completo</label>
                 <div className="icon-input">
                   <User size={15} />
                   <input
                     className={fieldErrors.inputClass("nombre_completo")}
                     name="nombre_completo"
+                    id="usuario-create-nombre"
                     type="text"
                     placeholder="Nombre completo"
                     value={form.nombre_completo}
@@ -877,12 +914,13 @@ export default function Usuarios() {
               </div>
 
               <div className="form-group">
-                <label className="input-label">Usuario</label>
+                <label className="input-label" htmlFor="usuario-create-username">Usuario</label>
                 <div className="icon-input">
                   <BadgeCheck size={15} />
                   <input
                     className={fieldErrors.inputClass("username")}
                     name="username"
+                    id="usuario-create-username"
                     type="text"
                     placeholder="nombre_usuario"
                     value={form.username}
@@ -894,12 +932,13 @@ export default function Usuarios() {
               </div>
 
               <div className="form-group">
-                <label className="input-label">Contrasena</label>
+                <label className="input-label" htmlFor="usuario-create-password">Contrasena</label>
                 <div className="icon-input">
                   <KeyRound size={15} />
                   <input
                     className={fieldErrors.inputClass("password")}
                     name="password"
+                    id="usuario-create-password"
                     type="password"
                     placeholder="••••••••"
                     value={form.password}
@@ -911,10 +950,11 @@ export default function Usuarios() {
               </div>
 
               <div className="form-group">
-                <label className="input-label">Rol</label>
+                <label className="input-label" htmlFor="usuario-create-rol">Rol del sistema</label>
                 <select
                   className={fieldErrors.inputClass("rol")}
                   name="rol"
+                  id="usuario-create-rol"
                   value={form.rol}
                   onChange={(e) => fieldErrors.setFormValue(setForm, "rol", e.target.value)}
                 >
@@ -930,10 +970,11 @@ export default function Usuarios() {
                 {fieldErrors.fieldError("rol") && <div className="field-error-text">{fieldErrors.fieldError("rol")}</div>}
               </div>
 
+              <PerfilProfesionalFields value={form} required disabled={loading} onReady={setCreateReady} onChange={(campo, valor) => setForm(current => ({ ...current, [campo]: valor }))} />
               <button
                 className="btn-primary"
                 type="submit"
-                disabled={loading}
+                disabled={loading || !createReady}
                 style={{ justifyContent: "center", marginTop: "0.25rem" }}
               >
                 {loading
@@ -945,7 +986,7 @@ export default function Usuarios() {
           </div>
           </div>
           )}
-        </div>
+        </div>}
       </div>
     </>
   );

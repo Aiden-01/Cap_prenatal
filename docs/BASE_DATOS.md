@@ -2,6 +2,12 @@
 
 Motor: PostgreSQL.
 
+CPREN-116 agrega cargo_id y especialidad_id nullable a usuarios mediante
+`024_usuarios_perfiles_profesionales.sql`, con FK ON DELETE RESTRICT e índices.
+Los registros existentes comienzan con NULL, sin backfill ni cambios de permisos.
+El esquema inicial y compatibilidad de arranque incluyen 024.
+[Migración, concurrencia y pruebas](CPREN_116_PERFILES_PROFESIONALES.md#migración-024).
+
 CPREN-115 agrega `cargos_personal` y `especialidades_personal` mediante la
 migración aditiva `023_catalogos_profesionales.sql`, sincronizada con schema.sql.
 Incluye claves únicas normalizadas por mayúsculas, diacríticos y espacios,

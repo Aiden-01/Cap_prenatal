@@ -36,34 +36,59 @@ async function crearUsuario({ body, req, dependencies = {} }) {
   assertPuedeAsignarRol({ rol: body.rol, actorRol: req.usuario.rol });
 
   const hash = await bcrypt.hash(body.password, 12);
-  const usuario = await usuariosRepo.crear({
-    nombreCompleto: body.nombre_completo,
-    username: body.username,
-    passwordHash: hash,
-    rol: body.rol,
-    createdBy: req.usuario?.id || null,
-  });
-  await permisosRepo.asignarPermisosIniciales({
-    usuarioId: usuario.id,
-    rol: body.rol,
-    otorgadoPor: req.usuario?.id || null,
-  });
+  const crear = async (db) => {
+    if (db) await validarPerfil(body, null, usuariosRepo, db);
+    const usuario = await usuariosRepo.crear({
+      nombreCompleto: body.nombre_completo,
+      username: body.username,
+      passwordHash: hash,
+      rol: body.rol,
+      createdBy: req.usuario?.id || null,
+      cargoId: body.cargo_id ?? null,
+      especialidadId: body.especialidad_id ?? null,
+    }, db);
+    await permisosRepo.asignarPermisosIniciales({
+      usuarioId: usuario.id,
+      rol: body.rol,
+      otorgadoPor: req.usuario?.id || null,
+    }, db);
 
-  await registrarEventoPrivado(req, {
-    contexto: { categoria: 'usuarios', entidad: 'usuario', evento: 'usuario_creado' },
-    accion: 'crear',
-    entidadId: usuario.id,
-    cambios: {
-      anteriores: null,
-      nuevos: {
-        nombre_completo: body.nombre_completo,
-        username: body.username,
-        rol: body.rol,
+    await registrarEventoPrivado(req, {
+      contexto: { categoria: 'usuarios', entidad: 'usuario', evento: 'usuario_creado' },
+      accion: 'crear',
+      entidadId: usuario.id,
+      cambios: {
+        anteriores: null,
+        nuevos: {
+          nombre_completo: body.nombre_completo,
+          username: body.username,
+          rol: body.rol,
+          ...(body.cargo_id !== undefined ? { cargo_id: body.cargo_id } : {}),
+          ...(body.especialidad_id !== undefined ? { especialidad_id: body.especialidad_id } : {}),
+        },
       },
-    },
-  });
+    }, { db, obligatorio: Boolean(db) });
 
-  return usuario;
+    return usuario;
+  };
+  if (body.cargo_id !== undefined || body.especialidad_id !== undefined) {
+    return permisosRepo.enTransaccion(crear);
+  }
+  return crear();
+}
+
+async function validarPerfil(body, before, repository, db) {
+  for (const campo of ['cargo_id', 'especialidad_id']) {
+    const valor = body[campo];
+    if (valor === undefined || valor === null || valor === before?.[campo]) continue;
+    const elemento = await repository.obtenerElementoProfesional(campo, valor, db);
+    if (!elemento || !elemento.activo) {
+      throw new HttpError(400, 'Selecciona un cargo o especialidad existente y activo', {
+        code: 'PERFIL_PROFESIONAL_INVALIDO',
+        details: [{ campo, mensaje: elemento ? 'La opción está inactiva' : 'La opción no existe' }],
+      });
+    }
+  }
 }
 
 async function auditarCambiosUsuario({
@@ -80,6 +105,16 @@ async function auditarCambiosUsuario({
     accion: 'actualizar',
     entidadId: after.id,
   };
+
+  for (const campo of ['cargo_id', 'especialidad_id']) {
+    if ((before[campo] ?? null) !== (after[campo] ?? null)) {
+      await registrarEventoPrivado(req, {
+        ...common,
+        contexto: { categoria: 'usuarios', entidad: 'usuario', evento: 'perfil_profesional_actualizado' },
+        cambios: { anteriores: { [campo]: before[campo] ?? null }, nuevos: { [campo]: after[campo] ?? null } },
+      }, options);
+    }
+  }
 
   if (before.nombre_completo !== after.nombre_completo) {
     await registrarEventoPrivado(req, {
@@ -188,7 +223,7 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
     id,
     actorId: req.usuario.id,
     activo: body.activo,
-    rol: nextRol,
+    rol: nextRol !== before.rol ? nextRol : undefined,
     repository: usuariosRepo,
   });
 
@@ -202,21 +237,23 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
   const passwordHash = body.password ? await bcrypt.hash(body.password, 12) : null;
   const actualizar = (db = null, estadoAnterior = before) => usuariosRepo.actualizar({
     id,
-    nombreCompleto: body.nombre_completo,
+    nombreCompleto: body.nombre_completo ?? estadoAnterior.nombre_completo,
     activo: body.activo ?? estadoAnterior.activo,
-    rol: nextRol,
+    rol: body.rol ?? estadoAnterior.rol,
     passwordHash,
     updatedBy: req.usuario.id,
+    cargoId: body.cargo_id,
+    especialidadId: body.especialidad_id,
   }, db || undefined);
 
   const roleChanged = before.rol !== nextRol;
   const nextActivo = body.activo ?? before.activo;
   const stateChanged = before.activo !== nextActivo;
-  const deactivated = before.activo === true && nextActivo === false;
   const passwordReset = Boolean(body.password);
   const criticalChange = roleChanged || stateChanged || passwordReset;
 
-  if (criticalChange) {
+  const perfilProporcionado = body.cargo_id !== undefined || body.especialidad_id !== undefined;
+  if (criticalChange || perfilProporcionado) {
     await permisosRepo.enTransaccion(async (db) => {
       const bloqueado = await permisosRepo.bloquearUsuarioPermisos(id, db);
       if (!bloqueado) throw new HttpError(404, 'Usuario no encontrado');
@@ -226,9 +263,17 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
         throw new HttpError(404, 'Usuario no encontrado');
       }
 
+      const rolBloqueado = body.rol ?? estadoAnterior.rol;
+      assertPuedeAsignarRol({ rol: rolBloqueado, actorRol: req.usuario.rol });
+      await assertPuedeCambiarSelf({ id, actorId: req.usuario.id, activo: body.activo,
+        rol: rolBloqueado !== estadoAnterior.rol ? rolBloqueado : undefined, repository: usuariosRepo });
+      await assertNoDejaSinDirector({ target: estadoAnterior, nextActivo: body.activo ?? estadoAnterior.activo,
+        nextRol: rolBloqueado, repository: usuariosRepo });
+      if (perfilProporcionado) await validarPerfil(body, estadoAnterior, usuariosRepo, db);
+
       const usuario = await actualizar(db, estadoAnterior);
-      if (estadoAnterior.rol !== nextRol) {
-        let codigos = permisosRepo.codigosPorRol(nextRol);
+      if (estadoAnterior.rol !== rolBloqueado) {
+        let codigos = permisosRepo.codigosPorRol(rolBloqueado);
         if (codigos === null) {
           const catalogo = await permisosRepo.listarCatalogo(db);
           codigos = catalogo.map((permiso) => permiso.codigo);
@@ -242,7 +287,7 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
           contexto: {
             origen: 'cambio_rol',
             rol_anterior: estadoAnterior.rol,
-            rol_nuevo: nextRol,
+            rol_nuevo: rolBloqueado,
           },
           revocarSesiones: false,
           dependencies: {
@@ -257,9 +302,9 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
 
       const reasons = [];
       if (passwordReset) reasons.push('password_reset');
-      if (deactivated) reasons.push('user_deactivated');
-      if (roleChanged) reasons.push('role_changed');
-      await sessions.revokeAllInTransaction({
+      if (estadoAnterior.activo === true && body.activo === false) reasons.push('user_deactivated');
+      if (estadoAnterior.rol !== rolBloqueado) reasons.push('role_changed');
+      if (reasons.length) await sessions.revokeAllInTransaction({
         usuarioId: id,
         reason: reasons.join('+'),
         req,
@@ -354,6 +399,7 @@ async function eliminarUsuario({ id, req, dependencies = {} }) {
 }
 
 module.exports = {
+  obtenerUsuario: obtenerTargetVisible,
   listarUsuarios,
   crearUsuario,
   actualizarUsuario,

@@ -6,17 +6,19 @@ function createCatalogosRepository(tipo, dbPool = pool) {
   const tabla = TABLAS[tipo];
   if (!tabla) throw new TypeError('Catálogo no soportado');
   return {
-    async listar({ estado, limite, offset }, db = dbPool) {
+    async listar({ estado, limite, offset, buscar = '' }, db = dbPool) {
       const activo = estado === 'todos' ? null : estado === 'activos';
       const { rows } = await db.query(`SELECT id, codigo, nombre, descripcion, activo, created_at, updated_at
         FROM ${tabla} WHERE ($1::boolean IS NULL OR activo = $1)
-        ORDER BY nombre, id LIMIT $2 OFFSET $3`, [activo, limite, offset]);
+        AND strpos(catalogo_personal_clave(nombre || ' ' || COALESCE(codigo, '')), catalogo_personal_clave($2)) > 0
+        ORDER BY nombre, id LIMIT $3 OFFSET $4`, [activo, buscar, limite, offset]);
       return rows;
     },
-    async contar({ estado }, db = dbPool) {
+    async contar({ estado, buscar = '' }, db = dbPool) {
       const activo = estado === 'todos' ? null : estado === 'activos';
       const { rows } = await db.query(`SELECT count(*)::integer AS total FROM ${tabla}
-        WHERE ($1::boolean IS NULL OR activo = $1)`, [activo]);
+        WHERE ($1::boolean IS NULL OR activo = $1)
+        AND strpos(catalogo_personal_clave(nombre || ' ' || COALESCE(codigo, '')), catalogo_personal_clave($2)) > 0`, [activo, buscar]);
       return rows[0].total;
     },
     async obtener(id, db = dbPool, bloquear = false) {

@@ -6,6 +6,10 @@ const listar = asyncHandler(async (req, res) => {
   return res.json(usuarios);
 });
 
+const obtener = asyncHandler(async (req, res) => {
+  return res.json(await usuariosService.obtenerUsuario({ id: req.params.id, req }));
+});
+
 const crear = asyncHandler(async (req, res) => {
   const usuario = await usuariosService.crearUsuario({ body: req.body, req });
   return res.status(201).json(usuario);
@@ -32,6 +36,7 @@ const eliminar = asyncHandler(async (req, res) => {
 
 module.exports = {
   listar,
+  obtener,
   crear,
   actualizar,
   eliminar,

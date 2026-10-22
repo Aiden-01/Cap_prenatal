@@ -121,7 +121,7 @@ async function reemplazarPermisosUsuario(args, db = null) {
   return enTransaccion((client) => aplicarReemplazoPermisos(args, client));
 }
 
-async function asignarPermisosIniciales({ usuarioId, rol, otorgadoPor = null }) {
+async function asignarPermisosIniciales({ usuarioId, rol, otorgadoPor = null }, db = pool) {
   const codigos = codigosPorRol(rol);
   const params = [usuarioId, otorgadoPor];
   const where = codigos === null
@@ -129,7 +129,7 @@ async function asignarPermisosIniciales({ usuarioId, rol, otorgadoPor = null }) 
     : 'WHERE p.codigo = ANY($3::text[])';
   if (codigos !== null) params.push(codigos);
 
-  await pool.query(
+  await db.query(
     `INSERT INTO usuario_permisos (usuario_id, permiso_id, otorgado_por)
      SELECT $1, p.id, $2
      FROM permisos p
