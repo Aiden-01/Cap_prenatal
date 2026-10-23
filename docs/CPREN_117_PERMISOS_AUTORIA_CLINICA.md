@@ -1,5 +1,7 @@
 # CPREN-117 — Permisos clínicos y autoría profesional
 
+> Documento histórico de la fase original. CHECKPOINT-10 sustituye sus contratos de perfiles/directorio: la arquitectura vigente usa cargo y clasificación, sin Especialidades; las altas requieren email. Véase [arquitectura y contratos actuales](CPREN_120_CHECKPOINT_10_PROFESIONALES_USUARIOS.md). Se conserva el contenido original como evidencia histórica.
+
 ## Alcance y decisiones confirmadas el 22/10/2026
 
 Implementación local desde `9cd23aed8bf07ad47c97c72b997b2612d1cdd176`, rama

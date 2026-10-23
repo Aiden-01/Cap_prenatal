@@ -4,8 +4,8 @@ const { prepararAutoriaClinica } = require('../src/services/autoriaClinicaServic
 const { profesionalesQuerySchema } = require('../src/validations/profesionales.schemas');
 
 const ahora = new Date('2026-10-22T16:00:00Z');
-const externo = { tipo: 'externo', nombre_completo: 'Profesional sintético', cargo: 'Cargo declarado',
-  especialidad: null, clasificacion_profesional: 'medico' };
+const externo = { tipo: 'externo', nombre_completo: 'Profesional sintético',
+  cargo_codigo: 'MED' };
 
 function escenario({ permisos = [], rol = 'personal_salud', clase = 'no_clinico', activo = true,
   cargoActivo = true, revocada = false, sessionUsuarioId = 1, expired = false } = {}) {
@@ -13,10 +13,10 @@ function escenario({ permisos = [], rol = 'personal_salud', clase = 'no_clinico'
   const calls = [];
   const personas = new Map([[1, { id: 1, rol, activo, nombre_completo: 'Capturista sintético',
     cargo_id: 80, cargo_nombre: 'Nombre editable', cargo_activo: cargoActivo,
-    clasificacion_profesional: clase, especialidad_id: null, especialidad_nombre: null }],
+    cargo_codigo: clase }],
   [2, { id: 2, rol: 'personal_salud', activo: true, nombre_completo: 'Médico sintético',
     cargo_id: 91, cargo_nombre: 'Sin referencia al título', cargo_activo: true,
-    clasificacion_profesional: 'medico', especialidad_id: 10, especialidad_nombre: 'Especialidad sintética' }]]);
+    cargo_codigo: 'MED' }]]);
   const req = { usuario: { id: 1, rol: 'director', permisos: ['ordenes_medicas.emitir'] },
     authSession: { id: 'synthetic-session', usuario_id: 1 }, body: { capturista_usuario_id: 2 } };
   const dependencies = {
@@ -47,7 +47,7 @@ test('digitador transcribe a otro médico sin adquirir su identidad ni permiso d
   const result = await env.preparar();
   assert.equal(result.capturista_usuario_id, 1);
   assert.equal(result.responsable.usuario_id, 2);
-  assert.equal(result.responsable.clasificacion_profesional, 'medico');
+  assert.equal(result.responsable.cargo_codigo, 'MED');
   assert.equal(result.emisor_usuario_id, undefined);
   assert.equal(result.finalizador_usuario_id, undefined);
   assert.equal(result.firma, 'manuscrita'); assert.equal(result.validacion_clinica, false);
@@ -91,21 +91,21 @@ test('responsable externo conserva snapshot manual y no obtiene cuenta/acceso', 
   const result = await env.preparar({ responsable: externo });
   assert.equal(result.responsable.usuario_id, null);
   assert.equal(result.responsable.cargo_id, null);
-  assert.equal(result.responsable.cargo_nombre, externo.cargo);
+  assert.equal(result.responsable.cargo_nombre, 'Médico/a');
   assert.equal(result.capturista_usuario_id, 1);
   await assert.rejects(env.preparar({ responsable: externo, accion: 'emitir' }), { code: 'EMISION_PROPIA_REQUERIDA' });
   await assert.rejects(env.preparar({ responsable: { ...externo, usuario_id: 2 } }), { code: 'RESPONSABLE_INVALIDO' });
 });
 
 test('emitir exige médico responsable propio; selección ajena nunca hereda identidad', async () => {
-  const env = escenario({ permisos: ['ordenes_medicas.emitir'], clase: 'medico' });
+  const env = escenario({ permisos: ['ordenes_medicas.emitir'], clase: 'MED' });
   const result = await env.preparar({ accion: 'emitir', responsable: { tipo: 'autenticado' } });
   assert.equal(result.responsable.usuario_id, 1); assert.equal(result.emisor_usuario_id, 1);
   assert.equal(result.capturista_usuario_id, undefined);
   await assert.rejects(env.preparar({ accion: 'emitir' }), { code: 'EMISION_PROPIA_REQUERIDA' });
 });
 
-for (const clase of ['enfermeria_ae', 'enfermeria_ep', 'no_clinico', 'sin_clasificar']) {
+for (const clase of ['AE', 'EP', 'no_clinico', 'sin_clasificar']) {
   test(`${clase} no puede emitir una orden aunque tenga permiso funcional`, async () => {
     const env = escenario({ permisos: ['ordenes_medicas.emitir'], clase });
     await assert.rejects(env.preparar({ accion: 'emitir', responsable: { tipo: 'autenticado' } }),
@@ -113,7 +113,7 @@ for (const clase of ['enfermeria_ae', 'enfermeria_ep', 'no_clinico', 'sin_clasif
   });
 }
 
-for (const clase of ['enfermeria_ae', 'enfermeria_ep']) {
+for (const clase of ['AE', 'EP']) {
   test(`${clase} es responsable de nota de enfermería y no de nota médica`, async () => {
     const env = escenario({ permisos: ['notas_enfermeria.registrar', 'notas_evolucion.registrar'], clase });
     const args = { tipoDocumento: 'nota_enfermeria', accion: 'registrar', responsable: { tipo: 'autenticado' } };
@@ -149,7 +149,7 @@ test('tipos/acciones desconocidos y responsabilidad con metadatos de acceso se r
 test('directorio tiene límites estrictos y no admite consultas de información privada', () => {
   assert.deepEqual(profesionalesQuerySchema.parse({}), { buscar: '', pagina: 1, limite: 20 });
   for (const query of [{ limite: '51' }, { limite: '0' }, { pagina: '-1' }, { incluir_inactivos: true },
-    { rol: 'director' }, { clasificacion_profesional: 'no_clinico' }, { buscar: '\u0000' }]) {
+    { rol: 'director' }, { cargo_codigo: 'no_clinico' }, { buscar: '\u0000' }]) {
     assert.equal(profesionalesQuerySchema.safeParse(query).success, false);
   }
 });

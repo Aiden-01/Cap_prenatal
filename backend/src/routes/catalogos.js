@@ -3,7 +3,7 @@ const { authMiddleware, permitirRoles } = require('../middleware/auth');
 const { cargarPermisos, verificarPermiso } = require('../middleware/permisos');
 const { PERMISO_GESTION_CATALOGOS } = require('../security/clinicalPermissions');
 const { validateBody, validateParams, validateQuery } = require('../middleware/validate');
-const { catalogoSchema, cargoSchema, catalogoIdSchema, catalogoListSchema } = require('../validations/catalogos.schemas');
+const { cargoSchema, catalogoIdSchema, catalogoListSchema } = require('../validations/catalogos.schemas');
 const { createCatalogosController } = require('../controllers/catalogosController');
 const { createCatalogosService } = require('../services/catalogosService');
 
@@ -12,9 +12,9 @@ function createCatalogosRouter({ authenticate = authMiddleware, loadPermissions 
   const router = express.Router();
   router.use(authenticate);
   const escritura = [autorizarEscritura, loadPermissions, verificarPermiso(PERMISO_GESTION_CATALOGOS)];
-  for (const tipo of ['cargos', 'especialidades']) {
+  for (const tipo of ['cargos']) {
     const controller = createCatalogosController(services[tipo] || createCatalogosService(tipo));
-    const schema = tipo === 'cargos' ? cargoSchema : catalogoSchema;
+    const schema = cargoSchema;
     router.get(`/${tipo}`, validateQuery(catalogoListSchema), controller.listar);
     router.get(`/${tipo}/:id`, validateParams(catalogoIdSchema), controller.obtener);
     router.post(`/${tipo}`, ...escritura, validateBody(schema), controller.crear);

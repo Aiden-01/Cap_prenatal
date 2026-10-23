@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
 const { once } = require('node:events');
-const { catalogoSchema, catalogoIdSchema, catalogoListSchema } = require('../src/validations/catalogos.schemas');
+const { cargoSchema, catalogoIdSchema, catalogoListSchema } = require('../src/validations/catalogos.schemas');
 const { createCatalogosRouter } = require('../src/routes/catalogos');
 const { createCatalogosService } = require('../src/services/catalogosService');
 const { createCatalogosRepository } = require('../src/repositories/catalogosRepository');
@@ -14,16 +14,16 @@ test('Zod: requeridos, límites, normalización, opcionales y campos fuera de al
     { nombre: '\u0000' }, { nombre: '\u0301' }, { nombre: 'Cargo', activo: true },
     { nombre: 'Cargo', cargo_id: 2 }, { nombre: 'Cargo', codigo: 'x'.repeat(41) },
     { nombre: 'Cargo', descripcion: 'x'.repeat(501) }]) {
-    assert.equal(catalogoSchema.safeParse(body).success, false, JSON.stringify(body));
+    assert.equal(cargoSchema.safeParse(body).success, false, JSON.stringify(body));
   }
-  assert.deepEqual(catalogoSchema.parse({ nombre: '  Me\u0301dico/a  Rural ', codigo: ' ', descripcion: '' }),
+  assert.deepEqual(cargoSchema.parse({ nombre: '  Me\u0301dico/a  Rural ', codigo: ' ', descripcion: '' }),
     { nombre: 'Médico/a Rural', codigo: null, descripcion: null });
   for (const id of ['0', '-1', '1.1', '2147483648', '1 OR 1=1']) assert.equal(catalogoIdSchema.safeParse({ id }).success, false);
   for (const query of [{ estado: 'otro' }, { limite: '101' }, { pagina: '' }, { extra: 'x' }]) assert.equal(catalogoListSchema.safeParse(query).success, false);
 });
 
 test('servicio: ausencia, duplicados concurrentes y auditoría obligatoria', async () => {
-  for (const tipo of ['cargos', 'especialidades']) {
+  for (const tipo of ['cargos']) {
     const calls = [];
     const db = {};
     let stored = null;
@@ -62,7 +62,7 @@ test('repositorio: rollback y liberación ante fallo de escritura o auditoría',
   assert.throws(() => createCatalogosRepository('usuarios; DROP TABLE roles'), /no soportado/);
 });
 
-test('HTTP: autenticación real sin token; roles, CSRF, validación y rutas de ambos catálogos', async (t) => {
+test('HTTP: autenticación real sin token; roles, CSRF, validación y catálogo únicamente de cargos', async (t) => {
   let writes = 0;
   const service = {
     listar: async query => ({ data: [{ id: 1, estado: query.estado }], total: 1 }),
@@ -71,7 +71,7 @@ test('HTTP: autenticación real sin token; roles, CSRF, validación y rutas de a
     actualizar: async (id, body) => ({ id, ...body }),
     estado: async (id, activo) => ({ id, activo }),
   };
-  const services = { cargos: service, especialidades: service };
+  const services = { cargos: service };
   const app = express();
   app.use(express.json());
   app.use('/real', createCatalogosRouter({ services }));
@@ -90,7 +90,7 @@ test('HTTP: autenticación real sin token; roles, CSRF, validación y rutas de a
     if (csrf) { headers.cookie = `${CSRF_COOKIE_NAME}=test`; headers['x-csrf-token'] = 'test'; }
     return fetch(`http://127.0.0.1:${server.address().port}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   };
-  for (const tipo of ['cargos', 'especialidades']) {
+  for (const tipo of ['cargos']) {
     const base = `/api/catalogos/${tipo}`;
     assert.equal((await send(`/real/${tipo}`)).status, 401);
     for (const [suffix, method, body] of [['', 'POST', { nombre: 'Cargo' }], ['/1', 'PUT', { nombre: 'Cargo' }], ['/1/desactivar', 'PATCH'], ['/1/reactivar', 'PATCH']]) {
@@ -118,5 +118,6 @@ test('HTTP: autenticación real sin token; roles, CSRF, validación y rutas de a
     }
     assert.equal((await send(base + '/1', 'DELETE')).status, 404);
   }
-  assert.equal(writes, 4);
+  assert.equal(writes, 2);
+  assert.equal((await send('/api/catalogos/especialidades')).status, 404, 'la funcionalidad eliminada no conserva endpoints');
 });

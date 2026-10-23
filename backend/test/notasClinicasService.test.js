@@ -4,11 +4,10 @@ const service = require('../src/services/notasClinicasService');
 const { buildAuditPayload } = require('../src/services/audit/auditDiffBuilder');
 
 const snapshot = { tipo: 'externo', usuario_id: null, nombre_completo: 'Profesional sintético',
-  cargo_id: null, cargo_nombre: 'Cargo declarado', clasificacion_profesional: 'medico',
-  especialidad_id: null, especialidad_nombre: null };
+  cargo_id: null, cargo_nombre: 'Cargo declarado', cargo_codigo: 'MED',
+};
 const body = { tipo: 'nota_evolucion', contenido: 'Narrativa sintética reservada',
-  responsable: { tipo: 'externo', nombre_completo: snapshot.nombre_completo,
-    cargo: snapshot.cargo_nombre, clasificacion_profesional: 'medico' },
+  responsable: { tipo: 'externo', nombre_completo: snapshot.nombre_completo, cargo_codigo: 'MED' },
   clave_idempotencia: '11111111-1111-4111-8111-111111111111' };
 
 function escenario({ permisos = ['pacientes.ver', 'notas_evolucion.registrar'], auditFailure = false } = {}) {

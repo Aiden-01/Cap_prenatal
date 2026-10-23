@@ -1,0 +1,647 @@
+{
+  "synthetic_only": true,
+  "requests": [
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/4/finalizar",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/4/pdf",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/5",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/5",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/5",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/5",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/5/finalizar",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/5/pdf",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/6",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/6/finalizar",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/6/pdf",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/7",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/7",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/7",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/7",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/7/finalizar",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/7/pdf",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/8",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/8",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/8",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/8",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/8/finalizar",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/8/pdf",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/3/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/3/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/3/notas-clinicas",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/pacientes/3/notas-clinicas/9",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/3/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/3/notas-clinicas/9",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/3/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/3/notas-clinicas/9",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/3/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/3/notas-clinicas/9",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/3/notas-clinicas/9/finalizar",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/3/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/3/notas-clinicas/9/pdf",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/profesionales",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "POST",
+      "status": 403
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/10",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/10",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/10",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/10",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/10",
+      "method": "PUT",
+      "status": 409
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas/10",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/999/notas-clinicas",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/pacientes/1/notas-clinicas",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/auth/me",
+      "method": "GET",
+      "status": 401
+    }
+  ],
+  "cases": [
+    {
+      "actor": 2,
+      "tipo": "nota_evolucion",
+      "mode": "autenticado",
+      "clase": "medico"
+    },
+    {
+      "actor": 3,
+      "tipo": "nota_enfermeria",
+      "mode": "autenticado",
+      "clase": "enfermeria_ae"
+    },
+    {
+      "actor": 4,
+      "tipo": "nota_enfermeria",
+      "mode": "autenticado",
+      "clase": "enfermeria_ep"
+    },
+    {
+      "actor": 1,
+      "tipo": "nota_evolucion",
+      "mode": "usuario",
+      "clase": "medico"
+    },
+    {
+      "actor": 1,
+      "tipo": "nota_enfermeria",
+      "mode": "usuario",
+      "clase": "enfermeria_ae"
+    },
+    {
+      "actor": 1,
+      "tipo": "nota_enfermeria",
+      "mode": "externo",
+      "clase": "enfermeria_ep"
+    }
+  ],
+  "notes_created": 7,
+  "errors_verified": [
+    401,
+    403,
+    404,
+    409
+  ],
+  "widths": [
+    1440,
+    1280,
+    768,
+    390,
+    320
+  ]
+}

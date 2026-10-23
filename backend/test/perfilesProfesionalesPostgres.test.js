@@ -39,7 +39,9 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
     process.env.JWT_SECRET = 'synthetic-perfiles-test-only-secret-2026-116'; process.env.NODE_ENV = 'test';
     t.diagnostic(`PostgreSQL ${(await db.query('SHOW server_version')).rows[0].server_version}; temporal propio 127.0.0.1:55476`);
     const schema = fs.readFileSync(path.join(__dirname, '../src/db/schema.sql'), 'utf8');
-    await db.query(schema.slice(0, schema.indexOf('-- CPREN-116:')));
+    await db.query(schema.slice(0, schema.indexOf('-- CPREN-115:')));
+    const catalogoFilename = '023_catalogos_profesionales.sql';
+    await applyMigration({ db, filename: catalogoFilename, sql: fs.readFileSync(path.join(__dirname, '../src/db/migrations', catalogoFilename), 'utf8') });
     await db.query(`INSERT INTO roles (id,nombre) VALUES (1,'director'),(2,'admin'),(3,'personal_salud');
       INSERT INTO usuarios (id,nombre_completo,username,password_hash,rol_id) VALUES
       (1,'Director sintético','dir_test','no-login',1), (2,'Admin sintético','adm_test','no-login',2),
@@ -89,6 +91,10 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
     const notasFilename = '026_notas_clinicas.sql';
     await applyMigration({ db, filename: notasFilename,
       sql: fs.readFileSync(path.join(__dirname, '../src/db/migrations', notasFilename), 'utf8') });
+    for (const filename of ['027_seguimiento_notas_controles.sql', '028_retirar_especialidades.sql', '029_usuarios_email.sql', '030_cargos_autoria_estable.sql']) {
+      await applyMigration({ db, filename, sql: fs.readFileSync(path.join(__dirname, '../src/db/migrations', filename), 'utf8') });
+    }
+    await db.query('UPDATE usuarios SET password_hash=$1 WHERE id=3', [await require('bcryptjs').hash('synthetic-login-password', 4)]);
     const tokens = {};
     const jwtConfig = getJwtConfig();
     for (const id of [1, 2, 3]) {
@@ -109,9 +115,8 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       if (csrf) { headers.cookie = 'cap_prenatal_csrf=test'; headers['x-csrf-token'] = 'test'; }
       return fetch(`http://127.0.0.1:${server.address().port}/api/${url}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     };
-    const especialidad = (await db.query("INSERT INTO especialidades_personal(nombre) VALUES ('Formación sintética') RETURNING id")).rows[0].id;
     let target;
-    const crearBody = { nombre_completo: 'Cuenta sintética', username: 'nueva_test', password: 'test-only-password', rol: 'personal_salud', cargo_id: 1 };
+    const crearBody = { nombre_completo: 'Cuenta sintética', username: 'nueva_test', password: 'test-only-password', email: 'nueva@example.test', rol: 'personal_salud', cargo_id: 1 };
     await t.test('autenticación, CSRF, admin/director y protección de director', async () => {
       assert.equal((await send('usuarios', 'GET', undefined, null)).status, 401);
       assert.equal((await send('usuarios', 'GET', undefined, 3)).status, 403);
@@ -122,14 +127,40 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       assert.equal((await send('usuarios', 'POST', { ...crearBody, rol: 'director' }, 2)).status, 403);
       assert.equal((await send('usuarios/1', 'PUT', { cargo_id: 1 })).status, 200, 'director conserva acceso a su perfil');
     });
-    await t.test('crear con cargo sin especialidad y cliente anterior; respuestas con nombres y sin hash', async () => {
+    await t.test('crear con cargo/email y sin cargo; contrato administrativo sin hash ni especialidad', async () => {
       const response = await send('usuarios', 'POST', crearBody, 2); assert.equal(response.status, 201);
       target = await response.json(); assert.equal(target.cargo_nombre, 'Auxiliar de Enfermería');
-      assert.equal(target.especialidad_id, null); assert.equal(Object.hasOwn(target, 'password_hash'), false);
-      const legacy = { ...crearBody, username: 'legacy_test' }; delete legacy.cargo_id;
+      assert.equal(Object.hasOwn(target, 'especialidad_id'), false); assert.equal(target.email, crearBody.email); assert.equal(Object.hasOwn(target, 'password_hash'), false);
+      const legacy = { ...crearBody, username: 'legacy_test', email: 'sin-cargo@example.test' }; delete legacy.cargo_id;
       assert.equal((await send('usuarios', 'POST', legacy)).status, 201);
-      assert.equal((await send('usuarios', 'POST', { ...crearBody, username: 'sin_cargo', cargo_id: 9999 })).status, 400);
+      assert.equal((await send('usuarios', 'POST', { ...crearBody, username: 'sin_cargo', email: 'invalid-cargo@example.test', cargo_id: 9999 })).status, 400);
       assert.equal((await send('usuarios/3', 'PUT', { cargo_id: '' })).status, 400);
+    });
+    await t.test('correo obligatorio y único, normalización real, cuenta legada sin correo y privacidad', async () => {
+      const legacy = await (await send('usuarios/3')).json();
+      assert.equal(legacy.email, null); assert.equal(legacy.email_pendiente, true);
+      const before = (await db.query('SELECT password_hash,rol_id,activo FROM usuarios WHERE id=3')).rows[0];
+      const login = await send('auth/login', 'POST', { username: 'salud_test', password: 'synthetic-login-password' }, null);
+      assert.equal(login.status, 200, 'login legado sigue usando username y contraseña');
+      assert.deepEqual((await db.query('SELECT password_hash,rol_id,activo FROM usuarios WHERE id=3')).rows[0], before);
+      for (const email of [undefined, '', 'sin-arroba', 'a@b', 'a b@example.test']) {
+        const body = { ...crearBody, username: 'invalid_email_test', email }; if (email === undefined) delete body.email;
+        assert.equal((await send('usuarios', 'POST', body)).status, 400);
+      }
+      const duplicate = await send('usuarios', 'POST', { ...crearBody, username: 'email_dup_test', email: '  NUEVA@EXAMPLE.TEST  ' });
+      assert.equal(duplicate.status, 409); assert.equal((await duplicate.json()).code, 'EMAIL_DUPLICADO');
+      const simultaneous = await Promise.all(['one', 'two'].map((name, i) => send('usuarios', 'POST', {
+        ...crearBody, username: `race_email_${name}`, email: i ? 'RACE@EXAMPLE.TEST' : 'race@example.test',
+      })));
+      assert.deepEqual(simultaneous.map(response => response.status).sort(), [201, 409]);
+      assert.equal((await send('usuarios/3', 'PUT', { nombre_completo: 'Personal sintético' })).status, 200);
+      assert.equal((await (await send('usuarios/3')).json()).email, null, 'editar otros campos no bloquea legados');
+      assert.equal((await send('usuarios/3', 'PUT', { email: '  LEGADO@EXAMPLE.TEST ' })).status, 200);
+      assert.equal((await (await send('usuarios/3')).json()).email, 'legado@example.test');
+      assert.equal((await send('usuarios/3', 'PUT', { email: 'NUEVA@EXAMPLE.TEST' })).status, 409);
+      assert.equal((await send('usuarios/3', 'GET', undefined, 3)).status, 403, 'correo ajeno requiere acceso administrativo');
+      const events = JSON.stringify((await db.query('SELECT * FROM auditoria_eventos')).rows);
+      for (const email of ['nueva@example.test', 'legado@example.test', 'race@example.test']) assert.equal(events.includes(email), false);
     });
     const snapshot = async () => ({
       usuario: (await db.query('SELECT rol_id,password_hash,activo,nombre_completo FROM usuarios WHERE id=$1', [target.id])).rows[0],
@@ -143,25 +174,23 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       await db.query('UPDATE usuarios SET activo=FALSE WHERE id=$1', [target.id]);
       const before = await snapshot();
       assert.equal(before.sesiones.length, 1); assert.ok(before.permisos.length > 0);
-      assert.equal((await send(`usuarios/${target.id}`, 'PUT', { cargo_id: 2, especialidad_id: especialidad })).status, 200);
+      assert.equal((await send(`usuarios/${target.id}`, 'PUT', { cargo_id: 2, email: '  MODIFICADO@EXAMPLE.TEST  ' })).status, 200);
       assert.deepEqual(await snapshot(), before);
       const user = await (await send(`usuarios/${target.id}`)).json();
-      assert.equal(user.cargo_id, 2); assert.equal(user.especialidad_nombre, 'Formación sintética');
-      assert.equal((await send(`usuarios/${target.id}`, 'PUT', { especialidad_id: null })).status, 200);
+      assert.equal(user.cargo_id, 2); assert.equal(user.email, 'modificado@example.test');
+      assert.equal((await send(`usuarios/${target.id}`, 'PUT', { especialidad_id: null })).status, 400);
       assert.equal((await (await send(`usuarios/${target.id}`)).json()).cargo_id, 2);
       assert.equal((await send(`usuarios/${target.id}`, 'PUT', { nombre_completo: 'Cuenta sintética' })).status, 200);
-      assert.equal((await (await send(`usuarios/${target.id}`)).json()).especialidad_id, null);
+      assert.equal(Object.hasOwn(await (await send(`usuarios/${target.id}`)).json(), 'especialidad_id'), false);
       assert.deepEqual(await snapshot(), before);
       const events = (await db.query("SELECT * FROM auditoria_eventos WHERE registro_id=$1 AND descripcion='perfil_profesional_actualizado'", [String(target.id)])).rows;
-      assert.ok(events.length >= 3); assert.equal(JSON.stringify(events).includes('Cuenta sintética'), false);
+      assert.ok(events.length >= 1); assert.equal(JSON.stringify(events).includes('Cuenta sintética'), false);
       assert.equal(JSON.stringify(events).includes('test-only-password'), false);
     });
     await t.test('asignaciones inactivas conservadas; nuevas rechazadas; FK preserva histórico', async () => {
       await db.query('UPDATE cargos_personal SET activo=FALSE WHERE id=2');
       assert.equal((await send(`usuarios/${target.id}`, 'PUT', { cargo_id: 2 })).status, 200);
       assert.equal((await send('usuarios/3', 'PUT', { cargo_id: 2 })).status, 400);
-      await db.query('UPDATE especialidades_personal SET activo=FALSE WHERE id=$1', [especialidad]);
-      assert.equal((await send(`usuarios/${target.id}`, 'PUT', { especialidad_id: especialidad })).status, 400);
       await assert.rejects(db.query('DELETE FROM cargos_personal WHERE id=2'), error => ['23503', '23001'].includes(error.code));
       await db.query("INSERT INTO pacientes(no_expediente,nombres,apellidos,registrado_por) VALUES('SYN-PERFIL','Sintética','Prueba',$1)", [target.id]);
       assert.equal((await send(`usuarios/${target.id}`, 'DELETE')).status, 409, 'historial conserva protección existente');
@@ -193,7 +222,7 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       const users = require('../src/services/usuariosService');
       const dependencies = { registrarEventoPrivado: async () => { throw new Error('audit unavailable'); } };
       const req = { usuario: { id: 1, rol: 'director' } };
-      await assert.rejects(users.crearUsuario({ body: { ...crearBody, username: 'rollback_test', cargo_id: 4 }, req, dependencies }), /audit unavailable/);
+      await assert.rejects(users.crearUsuario({ body: { ...crearBody, username: 'rollback_test', email: 'rollback@example.test', cargo_id: 4 }, req, dependencies }), /audit unavailable/);
       assert.equal((await db.query("SELECT count(*)::int AS n FROM usuarios WHERE username='rollback_test'")).rows[0].n, 0);
       const before = await snapshot();
       await assert.rejects(users.actualizarUsuario({ id: target.id, body: { cargo_id: 4 }, req, dependencies }), /audit unavailable/);
@@ -219,6 +248,39 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
         assert.ok(after.sesiones.every(row => row.revoked_at === null));
       } finally { await blocker.query('ROLLBACK'); blocker.release(); }
     });
+    await t.test('CHECKPOINT-11: identidad administrativa, auditoría, unicidad y revocación transaccional', async () => {
+      const created = await send('usuarios', 'POST', { ...crearBody, username: 'identity_admin', email: 'identity@example.test', rol: 'admin' });
+      assert.equal(created.status, 201); const identity = await created.json();
+      const original = (await db.query('SELECT * FROM usuarios WHERE id=$1', [identity.id])).rows[0];
+      const patient=(await db.query(`INSERT INTO pacientes(no_expediente,nombres,apellidos,registrado_por) VALUES('SYN-CP11-IDENTITY','Paciente sintética','Relación por ID',$1) RETURNING id`,[identity.id])).rows[0];
+      const grantBefore = (await db.query('SELECT * FROM usuario_permisos WHERE usuario_id=$1 ORDER BY id', [identity.id])).rows;
+      const sessions = [];
+      for (let i=0;i<2;i++) {
+        const sid = crypto.randomUUID(); sessions.push(sid);
+        await db.query(`INSERT INTO auth_sessions(id,usuario_id,refresh_token_hash,absolute_expires_at) VALUES($1,$2,$3,NOW()+INTERVAL '1 hour')`,[sid,identity.id,crypto.randomBytes(32).toString('hex')]);
+      }
+      tokens[identity.id] = jwt.sign({sid:sessions[0]},jwtConfig.secret,{algorithm:jwtConfig.algorithm,issuer:jwtConfig.issuer,audience:jwtConfig.audience,subject:String(identity.id),jwtid:crypto.randomUUID(),expiresIn:'5m'});
+      assert.equal((await send('usuarios/'+identity.id,'PUT',{nombre_completo:'No autorizado'},3)).status,403);
+      const service=require('../src/services/usuariosService');
+      await assert.rejects(service.actualizarUsuario({id:identity.id,body:{username:'rejected'},req:{usuario:{id:3,rol:'personal_salud'}}}),{status:403});
+      assert.equal((await send('usuarios/'+identity.id,'PUT',{username:'dir_test'},2)).status,409);
+      await assert.rejects(service.actualizarUsuario({id:identity.id,body:{username:'rollback_identity',nombre_completo:'Nombre sin confirmar'},req:{usuario:{id:1,rol:'director'}},dependencies:{registrarEventoPrivado:async()=>{throw Error('synthetic identity audit failure');}}}),/synthetic identity audit failure/);
+      assert.equal((await db.query('SELECT username FROM usuarios WHERE id=$1',[identity.id])).rows[0].username,original.username);
+      assert.equal((await db.query('SELECT count(*)::int AS n FROM auth_sessions WHERE usuario_id=$1 AND revoked_at IS NULL',[identity.id])).rows[0].n,2);
+      const permissionsBefore=(await db.query('SELECT id,nombre FROM roles ORDER BY id')).rows;
+      assert.equal((await send('usuarios/'+identity.id,'PUT',{nombre_completo:'Nombre completo sintético nuevo'},2)).status,200);
+      assert.equal((await send('usuarios/'+identity.id,'PUT',{username:'identity_renamed'},identity.id)).status,200);
+      assert.equal((await send('auth/me','GET',undefined,identity.id)).status,401);
+      assert.equal((await db.query('SELECT count(*)::int AS n FROM auth_sessions WHERE usuario_id=$1 AND revoked_at IS NOT NULL',[identity.id])).rows[0].n,2);
+      const after=(await db.query('SELECT * FROM usuarios WHERE id=$1',[identity.id])).rows[0];
+      assert.equal((await db.query('SELECT registrado_por FROM pacientes WHERE id=$1',[patient.id])).rows[0].registrado_por,identity.id);
+      assert.equal(after.id,original.id);assert.equal(after.password_hash,original.password_hash);assert.equal(after.email,original.email);assert.equal(after.rol_id,original.rol_id);assert.equal(after.nombre_completo,'Nombre completo sintético nuevo');
+      assert.deepEqual((await db.query('SELECT * FROM usuario_permisos WHERE usuario_id=$1 ORDER BY id',[identity.id])).rows,grantBefore);
+      assert.deepEqual((await db.query('SELECT id,nombre FROM roles ORDER BY id')).rows,permissionsBefore);
+      const events=(await db.query(`SELECT * FROM auditoria_eventos WHERE registro_id=$1 AND descripcion='identidad_usuario_actualizada' ORDER BY id`,[String(identity.id)])).rows;
+      assert.equal(events.length,2);const payload=JSON.stringify(events);assert.ok(payload.includes('identity_admin'));assert.ok(payload.includes('identity_renamed'));assert.ok(payload.includes('Nombre completo sintético nuevo'));
+      assert.ok(events.every(event=>event.usuario_id && event.created_at));
+    });
     await t.test('bootstrap oficial completo y reejecución de 024', async () => {
       await db.query('CREATE DATABASE perfiles_bootstrap');
       for (let i = 0; i < 2; i++) {
@@ -230,10 +292,10 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       skip: process.env.RUN_PERFILES_BROWSER !== '1',
     }, async () => {
       await require('./helpers/perfilesBrowser').verificarPerfilesBrowser({ apiPort: server.address().port, token: tokens[1], t });
-      const row = (await db.query(`SELECT u.cargo_id, u.especialidad_id, c.nombre AS cargo, e.nombre AS especialidad
+      const row = (await db.query(`SELECT u.cargo_id, u.email, c.nombre AS cargo, c.codigo
         FROM usuarios u JOIN cargos_personal c ON c.id=u.cargo_id
-        JOIN especialidades_personal e ON e.id=u.especialidad_id WHERE u.username='browser_fixture'`)).rows[0];
-      assert.equal(row.cargo, 'Cargo navegador'); assert.equal(row.especialidad, 'Especialidad navegador');
+        WHERE u.username='browser_fixture'`)).rows[0];
+      assert.equal(row.cargo, 'Cargo navegador'); assert.equal(row.email, 'updated@example.test'); assert.equal(row.codigo, 'CP11-TEST');
     });
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));

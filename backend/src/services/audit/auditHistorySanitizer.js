@@ -169,6 +169,7 @@ const KNOWN_EVENTS = new Set([
   ...Object.values(ACTION_TO_EVENT),
   'usuario_creado',
   'usuario_actualizado',
+  'identidad_usuario_actualizada',
   'usuario_eliminado',
   'cambio_rol',
   'password_cambiado',
@@ -199,6 +200,8 @@ const BASE_PAYLOAD_KEYS = new Set([
   'categoria_autenticacion',
   'password_cambiado',
   'sesion_creada',
+  'contacto_modificado',
+  'contacto_pendiente',
   'sesion_revocada',
   'sesion_expirada',
   'usuario_inactivo',
@@ -348,6 +351,13 @@ function validPermissionDelta(value) {
 function validChanges(value, context) {
   if (!isPlainObject(value) || Object.keys(value).length === 0) return false;
   return Object.entries(value).every(([field, transition]) => {
+    if (context.categoria === 'usuarios' && context.entidad === 'usuario'
+      && context.evento === 'identidad_usuario_actualizada' && ['nombre_completo', 'username'].includes(field)) {
+      return isPlainObject(transition) && Object.keys(transition).sort().join(',') === 'anterior,nuevo'
+        && [transition.anterior, transition.nuevo].every(item => typeof item === 'string'
+          && item.trim().length > 0 && item.length <= (field === 'username' ? 80 : 150)
+          && !/[\p{Cc}\p{Cf}]/u.test(item));
+    }
     if (field === 'permisos_agregados' || field === 'permisos_retirados') {
       return context.entidad === 'usuario' || context.entidad === 'usuario_permisos'
         ? validPermissionDelta(transition)
@@ -387,6 +397,10 @@ function validMetadataEntry(key, value, context) {
       return isAuthenticationContext(context) && value === 'password';
     case 'password_cambiado':
       return context.entidad === 'usuario' && value === true;
+    case 'contacto_modificado':
+    case 'contacto_pendiente':
+      return context.categoria === 'usuarios' && context.entidad === 'usuario'
+        && ['usuario_creado', 'email_actualizado'].includes(context.evento) && typeof value === 'boolean';
     case 'sesion_creada':
     case 'sesion_revocada':
     case 'sesion_expirada':

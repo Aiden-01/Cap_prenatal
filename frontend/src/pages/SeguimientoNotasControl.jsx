@@ -15,9 +15,7 @@ function ConfirmarProfesional({ tipo, pacienteId, embarazoId, controlId, onConfi
   const [directorio, setDirectorio] = useState(null);
   const [profesionalId, setProfesionalId] = useState('');
   const [nombre, setNombre] = useState('');
-  const [cargo, setCargo] = useState('');
-  const [especialidad, setEspecialidad] = useState('');
-  const [clase, setClase] = useState(tipo === 'nota_evolucion' ? 'medico' : '');
+  const [clase, setClase] = useState(tipo === 'nota_evolucion' ? 'MED' : '');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const lock = useRef(false);
@@ -25,9 +23,9 @@ function ConfirmarProfesional({ tipo, pacienteId, embarazoId, controlId, onConfi
   useEffect(() => {
     if (modo !== 'usuario') return;
     let active = true;
-    const clases = nursing ? ['enfermeria_ae', 'enfermeria_ep'] : ['medico'];
-    Promise.all(clases.map(clasificacion_profesional => api.get('/profesionales', {
-      params: { buscar, clasificacion_profesional, limite: 50 },
+    const clases = nursing ? ['AE', 'EP'] : ['MED'];
+    Promise.all(clases.map(cargo_codigo => api.get('/profesionales', {
+      params: { buscar, cargo_codigo, limite: 50 },
     }))).then(responses => {
       if (active) setDirectorio({ buscar, data: responses.flatMap(response => response.data.data),
         truncated: responses.some(response => response.data.total > response.data.data.length) });
@@ -40,7 +38,7 @@ function ConfirmarProfesional({ tipo, pacienteId, embarazoId, controlId, onConfi
     lock.current = true; setSaving(true); setError('');
     const responsable = modo === 'autenticado' ? { tipo: 'autenticado' }
       : modo === 'usuario' ? { tipo: 'usuario', usuario_id: Number(profesionalId) }
-        : { tipo: 'externo', nombre_completo: nombre, cargo, especialidad: especialidad || null, clasificacion_profesional: clase };
+        : { tipo: 'externo', nombre_completo: nombre, cargo_codigo: clase };
     try {
       await api.post(`/pacientes/${pacienteId}/controles/${controlId}/seguimiento-notas`, {
         embarazo_id: Number(embarazoId), version: 1, tipo, responsable,
@@ -56,7 +54,7 @@ function ConfirmarProfesional({ tipo, pacienteId, embarazoId, controlId, onConfi
       <label>Profesional que atendió
         <select required value={modo} onChange={event => { setModo(event.target.value); setProfesionalId(''); }}>
           <option value="">Sin confirmar</option>
-          <option value="autenticado">Yo atendí (el servidor validará mi clasificación)</option>
+          <option value="autenticado">Yo atendí (el servidor validará mi cargo)</option>
           <option value="usuario">Otro profesional del directorio</option>
           <option value="externo">Profesional externo</option>
         </select>
@@ -69,15 +67,14 @@ function ConfirmarProfesional({ tipo, pacienteId, embarazoId, controlId, onConfi
               <option value="">Selecciona un profesional</option>
               {directorio.data.map(persona => <option key={persona.id} value={persona.id}>{persona.nombre_completo} — {persona.cargo_nombre}</option>)}
             </select>{directorio.truncated && <span>Hay más resultados; precisa la búsqueda.</span>}</label>}
-      </>}
+    </>}
       {modo === 'externo' && <>
         <label>Nombre completo<input required maxLength={150} value={nombre} onChange={event => setNombre(event.target.value)} /></label>
-        <label>Cargo declarado<input required maxLength={150} value={cargo} onChange={event => setCargo(event.target.value)} /></label>
-        <label>Especialidad (opcional)<input maxLength={150} value={especialidad} onChange={event => setEspecialidad(event.target.value)} /></label>
-        {nursing && <label>Clasificación profesional<select required value={clase} onChange={event => setClase(event.target.value)}>
-          <option value="">Selecciona clasificación</option><option value="enfermeria_ae">Auxiliar de Enfermería</option><option value="enfermeria_ep">Enfermera Profesional</option>
+          {<label>Cargo declarado<select required value={clase} onChange={event => setClase(event.target.value)}>
+          <option value="">Selecciona cargo</option>{!nursing && <option value="MED">Médico/a</option>}{nursing && <option value="AE">Auxiliar de Enfermería</option>}{nursing && <option value="EP">Enfermera Profesional</option>}
         </select></label>}
-      </>}
+      <p className="nota-muted">Identidad externa declarada; no verificada por el establecimiento.</p>
+</>}
       <button className="btn-primary" type="submit" disabled={!modo || saving}>{saving ? 'Confirmando…' : 'Confirmar seguimiento'}</button>
     </fieldset>
     {error && <p role="alert">{error}</p>}

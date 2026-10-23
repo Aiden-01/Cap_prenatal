@@ -169,7 +169,7 @@ test('grupos clínicos distinguen consulta, captura, cierre y emisión conservan
     ['ordenes_medicas.transcribir', 'Transcribir órdenes médicas'],
     ['ordenes_medicas.finalizar_captura', 'Finalizar captura de órdenes médicas'],
     ['ordenes_medicas.emitir', 'Emitir órdenes médicas'],
-    ['catalogos_profesionales.gestionar', 'Gestionar catálogos profesionales'],
+    ['catalogos_profesionales.gestionar', 'Gestionar catálogo de cargos'],
   ];
   api.get.mockImplementation(url => Promise.resolve({ data: url === '/usuarios'
     ? [{ id: 2, rol: 'personal_salud', activo: true, nombre_completo: 'Objetivo', username: 'objetivo' }]
@@ -179,7 +179,7 @@ test('grupos clínicos distinguen consulta, captura, cierre y emisión conservan
   fireEvent.click(await screen.findByTitle('Gestionar permisos'));
   await screen.findByText('Consultar notas de evolución médica');
   expect(screen.getAllByRole('checkbox')).toHaveLength(11);
-  for (const titulo of ['Notas de evolución médica', 'Notas de evolución de enfermería', 'Órdenes médicas', 'Catálogos profesionales']) {
+  for (const titulo of ['Notas de evolución médica', 'Notas de evolución de enfermería', 'Órdenes médicas', 'Catálogo de cargos']) {
     expect(screen.getByRole('button', { name: new RegExp(titulo) })).toBeTruthy();
   }
   for (const [, label] of permisos) expect(screen.getByText(label)).toBeTruthy();

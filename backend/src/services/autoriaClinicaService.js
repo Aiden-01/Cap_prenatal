@@ -7,9 +7,9 @@ const { responsableSchema } = require('../validations/profesionales.schemas');
 const { HttpError } = require('../utils/httpError');
 
 const POLITICAS = Object.freeze({
-  nota_evolucion: Object.freeze({ prefijo: 'notas_evolucion', captura: 'registrar', clases: ['medico'] }),
-  nota_enfermeria: Object.freeze({ prefijo: 'notas_enfermeria', captura: 'registrar', clases: ['enfermeria_ae', 'enfermeria_ep'] }),
-  orden_medica: Object.freeze({ prefijo: 'ordenes_medicas', captura: 'transcribir', clases: ['medico'] }),
+  nota_evolucion: Object.freeze({ prefijo: 'notas_evolucion', captura: 'registrar', cargos: ['MED'] }),
+  nota_enfermeria: Object.freeze({ prefijo: 'notas_enfermeria', captura: 'registrar', cargos: ['AE', 'EP'] }),
+  orden_medica: Object.freeze({ prefijo: 'ordenes_medicas', captura: 'transcribir', cargos: ['MED'] }),
 });
 const PERMISOS_DIRECTORIO = Object.freeze([
   'notas_evolucion.registrar', 'notas_evolucion.finalizar_captura',
@@ -23,8 +23,7 @@ function snapshotUsuario(persona) {
   return {
     tipo: 'usuario', usuario_id: persona.id, nombre_completo: persona.nombre_completo,
     cargo_id: persona.cargo_id, cargo_nombre: persona.cargo_nombre,
-    clasificacion_profesional: persona.clasificacion_profesional,
-    especialidad_id: persona.especialidad_id, especialidad_nombre: persona.especialidad_nombre,
+    cargo_codigo: persona.cargo_codigo,
   };
 }
 
@@ -33,14 +32,13 @@ async function resolverResponsable({ responsable, actor, politica, db, repositor
   if (!parsed.success) throw error(400, 'RESPONSABLE_INVALIDO', 'Identidad profesional inválida');
   const identidad = parsed.data;
   if (identidad.tipo === 'externo') {
-    if (!politica.clases.includes(identidad.clasificacion_profesional)) {
-      throw error(400, 'CLASIFICACION_PROFESIONAL_INVALIDA', 'El responsable no corresponde al tipo de documento');
+    if (!politica.cargos.includes(identidad.cargo_codigo)) {
+      throw error(400, 'CARGO_PROFESIONAL_INVALIDO', 'El responsable no corresponde al tipo de documento');
     }
     return {
       tipo: 'externo', usuario_id: null, nombre_completo: identidad.nombre_completo,
-      cargo_id: null, cargo_nombre: identidad.cargo,
-      clasificacion_profesional: identidad.clasificacion_profesional,
-      especialidad_id: null, especialidad_nombre: identidad.especialidad,
+      cargo_id: null, cargo_nombre: ({ MED: 'Médico/a', AE: 'Auxiliar de Enfermería', EP: 'Enfermera Profesional' })[identidad.cargo_codigo],
+      cargo_codigo: identidad.cargo_codigo,
     };
   }
   const id = identidad.tipo === 'autenticado' ? actor.id : identidad.usuario_id;
@@ -49,7 +47,7 @@ async function resolverResponsable({ responsable, actor, politica, db, repositor
     || (actor.rol !== 'director' && persona.rol === 'director')) {
     throw error(404, 'PROFESIONAL_NO_DISPONIBLE', 'Profesional no disponible');
   }
-  if (!politica.clases.includes(persona.clasificacion_profesional)) {
+  if (!politica.cargos.includes(persona.cargo_codigo)) {
     throw error(403, 'ATRIBUCION_CLINICA_REQUERIDA', 'El perfil profesional no corresponde al documento');
   }
   return snapshotUsuario(persona);

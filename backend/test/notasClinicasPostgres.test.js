@@ -55,21 +55,21 @@ test('CPREN-118: notas clínicas, seguridad y concurrencia en PostgreSQL tempora
       INSERT INTO cargos_personal(id,nombre,clasificacion_profesional) VALUES
       (101,'Médico sintético de notas','medico'),(102,'AE sintética de notas','enfermeria_ae'),
       (103,'EP sintética de notas','enfermeria_ep'),(104,'Captura sintética de notas','no_clinico');
-      INSERT INTO especialidades_personal(id,nombre) VALUES(101,'Especialidad sintética de notas');
-      INSERT INTO usuarios(id,nombre_completo,username,password_hash,rol_id,cargo_id,especialidad_id) VALUES
-      (1,'Director sintético de notas','notas_dir','synthetic-no-login',1,104,NULL),
-      (2,'Capturista sintético de notas','notas_cap','synthetic-no-login',3,104,NULL),
-      (3,'Médico sintético responsable','notas_med','synthetic-no-login',3,101,101),
-      (4,'AE sintética responsable','notas_ae','synthetic-no-login',3,102,NULL),
-      (5,'EP sintética responsable','notas_ep','synthetic-no-login',3,103,NULL),
-      (6,'Lector médico sintético','notas_read_med','synthetic-no-login',3,104,NULL),
-      (7,'Lector enfermería sintético','notas_read_nurse','synthetic-no-login',3,104,NULL),
-      (8,'Finalizador sintético','notas_close','synthetic-no-login',3,104,NULL),
-      (9,'Sin facultades sintético','notas_none','synthetic-no-login',3,104,NULL),
-      (10,'Inactivo sintético','notas_inactive','synthetic-no-login',3,104,NULL),
-      (11,'Revocado sintético','notas_revoked','synthetic-no-login',3,104,NULL),
-      (12,'Expirado sintético','notas_expired','synthetic-no-login',3,104,NULL),
-      (13,'Sin acceso paciente sintético','notas_no_patient','synthetic-no-login',3,104,NULL);
+
+      INSERT INTO usuarios(id,nombre_completo,username,password_hash,rol_id,cargo_id) VALUES
+      (1,'Director sintético de notas','notas_dir','synthetic-no-login',1,104),
+      (2,'Capturista sintético de notas','notas_cap','synthetic-no-login',3,104),
+      (3,'Médico sintético responsable','notas_med','synthetic-no-login',3,101),
+      (4,'AE sintética responsable','notas_ae','synthetic-no-login',3,102),
+      (5,'EP sintética responsable','notas_ep','synthetic-no-login',3,103),
+      (6,'Lector médico sintético','notas_read_med','synthetic-no-login',3,104),
+      (7,'Lector enfermería sintético','notas_read_nurse','synthetic-no-login',3,104),
+      (8,'Finalizador sintético','notas_close','synthetic-no-login',3,104),
+      (9,'Sin facultades sintético','notas_none','synthetic-no-login',3,104),
+      (10,'Inactivo sintético','notas_inactive','synthetic-no-login',3,104),
+      (11,'Revocado sintético','notas_revoked','synthetic-no-login',3,104),
+      (12,'Expirado sintético','notas_expired','synthetic-no-login',3,104),
+      (13,'Sin acceso paciente sintético','notas_no_patient','synthetic-no-login',3,104);
       INSERT INTO pacientes(id,no_expediente,nombres,apellidos) VALUES
       (1,'SYN-NOTAS-1','Paciente sintética','Prueba uno'),(2,'SYN-NOTAS-2','Paciente sintética','Prueba dos');
       INSERT INTO embarazos(id,paciente_id,numero_embarazo,estado,fur,fpp) VALUES
@@ -104,6 +104,12 @@ test('CPREN-118: notas clínicas, seguridad y concurrencia en PostgreSQL tempora
       assert.equal((await db.query('SELECT count(*)::integer AS n FROM notas_clinicas')).rows[0].n, 0);
       assert.equal((await db.query("SELECT to_regclass('ordenes_medicas') AS tabla")).rows[0].tabla, null);
     });
+    // Upgrade correctivo sin reescribir 023–027; todo dentro del clúster propio.
+    for (const filename of fs.readdirSync(path.join(__dirname, '../src/db/migrations')).filter(name => /^(027|028|029|030)_/.test(name)).sort()) {
+      const sql = fs.readFileSync(path.join(__dirname, '../src/db/migrations', filename), 'utf8');
+      await db.query(sql);
+    }
+    assert.equal((await db.query("SELECT to_regclass('especialidades_personal') AS tabla")).rows[0].tabla, null);
     const contextBeforeNotes = await contextSnapshot();
     const grant = async (id, codes) => db.query(`INSERT INTO usuario_permisos(usuario_id,permiso_id)
       SELECT $1,id FROM permisos WHERE codigo=ANY($2::text[]) ON CONFLICT DO NOTHING`, [id, codes]);
@@ -115,6 +121,7 @@ test('CPREN-118: notas clínicas, seguridad y concurrencia en PostgreSQL tempora
     await grant(6, ['notas_evolucion.ver']); await grant(7, ['notas_enfermeria.ver']);
     await grant(8, ['notas_evolucion.finalizar_captura', 'notas_enfermeria.finalizar_captura']);
     for (const id of [10, 11, 12, 13]) await grant(id, medical);
+    await db.query("UPDATE cargos_personal SET codigo=NULL WHERE codigo IN ('MED','AE','EP'); UPDATE cargos_personal SET codigo=CASE id WHEN 101 THEN 'MED' WHEN 102 THEN 'AE' WHEN 103 THEN 'EP' ELSE codigo END WHERE id IN (101,102,103)");
     const tokens = {}, sessions = {};
     const jwtConfig = getJwtConfig();
     const login = async id => {
@@ -224,13 +231,13 @@ test('CPREN-118: notas clínicas, seguridad y concurrencia en PostgreSQL tempora
     });
     await t.test('SQL rechaza snapshots con NULL y no permite finalizar cambiando contenido o responsable', async () => {
       const note = await create(); const source = await snapshot(note.id);
-      for (const campo of ['tipo', 'clasificacion_profesional', 'nombre_completo']) {
+      for (const campo of ['tipo', 'cargo_codigo', 'nombre_completo']) {
         await assert.rejects(cloneRaw(source, { responsable_snapshot: { ...source.responsable_snapshot, [campo]: null } }), { code: '23514' });
       }
       await assert.rejects(db.query(`UPDATE notas_clinicas SET estado='captura_finalizada',finalizador_usuario_id=8,
         finalizada_at=clock_timestamp(),version=version+1,contenido='Mutación simultánea prohibida' WHERE id=$1`, [note.id]), { code: '23514' });
       const externo = { tipo: 'externo', usuario_id: null, nombre_completo: 'Externo sintético SQL', cargo_id: null,
-        cargo_nombre: 'Médico externo', clasificacion_profesional: 'medico', especialidad_id: null, especialidad_nombre: null };
+        cargo_nombre: 'Médico externo', cargo_codigo: 'MED' };
       await assert.rejects(db.query(`UPDATE notas_clinicas SET estado='captura_finalizada',finalizador_usuario_id=8,
         finalizada_at=clock_timestamp(),version=version+1,responsable_usuario_id=NULL,responsable_snapshot=$2::jsonb
         WHERE id=$1`, [note.id, JSON.stringify(externo)]), { code: '23514' });
@@ -305,8 +312,7 @@ test('CPREN-118: notas clínicas, seguridad y concurrencia en PostgreSQL tempora
       assert.equal((await send(route(), 'POST', freshBody({ responsable: { tipo: 'autenticado' } }))).status, 403);
       assert.equal((await send(route(), 'POST', freshBody({ capturista_usuario_id: 3 }))).status, 400);
       assert.equal((await send(route(), 'POST', freshBody({ finalizador_usuario_id: 3 }))).status, 400);
-      const external = { tipo: 'externo', nombre_completo: 'Médico externo sintético de notas', cargo: 'Médico externo',
-        especialidad: null, clasificacion_profesional: 'medico' };
+      const external = { tipo: 'externo', nombre_completo: 'Médico externo sintético de notas', cargo_codigo: 'MED' };
       const note = await create({ responsable: external }); const row = await snapshot(note.id);
       assert.equal(row.responsable_usuario_id, null); assert.equal(row.responsable_snapshot.tipo, 'externo');
       assert.equal(row.responsable_snapshot.nombre_completo, external.nombre_completo);
@@ -327,8 +333,7 @@ test('CPREN-118: notas clínicas, seguridad y concurrencia en PostgreSQL tempora
     });
     await t.test('editar responsable explícitamente genera nuevo snapshot sin cambiar el capturista original', async () => {
       const note = await create(); const before = await snapshot(note.id);
-      const responsable = { tipo: 'externo', nombre_completo: 'Nuevo responsable externo sintético', cargo: 'Médico externo',
-        especialidad: 'Declaración sintética', clasificacion_profesional: 'medico' };
+      const responsable = { tipo: 'externo', nombre_completo: 'Nuevo responsable externo sintético', cargo_codigo: 'MED' };
       const result = await send(route(note.id), 'PUT', { version: 1, responsable }, 3);
       assert.equal(result.status, 200); assertMetadata(result.body);
       const row = await snapshot(note.id); assert.equal(row.capturista_usuario_id, before.capturista_usuario_id);
@@ -367,7 +372,6 @@ test('CPREN-118: notas clínicas, seguridad y concurrencia en PostgreSQL tempora
       const note = await create(); const before = await snapshot(note.id);
       await db.query("UPDATE usuarios SET nombre_completo='Nombre posterior sintético',activo=FALSE WHERE id=3");
       await db.query("UPDATE cargos_personal SET nombre='Cargo posterior sintético',activo=FALSE WHERE id=101");
-      await db.query("UPDATE especialidades_personal SET nombre='Especialidad posterior sintética',activo=FALSE WHERE id=101");
       const changed = await send(route(note.id), 'PUT', { version: 1, contenido: 'Edición sin cambiar identidad histórica' }, 2);
       assert.equal(changed.status, 200); assert.deepEqual((await snapshot(note.id)).responsable_snapshot, before.responsable_snapshot);
       assert.equal((await send(route(note.id) + '/finalizar', 'POST', { version: changed.body.version }, 8)).status, 200);
@@ -376,7 +380,6 @@ test('CPREN-118: notas clínicas, seguridad y concurrencia en PostgreSQL tempora
       assert.equal((await send(route(), 'POST', freshBody())).status, 404, 'no permite nuevas atribuciones al responsable inactivo');
       await db.query("UPDATE usuarios SET nombre_completo='Médico sintético responsable',activo=TRUE WHERE id=3");
       await db.query("UPDATE cargos_personal SET nombre='Médico sintético de notas',activo=TRUE WHERE id=101");
-      await db.query("UPDATE especialidades_personal SET nombre='Especialidad sintética de notas',activo=TRUE WHERE id=101");
       await login(3);
     });
     await t.test('auditoría privada obligatoria sin narrativa ni nombres; fallos revierten crear/editar/finalizar', async () => {

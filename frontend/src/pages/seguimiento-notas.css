@@ -24,3 +24,91 @@
 .nota-clinica button, .nota-historial button { margin: .4rem .4rem .4rem 0; white-space: normal; }
 .nota-historial { padding: .75rem 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
 .nota-clinica input[type="checkbox"] { width: auto; }
+
+.notas-module { display: grid; gap: 1.25rem; min-width: 0; }
+.notas-module-header, .notas-history-title { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.notas-module-header h2 { margin: .2rem 0 .4rem; font-size: 1.45rem; font-weight: 800; }
+.notas-module-header p, .nota-muted { color: var(--text-muted); line-height: 1.55; }
+.nota-eyebrow { color: var(--primary); text-transform: uppercase; font-size: .7rem; font-weight: 800; letter-spacing: .09em; }
+.nota-action-buttons { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.notas-history, .nota-create { padding: 1.25rem; min-width: 0; }
+.notas-history-title h3 { font-weight: 800; }
+.notas-history-title { padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+.nota-empty { display: grid; justify-items: center; text-align: center; gap: .75rem; padding: 2.5rem 1rem; color: var(--text-muted); }
+.nota-empty h3 { color: var(--text); font-weight: 700; }
+.nota-empty p { max-width: 32rem; line-height: 1.6; }
+.nota-section-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 2.7rem; height: 2.7rem; border-radius: .8rem; color: var(--primary); background: var(--primary-lt); }
+.nota-historial { display: flex; align-items: center; gap: .8rem; padding: 1rem 0; }
+.nota-history-details { flex: 1; min-width: 0; }
+.nota-history-details strong { font-size: .9rem; }
+.nota-history-details p, .nota-history-details small { font-size: .8rem; color: var(--text-muted); line-height: 1.6; }
+.nota-status { display: inline-flex; align-items: center; padding: .3rem .65rem; border: 1px solid var(--border); border-radius: 2rem; background: var(--surface2); color: var(--text-muted); font-size: .73rem; font-weight: 700; white-space: nowrap; }
+.nota-status.is-final { background: var(--primary-lt); color: var(--primary); }
+.notas-pagination { display: flex; justify-content: flex-end; align-items: center; gap: .75rem; padding-top: 1rem; font-size: .8rem; color: var(--text-muted); }
+.nota-clinica.card { padding: 0; overflow: hidden; }
+.nota-editor-header { display: flex; align-items: flex-start; gap: .8rem; padding: 1.25rem; background: var(--surface2); border-bottom: 1px solid var(--border); }
+.nota-editor-header > div { flex: 1; min-width: 0; }
+.nota-editor-header h2 { font-size: 1.15rem; font-weight: 800; margin: .2rem 0; }
+.nota-editor-header p { font-size: .8rem; color: var(--text-muted); line-height: 1.5; }
+.nota-editor-form > fieldset { max-width: none; gap: 0; }
+.nota-editor-section { padding: 1.25rem; border-bottom: 1px solid var(--border); min-width: 0; }
+.nota-editor-section h3 { display: flex; align-items: center; gap: .5rem; font-weight: 800; font-size: .9rem; margin-bottom: 1rem; }
+.nota-editor-section h3 svg { color: var(--primary); }
+.nota-fields-grid { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 1rem; }
+.nota-editor-form label, .nota-create label { font-weight: 600; font-size: .83rem; }
+.nota-field-summary { display: grid; gap: .35rem; padding: .65rem .8rem; background: var(--surface2); border-radius: .65rem; font-size: .8rem; }
+.nota-field-summary small, .nota-field-summary > span { color: var(--text-muted); }
+.nota-responsable-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+.nota-responsable-fields > label:first-child, .nota-responsable-fields > p, .nota-responsable-fields > div { grid-column: 1 / -1; }
+.nota-responsable-summary { display: grid; gap: .35rem; padding: .8rem; margin: .8rem 0; border-left: 3px solid var(--primary); background: var(--surface2); border-radius: .4rem; font-size: .85rem; }
+.nota-responsable-summary span { color: var(--text-muted); }
+.nota-editor-form .nota-check { display: flex; align-items: center; gap: .5rem; }
+.nota-editor-form textarea { border: 1px solid var(--border); border-radius: .7rem; background: var(--surface); color: var(--text); min-height: 20rem; }
+.nota-editor-form textarea:focus-visible, .nota-create select:focus-visible, .content-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.nota-editor-form :disabled { opacity: .8; cursor: default; }
+.nota-textarea-meta { display: flex; justify-content: space-between; gap: .5rem; padding-top: .5rem; color: var(--text-muted); font-size: .73rem; }
+.nota-feedback { padding: 0 1.25rem; display: grid; gap: .65rem; font-size: .85rem; }
+.nota-feedback:not(:empty) { padding-top: 1rem; padding-bottom: 1rem; }
+.nota-error { padding: .9rem; border: 1px solid var(--danger); border-radius: .6rem; background: var(--surface2); color: var(--text); line-height: 1.6; }
+.nota-success, .nota-selection { color: var(--primary); font-weight: 700; display: flex; align-items: center; gap: .5rem; }
+.nota-editor-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 1rem 1.25rem; background: var(--surface2); }
+.nota-editor-actions > div:first-child { display: grid; gap: .35rem; font-size: .85rem; }
+.nota-editor-actions small { color: var(--text-muted); max-width: 36rem; font-size: .75rem; }
+.nota-clinica > .nota-muted { padding: .7rem 1.25rem; font-size: .8rem; }
+.nota-create { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: end; }
+.nota-create label { display: grid; gap: .4rem; }
+.nota-create select { min-width: 0; width: 100%; border: 1px solid var(--border); border-radius: .5rem; background: var(--surface); color: var(--text); padding: .7rem; }
+.nota-create .nota-action-buttons { grid-column: 1 / -1; }
+.notas-module > *, .nota-editor-form label, .nota-responsable-fields > *, .nota-fields-grid > * { min-width: 0; }
+.nota-responsable-fields select, .nota-editor-form input { max-width: 100%; box-sizing: border-box; }
+@media (min-width: 1180px) {
+  .notas-module:has(.nota-clinica) { grid-template-columns: minmax(250px, .8fr) minmax(0, 2fr); align-items: start; }
+  .notas-module:has(.nota-clinica) > .notas-module-header, .notas-module > .nota-create { grid-column: 1 / -1; }
+  .notas-module:has(.nota-clinica) .notas-history-list { max-height: 38rem; overflow-y: auto; }
+  .notas-module:has(.nota-clinica) .nota-historial { flex-wrap: wrap; }
+  .notas-module:has(.nota-clinica) .nota-historial > .nota-section-icon { display: none; }
+  .notas-module:has(.nota-clinica) .nota-history-details { flex-basis: 100%; }
+  .notas-module:has(.nota-clinica) .notas-pagination { flex-wrap: wrap; justify-content: center; }
+  .notas-module:has(.nota-clinica) .nota-fields-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .notas-module:has(.nota-clinica) .nota-field-summary { grid-column: 1 / -1; }
+}
+@media (max-width: 1000px) {
+  .nota-historial { flex-wrap: wrap; }
+  .nota-history-details { flex-basis: calc(100% - 4rem); }
+}
+@media (max-width: 600px) {
+  .notas-module-header { align-items: flex-start; flex-direction: column; }
+  .notas-module-header > .nota-action-buttons { width: 100%; justify-content: space-between; }
+  .notas-history, .nota-create, .nota-editor-header, .nota-editor-section { padding: 1rem; }
+  .nota-editor-header { display: grid; grid-template-columns: 2.7rem minmax(0, 1fr); }
+  .nota-editor-header > .nota-status { grid-column: 2; margin-left: 0; justify-self: start; }
+  .nota-fields-grid, .nota-responsable-fields, .nota-create { grid-template-columns: minmax(0, 1fr); }
+  .nota-editor-actions { padding: 1rem; }
+  .nota-editor-actions > .nota-action-buttons { width: 100%; }
+  .nota-editor-actions button { flex: 1 1 100%; justify-content: center; margin: 0; }
+  .nota-textarea-meta { flex-direction: column; }
+  .notas-pagination { gap: .35rem; justify-content: space-between; }
+  .notas-pagination button { padding: .5rem; font-size: .75rem; }
+  .nota-historial > .nota-section-icon { display: none; }
+  .nota-history-details { flex-basis: 100%; }
+}

@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-23",
+  "equipment": "Trabajo",
+  "device": "Aiden29",
+  "branch": "feature/cpren-120-editor-pdf-notas-clinicas",
+  "head": "b00ddf3e881abfa784e2262aceabaabef00bb465",
+  "synthetic_only": true,
+  "persistent_database_accessed": false,
+  "commit_or_push": false,
+  "frontend": { "logical_passed": 191, "dom_passed": 300, "dom_files": 26, "failed": 0, "lint": "passed", "build": "passed" },
+  "backend_full": { "total": 1414, "passed": 1359, "failed": 0, "skipped_opt_in": 55 },
+  "temporary_postgres": {
+    "version": "18.3",
+    "migrations_027_to_029": { "passed": 6, "failed": 0, "port": 55480 },
+    "cargos": { "passed": 7, "failed": 0, "port": 55475 },
+    "perfiles_email_browser": { "passed": 14, "failed": 0, "port": 55476 },
+    "autoria": { "passed": 15, "failed": 0, "port": 55477 },
+    "notas": { "passed": 21, "failed": 0, "port": 55478 },
+    "seguimiento_and_browser_09_10": { "passed": 20, "failed": 0, "port": 55479, "skipped": 0 }
+  },
+  "pdf_browser": { "passed": 2, "failed": 0, "pages_per_sample": 9, "page_size_points": [612, 792], "final_marker_present": true, "specialty_absent": true, "poppler_pages_visually_reviewed": ["medical_first", "nursing_last"] },
+  "screenshots": { "admin": 20, "notes": 10, "themes": ["light", "dark"], "admin_widths": [1440, 390], "notes_widths": [1440, 1280, 768, 390, 320] },
+  "historical_migrations_023_to_027_unchanged": true,
+  "original_logos_unchanged": true,
+  "owner_visual_and_functional_approval": "pending"
+}

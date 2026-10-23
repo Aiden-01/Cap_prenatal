@@ -1,5 +1,7 @@
 # CPREN-115 — Catálogos profesionales, fase 1
 
+> Documento histórico de la fase original. CHECKPOINT-10 sustituye sus contratos de perfiles/directorio: la arquitectura vigente usa cargo y clasificación, sin Especialidades; las altas requieren email. Véase [arquitectura y contratos actuales](CPREN_120_CHECKPOINT_10_PROFESIONALES_USUARIOS.md). Se conserva el contenido original como evidencia histórica.
+
 ## Alcance y decisiones
 
 Dos catálogos independientes: `cargos_personal` (puesto real) y

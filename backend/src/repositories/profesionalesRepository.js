@@ -3,21 +3,18 @@ const pool = require('../db/pool');
 // Lista explícita: nunca reutilizar SELECT * ni la respuesta administrativa de usuarios.
 const COLUMNAS = `u.id, u.nombre_completo, u.activo,
   c.id AS cargo_id, c.nombre AS cargo_nombre, c.activo AS cargo_activo,
-  c.clasificacion_profesional, e.id AS especialidad_id,
-  e.nombre AS especialidad_nombre, e.activo AS especialidad_activa`;
+  upper(btrim(c.codigo)) AS cargo_codigo`;
 const JOINS = `JOIN roles r ON r.id = u.rol_id
-  JOIN cargos_personal c ON c.id = u.cargo_id
-  LEFT JOIN especialidades_personal e ON e.id = u.especialidad_id`;
+  JOIN cargos_personal c ON c.id = u.cargo_id`;
 
-async function listar({ buscar, pagina, limite, clasificacion_profesional, actorRol }, db = pool) {
-  const params = [buscar, actorRol, clasificacion_profesional ?? null];
+async function listar({ buscar, pagina, limite, cargo_codigo, actorRol }, db = pool) {
+  const params = [buscar, actorRol, cargo_codigo ?? null];
   const where = `u.activo = TRUE AND c.activo = TRUE
-    AND c.clasificacion_profesional IN ('medico', 'enfermeria_ae', 'enfermeria_ep')
+    AND upper(btrim(c.codigo)) IN ('MED', 'AE', 'EP')
     AND ($2::text = 'director' OR r.nombre <> 'director')
-    AND ($3::text IS NULL OR c.clasificacion_profesional = $3)
+    AND ($3::text IS NULL OR upper(btrim(c.codigo)) = $3)
     AND ($1::text = '' OR strpos(catalogo_personal_clave(u.nombre_completo), catalogo_personal_clave($1)) > 0
-      OR strpos(catalogo_personal_clave(c.nombre), catalogo_personal_clave($1)) > 0
-      OR strpos(catalogo_personal_clave(COALESCE(e.nombre, '')), catalogo_personal_clave($1)) > 0)`;
+      OR strpos(catalogo_personal_clave(c.nombre), catalogo_personal_clave($1)) > 0)`;
   // Una sentencia conserva el mismo snapshot para total y página, incluso si la página está vacía.
   const { rows } = await db.query(`WITH elegibles AS (
       SELECT ${COLUMNAS} FROM usuarios u ${JOINS} WHERE ${where}

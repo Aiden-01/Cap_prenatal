@@ -11,13 +11,14 @@ import { getErrorMessage } from "../utils/errorMessage";
 import { useFieldErrors } from "../hooks/useFieldErrors";
 import PerfilProfesionalFields from '../components/usuarios/PerfilProfesionalFields';
 import ModalPerfilProfesional from '../components/usuarios/ModalPerfilProfesional';
-import CatalogosProfesionales from '../components/usuarios/CatalogosProfesionales';
+import CatalogoCargos from '../components/usuarios/CatalogoCargos';
+import { normalizarEmail, validarEmail } from '../utils/usuarioEmail';
 import '../components/usuarios/profesionales.css';
 
 import { requiresVihConfirmation } from "../utils/permissionConfirmation";
 import { hasPermission } from "../utils/accessRules";
 
-const INIT = { nombre_completo: "", username: "", password: "", rol: "personal_salud", cargo_id: null, especialidad_id: null };
+const INIT = { nombre_completo: "", username: "", email: "", password: "", rol: "personal_salud", cargo_id: null };
 
 const PERMISSION_UI = {
   "auditoria.ver": {
@@ -143,8 +144,8 @@ const PERMISSION_UI = {
     sensitive: true,
   },
   "catalogos_profesionales.gestionar": {
-    label: "Gestionar catálogos profesionales",
-    description: "Administrar cargos, su clasificación profesional y especialidades. Requiere además un rol administrativo autorizado.",
+    label: "Gestionar catálogo de cargos",
+    description: "Administrar cargos y sus códigos. Requiere además un rol administrativo autorizado.",
     section: "catalogos_profesionales",
     Icon: BadgeCheck,
   },
@@ -202,8 +203,8 @@ const PERMISSION_SECTIONS = [
   },
   {
     id: "catalogos_profesionales",
-    title: "Catálogos profesionales",
-    description: "Administración de cargos y especialidades; no concede autoría clínica.",
+    title: "Catálogo de cargos",
+    description: "Administración de cargos y su clasificación; no concede autoría clínica.",
     Icon: BadgeCheck,
   },
 ];
@@ -224,15 +225,16 @@ function normalizarBusquedaPermisos(texto) {
 const FIELD_LABELS = {
   nombre_completo: "Nombre completo",
   username: "Usuario",
+  email: "Correo electrónico",
   password: "Contrasena",
   rol: "Rol",
   cargo_id: 'Cargo laboral',
-  especialidad_id: 'Especialidad',
 };
 
 function inferUsuarioFieldErrors(err) {
   const code = err?.response?.data?.code;
   const message = getErrorMessage(err, "");
+  if (code === "EMAIL_DUPLICADO") return { email: message };
   if (code === "DUPLICATE_RESOURCE" && message.toLowerCase().includes("usuario")) {
     return { username: message };
   }
@@ -597,13 +599,22 @@ export default function Usuarios() {
   const handleCrear = async (e) => {
     e.preventDefault();
     if (createPending.current || !createReady) return;
-    if (!form.cargo_id) { toast('Selecciona un cargo laboral', 'error'); return; }
+    const errores = Object.entries({ nombre_completo: form.nombre_completo.trim() ? '' : 'Ingresa el nombre completo.',
+      username: form.username.trim() ? '' : 'Ingresa el nombre de usuario.', email: validarEmail(form.email),
+      password: form.password ? '' : 'Ingresa una contraseña.', cargo_id: form.cargo_id ? '' : 'Selecciona un cargo laboral.' })
+      .filter(([, message]) => message).map(([campo, mensaje]) => ({ campo, mensaje }));
+    if (errores.length) {
+      const result = fieldErrors.setErrorsFromResponse({ response: { data: { details: errores } } });
+      toast(result.message, 'error');
+      document.getElementById(`usuario-create-${({ nombre_completo: 'nombre' })[result.firstField] || result.firstField}`)?.focus();
+      return;
+    }
     createPending.current = true;
     setLoading(true);
     setUltimoCreado(null);
     fieldErrors.clearFieldErrors();
     try {
-      await api.post("/usuarios", form);
+      await api.post("/usuarios", { ...form, email: normalizarEmail(form.email) });
       setUltimoCreado(form.nombre_completo);
       setForm(INIT);
       cargar();
@@ -757,10 +768,10 @@ export default function Usuarios() {
             <UserPlus size={16} />
             Nuevo usuario
           </button>
-          {puedeGestionarCatalogos && <button type="button" className="btn-secondary" onClick={() => setCatalogosOpen(true)}>Catálogos profesionales</button>}
+          {puedeGestionarCatalogos && <button type="button" className="btn-secondary" onClick={() => setCatalogosOpen(true)}>Catálogo de cargos</button>}
         </div>
 
-        {catalogosOpen && puedeGestionarCatalogos ? <CatalogosProfesionales onClose={() => setCatalogosOpen(false)} /> : <div
+        {catalogosOpen && puedeGestionarCatalogos ? <CatalogoCargos onClose={() => setCatalogosOpen(false)} /> : <div
           className="usuarios-grid"
         >
           {/* ── Tabla de usuarios ── */}
@@ -820,15 +831,15 @@ export default function Usuarios() {
             <div className="tabla-wrapper">
               {usuariosLoading && <p role="status">Cargando usuarios…</p>}
               {usuariosError && <div role="alert" className="error-box">{usuariosError} <button className="btn-secondary" onClick={cargar}>Reintentar</button></div>}
-              <table className="tabla">
+              <table className="tabla usuarios-table" aria-label="Usuarios registrados">
                 <thead>
                   <tr>
-                    <th>Nombre</th>
-                    <th>Usuario</th>
-                    <th>Rol</th>
-                    <th>Estado</th>
-                    <th>Historial</th>
-                    <th>Acciones</th>
+                    <th scope="col">Nombre</th>
+                    <th scope="col">Usuario</th>
+                    <th scope="col">Rol</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Historial</th>
+                    <th scope="col">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -842,19 +853,19 @@ export default function Usuarios() {
                         : "Eliminar usuario";
                     return (
                       <tr key={u.id} className={!u.activo ? "usuario-row-inactivo" : ""}>
-                        <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                        <td className="usuario-identity-cell" data-label="Nombre">
+                          <div className="usuario-identity" style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
                             <div className="avatar-token">
                               <User size={14} color="var(--primary)" />
                             </div>
-                            <div>
+                            <div className="usuario-identity-copy">
                               <div style={{ fontWeight: 500, fontSize: "0.88rem" }}>
                                 {u.nombre_completo}
                               </div>
                               <div className="usuario-profesion">
                                 {u.cargo_nombre || 'Sin cargo asignado'}{u.cargo_activo === false ? ' (inactivo)' : ''}
-                                {u.especialidad_nombre && <> · {u.especialidad_nombre}{u.especialidad_activa === false ? ' (inactiva)' : ''}</>}
                               </div>
+                              {!u.email && <div className="usuario-email-pendiente">Correo pendiente</div>}
                               {esSelf && (
                                 <div style={{ fontSize: "0.72rem", color: "var(--primary)" }}>
                                   (tu)
@@ -863,15 +874,15 @@ export default function Usuarios() {
                             </div>
                           </div>
                         </td>
-                        <td style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                        <td className="usuario-username-cell" data-label="Usuario" style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
                           {u.username}
                         </td>
-                        <td>
+                        <td data-label="Rol">
                           <span className={`badge ${rolBadge(u.rol)}`}>
                             {rolLabel(u.rol)}
                           </span>
                         </td>
-                        <td>
+                        <td data-label="Estado">
                           {u.activo
                             ? <span className="badge badge-green" style={{ gap: "0.3rem" }}>
                                 <ShieldCheck size={11} /> Activo
@@ -881,7 +892,7 @@ export default function Usuarios() {
                               </span>
                           }
                         </td>
-                        <td>
+                        <td className="usuario-history-cell" data-label="Historial">
                           {u.puede_eliminarse
                             ? <span className="badge badge-blue" title="No tiene registros clinicos ni auditoria asociada">
                                 <CheckCircle2 size={11} /> Puede eliminarse
@@ -891,9 +902,9 @@ export default function Usuarios() {
                               </span>
                           }
                         </td>
-                        <td>
+                        <td className="usuario-actions-cell" data-label="Acciones">
                           <div className="table-actions">
-                            <button className="btn-secondary btn-compact" onClick={() => setPerfilUsuario(u)} title={`Editar perfil profesional de ${u.nombre_completo}`}><Pencil size={13} /> Perfil</button>
+                            <button className="btn-secondary btn-compact" onClick={() => setPerfilUsuario(u)} title={`Editar perfil de ${u.nombre_completo}`}><Pencil size={13} /> Perfil</button>
                             {/* Activar / Desactivar */}
                             <button
                               className={`btn-secondary btn-compact ${!u.activo ? "btn-reactivar" : ""}`}
@@ -982,9 +993,9 @@ export default function Usuarios() {
               </div>
             )}
 
-            <form onSubmit={handleCrear} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <form onSubmit={handleCrear} noValidate style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               {fieldErrors.summary.length > 0 && (
-                <div className="error-box">
+                <div className="error-box" role="alert">
                   <strong>Revisa estos datos:</strong>{" "}
                   {fieldErrors.summary.map((error) => `${error.label}: ${error.message}`).join(" | ")}
                 </div>
@@ -1023,6 +1034,13 @@ export default function Usuarios() {
                   />
                 </div>
                 {fieldErrors.fieldError("username") && <div className="field-error-text">{fieldErrors.fieldError("username")}</div>}
+              </div>
+
+              <div className="form-group">
+                <label className="input-label" htmlFor="usuario-create-email">Correo electrónico *</label>
+                <input className={fieldErrors.inputClass('email')} name="email" id="usuario-create-email" type="email" inputMode="email" autoComplete="off" maxLength={254} value={form.email} onChange={event => fieldErrors.setFormValue(setForm, 'email', event.target.value)} required aria-invalid={Boolean(fieldErrors.fieldError('email'))} aria-describedby={`usuario-create-email-help${fieldErrors.fieldError('email') ? ' usuario-create-email-error' : ''}`} />
+                <p id="usuario-create-email-help" className="usuario-email-help">Obligatorio para cuentas nuevas. El acceso continúa con nombre de usuario y contraseña.</p>
+                {fieldErrors.fieldError('email') && <div id="usuario-create-email-error" className="field-error-text">{fieldErrors.fieldError('email')}</div>}
               </div>
 
               <div className="form-group">

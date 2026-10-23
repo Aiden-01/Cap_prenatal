@@ -13,9 +13,6 @@ const PERMISOS_CLINICOS = Object.freeze([
 ]);
 const PREFIJOS_CLINICOS = Object.freeze(['notas_evolucion.', 'notas_enfermeria.', 'ordenes_medicas.']);
 const PERMISO_GESTION_CATALOGOS = 'catalogos_profesionales.gestionar';
-const CLASIFICACIONES_PROFESIONALES = Object.freeze([
-  'sin_clasificar', 'medico', 'enfermeria_ae', 'enfermeria_ep', 'no_clinico',
-]);
 
 function esPermisoClinico(codigo) {
   return typeof codigo === 'string' && PREFIJOS_CLINICOS.some(prefijo => codigo.startsWith(prefijo));
@@ -26,7 +23,6 @@ function filtrarPermisosAutomaticos(codigos) {
 }
 
 module.exports = {
-  CLASIFICACIONES_PROFESIONALES,
   PERMISOS_CLINICOS,
   PERMISO_GESTION_CATALOGOS,
   PREFIJOS_CLINICOS,

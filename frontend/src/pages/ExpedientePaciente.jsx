@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { ACCESS, canAccess } from "../utils/accessRules";
@@ -6,6 +6,7 @@ import { useGlobalToast } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
 import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
 import SemaforoCompletitud from "../components/SemaforoCompletitud";
+import NotasClinicas from "./NotasClinicas";
 import TimelineControles from "../components/TimelineControles";
 import PrintDocumentsModal from "../components/PrintDocumentsModal";
 import {
@@ -676,6 +677,8 @@ export default function ExpedientePaciente() {
   const navigate   = useNavigate();
   const location   = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [notesVisited, setNotesVisited] = useState(() => searchParams.get("tab") === "notas");
+  const tabsRef = useRef(null);
   const toast      = useGlobalToast();
   const { usuario } = useAuth();
   const { setPregnancyStatus } = useChatbotScreenContext();
@@ -750,8 +753,18 @@ export default function ExpedientePaciente() {
   }, [id, loadedRequestKey, requestKey, selectedEmbarazoId, toast]);
 
   const tab = searchParams.get("tab") || "general";
+  useEffect(() => {
+    const tabs = tabsRef.current;
+    if (!tabs) return;
+    const reveal = () => tabs.querySelector('[aria-current="page"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    reveal();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(reveal); observer.observe(tabs);
+    return () => observer.disconnect();
+  }, [tab, loading]);
 
   const cambiarTab = (nextTab) => {
+    if (nextTab === "notas") setNotesVisited(true);
     const next = new URLSearchParams(searchParams);
     if (nextTab === "general") next.delete("tab");
     else next.set("tab", nextTab);
@@ -1044,6 +1057,7 @@ export default function ExpedientePaciente() {
   const TABS = [
     { id: "general",    label: "Datos generales",                          icon: FileText     },
     { id: "controles",  label: `Controles (${exp.controles_prenatales?.length ?? 0})`, icon: Activity     },
+    ...(canAccess(usuario, ACCESS.noteFollowup) ? [{ id: "notas", label: "Notas clínicas", icon: PenLine }] : []),
     { id: "laboratorio",label: "Laboratorios",                             icon: FlaskConical },
     { id: "riesgo",     label: "Riesgo obstétrico",                        icon: AlertTriangle },
     { id: "plan",       label: "Plan de parto",                            icon: FileText },
@@ -1149,16 +1163,13 @@ export default function ExpedientePaciente() {
         <SemaforoCompletitud pacienteId={id} initialData={buildCompletitudFromExp(exp, id)} />
       )}
 
-      {canAccess(usuario, ACCESS.noteFollowup) && <button type="button" className="btn-secondary"
-        onClick={() => navigate(`/pacientes/${id}/notas${embarazoSeleccionado?.id ? `?embarazo_id=${embarazoSeleccionado.id}` : ''}`)}>Notas clínicas</button>}
-
       {/* ── TABS ── */}
-      {hasEmbarazo && (
-        <div className="content-tabs" style={{ marginBottom: "1.5rem", marginTop: "1.5rem" }}>
+      {(hasEmbarazo || canAccess(usuario, ACCESS.noteFollowup)) && (
+        <div ref={tabsRef} className="content-tabs" aria-label="Secciones del expediente" style={{ marginBottom: "1.5rem", marginTop: "1.5rem" }}>
           {TABS.map((t) => {
             const Icon = t.icon;
             return (
-              <button key={t.id} onClick={() => cambiarTab(t.id)} className={`content-tab ${tab === t.id ? "is-active" : ""}`}>
+              <button key={t.id} disabled={!hasEmbarazo && !["general", "notas"].includes(t.id)} onClick={() => cambiarTab(t.id)} aria-current={tab === t.id ? "page" : undefined} className={`content-tab ${tab === t.id ? "is-active" : ""}`}>
                 <Icon size={13} />{t.label}
               </button>
             );
@@ -1169,6 +1180,8 @@ export default function ExpedientePaciente() {
       {/* ══════════════════════════════════════════
           TAB: DATOS GENERALES
       ══════════════════════════════════════════ */}
+      {(tab === "notas" || notesVisited) && canAccess(usuario, ACCESS.noteFollowup) && <div hidden={tab !== "notas"}><NotasClinicas key={id} embedded expediente={exp} /></div>}
+
       {hasEmbarazo && tab === "general" && (
         <div className="clinical-card-list">
 

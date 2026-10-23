@@ -24,36 +24,50 @@ GET `/api/profesionales` ofrece un directorio mínimo y paginado para selecciona
 responsables, separado de la API administrativa de usuarios. Exige sesión activa
 y permiso funcional de registrar/transcribir/finalizar/emitir; el rol o permiso
 de solo consulta de documentos es insuficiente. Query: `buscar`, `pagina`,
-`limite` (máximo 50) y `clasificacion_profesional` médico/AE/EP. Respuesta
-`{ data, total, pagina, limite }`, sin username, rol, permisos ni sesiones.
-Solo usuarios/cargos activos clasificados; director oculto para otros roles.
+`limite` (máximo 50) y `cargo_codigo=MED|AE|EP`. Respuesta
+`{data,total,pagina,limite}`, sin username, rol, email, permisos ni sesiones.
+Solo usuarios/cargos activos con códigos clínicos; director oculto para otros roles.
+MED corresponde a notas médicas y AE/EP a enfermería. Los nombres son editables;
+la autorización no compara nombres visibles. Los externos seleccionan un código
+compatible y su identidad se conserva como declarada, no verificada.
 
-POST/PUT de cargos aceptan `clasificacion_profesional` opcional: `sin_clasificar`,
-`medico`, `enfermeria_ae`, `enfermeria_ep`, `no_clinico`. Omitir conserva en
-edición. No aplica a especialidades ni acredita habilitación legal.
+POST/PUT de cargos aceptan nombre, código y descripción; no aceptan clasificación.
+La migración030 retira la columna y sus dependencias sin reasignar códigos.
+Asignar/modificar códigos clínicos exige revisión administrativa y nunca otorga
+permisos. Contrato vigente: [CHECKPOINT-11](CPREN_120_CHECKPOINT_11_SIMPLIFICACION_NOTAS_USUARIOS.md).
 Los diez permisos clínicos no se conceden automáticamente a ningún rol.
 Administración de permisos conserva su restricción a director.
 [Matriz, contratos y política reutilizable](CPREN_117_PERMISOS_AUTORIA_CLINICA.md).
 
 ## Perfiles profesionales de usuarios (CPREN-116)
 
-POST/PUT de usuarios aceptan cargo_id y especialidad_id opcionales. En PUT,
-omitir conserva y NULL retira la asignación. GET `/usuarios/:id` y listado
-incluyen IDs, nombres y estado de ambas referencias mediante joins, sin hash.
+POST de usuarios exige `nombre_completo`, `username`, `email`, `password` y `rol`;
+acepta `cargo_id` opcional. Email se recorta y almacena en minúsculas, con formato
+válido, hasta 254 caracteres y unicidad PostgreSQL sin distinguir mayúsculas.
+PUT permite modificar nombre completo, username y email o completar uno legado; omitirlo conserva el actual.
+Nombre/username requieren admin/director, auditoría anterior/nuevo transaccional y unicidad existente. Cambiar username revoca todas las sesiones de esa cuenta; las referencias por ID se conservan.
+NULL o vacío no permiten retirar un email. Los legados con NULL pueden editar
+otros campos y seguir iniciando sesión por username/contraseña.
+Para `cargo_id`, omitir conserva y NULL retira la asignación. GET `/usuarios/:id`
+y listado incluyen cargo, email y `email_pendiente`, sin hash.
 Solo admin/director; las protecciones de cuentas director y CSRF se conservan.
 Nueva asignación requiere catálogo activo; la histórica inactiva puede mantenerse.
 Catálogos admiten `buscar` por nombre/código antes de paginar.
-[Contrato y decisiones](CPREN_116_PERFILES_PROFESIONALES.md#contratos-api).
+[Contrato vigente y decisiones](CPREN_120_CHECKPOINT_10_PROFESIONALES_USUARIOS.md).
 
 ## Catálogos profesionales (CPREN-115)
 
-`/api/catalogos/cargos` y `/api/catalogos/especialidades`: GET listado e ID,
+`/api/catalogos/cargos`: GET listado e ID,
 POST creación, PUT edición y PATCH `/:id/desactivar` o `/:id/reactivar`.
 Lecturas autenticadas; escrituras para admin/director con
 `catalogos_profesionales.gestionar` y CSRF desde CPREN-117. La 025 preserva esa
 capacidad en cuentas administrativas existentes; nuevas altas reciben el valor inicial.
 Listado paginado `{ data, total }`, filtro `estado=activos|inactivos|todos`.
-Contrato, ejemplos y errores: [Catálogos profesionales](CPREN_115_CATALOGOS_PROFESIONALES.md#api).
+Solo existe el catálogo de cargos. Directorio y snapshots nuevos no incluyen
+especialidad ni email. La ruta anterior de especialidades deja de existir.
+Email duplicado devuelve 409 `EMAIL_DUPLICADO`; ausente/inválido, 400 con detalle
+del campo. Los campos retirados son rechazados por los contratos estrictos.
+Contrato vigente: [CHECKPOINT-10](CPREN_120_CHECKPOINT_10_PROFESIONALES_USUARIOS.md).
 
 Base local:
 

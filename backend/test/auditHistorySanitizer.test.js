@@ -457,3 +457,12 @@ test('dry-run abre una transacción read-only, no actualiza y hace rollback', as
   assert.equal(result.statistics.filas_que_serian_modificadas, 1);
   assert.equal(result.statistics.aserciones, 'ok');
 });
+
+test('CHECKPOINT-11: saneamiento conserva identidad administrativa explícita sin ampliar contexto clínico',()=>{
+ const event=row({modulo:'usuarios',entidad_afectada:'usuario',tabla:'usuarios',descripcion:'identidad_usuario_actualizada',datos_anteriores:null,ip:null,user_agent:null,paciente_id:null,embarazo_id:null,
+ datos_nuevos:{politica_version:1,cambios:{username:{anterior:'before_fixture',nuevo:'after_fixture'},nombre_completo:{anterior:'Nombre sintético anterior',nuevo:'Nombre sintético nuevo'}}}});
+ assert.equal(isStrictlySafeEvent(event),true);
+ assert.equal(classifyAuditEvent(event).classification,CLASSIFICATIONS.SAFE);
+ const clinical={...event,modulo:'pacientes',tabla:'pacientes',entidad_afectada:'paciente'};
+ assert.equal(isStrictlySafeEvent(clinical),false);
+});

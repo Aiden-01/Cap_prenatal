@@ -60,13 +60,16 @@ test('CPREN-115: migración, HTTP, integridad, auditoría y concurrencia en clú
     });
 
     // La regresión 023 anterior se comprueba antes; la API actual requiere 024/025.
-    for (const posterior of ['024_usuarios_perfiles_profesionales.sql', '025_permisos_autoria_clinica.sql']) {
+    for (const posterior of ['024_usuarios_perfiles_profesionales.sql', '025_permisos_autoria_clinica.sql',
+      '026_notas_clinicas.sql', '027_seguimiento_notas_controles.sql',
+      '028_retirar_especialidades.sql', '029_usuarios_email.sql', '030_cargos_autoria_estable.sql']) {
       await applyMigration({ db, filename: posterior,
         sql: fs.readFileSync(path.join(__dirname, '../src/db/migrations', posterior), 'utf8') });
     }
 
+    assert.equal((await db.query("SELECT to_regclass('public.especialidades_personal') tabla")).rows[0].tabla, null);
     // API real con servicios/repositorios/auditoría reales; identidad sintética.
-    const services = Object.fromEntries(['cargos', 'especialidades'].map(tipo => [tipo,
+    const services = Object.fromEntries(['cargos'].map(tipo => [tipo,
       createCatalogosService(tipo, { repository: createCatalogosRepository(tipo, db) })]));
     const app = express();
     app.use(express.json());
@@ -86,7 +89,12 @@ test('CPREN-115: migración, HTTP, integridad, auditoría y concurrencia en clú
       method, headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body),
     });
 
-    for (const tipo of ['cargos', 'especialidades']) {
+    await t.test('Especialidades retirada: todos sus endpoints devuelven 404', async () => {
+      for (const method of ['GET', 'POST', 'PUT', 'PATCH']) {
+        assert.equal((await send('especialidades', method, method === 'GET' ? undefined : {})).status, 404);
+      }
+    });
+    for (const tipo of ['cargos']) {
       const tabla = `${tipo}_personal`;
       await t.test(`${tipo}: CRUD lógico HTTP, filtros, fechas, privacidad e integridad SQL`, async () => {
         const created = await send(tipo, 'POST', { nombre: '  Título  Sintético  ', codigo: ' ÁB  01 ', descripcion: 'Narrativa privada' });

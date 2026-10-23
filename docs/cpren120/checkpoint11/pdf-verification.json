@@ -1,0 +1,26 @@
+[
+  {
+    "kind": "nota_evolucion",
+    "pages": 10,
+    "size_points": [
+      612,
+      792
+    ],
+    "narrative_complete": true,
+    "accents_verified": true,
+    "signature_area": true,
+    "within_body_bounds": true
+  },
+  {
+    "kind": "nota_enfermeria",
+    "pages": 10,
+    "size_points": [
+      612,
+      792
+    ],
+    "narrative_complete": true,
+    "accents_verified": true,
+    "signature_area": true,
+    "within_body_bounds": true
+  }
+]

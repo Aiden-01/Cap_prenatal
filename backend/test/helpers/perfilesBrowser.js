@@ -12,6 +12,8 @@ async function verificarPerfilesBrowser({ apiPort, token, t }) {
   const { createServer } = await import(pathToFileURL(require.resolve('vite', { paths: [frontendRoot] })).href);
   const { default: react } = await import(pathToFileURL(require.resolve('@vitejs/plugin-react', { paths: [frontendRoot] })).href);
   const artifacts = fs.mkdtempSync(path.join(os.tmpdir(), 'cpren116-ui-'));
+  const evidence = path.resolve(__dirname, '../../../docs/cpren120/checkpoint11');
+  fs.mkdirSync(evidence, { recursive: true });
   const emptyEnv = path.join(artifacts, 'empty-env'); fs.mkdirSync(emptyEnv);
   let vite, browser;
   const previousCwd = process.cwd();
@@ -41,61 +43,70 @@ async function verificarPerfilesBrowser({ apiPort, token, t }) {
       activo: true, permisos: ['catalogos_profesionales.gestionar'], lastActivityAt: new Date().toISOString(),
     })));
     await page.setViewport({ width: 1440, height: 1000 });
+    const captureSet = async name => {
+      for (const width of [1440, 390]) {
+        await page.setViewport({ width, height: width === 1440 ? 1000 : 844 });
+        for (const [theme, label] of [['light', 'claro'], ['dark', 'oscuro']]) {
+          await page.evaluate(value => document.documentElement.classList.toggle('dark', value === 'dark'), theme);
+          await page.evaluate(async () => {
+            await Promise.all(document.getAnimations().filter(animation => Number.isFinite(animation.effect?.getComputedTiming().iterations)).map(animation => animation.finished.catch(() => {})));
+          });
+          await page.screenshot({ path: path.join(evidence, `${name}-${width}-${label}.png`), fullPage: true });
+          assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${name} ${width} ${theme}: sin desbordamiento de página`);
+        }
+      }
+      await page.setViewport({ width: 1440, height: 1000 });
+      await page.evaluate(() => document.documentElement.classList.remove('dark'));
+    };
     await page.goto(`${base}/usuarios`, { waitUntil: 'networkidle0' });
     await page.waitForSelector('.usuarios-grid');
+    await page.waitForSelector('.tabla tbody tr');
+    await captureSet('usuarios');
     await page.click('.user-create-minimal');
     await page.waitForFunction(() => [...document.querySelectorAll('.perfil-fields select option')].some(option => option.value === '4'));
     await page.type('input[name="nombre_completo"]', 'Perfil navegador');
     await page.type('input[name="username"]', 'browser_fixture');
+    await page.type('input[name="email"]', '  BROWSER@EXAMPLE.TEST  ');
     await page.type('input[name="password"]', 'test-only-browser');
     await page.select('.perfil-fields select', '4');
+    await captureSet('nuevo-usuario');
     const created = page.waitForResponse(response => response.url().endsWith('/api/usuarios') && response.request().method() === 'POST');
     await page.click('form button[type="submit"]');
     assert.equal((await created).status(), 201);
     await page.waitForSelector('.status-banner.success');
     await page.click('.user-create-drawer button[aria-label="Cerrar"]');
-    await page.waitForSelector('[title="Editar perfil profesional de Perfil navegador"]');
-    await page.screenshot({ path: path.join(artifacts, 'usuarios-desktop.png'), fullPage: true });
-    await page.locator('button::-p-text(Catálogos profesionales)').click();
+    await page.waitForSelector('[title="Editar perfil de Perfil navegador"]');
+    await page.locator('button::-p-text(Catálogo de cargos)').click();
     await page.waitForSelector('.catalogos-list li');
-    for (const [tipo, nombre] of [['cargos', 'Cargo navegador'], ['especialidades', 'Especialidad navegador']]) {
-      await page.select('.catalogos-controls label:first-child select', tipo);
-      await page.waitForSelector('.catalogos-panel [role="status"]', { hidden: true });
-      await page.click('.catalogos-controls .btn-primary');
-      await page.type('#catalogo-nombre', nombre);
-      const saved = page.waitForResponse(response => response.url().endsWith(`/api/catalogos/${tipo}`) && response.request().method() === 'POST');
-      await page.click('.perfil-modal .btn-primary'); assert.equal((await saved).status(), 201);
-      await page.waitForSelector('.perfil-modal', { hidden: true });
-      await page.waitForFunction(text => [...document.querySelectorAll('.catalogos-list strong')].some(el => el.textContent === text), {}, nombre);
-    }
-    await page.screenshot({ path: path.join(artifacts, 'catalogos-desktop.png'), fullPage: true });
-    // Cambiar isMobile en Puppeteer recarga la página y pierde el panel abierto.
-    // El breakpoint real se verifica redimensionando la misma sesión.
-    await page.setViewport({ width: 390, height: 844 });
-    await page.waitForSelector('.catalogos-panel');
-    await page.waitForFunction(() => Math.abs(parseFloat(getComputedStyle(document.querySelector('.app-main')).marginLeft)) < 1);
-    await page.screenshot({ path: path.join(artifacts, 'catalogos-mobile.png'), fullPage: true });
-    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'catálogos sin overflow de página en móvil');
+    assert.equal(await page.$('select[aria-label="Catálogo"]'), null);
+    await page.click('.catalogos-controls .btn-primary');
+    await page.type('#catalogo-nombre', 'Cargo navegador');
+    assert.equal(await page.$('#catalogo-clasificacion'), null);
+    await page.type('#catalogo-codigo', 'CP11-TEST');
+    await captureSet('editar-cargo');
+    const saved = page.waitForResponse(response => response.url().endsWith('/api/catalogos/cargos') && response.request().method() === 'POST');
+    await page.click('.perfil-modal .btn-primary'); assert.equal((await saved).status(), 201);
+    await page.waitForSelector('.perfil-modal', { hidden: true });
+    await page.waitForFunction(() => [...document.querySelectorAll('.catalogos-list strong')].some(el => el.textContent === 'Cargo navegador'));
+    await captureSet('catalogo-cargos');
     await page.locator('button::-p-text(Volver a usuarios)').click();
-    await page.click('[title="Editar perfil profesional de Perfil navegador"]');
+    await page.click('[title="Editar perfil de Perfil navegador"]');
     await page.waitForFunction(() => [...document.querySelectorAll('.perfil-fields select option')].some(el => el.textContent === 'Cargo navegador'));
-    const ids = await page.evaluate(() => ({
-      cargo: [...document.querySelectorAll('.perfil-fields select:first-of-type option')].find(el => el.textContent === 'Cargo navegador')?.value,
-      especialidad: [...document.querySelectorAll('.perfil-fields option')].find(el => el.textContent === 'Especialidad navegador')?.value,
-    }));
-    const selects = await page.$$('.perfil-fields select');
-    await selects[0].select(ids.cargo); await selects[1].select(ids.especialidad);
-    await page.screenshot({ path: path.join(artifacts, 'perfil-mobile.png'), fullPage: false });
+    const cargo = await page.evaluate(() => [...document.querySelectorAll('.perfil-fields option')].find(el => el.textContent === 'Cargo navegador')?.value);
+    await page.select('.perfil-fields select', cargo);
+    assert.equal(await page.$eval('.perfil-modal input[type="email"]', element => element.value), 'browser@example.test');
+    await page.$eval('.perfil-modal input[type="email"]', element => { element.focus(); element.select(); });
+    await page.type('.perfil-modal input[type="email"]', 'UPDATED@EXAMPLE.TEST');
+    await captureSet('perfil-usuario');
     const updated = page.waitForResponse(response => /\/api\/usuarios\/\d+$/.test(response.url()) && response.request().method() === 'PUT');
     await page.locator('button::-p-text(Guardar perfil)').click();
     assert.equal((await updated).status(), 200);
     await page.waitForSelector('.perfil-modal', { hidden: true });
     await page.waitForFunction(() => document.querySelector('.usuarios-grid')?.textContent.includes('Cargo navegador'));
     await page.evaluate(() => { document.querySelector('.tabla-wrapper').scrollLeft = 0; });
-    await page.screenshot({ path: path.join(artifacts, 'usuarios-mobile.png'), fullPage: true });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'usuarios sin overflow de página en móvil');
     assert.deepEqual(errors, []);
-    t.diagnostic(`Navegador real: creación de usuario, cargo, especialidad y edición de perfil; 1440×1000 y 390×844; capturas: ${artifacts}`);
+    t.diagnostic(`CHECKPOINT-10: navegador real crea usuario con email, clasifica cargo explícitamente y edita perfil/email; 1440×1000 y 390×844, claro/oscuro; capturas sintéticas: ${evidence}`);
   } finally { if (browser) await browser.close(); if (vite) await vite.close(); process.chdir(previousCwd); }
 }
 module.exports = { verificarPerfilesBrowser };

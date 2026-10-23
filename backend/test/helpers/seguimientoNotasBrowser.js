@@ -56,9 +56,9 @@ async function verificarSeguimientoBrowser({ apiPort, token, t }) {
       const forms = await page.$$('.seguimiento-notas-form');
       const medical = forms[0];
       await (await medical.$('select')).select('externo');
-      await page.waitForFunction(() => document.querySelectorAll('.seguimiento-notas-form input').length >= 3);
+      await page.waitForFunction(() => document.querySelectorAll('.seguimiento-notas-form input').length >= 1);
       const fields = await medical.$$('input');
-      await fields[0].type('Médico navegador sintético'); await fields[1].type('Médico declarado');
+      await fields[0].type('Médico navegador sintético');
       const confirmed = page.waitForResponse(result => result.url().includes(`/controles/${control.id}/seguimiento-notas`) && result.request().method() === 'POST');
       await (await medical.$('button[type="submit"]')).click();
       assert.equal((await confirmed).status(), 200);
@@ -80,10 +80,12 @@ async function verificarSeguimientoBrowser({ apiPort, token, t }) {
       if (!button || button.disabled) throw new Error(`Unavailable button: ${text}`);
       button.click();
     }, text);
-    for (const [width, tipo, clase] of [[1440, 'nota_evolucion', 'medico'], [390, 'nota_enfermeria', 'enfermeria_ae'], [320, 'nota_enfermeria', 'enfermeria_ep']]) {
+    for (const [width, tipo, clase] of [[1440, 'nota_evolucion', 'MED'], [390, 'nota_enfermeria', 'AE'], [320, 'nota_enfermeria', 'EP']]) {
       await page.setViewport({ width, height: 1000 });
       await page.goto(`${base}/pacientes/1/notas?embarazo_id=11${tipo === 'nota_evolucion' ? `&control_id=${createdControls[0]}&tipo=${tipo}` : ''}`, { waitUntil: 'networkidle0' });
-      if (tipo !== 'nota_evolucion') await clickText('Nueva nota de evolución de enfermería');
+      if (tipo !== 'nota_evolucion') {
+        await clickText('Nueva nota'); await page.select('.nota-create select', tipo); await clickText('Abrir editor');
+      }
       await page.waitForSelector('.nota-clinica select');
       await page.select('.nota-clinica select', 'externo');
       const fields = await page.$$('.nota-clinica input');
@@ -95,7 +97,7 @@ async function verificarSeguimientoBrowser({ apiPort, token, t }) {
           input.dispatchEvent(new Event('input', { bubbles: true }));
         }
       });
-      await fields[2].type(`Responsable sintético ${clase}`); await fields[3].type('Cargo sintético');
+      await fields[2].type(`Responsable sintético ${clase}`);
       if (tipo === 'nota_enfermeria') {
         const selects = await page.$$('.nota-clinica select'); await selects[1].select(clase);
       }
@@ -113,7 +115,7 @@ async function verificarSeguimientoBrowser({ apiPort, token, t }) {
       assert.equal(await page.$eval('.nota-clinica input[type="date"]', el => el.value), '2026-10-20');
       const finalized = page.waitForResponse(r => r.url().endsWith(`/notas-clinicas/${metadata.id}/finalizar`) && r.request().method() === 'POST');
       await clickText('Finalizar captura'); assert.equal((await finalized).status(), 200);
-      await page.waitForFunction(() => document.querySelector('.nota-clinica')?.textContent.includes('Captura finalizada ·'));
+      await page.waitForFunction(() => Boolean(document.querySelector('.nota-clinica .nota-status.is-final')));
       assert.ok(await page.$eval('.nota-clinica textarea', el => el.matches(':disabled')));
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${width}: editor sin overflow`);
       await page.screenshot({ path: path.join(artifacts, `editor-finalizado-${clase}-${width}.png`), fullPage: true });

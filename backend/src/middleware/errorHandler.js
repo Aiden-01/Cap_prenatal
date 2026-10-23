@@ -67,6 +67,11 @@ function uniqueMessage(err) {
 
 function fromPostgresError(err) {
   if (err.code === '23505') {
+    if (err.constraint === 'ux_usuarios_email') {
+      return new AppError(409, 'El correo electrónico ya está registrado', {
+        code: 'EMAIL_DUPLICADO', details: [{ campo: 'email', mensaje: 'El correo electrónico ya está registrado' }],
+      });
+    }
     if (err.constraint === 'ux_vacunas_tdap_embarazo') {
       return new AppError(409, uniqueMessage(err), {
         code: 'TDAP_ALREADY_EXISTS',

@@ -100,19 +100,25 @@ test('CPREN-117: permisos, autoría y directorio en PostgreSQL temporal propio',
       await assert.rejects(db.query("UPDATE cargos_personal SET clasificacion_profesional='medico_inventado' WHERE id=(SELECT min(id) FROM cargos_personal)"), { code: '23514' });
     });
 
-    // El listado administrativo actual incluye referencias históricas de notas.
-    const notasFilename = '026_notas_clinicas.sql';
-    await applyMigration({ db, filename: notasFilename,
-      sql: fs.readFileSync(path.join(__dirname, '../src/db/migrations', notasFilename), 'utf8') });
+    // La evidencia histórica de 025 anterior permanece; las APIs se prueban
+    // contra el contrato vigente de cargos y correo, con el historial intacto.
+    for (const filename of ['026_notas_clinicas.sql', '027_seguimiento_notas_controles.sql',
+      '028_retirar_especialidades.sql', '029_usuarios_email.sql', '030_cargos_autoria_estable.sql']) {
+      await applyMigration({ db, filename,
+        sql: fs.readFileSync(path.join(__dirname, '../src/db/migrations', filename), 'utf8') });
+    }
+    assert.equal((await db.query("SELECT to_regclass('especialidades_personal') AS tabla")).rows[0].tabla, null);
+    assert.equal((await db.query(`SELECT count(*)::int AS total FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='usuarios' AND column_name='especialidad_id'`)).rows[0].total, 0);
+    await db.query("UPDATE cargos_personal SET codigo=NULL WHERE upper(btrim(codigo)) IN ('MED','AE','EP')");
     const cargos = {};
     for (const [key, nombre, clasificacion] of [
-      ['medico', 'Atención médica sintética', 'medico'], ['ae', 'AE sintético', 'enfermeria_ae'],
-      ['ep', 'EP sintético', 'enfermeria_ep'], ['captura', 'Captura sintética', 'no_clinico'],
+      ['medico', 'Atención médica sintética', 'MED'], ['ae', 'AE sintético', 'AE'],
+      ['ep', 'EP sintético', 'EP'], ['captura', 'Captura sintética', 'no_clinico'],
     ]) {
-      cargos[key] = (await db.query(`INSERT INTO cargos_personal(nombre,clasificacion_profesional)
+      cargos[key] = (await db.query(`INSERT INTO cargos_personal(nombre,codigo)
         VALUES($1,$2) RETURNING id`, [nombre, clasificacion])).rows[0].id;
     }
-    const especialidad = (await db.query("INSERT INTO especialidades_personal(nombre) VALUES('Especialidad sintética') RETURNING id")).rows[0].id;
     await db.query('UPDATE usuarios SET cargo_id=$1 WHERE id IN (1,2,3)', [cargos.captura]);
     for (const [id, nombre, rolId, cargo, activo = true] of [
       [4, 'Médico sintético A', 3, cargos.medico], [5, 'AE sintética', 3, cargos.ae],
@@ -120,9 +126,9 @@ test('CPREN-117: permisos, autoría y directorio en PostgreSQL temporal propio',
       [8, 'Director médico reservado', 1, cargos.medico], [9, 'Cambio rol sintético', 3, cargos.captura],
       [10, 'Médico sesión revocada', 3, cargos.medico], [11, 'Médico sintético B', 3, cargos.medico],
     ]) {
-      await db.query(`INSERT INTO usuarios(id,nombre_completo,username,password_hash,rol_id,cargo_id,especialidad_id,activo)
-        VALUES($1,$2,$3,'synthetic-no-login',$4,$5,$6,$7)`,
-      [id, nombre, `autoria_fixture_${id}`, rolId, cargo, especialidad, activo]);
+      await db.query(`INSERT INTO usuarios(id,nombre_completo,username,password_hash,rol_id,cargo_id,activo)
+        VALUES($1,$2,$3,'synthetic-no-login',$4,$5,$6)`,
+      [id, nombre, `autoria_fixture_${id}`, rolId, cargo, activo]);
     }
     await db.query("SELECT setval(pg_get_serial_sequence('usuarios','id'), (SELECT max(id) FROM usuarios))");
     const permisosRepo = require('../src/repositories/permisosRepository');
@@ -161,7 +167,7 @@ test('CPREN-117: permisos, autoría y directorio en PostgreSQL temporal propio',
     await t.test('altas de director y personal no reciben permisos clínicos; preservar administración de catálogos', async () => {
       for (const [username, rol] of [['alta_director_sintetica', 'director'], ['alta_personal_sintetica', 'personal_salud']]) {
         const response = await send('usuarios', 'POST', { nombre_completo: 'Alta sintética', username,
-          password: 'synthetic-test-only-password', rol, cargo_id: cargos.captura });
+          email: `${username}@example.test`, password: 'synthetic-test-only-password', rol, cargo_id: cargos.captura });
         assert.equal(response.status, 201);
         const row = await response.json();
         const granted = await codigos(row.id);
@@ -169,28 +175,18 @@ test('CPREN-117: permisos, autoría y directorio en PostgreSQL temporal propio',
         if (rol === 'director') assert.ok(granted.includes('catalogos_profesionales.gestionar'));
       }
     });
-    await t.test('clasificación del cargo audita enum anterior/nuevo y revierte si falla auditoría obligatoria', async () => {
-      const response = await send('catalogos/cargos', 'POST', { nombre: 'Clasificación privada sintética' });
-      assert.equal(response.status, 201);
-      const cargo = await response.json();
-      assert.equal(cargo.clasificacion_profesional, 'sin_clasificar');
-      const changed = await send(`catalogos/cargos/${cargo.id}`, 'PUT', {
-        nombre: 'Clasificación privada sintética', clasificacion_profesional: 'medico',
-      });
-      assert.equal(changed.status, 200);
-      assert.equal((await changed.json()).clasificacion_profesional, 'medico');
-      const events = (await db.query(`SELECT * FROM auditoria_eventos
-        WHERE tabla='cargos_personal' AND registro_id=$1 AND descripcion='actualizar'`, [String(cargo.id)])).rows;
-      assert.equal(events.length, 1);
-      assert.equal(events[0].datos_anteriores, null);
-      assert.deepEqual(events[0].datos_nuevos.cambios.clasificacion_profesional,
-        { anterior: 'sin_clasificar', nuevo: 'medico' });
-      assert.equal(JSON.stringify(events).includes('Clasificación privada sintética'), false);
-      const { createCatalogosService } = require('../src/services/catalogosService');
-      const failing = createCatalogosService('cargos', { audit: async () => { throw new Error('synthetic classification audit unavailable'); } });
-      await assert.rejects(failing.actualizar(cargo.id, { nombre: cargo.nombre, codigo: null,
-        descripcion: null, clasificacion_profesional: 'enfermeria_ep' }, await reqFor(1)), /synthetic classification audit unavailable/);
-      assert.equal((await db.query('SELECT clasificacion_profesional FROM cargos_personal WHERE id=$1', [cargo.id])).rows[0].clasificacion_profesional, 'medico');
+    await t.test('cargos sin clasificación: código administrativo, nombre editable y rollback de auditoría',async()=>{
+      const response=await send('catalogos/cargos','POST',{nombre:'Cargo de prueba sin código'});assert.equal(response.status,201);
+      const cargo=await response.json();assert.equal(Object.hasOwn(cargo,'clasificacion_profesional'),false);
+      const changed=await send('catalogos/cargos/'+cargo.id,'PUT',{nombre:'Nombre visible modificado',codigo:'CP11-ADMIN'});
+      assert.equal(changed.status,200);assert.equal((await changed.json()).codigo,'CP11-ADMIN');
+      const {createCatalogosService}=require('../src/services/catalogosService');
+      const failing=createCatalogosService('cargos',{audit:async()=>{throw Error('synthetic cargo audit failure');}});
+      await assert.rejects(failing.actualizar(cargo.id,{nombre:'No guardar',codigo:'CP11-OTHER',descripcion:null},await reqFor(1)),/synthetic cargo audit failure/);
+      assert.equal((await db.query('SELECT codigo FROM cargos_personal WHERE id=$1',[cargo.id])).rows[0].codigo,'CP11-ADMIN');
+      const before=(await send('profesionales?cargo_codigo=MED','GET',undefined,1));
+      assert.equal(before.status,403);
+      await db.query(`UPDATE cargos_personal SET nombre='Nombre sin título clínico' WHERE id=$1`,[cargos.medico]);
     });
     await t.test('directorio exige sesión y permiso funcional, admite búsqueda y limita campos/paginación', async () => {
       assert.equal((await send('profesionales', 'GET', undefined, null)).status, 401);
@@ -209,15 +205,15 @@ test('CPREN-117: permisos, autoría y directorio en PostgreSQL temporal propio',
       assert.equal(all.data.some(row => [1, 2, 3, 7, 8].includes(row.id)), false);
       for (const row of all.data) {
         assert.ok(row.nombre_completo); assert.ok(row.cargo_nombre);
-        assert.equal(Object.keys(row).some(key => /username|password|hash|sesion|session|permiso|rol|created_by|updated_by/.test(key)), false);
+        assert.equal(Object.keys(row).some(key => /email|username|password|hash|sesion|session|permiso|rol|created_by|updated_by/.test(key)), false);
       }
       const text = JSON.stringify(all);
       for (const forbidden of ['synthetic-no-login', 'autoria_fixture_', 'refresh_token', 'Director médico reservado']) assert.equal(text.includes(forbidden), false);
       const byName = await (await send('profesionales?buscar=M%C3%A9dico%20sint%C3%A9tico', 'GET', undefined, 3)).json();
       assert.deepEqual(byName.data.map(row => row.id).sort((a, b) => a - b), [4, 11]);
-      const bySpecialty = await (await send('profesionales?buscar=Especialidad', 'GET', undefined, 3)).json();
-      assert.ok(bySpecialty.total >= 5);
-      const nurses = await (await send('profesionales?clasificacion_profesional=enfermeria_ae', 'GET', undefined, 3)).json();
+      const byCargo = await (await send(`profesionales?buscar=${encodeURIComponent('Nombre sin título clínico')}`, 'GET', undefined, 3)).json();
+      assert.deepEqual(byCargo.data.map(row => row.id).sort((a, b) => a - b), [4, 10, 11]);
+      const nurses = await (await send('profesionales?cargo_codigo=AE', 'GET', undefined, 3)).json();
       assert.deepEqual(nurses.data.map(row => row.id), [5]);
       assert.equal((await send('profesionales?limite=1000', 'GET', undefined, 3)).status, 400);
       await grant(2, ['notas_evolucion.registrar']);
@@ -233,7 +229,7 @@ test('CPREN-117: permisos, autoría y directorio en PostgreSQL temporal propio',
       const result = await prepararAutoriaClinica({ req: await reqFor(3), tipoDocumento: 'orden_medica',
         accion: 'transcribir', responsable: { tipo: 'usuario', usuario_id: 4 } });
       assert.equal(result.responsable.usuario_id, 4); assert.equal(result.capturista_usuario_id, 3);
-      assert.equal(result.responsable.clasificacion_profesional, 'medico');
+      assert.equal(result.responsable.cargo_codigo, 'MED');
       assert.equal(result.firma, 'manuscrita'); assert.equal(result.validacion_clinica, false);
       assert.equal(Object.hasOwn(result, 'emisor_usuario_id'), false);
       assert.equal(Object.hasOwn(result, 'finalizador_usuario_id'), false);
@@ -244,13 +240,13 @@ test('CPREN-117: permisos, autoría y directorio en PostgreSQL temporal propio',
         accion: 'transcribir', responsable: { tipo: 'autenticado' } }), error => error.statusCode === 403 || error.statusCode === 400);
     });
     await t.test('responsable externo conserva instantánea sin cuenta ni atribución de emisión', async () => {
-      const external = { tipo: 'externo', nombre_completo: 'Profesional externo sintético', cargo: 'Médico externo sintético',
-        especialidad: 'Formación declarada', clasificacion_profesional: 'medico' };
+      const external = { tipo: 'externo', nombre_completo: 'Profesional externo sintético', cargo_codigo: 'MED' };
       const count = (await db.query('SELECT count(*)::int AS n FROM usuarios')).rows[0].n;
       const result = await prepararAutoriaClinica({ req: await reqFor(3), tipoDocumento: 'orden_medica', accion: 'transcribir', responsable: external });
       assert.equal(result.responsable.tipo, 'externo'); assert.equal(result.responsable.usuario_id, null);
       assert.equal(result.responsable.nombre_completo, external.nombre_completo);
-      assert.equal(result.responsable.especialidad_nombre, external.especialidad);
+      assert.deepEqual(Object.keys(result.responsable).sort(), ['tipo', 'usuario_id', 'nombre_completo',
+        'cargo_id', 'cargo_nombre', 'cargo_codigo'].sort());
       assert.equal((await db.query('SELECT count(*)::int AS n FROM usuarios')).rows[0].n, count);
       await assert.rejects(prepararAutoriaClinica({ req: await reqFor(4), tipoDocumento: 'orden_medica', accion: 'emitir', responsable: external }), error => error.statusCode === 403);
     });
@@ -354,9 +350,9 @@ test('CPREN-117: permisos, autoría y directorio en PostgreSQL temporal propio',
       await assert.rejects(prepararAutoriaClinica({ req: await reqFor(4), tipoDocumento: 'orden_medica',
         accion: 'emitir', responsable: { tipo: 'autenticado' } }), error => error.statusCode === 404);
       const remaining = await (await send('profesionales', 'GET', undefined, 3)).json();
-      assert.equal(remaining.data.some(row => row.clasificacion_profesional === 'medico'), false);
+      assert.equal(remaining.data.some(row => row.cargo_codigo === 'MED'), false);
     });
-    await t.test('bootstrap oficial vacío y segunda ejecución verifican compatibilidad de 025', async () => {
+    await t.test('bootstrap oficial vacío y segunda ejecución verifican compatibilidad vigente', async () => {
       await db.query('CREATE DATABASE autoria_bootstrap');
       for (let i = 0; i < 2; i++) {
         const result = await migrate({ db: new Pool({ ...config, database: 'autoria_bootstrap' }),

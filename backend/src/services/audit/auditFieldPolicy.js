@@ -7,6 +7,7 @@ const AUDIT_FIELD_CATEGORIES = Object.freeze({
 
 const AUDIT_VALUE_TYPES = Object.freeze({
   BOOLEAN: 'BOOLEAN',
+  ACCOUNT_IDENTITY: 'ACCOUNT_IDENTITY',
   CONTROLLED_CODE: 'CONTROLLED_CODE',
   ENUM: 'ENUM',
   ISO_DATE: 'ISO_DATE',
@@ -159,6 +160,14 @@ const DEFAULT_FREE_TEXT_PATTERNS = Object.freeze([
 ]);
 
 const BASE_CONTEXTUAL_RULES = Object.freeze([
+  Object.freeze({ categories: ['usuarios'], entities: ['usuario'],
+    events: ['identidad_usuario_actualizada'], fields: ['nombre_completo', 'username'],
+    valueType: AUDIT_VALUE_TYPES.ACCOUNT_IDENTITY }),
+  Object.freeze({
+    categories: ['usuarios'], entities: ['usuario'],
+    events: ['usuario_creado', 'email_actualizado'],
+    fields: ['contacto_modificado', 'contacto_pendiente'], valueType: AUDIT_VALUE_TYPES.BOOLEAN,
+  }),
   Object.freeze({ categories: ['clinica'], entities: ['control_prenatal'],
     events: ['seguimiento_nota_confirmado'], fields: ['resultado'], valueType: AUDIT_VALUE_TYPES.CONTROLLED_CODE }),
   Object.freeze({ categories: ['clinica'], entities: ['control_prenatal'],
@@ -193,31 +202,24 @@ const BASE_CONTEXTUAL_RULES = Object.freeze([
     categories: ['clinica'], entities: ['nota_clinica'],
     events: ['actualizar'], fields: ['responsable_cambiado'], valueType: AUDIT_VALUE_TYPES.BOOLEAN,
   }),
-  Object.freeze({
-    categories: ['catalogos'],
-    entities: ['cargo_personal'],
-    events: ['crear', 'actualizar'],
-    fields: ['clasificacion_profesional'],
-    valueType: AUDIT_VALUE_TYPES.ENUM,
-    allowedValues: ['sin_clasificar', 'medico', 'enfermeria_ae', 'enfermeria_ep', 'no_clinico'],
-  }),
+
   Object.freeze({
     categories: ['usuarios'],
     entities: ['usuario'],
     events: ['usuario_creado', 'perfil_profesional_actualizado'],
-    fields: ['cargo_id', 'especialidad_id'],
+    fields: ['cargo_id'],
     valueType: AUDIT_VALUE_TYPES.NON_NEGATIVE_INTEGER,
   }),
   Object.freeze({
     categories: ['catalogos'],
-    entities: ['cargo_personal', 'especialidad_personal'],
+    entities: ['cargo_personal'],
     events: ['cambiar_estado'],
     fields: ['activo'],
     valueType: AUDIT_VALUE_TYPES.BOOLEAN,
   }),
   Object.freeze({
     categories: ['catalogos'],
-    entities: ['cargo_personal', 'especialidad_personal'],
+    entities: ['cargo_personal'],
     events: ['crear', 'actualizar', 'cambiar_estado'],
     fields: ['resultado'],
     valueType: AUDIT_VALUE_TYPES.CONTROLLED_CODE,
@@ -746,6 +748,9 @@ function normalizeAllowedAuditValue(rule, value) {
   }
 
   switch (rule.valueType) {
+    case AUDIT_VALUE_TYPES.ACCOUNT_IDENTITY:
+      return typeof value === 'string' && value.trim().length > 0 && value.length <= 150 && !/[\p{Cc}\p{Cf}]/u.test(value)
+        ? { valid: true, value } : { valid: false, value: null };
     case AUDIT_VALUE_TYPES.BOOLEAN:
       return typeof value === 'boolean'
         ? { valid: true, value }

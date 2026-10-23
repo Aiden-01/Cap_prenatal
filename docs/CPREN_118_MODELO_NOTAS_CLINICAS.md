@@ -1,5 +1,7 @@
 # CPREN-118 — Modelo de datos y API de notas de evolución
 
+> Documento histórico de la fase original. CHECKPOINT-10 sustituye sus contratos de perfiles/directorio: la arquitectura vigente usa cargo y clasificación, sin Especialidades; las altas requieren email. Véase [arquitectura y contratos actuales](CPREN_120_CHECKPOINT_10_PROFESIONALES_USUARIOS.md). Se conserva el contenido original como evidencia histórica.
+
 ## Alcance y dependencias
 
 Sesión 22/10/2026 en Trabajo / Aiden29, PC del CAP El Chal. Rama local:

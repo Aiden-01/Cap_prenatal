@@ -353,7 +353,7 @@ test('actualizacion sin rol conserva permisos y auditoria normal de usuario', as
   assert.equal(escenario.usuario().nombre_completo, 'Nombre sin cambio de rol');
   assert.equal(escenario.usuario().rol, 'admin');
   assert.deepEqual(escenario.permisos(), personalizados);
-  assert.equal(escenario.llamadas.includes('LOCK'), false);
+  assert.equal(escenario.llamadas.includes('LOCK'), true);
   assert.equal(escenario.llamadas.includes('REPLACE_PERMISSIONS'), false);
   assert.equal(eventoPermisos(escenario), undefined);
   assert.equal(escenario.auditorias.length, 1);
@@ -391,7 +391,7 @@ test('mismo rol sin otros cambios no genera evento falso', async () => {
   assert.equal(eventoPermisos(escenario), undefined);
   assert.deepEqual(
     escenario.llamadas,
-    ['UPDATE_USER']
+    ['BEGIN', 'LOCK', 'UPDATE_USER', 'COMMIT']
   );
 });
 

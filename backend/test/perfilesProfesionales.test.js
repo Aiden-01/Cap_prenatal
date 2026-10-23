@@ -6,16 +6,15 @@ const service = require('../src/services/usuariosService');
 test('perfiles: IDs estrictos, null explícito y omisión conservada en el contrato', () => {
   for (const id of ['', '0', '2.5', false, {}, -1, 2147483648]) {
     assert.equal(usuarioUpdateSchema.safeParse({ cargo_id: id }).success, false);
-    assert.equal(usuarioUpdateSchema.safeParse({ especialidad_id: id }).success, false);
   }
-  assert.deepEqual(usuarioUpdateSchema.parse({ cargo_id: '2', especialidad_id: null }), { cargo_id: 2, especialidad_id: null });
+  assert.deepEqual(usuarioUpdateSchema.parse({ cargo_id: '2' }), { cargo_id: 2 });
   assert.equal(Object.hasOwn(usuarioUpdateSchema.parse({ nombre_completo: 'Sintético' }), 'cargo_id'), false);
-  assert.equal(usuarioCreateSchema.safeParse({ nombre_completo: 'Sintético', username: 'fixture', password: 'test-only', rol: 'personal_salud' }).success, true);
+  assert.equal(usuarioCreateSchema.safeParse({ nombre_completo: 'Sintético', username: 'fixture', email: 'fixture@example.test', password: 'test-only', rol: 'personal_salud' }).success, true);
 });
 
 test('perfiles: transacción, bloqueo, conservación y ausencia de cambios en seguridad', async () => {
   const db = {};
-  let current = { id: 4, rol: 'admin', activo: false, nombre_completo: 'Sintético', cargo_id: 1, especialidad_id: 2 };
+  let current = { id: 4, rol: 'admin', activo: false, nombre_completo: 'Sintético', cargo_id: 1 };
   const events = [];
   const calls = [];
   const usuariosRepository = {
@@ -24,8 +23,7 @@ test('perfiles: transacción, bloqueo, conservación y ausencia de cambios en se
     actualizar: async (args, connection) => {
       assert.equal(connection, db); assert.equal(args.passwordHash, null);
       current = { ...current, nombre_completo: args.nombreCompleto, rol: args.rol, activo: args.activo,
-        ...(args.cargoId !== undefined ? { cargo_id: args.cargoId } : {}),
-        ...(args.especialidadId !== undefined ? { especialidad_id: args.especialidadId } : {}) };
+        ...(args.cargoId !== undefined ? { cargo_id: args.cargoId } : {}) };
       return current;
     },
   };
@@ -40,10 +38,9 @@ test('perfiles: transacción, bloqueo, conservación y ausencia de cambios en se
   await edit({ cargo_id: 1 }); // Asignación histórica inactiva, sin validación nueva.
   assert.deepEqual(calls, []);
   await edit({ cargo_id: 5 });
-  assert.equal(current.especialidad_id, 2);
   assert.equal(current.rol, 'admin'); assert.equal(current.activo, false);
-  await edit({ especialidad_id: null });
-  assert.equal(current.cargo_id, 5); assert.equal(current.especialidad_id, null);
+  await edit({ cargo_id: null });
+  assert.equal(current.cargo_id, null);
   assert.equal(events.length, 2);
   assert.equal(JSON.stringify(events).includes('Sintético'), false);
   await assert.rejects(edit({ cargo_id: 999 }), { code: 'PERFIL_PROFESIONAL_INVALIDO' });

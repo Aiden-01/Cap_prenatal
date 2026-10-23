@@ -6,7 +6,7 @@
 .perfil-modal .action-row { justify-content: flex-end; }
 .usuario-profesion { color: var(--text-muted); font-size: .77rem; margin-top: .25rem; overflow-wrap: anywhere; }
 .catalogos-heading, .catalogos-pagination { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-.catalogos-controls { display: grid; grid-template-columns: 1fr 2fr 1fr auto; align-items: end; gap: 1rem; margin: 1rem 0; }
+.catalogos-controls { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; align-items: end; gap: 1rem; margin: 1rem 0; }
 .catalogos-controls label { display: grid; gap: .4rem; font-size: .85rem; }
 .catalogos-list { list-style: none; padding: 0; margin: 0 0 1rem; }
 .catalogos-list li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid var(--border); }
@@ -14,7 +14,24 @@
 .catalogo-copy span { display: block; font-size: .8rem; color: var(--text-muted); }
 .catalogo-copy p { white-space: pre-wrap; }
 .catalogos-list .action-row { flex-shrink: 0; }
+.usuario-email-pendiente { color: var(--warning, var(--text-muted)); font-size: .8rem; overflow-wrap: anywhere; }
+.usuario-email-help, .catalogos-guidance { color: var(--text-muted); font-size: .82rem; line-height: 1.5; }
+.perfil-modal .form-group, .catalogos-controls label { min-width: 0; }
+.usuario-identity-copy { min-width: 0; }
 @media (max-width: 760px) {
+  .usuarios-table { display: block; width: 100%; }
+  .usuarios-table thead { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .usuarios-table tbody { display: block; width: 100%; }
+  .usuarios-table tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem 1rem; padding: 1rem; border-bottom: 1px solid var(--border); }
+  .usuarios-table tbody td { display: block; min-width: 0; padding: 0; border: 0; text-align: left; overflow-wrap: anywhere; }
+  .usuarios-table tbody td[data-label]::before { content: attr(data-label); display: block; margin-bottom: .3rem; color: var(--text-muted); font-size: .7rem; font-weight: 600; }
+  .usuarios-table tbody .usuario-identity-cell::before { display: none; }
+  .usuarios-table .usuario-identity-cell, .usuarios-table .usuario-username-cell, .usuarios-table .usuario-history-cell, .usuarios-table .usuario-actions-cell, .usuarios-table td[colspan] { grid-column: 1 / -1; }
+  .usuarios-table .usuario-identity { align-items: flex-start !important; }
+  .usuarios-table .usuario-profesion, .usuarios-table .usuario-email-pendiente { overflow-wrap: normal; }
+  .usuarios-table .badge { max-width: 100%; white-space: normal; }
+  .usuarios-table .table-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+  .usuarios-table .table-actions button { min-width: 0; min-height: 40px; }
   .catalogos-controls { grid-template-columns: 1fr; }
   .catalogos-list li { align-items: stretch; flex-direction: column; }
   .catalogos-list .action-row { flex-wrap: wrap; }

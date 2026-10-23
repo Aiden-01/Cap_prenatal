@@ -182,6 +182,7 @@ test('crear y actualizar usuario conservan solo campos y transiciones permitidas
     body: {
       nombre_completo: created.nombre_completo,
       username: created.username,
+      email: 'cuenta.sintetica@example.test',
       password: 'PasswordSecreto123!',
       rol: created.rol,
     },
@@ -196,6 +197,7 @@ test('crear y actualizar usuario conservan solo campos y transiciones permitidas
   let current = { ...created };
   const usuariosRepository = {
     async obtenerVisibleParaActor() { return { ...current }; },
+    async obtenerPorId() { return { ...current }; },
     async actualizar(args) {
       current = { ...current, nombre_completo: args.nombreCompleto, activo: args.activo, rol: args.rol };
       return { ...current };
@@ -209,19 +211,21 @@ test('crear y actualizar usuario conservan solo campos y transiciones permitidas
     req: { usuario: { id: 7, rol: 'director' } },
     dependencies: {
       usuariosRepository,
+      permisosRepository: { enTransaccion: async fn => fn({}), bloquearUsuarioPermisos: async () => current },
       registrarEventoPrivado: recorder.registrarEventoPrivado,
     },
   });
 
   assert.deepEqual(recorder.events[0].datosNuevos, {
-    campos_registrados: ['nombre_completo', 'rol', 'username'],
+    campos_registrados: ['contacto_pendiente', 'nombre_completo', 'rol', 'username'],
     politica_version: 1,
   });
   assert.deepEqual(recorder.events[1].datosNuevos, {
-    campos_sensibles_modificados: ['nombre_completo'],
+    cambios: { nombre_completo: { anterior: 'Nombre Secreta', nuevo: 'Nombre Secreta Nueva' } },
     politica_version: 1,
   });
-  recorder.events.forEach(assertNoSensitiveAuditData);
+  assertNoSensitiveAuditData(recorder.events[0]);
+  assert.equal(recorder.events[1].descripcion, 'identidad_usuario_actualizada');
 });
 
 test('cambio y reinicio de password guardan unicamente el booleano y son obligatorios', async () => {

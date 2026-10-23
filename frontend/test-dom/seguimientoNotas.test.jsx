@@ -96,7 +96,7 @@ for (const width of [390, 1366]) {
     const form = document.querySelector('form');
     fireEvent.submit(form); fireEvent.submit(form);
     const heading = await screen.findByRole('heading', { name: 'Control registrado exitosamente' });
-    expect(document.activeElement).toBe(heading);
+    await waitFor(() => expect(document.activeElement).toBe(heading));
     expect(screen.getByText('Control 3 guardado.')).toBeTruthy();
     expect(api.post).toHaveBeenCalledTimes(1);
     expect(api.post.mock.calls[0][0]).toBe('/pacientes/1/controles');
@@ -180,12 +180,12 @@ test('confirmación externa explícita no infiere del campo libre ni del rol y n
   expect(api.post).not.toHaveBeenCalled();
   fireEvent.change(select, { target: { value: 'externo' } });
   fireEvent.change(screen.getByLabelText('Nombre completo'), { target: { value: 'Médico externo sintético' } });
-  fireEvent.change(screen.getByLabelText('Cargo declarado'), { target: { value: 'Médico declarado' } });
+  fireEvent.change(screen.getByLabelText('Cargo declarado'), { target: { value: 'MED' } });
   const form = select.closest('form'); fireEvent.submit(form); fireEvent.submit(form);
   await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1));
   expect(api.post.mock.calls[0]).toEqual(['/pacientes/1/controles/3/seguimiento-notas', {
     embarazo_id: 2, version: 1, tipo: 'nota_evolucion', responsable: { tipo: 'externo', nombre_completo: 'Médico externo sintético',
-      cargo: 'Médico declarado', especialidad: null, clasificacion_profesional: 'medico' },
+      cargo_codigo: 'MED' },
   }]);
 });
 test('embarazo cerrado permite consultar sin formulario de confirmación', async () => {

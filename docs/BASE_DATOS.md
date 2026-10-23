@@ -2,37 +2,33 @@
 
 Motor: PostgreSQL.
 
-CPREN-118 añade `026_notas_clinicas.sql` y la tabla única `notas_clinicas` para
-nota_evolucion y nota_enfermeria. Expediente obligatorio, embarazo/control
-opcionales con FKs compuestas RESTRICT, responsable histórico JSONB, capturista
-original, finalizador, fecha/hora clínicas, borrador/captura_finalizada y versión.
-Índice parcial protege principal por control/tipo; UUID y huella internos cubren
-idempotencia. Trigger impide borrar notas o sobrescribir finalizadas y preserva
-contexto/capturista. No modifica controles/citas ni genera notas históricas.
-Schema y compatibilidad requieren 026 con checksum; solo se verifica en clústeres
-temporales. [Modelo y decisiones](CPREN_118_MODELO_NOTAS_CLINICAS.md#migración-026-e-integridad).
+El modelo profesional vigente usa exclusivamente `cargos_personal`,
+`usuarios.cargo_id`, rol y permisos independientes. La030retira clasificación;
+los códigos existentes MED, AE y EP identifican cargos elegibles. No asigna
+códigos automáticamente ni infiere profesiones por nombres. Antes de aplicar,
+se verifican duplicados/contradicciones; los cambios requieren revisión del
+administrador y no conceden permisos. [Modelo vigente](CPREN_120_CHECKPOINT_11_SIMPLIFICACION_NOTAS_USUARIOS.md).
 
-CPREN-117 añade `025_permisos_autoria_clinica.sql`: diez permisos clínicos sin
-concesión automática, un permiso de gestión de catálogos con conservación de
-capacidad admin/director y `cargos_personal.clasificacion_profesional` controlada
-por CHECK, NOT NULL y default `sin_clasificar`. No infiere profesiones ni cambia
-roles, permisos anteriores, usuarios o migraciones 023/024. No crea tablas de
-notas/órdenes. El SQL aditivo se replica al final de schema.sql; el arranque
-requiere 025 con checksum. Solo se verifica en PostgreSQL temporal aislado.
-[Decisiones y contratos](CPREN_117_PERMISOS_AUTORIA_CLINICA.md).
+CHECKPOINT-10 incorpora dos upgrades preparados exclusivamente con pruebas
+temporales: `028_retirar_especialidades.sql` elimina la tabla y FK/columna/índice
+retirados sin reescribir 023–027; `029_usuarios_email.sql` añade `email VARCHAR(254)`
+nullable para legados, trigger de normalización trim/minúsculas, CHECK de formato
+no vacío y `ux_usuarios_email` único sobre lower(email). Altas nuevas requieren
+correo en API; completar legados es tarea administrativa, sin direcciones falsas
+ni cambios de contraseña. `NOT NULL` queda pendiente de regularización verificada.
 
-CPREN-116 agrega cargo_id y especialidad_id nullable a usuarios mediante
-`024_usuarios_perfiles_profesionales.sql`, con FK ON DELETE RESTRICT e índices.
-Los registros existentes comienzan con NULL, sin backfill ni cambios de permisos.
-El esquema inicial y compatibilidad de arranque incluyen 024, seguida de 025.
-[Migración, concurrencia y pruebas](CPREN_116_PERFILES_PROFESIONALES.md#migración-024).
+`notas_clinicas` mantiene responsable histórico JSONB, capturista, finalizador,
+fecha/hora clínicas, idempotencia, versión y protección de finalizadas. Los nuevos
+snapshots contienen identidad, nombre/código de cargo, sin clasificación. Los snapshots históricos
+permanecen intactos; el trigger valida el contrato actual al insertar o cambiar
+responsable, sin bloquear la finalización de un borrador histórico sin reatribución.
+El seguimiento documental de controles y las citas permanecen independientes.
 
-CPREN-115 agrega `cargos_personal` y `especialidades_personal` mediante la
-migración aditiva `023_catalogos_profesionales.sql`, sincronizada con schema.sql.
-Incluye claves únicas normalizadas por mayúsculas, diacríticos y espacios,
-estado lógico y fechas. No agrega campos a usuarios ni modifica roles.
-Requiere UTF8 y PostgreSQL >= 13. Diseño y validación aislada:
-[Catálogos profesionales](CPREN_115_CATALOGOS_PROFESIONALES.md#base-de-datos).
+El arranque requiere migraciones 008–030 con checksum. El esquema objetivo no
+contiene tabla de especialidades ni columna correspondiente en usuarios. Las
+migraciones históricas conservan su SQL y checksums; no se aplicó ninguna a bases
+persistentes durante esta fase. Antes de una aplicación persistente: inventario,
+respaldo y autorización independiente. [Detalle, evidencia y límites de auditoría](CPREN_120_CHECKPOINT_10_PROFESIONALES_USUARIOS.md).
 
 Schema principal:
 

@@ -7,10 +7,10 @@ const appPool = require('../src/db/pool');
 const { seed } = require('../src/db/seed');
 const { createCatalogosService } = require('../src/services/catalogosService');
 const { createCatalogosRepository } = require('../src/repositories/catalogosRepository');
-const { cargoSchema, catalogoSchema } = require('../src/validations/catalogos.schemas');
+const { cargoSchema } = require('../src/validations/catalogos.schemas');
 const { resolveFieldRule, normalizeAllowedAuditValue } = require('../src/services/audit/auditFieldPolicy');
 const {
-  PERMISOS_CLINICOS, PERMISO_GESTION_CATALOGOS, CLASIFICACIONES_PROFESIONALES,
+  PERMISOS_CLINICOS, PERMISO_GESTION_CATALOGOS,
   PREFIJOS_CLINICOS, filtrarPermisosAutomaticos,
 } = require('../src/security/clinicalPermissions');
 
@@ -99,51 +99,7 @@ test('025 es aditiva y la única concesión automática conserva la gestión adm
   assert.match(codigo, /IF NOT EXISTS \([\s\S]*pg_constraint/);
 });
 
-test('clasificación es enum explícito solo para cargos y no se infiere del nombre visible', () => {
-  for (const clasificacion_profesional of CLASIFICACIONES_PROFESIONALES) {
-    assert.equal(cargoSchema.parse({ nombre: 'Nombre editable', clasificacion_profesional }).clasificacion_profesional, clasificacion_profesional);
-  }
-  assert.equal(cargoSchema.safeParse({ nombre: 'Médico', clasificacion_profesional: 'doctor' }).success, false);
-  assert.equal(catalogoSchema.safeParse({ nombre: 'Especialidad', clasificacion_profesional: 'medico' }).success, false);
-  assert.equal(Object.hasOwn(cargoSchema.parse({ nombre: 'Médico' }), 'clasificacion_profesional'), false);
-});
-
-test('clasificación omitida conserva la histórica y se audita sin nombre ni descripción libre', async () => {
-  let row = { id: 1, nombre: 'Profesión privada', codigo: null, descripcion: 'Narrativa privada', clasificacion_profesional: 'medico' };
-  const calls = [];
-  const repository = {
-    enTransaccion: async fn => fn({}), obtener: async () => row,
-    crear: async body => (row = { id: 2, ...body }),
-    actualizar: async (_id, body) => (row = { ...row, ...body }),
-  };
-  const service = createCatalogosService('cargos', { repository, audit: async (_req, event) => calls.push(event) });
-  await service.actualizar(1, { nombre: 'Otro nombre', codigo: null, descripcion: null }, {});
-  assert.equal(row.clasificacion_profesional, 'medico');
-  await service.actualizar(1, { nombre: 'Otro nombre', codigo: null, descripcion: null, clasificacion_profesional: 'enfermeria_ep' }, {});
-  assert.deepEqual(calls[1].cambios, {
-    anteriores: { clasificacion_profesional: 'medico' }, nuevos: { clasificacion_profesional: 'enfermeria_ep' },
-  });
-  assert.equal(JSON.stringify(calls).includes('Profesión privada'), false);
-  assert.equal(JSON.stringify(calls).includes('Narrativa privada'), false);
-  await service.crear({ nombre: 'Médico', codigo: null, descripcion: null }, {});
-  assert.equal(row.clasificacion_profesional, 'sin_clasificar');
-});
-
-test('repositorio preserva clasificación omitida y nunca agrega campo a especialidades', async () => {
-  const calls = [];
-  const db = { query: async (sql, params) => { calls.push({ sql, params }); return { rows: [{ id: 1 }] }; } };
-  const cargos = createCatalogosRepository('cargos', db);
-  await cargos.crear({ nombre: 'Cargo', codigo: null, descripcion: null });
-  assert.equal(calls[0].params[3], 'sin_clasificar');
-  await cargos.actualizar(1, { nombre: 'Cargo', codigo: null, descripcion: null });
-  assert.match(calls[1].sql, /clasificacion_profesional = COALESCE\(\$5, clasificacion_profesional\)/);
-  assert.equal(calls[1].params[4], null);
-  await createCatalogosRepository('especialidades', db).crear({ nombre: 'Especialidad', codigo: null, descripcion: null });
-  assert.doesNotMatch(calls[2].sql, /clasificacion_profesional/);
-});
-
-test('auditoría admite únicamente el enum de clasificación dentro de su contexto', () => {
-  const rule = resolveFieldRule('clasificacion_profesional', { categoria: 'catalogos', entidad: 'cargo_personal', evento: 'actualizar' });
-  assert.deepEqual(normalizeAllowedAuditValue(rule, 'medico'), { valid: true, value: 'medico' });
-  assert.deepEqual(normalizeAllowedAuditValue(rule, 'Texto privado'), { valid: false, value: null });
+test('cargo no acepta clasificación y códigos no otorgan permisos',()=>{
+ assert.equal(cargoSchema.safeParse({nombre:'Cargo',clasificacion_profesional:'medico'}).success,false);
+ assert.equal(cargoSchema.parse({nombre:'Nombre editable',codigo:'MED'}).codigo,'MED');
 });

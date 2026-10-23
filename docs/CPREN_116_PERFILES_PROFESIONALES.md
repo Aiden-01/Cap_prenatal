@@ -1,5 +1,7 @@
 # CPREN-116 — Perfiles profesionales de usuarios
 
+> Documento histórico de la fase original. CHECKPOINT-10 sustituye sus contratos de perfiles/directorio: la arquitectura vigente usa cargo y clasificación, sin Especialidades; las altas requieren email. Véase [arquitectura y contratos actuales](CPREN_120_CHECKPOINT_10_PROFESIONALES_USUARIOS.md). Se conserva el contenido original como evidencia histórica.
+
 ## Objetivo y dependencia
 
 Integrar cargo laboral y especialidad opcional en la administración de usuarios,

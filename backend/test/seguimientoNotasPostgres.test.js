@@ -87,6 +87,10 @@ test('CPREN-119: seguimiento, controles y notas en PostgreSQL temporal propio', 
       assert.deepEqual((await db.query('SELECT * FROM usuario_permisos ORDER BY id')).rows, grants);
       assert.equal((await db.query('SELECT count(*)::int AS n FROM controles_seguimiento_notas')).rows[0].n, 0);
     });
+    for (const filename of fs.readdirSync(path.join(__dirname, '../src/db/migrations')).filter(name => /^(028|029|030)_/.test(name)).sort()) {
+      await db.query(fs.readFileSync(path.join(__dirname, '../src/db/migrations', filename), 'utf8'));
+    }
+    await db.query("UPDATE cargos_personal SET codigo=NULL WHERE codigo IN ('MED','AE','EP'); UPDATE cargos_personal SET codigo=CASE id WHEN 101 THEN 'MED' WHEN 102 THEN 'AE' WHEN 103 THEN 'EP' ELSE codigo END WHERE id IN (101,102,103)");
     const tokens = {}, sessions = {};
     for (let id = 1; id <= 6; id++) {
       const sid = crypto.randomUUID(); sessions[id] = sid;
@@ -99,6 +103,7 @@ test('CPREN-119: seguimiento, controles y notas en PostgreSQL temporal propio', 
     const reqFor = id => ({ usuario: { id }, authSession: { id: sessions[id], usuario_id: id } });
     const app = express(); app.use(express.json()); app.use('/api', csrfMiddleware);
     app.use('/api/auth', require('../src/routes/auth'));
+    app.use('/api/profesionales', require('../src/routes/profesionales').createProfesionalesRouter());
     app.use('/api/pacientes', require('../src/routes/pacientes')); app.use(errorHandler);
     server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
     const send = async (url, method = 'GET', body, actor = 1, csrf = true) => {
@@ -113,6 +118,43 @@ test('CPREN-119: seguimiento, controles y notas en PostgreSQL temporal propio', 
     const route = id => `1/controles/${id}/seguimiento-notas`;
     const query = (ids, actor = 1, paciente = 1, embarazo = 11) => send(`${paciente}/controles/seguimiento-notas?embarazo_id=${embarazo}&controles_ids=${ids}`, 'GET', undefined, actor);
     const confirmBody = (changes = {}) => ({ embarazo_id: 11, version: 1, tipo: 'nota_evolucion', responsable: { tipo: 'usuario', usuario_id: 2 }, ...changes });
+    await t.test('CHECKPOINT-10: directorio HTTP demuestra clasificación, estado, filtros, permisos y privacidad', async () => {
+      const directory = async (query = '', actor = 1) => {
+        const response = await fetch(`http://127.0.0.1:${server.address().port}/api/profesionales${query}`, {
+          headers: actor ? { authorization: `Bearer ${tokens[actor]}` } : {},
+        });
+        return { status: response.status, body: await response.json() };
+      };
+      for (const [clase, id] of [['MED', 2], ['AE', 3], ['EP', 4]]) {
+        const result = await directory(`?cargo_codigo=${clase}`);
+        assert.equal(result.status, 200); assert.deepEqual(result.body.data.map(row => row.id), [id]);
+        for (const row of result.body.data) for (const field of ['email', 'username', 'password_hash', 'permisos', 'rol']) {
+          assert.equal(Object.hasOwn(row, field), false, `Directorio no expone ${field}`);
+        }
+      }
+      const before = (await db.query('SELECT * FROM usuario_permisos ORDER BY id')).rows;
+      try {
+        await db.query("UPDATE cargos_personal SET codigo=NULL WHERE id=101");
+        const empty = await directory('?cargo_codigo=MED');
+        assert.equal(empty.status, 200); assert.deepEqual(empty.body.data, []);
+        // El nombre Médico y el rol permanecen idénticos: solo la clasificación explícita cambia elegibilidad.
+        await db.query("UPDATE cargos_personal SET codigo='MED',activo=FALSE WHERE id=101");
+        assert.deepEqual((await directory('?cargo_codigo=MED')).body.data, []);
+        await db.query('UPDATE cargos_personal SET activo=TRUE WHERE id=101');
+        await db.query('UPDATE usuarios SET activo=FALSE WHERE id=2');
+        assert.deepEqual((await directory('?cargo_codigo=MED')).body.data, []);
+      } finally {
+        await db.query("UPDATE cargos_personal SET codigo='MED',activo=TRUE WHERE id=101");
+        await db.query('UPDATE usuarios SET activo=TRUE WHERE id=2');
+      }
+      assert.deepEqual((await db.query('SELECT * FROM usuario_permisos ORDER BY id')).rows, before);
+      assert.deepEqual((await directory('?buscar=no-existe-sintetico')).body.data, []);
+      assert.equal((await directory('?cargo_codigo=invalida')).status, 400);
+      assert.equal((await directory('', 5)).status, 403);
+      assert.equal((await directory('', null)).status, 401);
+      assert.equal((await db.query("SELECT to_regclass('especialidades_personal') AS tabla")).rows[0].tabla, null);
+      assert.equal((await db.query("SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name='usuarios' AND column_name='especialidad_id'")).rows[0].n, 0);
+    });
     let controlId, nursingUnknownSnapshot;
     await t.test('POST control conserva contrato, ID, campo libre, cita siguiente; activa sin crear nota', async () => {
       const result = await send('1/controles?embarazo_id=11', 'POST', { numero_control: 2, fecha: '2026-10-20',
@@ -151,7 +193,7 @@ test('CPREN-119: seguimiento, controles y notas en PostgreSQL temporal propio', 
       const row = (await db.query('SELECT * FROM controles_notas_requeridas WHERE control_prenatal_id=$1', [controlId])).rows[0];
       assert.equal(row.confirmado_por, 1); assert.equal(row.responsable_snapshot.usuario_id, 2);
       assert.equal((await query(controlId)).body.data[0].documentos[0].estado, 'pendiente');
-      const changed = await send(route(controlId), 'POST', confirmBody({ responsable: { tipo: 'externo', nombre_completo: 'Otro sintético', cargo: 'Médico', clasificacion_profesional: 'medico' } }));
+      const changed = await send(route(controlId), 'POST', confirmBody({ responsable: { tipo: 'externo', nombre_completo: 'Otro sintético', cargo_codigo: 'MED' } }));
       assert.equal(changed.status, 409);
     });
     await t.test('enfermería coexiste y versiones no revelan decisiones médicas ocultas', async () => {
@@ -182,7 +224,7 @@ test('CPREN-119: seguimiento, controles y notas en PostgreSQL temporal propio', 
         VALUES(1,11,3,CURRENT_DATE) RETURNING id`); rollbackControl = created.rows[0].id;
       assert.equal((await send(route(rollbackControl), 'POST', confirmBody({ version: 2 }))).status, 409);
       assert.equal((await send(route(rollbackControl), 'POST', confirmBody({ tipo: 'nota_enfermeria', responsable: { tipo: 'usuario', usuario_id: 4 } }))).status, 200);
-      assert.equal((await send(route(rollbackControl), 'POST', confirmBody({ responsable: { tipo: 'externo', nombre_completo: 'Médico externo sintético', cargo: 'Médico declarado', clasificacion_profesional: 'medico' } }))).status, 200);
+      assert.equal((await send(route(rollbackControl), 'POST', confirmBody({ responsable: { tipo: 'externo', nombre_completo: 'Médico externo sintético', cargo_codigo: 'MED' } }))).status, 200);
     });
     await t.test('auditoría privada sin nombres; fallo revierte decisión y versión, sin tocar control/cita', async () => {
       const created = (await db.query(`INSERT INTO controles_prenatales(paciente_id,embarazo_id,numero_control,fecha)
@@ -233,7 +275,7 @@ test('CPREN-119: seguimiento, controles y notas en PostgreSQL temporal propio', 
         WHERE codigo IN ('notas_evolucion.ver','notas_evolucion.registrar') ON CONFLICT DO NOTHING`);
       const id = (await db.query(`INSERT INTO controles_prenatales(paciente_id,embarazo_id,numero_control,fecha)
         VALUES(1,11,5,CURRENT_DATE) RETURNING id`)).rows[0].id;
-      const payload = name => confirmBody({ responsable: { tipo: 'externo', nombre_completo: name, cargo: 'Médico', clasificacion_profesional: 'medico' } });
+      const payload = name => confirmBody({ responsable: { tipo: 'externo', nombre_completo: name, cargo_codigo: 'MED' } });
       const results = await Promise.all([send(route(id), 'POST', payload('Uno sintético'), 1), send(route(id), 'POST', payload('Dos sintético'), 2)]);
       assert.deepEqual(results.map(result => result.status).sort(), [200, 409]);
       assert.equal((await db.query('SELECT count(*)::int AS n FROM controles_notas_requeridas WHERE control_prenatal_id=$1', [id])).rows[0].n, 1);
@@ -257,6 +299,25 @@ test('CPREN-119: seguimiento, controles y notas en PostgreSQL temporal propio', 
       await require('./helpers/seguimientoNotasBrowser').verificarSeguimientoBrowser({ apiPort: server.address().port, token: tokens[1], t });
       assert.equal((await db.query('SELECT count(*)::int AS n FROM notas_clinicas')).rows[0].n, count + 3,
         'Solo tres notas creadas explícitamente; navegar y recuperar principal no duplican');
+    });
+    await t.test('CHECKPOINT-09/10: rediseño, borrador real recargado, autoría y errores desde expediente', {
+      skip: process.env.RUN_NOTAS_09_BROWSER !== '1' && process.env.RUN_NOTAS_10_BROWSER !== '1' && process.env.RUN_NOTAS_11_BROWSER !== '1', timeout: 180000,
+    }, async () => {
+      await db.query("INSERT INTO pacientes(id,no_expediente,nombres,apellidos) VALUES(3,'SYN-09-SIN-EMB','Paciente sintética','Sin embarazo')");
+      await db.query(`INSERT INTO usuario_permisos(usuario_id,permiso_id)
+        SELECT u.id,p.id FROM usuarios u CROSS JOIN permisos p WHERE
+        (u.id=2 AND p.codigo LIKE 'notas_evolucion.%') OR (u.id IN (3,4) AND p.codigo LIKE 'notas_enfermeria.%') ON CONFLICT DO NOTHING`);
+      const jwtConfig = getJwtConfig();
+      tokens.expired = jwt.sign({ sid: sessions[1] }, jwtConfig.secret, { algorithm: jwtConfig.algorithm, issuer: jwtConfig.issuer,
+        audience: jwtConfig.audience, subject: '1', jwtid: crypto.randomUUID(), expiresIn: -60 });
+      const setMedicalRegistration = async enabled => enabled
+        ? db.query("INSERT INTO usuario_permisos(usuario_id,permiso_id) SELECT 1,id FROM permisos WHERE codigo='notas_evolucion.registrar' ON CONFLICT DO NOTHING")
+        : db.query("DELETE FROM usuario_permisos WHERE usuario_id=1 AND permiso_id=(SELECT id FROM permisos WHERE codigo='notas_evolucion.registrar')");
+      const setPregnancyState = estado => db.query('UPDATE embarazos SET estado=$1 WHERE id=11', [estado]);
+      const count = (await db.query('SELECT count(*)::int AS n FROM notas_clinicas')).rows[0].n;
+      const ids = await require('./helpers/notasCheckpoint09Browser').verificarNotas09({ apiPort: server.address().port, tokens, setMedicalRegistration, setPregnancyState, t,
+        outputDirectory: process.env.RUN_NOTAS_11_BROWSER === '1' ? 'checkpoint11' : process.env.RUN_NOTAS_10_BROWSER === '1' ? 'checkpoint10' : 'checkpoint09' });
+      assert.equal(ids.length, 7); assert.equal((await db.query('SELECT count(*)::int AS n FROM notas_clinicas')).rows[0].n, count + 7);
     });
     await t.test('instalación nueva y bootstrap oficial incluyen 027 y checksums', async () => {
       await db.query('CREATE DATABASE seguimiento_bootstrap');

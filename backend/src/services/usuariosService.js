@@ -7,6 +7,7 @@ const sessionService = require('./sessionService');
 const authSessionsRepository = require('../repositories/authSessionsRepository');
 const { HttpError } = require('../utils/httpError');
 const { filtrarPermisosAutomaticos } = require('../security/clinicalPermissions');
+const { usuarioCreateSchema, usuarioUpdateSchema } = require('../validations/usuarios.schemas');
 
 async function listarUsuarios(req) {
   return usuariosRepository.listar({ actorRol: req.usuario.rol });
@@ -30,6 +31,7 @@ async function obtenerTargetVisible({ id, req, repository = usuariosRepository }
 }
 
 async function crearUsuario({ body, req, dependencies = {} }) {
+  body = usuarioCreateSchema.parse(body);
   const usuariosRepo = dependencies.usuariosRepository || usuariosRepository;
   const permisosRepo = dependencies.permisosRepository || permisosRepository;
   const registrarEventoPrivado = dependencies.registrarEventoPrivado
@@ -42,11 +44,11 @@ async function crearUsuario({ body, req, dependencies = {} }) {
     const usuario = await usuariosRepo.crear({
       nombreCompleto: body.nombre_completo,
       username: body.username,
+      email: body.email,
       passwordHash: hash,
       rol: body.rol,
       createdBy: req.usuario?.id || null,
       cargoId: body.cargo_id ?? null,
-      especialidadId: body.especialidad_id ?? null,
     }, db);
     await permisosRepo.asignarPermisosIniciales({
       usuarioId: usuario.id,
@@ -65,26 +67,26 @@ async function crearUsuario({ body, req, dependencies = {} }) {
           username: body.username,
           rol: body.rol,
           ...(body.cargo_id !== undefined ? { cargo_id: body.cargo_id } : {}),
-          ...(body.especialidad_id !== undefined ? { especialidad_id: body.especialidad_id } : {}),
+          contacto_pendiente: false,
         },
       },
     }, { db, obligatorio: Boolean(db) });
 
     return usuario;
   };
-  if (body.cargo_id !== undefined || body.especialidad_id !== undefined) {
+  if (body.cargo_id !== undefined) {
     return permisosRepo.enTransaccion(crear);
   }
   return crear();
 }
 
 async function validarPerfil(body, before, repository, db) {
-  for (const campo of ['cargo_id', 'especialidad_id']) {
+  for (const campo of ['cargo_id']) {
     const valor = body[campo];
     if (valor === undefined || valor === null || valor === before?.[campo]) continue;
     const elemento = await repository.obtenerElementoProfesional(campo, valor, db);
     if (!elemento || !elemento.activo) {
-      throw new HttpError(400, 'Selecciona un cargo o especialidad existente y activo', {
+      throw new HttpError(400, 'Selecciona un cargo existente y activo', {
         code: 'PERFIL_PROFESIONAL_INVALIDO',
         details: [{ campo, mensaje: elemento ? 'La opción está inactiva' : 'La opción no existe' }],
       });
@@ -107,7 +109,7 @@ async function auditarCambiosUsuario({
     entidadId: after.id,
   };
 
-  for (const campo of ['cargo_id', 'especialidad_id']) {
+  for (const campo of ['cargo_id']) {
     if ((before[campo] ?? null) !== (after[campo] ?? null)) {
       await registrarEventoPrivado(req, {
         ...common,
@@ -117,13 +119,27 @@ async function auditarCambiosUsuario({
     }
   }
 
+  if ((before.email ?? null) !== (after.email ?? null)) {
+    await registrarEventoPrivado(req, {
+      ...common,
+      contexto: { categoria: 'usuarios', entidad: 'usuario', evento: 'email_actualizado' },
+      metadata: { contacto_modificado: true, contacto_pendiente: after.email == null },
+    }, options);
+  }
+
+  if (before.username !== after.username) {
+    await registrarEventoPrivado(req, {
+      ...common, contexto: { categoria: 'usuarios', entidad: 'usuario', evento: 'identidad_usuario_actualizada' },
+      cambios: { anteriores: { username: before.username }, nuevos: { username: after.username } },
+    }, options);
+  }
   if (before.nombre_completo !== after.nombre_completo) {
     await registrarEventoPrivado(req, {
       ...common,
       contexto: {
         categoria: 'usuarios',
         entidad: 'usuario',
-        evento: 'usuario_actualizado',
+        evento: 'identidad_usuario_actualizada',
       },
       cambios: {
         anteriores: { nombre_completo: before.nombre_completo },
@@ -210,6 +226,8 @@ async function assertNoDejaSinDirector({
 }
 
 async function actualizarUsuario({ id, body, req, dependencies = {} }) {
+  if (!['admin', 'director'].includes(req.usuario?.rol)) throw new HttpError(403, 'Administración de usuarios no autorizada');
+  body = usuarioUpdateSchema.parse(body);
   const usuariosRepo = dependencies.usuariosRepository || usuariosRepository;
   const permisosRepo = dependencies.permisosRepository || permisosRepository;
   const permisosLogic = dependencies.permisosService || permisosService;
@@ -244,7 +262,8 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
     passwordHash,
     updatedBy: req.usuario.id,
     cargoId: body.cargo_id,
-    especialidadId: body.especialidad_id,
+    email: body.email,
+    username: body.username,
   }, db || undefined);
 
   const roleChanged = before.rol !== nextRol;
@@ -253,8 +272,8 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
   const passwordReset = Boolean(body.password);
   const criticalChange = roleChanged || stateChanged || passwordReset;
 
-  const perfilProporcionado = body.cargo_id !== undefined || body.especialidad_id !== undefined;
-  if (criticalChange || perfilProporcionado) {
+  const perfilProporcionado = body.cargo_id !== undefined;
+  if (criticalChange || perfilProporcionado || body.email !== undefined || body.username !== undefined || body.nombre_completo !== undefined) {
     await permisosRepo.enTransaccion(async (db) => {
       const bloqueado = await permisosRepo.bloquearUsuarioPermisos(id, db);
       if (!bloqueado) throw new HttpError(404, 'Usuario no encontrado');
@@ -303,6 +322,7 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
       }
 
       const reasons = [];
+      if (body.username !== undefined && estadoAnterior.username !== body.username) reasons.push('username_changed');
       if (passwordReset) reasons.push('password_reset');
       if (estadoAnterior.activo === true && body.activo === false) reasons.push('user_deactivated');
       if (estadoAnterior.rol !== rolBloqueado) reasons.push('role_changed');
@@ -391,7 +411,7 @@ async function eliminarUsuario({ id, req, dependencies = {} }) {
       accion: 'eliminar',
       entidadId: id,
       cambios: {
-        anteriores: target,
+        anteriores: Object.fromEntries(Object.entries(target).filter(([campo]) => campo !== 'email')),
         nuevos: null,
       },
     }, { db, obligatorio: true });

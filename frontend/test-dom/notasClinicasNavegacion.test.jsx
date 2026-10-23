@@ -21,9 +21,9 @@ test('desde seguimiento recupera principal de página posterior y nunca crea al 
   });
   vi.spyOn(api, 'post');
   mount('/pacientes/1/notas?embarazo_id=2&control_id=3&tipo=nota_evolucion');
-  await screen.findByLabelText('Narrativa clínica');
-  expect(screen.getByLabelText('Narrativa clínica').value).toBe(nota.contenido);
-  expect(screen.getByLabelText('Narrativa clínica').matches(':disabled')).toBe(true);
+  await screen.findByRole('textbox', { name: 'Narrativa clínica' });
+  expect(screen.getByRole('textbox', { name: 'Narrativa clínica' }).value).toBe(nota.contenido);
+  expect(screen.getByRole('textbox', { name: 'Narrativa clínica' }).matches(':disabled')).toBe(true);
   expect(api.get).toHaveBeenCalledWith('/pacientes/1/notas-clinicas', expect.objectContaining({ params: expect.objectContaining({ pagina: 2, tipo: 'nota_evolucion' }) }));
   expect(api.post).not.toHaveBeenCalled();
 });
@@ -31,12 +31,14 @@ test('historial sin embarazo permite nota independiente y filtra botones por per
   vi.spyOn(api, 'get').mockImplementation(async url => ({ data: url.endsWith('/expediente') ? { paciente: { nombres: 'Sintética', no_expediente: 'SYN' } }
     : { data: [], total: 0, limite: 20 } }));
   mount('/pacientes/1/notas');
-  await screen.findByText('No hay notas registradas.');
-  const create = await screen.findByRole('button', { name: 'Nueva nota de evolución' });
+  await screen.findByText('Aún no hay notas clínicas');
+  const create = await screen.findByRole('button', { name: 'Nueva nota' });
   expect(screen.queryByRole('button', { name: /Nueva nota de evolución de enfermería/ })).toBeNull();
   fireEvent.click(create);
-  await waitFor(() => expect(screen.getByLabelText('Narrativa clínica')).toBeTruthy());
-  expect(screen.getByText(/Nuevo borrador · Sin control asociado/)).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('Tipo de nota'), { target: { value: 'nota_evolucion' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Abrir editor' }));
+  await waitFor(() => expect(screen.getByRole('textbox', { name: 'Narrativa clínica' })).toBeTruthy());
+  expect(screen.getByText('Sin control asociado')).toBeTruthy();
 });
 test('fallo de contexto permanece visible aunque el historial cargue; reintentar recupera expediente', async () => {
   let failures = 1;
@@ -49,8 +51,8 @@ test('fallo de contexto permanece visible aunque el historial cargue; reintentar
   });
   mount('/pacientes/1/notas');
   await screen.findByText(/Contexto no disponible/);
-  expect(screen.queryByRole('button', { name: 'Nueva nota de evolución' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Nueva nota' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
-  await screen.findByRole('button', { name: 'Nueva nota de evolución' });
+  await screen.findByRole('button', { name: 'Nueva nota' });
   expect(screen.queryByText(/Contexto no disponible/)).toBeNull();
 });
