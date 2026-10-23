@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
@@ -415,6 +415,34 @@ export default function NuevoControl({ consultationOnly = false }) {
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [tab, setTab]         = useState("general");
+  const [tabNavigation, setTabNavigation] = useState(0);
+  const navigationRef = useRef(null);
+  const activePanelRef = useRef(null);
+  useLayoutEffect(() => {
+    if (!tabNavigation) return;
+    let cancelled = false;
+    let frame;
+    const revealPanel = () => {
+      if (cancelled) return;
+      frame = requestAnimationFrame(() => {
+        if (!activePanelRef.current || !navigationRef.current) return;
+        const navigation = navigationRef.current;
+        const stickyTop = Number.parseFloat(getComputedStyle(navigation).top) || 0;
+        const top = window.scrollY + activePanelRef.current.getBoundingClientRect().top
+          - navigation.getBoundingClientRect().height - stickyTop - 12;
+        // Measure after the entrance animation; reduced motion has no animation to wait for.
+        window.scrollTo({ top: Math.max(0, top), behavior: "instant" });
+      });
+    };
+    const animations = activePanelRef.current?.getAnimations?.() || [];
+    if (animations.length) Promise.all(animations.map((animation) => animation.finished.catch(() => {}))).then(revealPanel);
+    else revealPanel();
+    return () => { cancelled = true; cancelAnimationFrame(frame); };
+  }, [tabNavigation]);
+  const selectTab = (nextTab) => {
+    setTab(nextTab);
+    setTabNavigation((previous) => previous + 1);
+  };
   useEffect(() => {
     const current = { tab, navigationKey: location.key };
     setScreenTab(current);
@@ -484,8 +512,8 @@ export default function NuevoControl({ consultationOnly = false }) {
 
     event.preventDefault();
     const nextTabId = TABS[nextIndex].id;
-    setTab(nextTabId);
-    requestAnimationFrame(() => document.getElementById(`control-tab-${nextTabId}`)?.focus());
+    selectTab(nextTabId);
+    requestAnimationFrame(() => document.getElementById(`control-tab-${nextTabId}`)?.focus({ preventScroll: true }));
   };
   const visibleFieldErrors = Object.entries(fieldErrors).map(([field, message]) => ({
     field,
@@ -669,7 +697,7 @@ export default function NuevoControl({ consultationOnly = false }) {
             La revisión es una guía para esta captura. No se guarda como revisión clínica y no es necesaria para guardar.
           </p>
         )}
-        <div className="control-sticky-navigation">
+        <div className="control-sticky-navigation" ref={navigationRef}>
           <div className="control-navigation-summary">
             <button type="button" className="btn-secondary" onClick={volverAlExpediente}>
               <ChevronLeft size={16} aria-hidden="true" /> Volver al expediente
@@ -698,7 +726,7 @@ export default function NuevoControl({ consultationOnly = false }) {
                 aria-controls={`control-panel-${t.id}`}
                 aria-describedby={puedeGuardar ? `control-review-${t.id}` : undefined}
                 tabIndex={tab === t.id ? 0 : -1}
-                onClick={() => setTab(t.id)}
+                onClick={() => selectTab(t.id)}
                 onKeyDown={(event) => handleTabKeyDown(event, t.id)}
                 className={`control-workflow-tab ${tab === t.id ? "is-active" : ""}`}
               >
@@ -811,6 +839,7 @@ export default function NuevoControl({ consultationOnly = false }) {
           <div
             key="general"
             id="control-panel-general"
+            ref={activePanelRef}
             className="control-tab-panel"
             role="tabpanel"
             aria-labelledby="control-tab-general"
@@ -922,6 +951,7 @@ export default function NuevoControl({ consultationOnly = false }) {
           <div
             key="laboratorio"
             id="control-panel-laboratorio"
+            ref={activePanelRef}
             className="control-tab-panel"
             role="tabpanel"
             aria-labelledby="control-tab-laboratorio"
@@ -1081,6 +1111,7 @@ export default function NuevoControl({ consultationOnly = false }) {
           <div
             key="suplementacion"
             id="control-panel-suplementacion"
+            ref={activePanelRef}
             className="control-tab-panel"
             role="tabpanel"
             aria-labelledby="control-tab-suplementacion"
@@ -1143,6 +1174,7 @@ export default function NuevoControl({ consultationOnly = false }) {
           <div
             key="orientaciones"
             id="control-panel-orientaciones"
+            ref={activePanelRef}
             className="control-tab-panel"
             role="tabpanel"
             aria-labelledby="control-tab-orientaciones"

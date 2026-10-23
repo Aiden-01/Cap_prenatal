@@ -14,6 +14,7 @@ vi.mock('../src/hooks/useAuth', () => ({ useAuth: () => auth }));
 const toast = vi.fn();
 function Location() { return <output data-testid="location">{useLocation().pathname}</output>; }
 function mount(permissions, state = 'activo', edit = false, entry = 'detail', options = {}) {
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   auth.usuario = { id: 1, rol: 'medico', permisos: ['pacientes.ver', ...permissions] };
   const allowed = permissions.includes('controles.ver_vih');
   const control = { id: 3, numero_control: 1, fecha: '2026-01-15', motivo_consulta: 'Dato sintético',
@@ -261,4 +262,25 @@ test('regreso sticky conserva embarazo y pestaña del expediente', async () => {
   const sticky = document.querySelector('.control-sticky-navigation');
   fireEvent.click(within(sticky).getByRole('button', { name: 'Volver al expediente' }));
   expect(screen.getByTestId('location').textContent).toBe('/pacientes/1');
+});
+
+test('navegación desplaza solo por selección, permite reseleccionar y conserva datos/revisión/foco de teclado', async () => {
+  mount(['controles.editar'], 'activo', true);
+  await screen.findByText('0 de 4 secciones revisadas');
+  expect(window.scrollTo).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText('P/A Sistólica'), { target: { value: '118' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Marcar sección como revisada' }));
+  const general = screen.getByRole('tab', { name: 'General' });
+  fireEvent.keyDown(general, { key: 'ArrowRight' });
+  const labs = screen.getByRole('tab', { name: 'Laboratorios' });
+  await waitFor(() => expect(document.activeElement).toBe(labs));
+  expect(window.scrollTo).toHaveBeenCalledTimes(1);
+  expect(window.scrollTo.mock.calls[0][0].behavior).toBe('instant');
+  fireEvent.click(labs);
+  await waitFor(() => expect(window.scrollTo).toHaveBeenCalledTimes(2));
+  fireEvent.keyDown(labs, { key: 'Home' });
+  await waitFor(() => expect(document.activeElement).toBe(general));
+  expect(screen.getByLabelText('P/A Sistólica').value).toBe('118');
+  expect(screen.getByText('1 de 4 secciones revisadas')).toBeTruthy();
+  expect(api.put).not.toHaveBeenCalled();
 });

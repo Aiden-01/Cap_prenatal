@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const puppeteer = require('../../backend/node_modules/puppeteer');
 
-const base = process.argv[2] || 'http://127.0.0.1:5125';
+const base = process.argv.slice(2).find(arg => !arg.startsWith('--')) || 'http://127.0.0.1:5125';
 assert.ok(['127.0.0.1', 'localhost'].includes(new URL(base).hostname), 'Local server only');
 const output = path.resolve(__dirname, '../../tmp_ux125');
 fs.mkdirSync(output, { recursive: true });
@@ -44,6 +44,66 @@ async function measure(page) {
       scrollWidth: document.documentElement.scrollWidth, height: innerHeight };
   });
 }
+
+async function checkTabNavigation(page) {
+  const checks = [];
+  const targets = ['laboratorio', 'orientaciones', 'suplementacion'];
+  for (const width of process.argv.includes('--tablet-only') ? [768] : [1440, 768, 390, 320]) {
+    await page.setViewport({ width, height: width === 320 ? 568 : 900 });
+    for (const reducedMotion of ['no-preference', 'reduce']) {
+      await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: reducedMotion }]);
+      for (const mode of ['new', 'edit', 'consultation']) {
+        const route = mode === 'new' ? '/pacientes/1/controles/nuevo?embarazo_id=2'
+          : `/pacientes/1/controles/3${mode === 'edit' ? '/editar' : ''}?embarazo_id=2`;
+        await open(page, route);
+        for (const target of targets) {
+          for (const method of ['pointer', 'keyboard']) {
+            await page.click('#control-tab-general');
+            await page.evaluate(async () => {
+              await Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => {})));
+              await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            });
+            await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+            await page.waitForFunction(() => window.scrollY === 0);
+            // Start each selection at scrollY=0; never scroll to the target panel in this test.
+            if (method === 'pointer') await page.click(`#control-tab-${target}`);
+            else {
+              await page.focus('#control-tab-general');
+              for (let step = 0; step <= targets.indexOf(target); step++) await page.keyboard.press('ArrowRight');
+              await page.waitForFunction(id => document.activeElement?.id === `control-tab-${id}`, {}, target);
+            }
+            await page.waitForSelector(`#control-panel-${target}`);
+            await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => {}))));
+            await page.waitForFunction(id => {
+              const nav = document.querySelector('.control-sticky-navigation').getBoundingClientRect();
+              const heading = document.querySelector(`#control-panel-${id} h2`).getBoundingClientRect();
+              return heading.top >= nav.bottom && heading.bottom <= innerHeight;
+            }, { timeout: 1500 }, target).catch(() => {});
+            const layout = await page.evaluate(id => {
+              const nav = document.querySelector('.control-sticky-navigation').getBoundingClientRect();
+              const panel = document.getElementById(`control-panel-${id}`).getBoundingClientRect();
+              const heading = document.querySelector(`#control-panel-${id} h2`).getBoundingClientRect();
+              return { navTop: nav.top, navBottom: nav.bottom, panelTop: panel.top,
+                headingTop: heading.top, headingBottom: heading.bottom, height: innerHeight,
+                overflow: document.documentElement.scrollWidth > innerWidth + 1, scrollY: window.scrollY };
+            }, target);
+            const visible = layout.navTop >= 0 && layout.panelTop >= layout.navBottom - 1
+              && layout.headingTop >= layout.navBottom && layout.headingBottom <= layout.height && !layout.overflow;
+            checks.push({ width, reducedMotion, mode, method, target, visible, ...layout });
+            if (mode === 'edit' && reducedMotion === 'reduce' && method === 'pointer' && target === 'laboratorio') {
+              await page.screenshot({ path: path.join(output, `tab-navigation-${width}.png`) });
+            }
+          }
+        }
+      }
+    }
+  }
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+  fs.writeFileSync(path.join(output, 'tab-navigation-results.json'), JSON.stringify(checks, null, 2));
+  const failures = checks.filter(check => !check.visible);
+  console.log(JSON.stringify({ tabNavigationChecks: checks.length, failures: failures.length, examples: failures.slice(0, 4) }, null, 2));
+  assert.equal(failures.length, 0, 'Active section heading must be visible below sticky navigation after selecting a tab from scrollY=0');
+}
 (async () => {
   browser = await puppeteer.launch({ headless: true,
     executablePath: process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe' });
@@ -81,6 +141,9 @@ async function measure(page) {
     }
     return request.respond({ status, contentType: 'application/json', body: JSON.stringify(data) });
   });
+
+  await checkTabNavigation(page);
+  if (process.argv.includes('--navigation-only')) return;
 
   for (const width of [1440, 768, 390, 320]) {
     await page.setViewport({ width, height: width === 320 ? 568 : 900 });
