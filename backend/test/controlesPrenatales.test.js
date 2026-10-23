@@ -2059,6 +2059,34 @@ test('actualizacion privada registra solo nombres de signos y laboratorios modif
   );
 });
 
+test('PUT sin impresion_clinica ni tratamiento conserva las narrativas historicas', async () => {
+  const before = {
+    id: 301, paciente_id: 41, embarazo_id: 91, peso_kg: 62,
+    impresion_clinica: 'Impresion historica sintetica', tratamiento: 'Tratamiento historico sintetico',
+  };
+  let actualizaciones = 0;
+  await withService({
+    repository: {
+      obtenerPorId: async () => before,
+      actualizar: async ({ data, campos }) => {
+        actualizaciones += 1;
+        assert.ok(!campos.includes('impresion_clinica'));
+        assert.ok(!campos.includes('tratamiento'));
+        return { ...before, ...data };
+      },
+    },
+    pregnancies: { validarEmbarazoEditable: async () => ({ id: 91, paciente_id: 41, estado: 'activo' }) },
+  }, async service => {
+    const result = await service.actualizarControl({
+      pacienteId: 41, embarazoId: 91, id: 301, body: { peso_kg: 63 }, req: ACTOR,
+    });
+    assert.equal(result.impresion_clinica, before.impresion_clinica);
+    assert.equal(result.tratamiento, before.tratamiento);
+    assert.equal(result.peso_kg, 63);
+  });
+  assert.equal(actualizaciones, 1);
+});
+
 test('editar cita_siguiente exige el flujo formal de CITAS-01B', async () => {
   const before = {
     id: 301,

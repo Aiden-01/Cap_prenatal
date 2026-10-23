@@ -47,6 +47,9 @@ export function canCreatePrenatalControl({
 
 export function preparePrenatalControlUpdatePayload(payload, structuredAppointment) {
   const nextPayload = { ...payload };
+  // Retired from prenatal capture: omission preserves historical values on PUT.
+  delete nextPayload.impresion_clinica;
+  delete nextPayload.tratamiento;
   if (structuredAppointment?.id) delete nextPayload.cita_siguiente;
   return nextPayload;
 }
