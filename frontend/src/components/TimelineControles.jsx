@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ClipboardList,
   ExternalLink,
+  Pencil,
   HeartPulse,
   Ruler,
   Scale,
@@ -18,7 +19,9 @@ import { isValidPregnancyId } from "../utils/pregnancyState";
 import {
   canCreatePrenatalControl,
   canConsultPrenatalControl,
+  canEditPrenatalControl,
   prenatalControlDetailPath,
+  prenatalControlEditPath,
 } from "../utils/prenatalControlAccess";
 
 function fecha(value) {
@@ -70,7 +73,7 @@ function DetailItem({ label, value }) {
   );
 }
 
-function ControlRow({ control, index, pacienteId, embarazoId, puedeConsultarControles, isOpen, onToggle }) {
+function ControlRow({ control, index, pacienteId, embarazoId, puedeConsultarControles, puedeEditarControles, isReadOnly, estadoEmbarazo, isOpen, onToggle }) {
   const navigate = useNavigate();
   const observaciones = control.observaciones || control.impresion_clinica;
   const numeroControl = control.numero_control ?? index + 1;
@@ -89,6 +92,12 @@ function ControlRow({ control, index, pacienteId, embarazoId, puedeConsultarCont
     if (!puedeConsultar) return;
     navigate(prenatalControlDetailPath({ pacienteId, embarazoId, controlId: control.id }));
   };
+  const puedeEditar = canEditPrenatalControl({
+    canConsult: puedeConsultar,
+    canWrite: puedeEditarControles,
+    isReadOnly,
+    pregnancyState: estadoEmbarazo,
+  });
 
   return (
     <div className={`prenatal-control-record ${isOpen ? "is-open" : ""}`}>
@@ -120,6 +129,12 @@ function ControlRow({ control, index, pacienteId, embarazoId, puedeConsultarCont
           >
             <ExternalLink size={14} /> Abrir
           </button>
+          {puedeEditar && (
+            <button type="button" className="btn-secondary prenatal-open-button"
+              onClick={() => navigate(prenatalControlEditPath({ pacienteId, embarazoId, controlId: control.id }))}>
+              <Pencil size={14} aria-hidden="true" /> Editar
+            </button>
+          )}
         </div>
       </div>
 
@@ -153,6 +168,7 @@ export default function TimelineControles({
   isReadOnly = false,
   puedeConsultar = false,
   puedeCrear = false,
+  puedeEditar = false,
   estadoEmbarazo,
 }) {
   const navigate = useNavigate();
@@ -214,6 +230,9 @@ export default function TimelineControles({
             pacienteId={pacienteId}
             embarazoId={embarazoId}
             puedeConsultarControles={puedeConsultar}
+            puedeEditarControles={puedeEditar}
+            isReadOnly={isReadOnly}
+            estadoEmbarazo={estadoEmbarazo}
             isOpen={expandedId === control.id}
             onToggle={() => setExpandedId((value) => (value === control.id ? null : control.id))}
           />

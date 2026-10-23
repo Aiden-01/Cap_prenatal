@@ -141,10 +141,57 @@
   margin-top: 0.85rem;
 }
 
-.control-workflow-tabs {
+.control-sticky-navigation {
   position: sticky;
-  top: 0;
+  top: env(safe-area-inset-top, 0px);
   z-index: 20;
+  min-width: 0;
+  padding: 0.5rem max(0.5rem, env(safe-area-inset-right)) 0.5rem max(0.5rem, env(safe-area-inset-left));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.control-navigation-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+  padding-bottom: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.control-review-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.control-review-state { display: inline-flex; flex-shrink: 0; }
+.control-review-state.is-pending { color: var(--text-muted); }
+.control-review-state.is-reviewed { color: var(--accent); }
+.control-review-state.needs-correction { color: var(--danger); }
+
+.control-section-review {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.85rem;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.control-workflow :is(input, select, textarea, [role="tabpanel"], .clinical-section) {
+  scroll-margin-top: 10rem;
+}
+
+.control-workflow-tabs {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.35rem;
@@ -338,6 +385,14 @@ html.dark .control-lab-state.is-complete {
 }
 
 @media (max-width: 980px) {
+  .control-workflow-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .control-workflow :is(input, select, textarea, [role="tabpanel"], .clinical-section) {
+    scroll-margin-top: 14rem;
+  }
+
   .control-context-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -352,16 +407,22 @@ html.dark .control-lab-state.is-complete {
 }
 
 @media (max-width: 767px) {
-  .control-workflow-tabs {
+  .control-sticky-navigation {
     top: calc(4rem + env(safe-area-inset-top));
-    display: flex;
-    scroll-snap-type: x proximity;
+  }
+
+  .control-workflow-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .control-workflow-tab {
-    flex: 0 0 auto;
-    min-width: 9.25rem;
-    scroll-snap-align: start;
+    min-width: 0;
+    padding-inline: 0.25rem;
+    font-size: 0.72rem;
+  }
+
+  .control-workflow :is(input, select, textarea, [role="tabpanel"], .clinical-section) {
+    scroll-margin-top: calc(16rem + env(safe-area-inset-top));
   }
 
   .control-lab-head {
@@ -415,7 +476,7 @@ html.dark .control-lab-state.is-complete {
   }
 
   .control-workflow-tab {
-    min-width: 8.5rem;
+    min-width: 0;
   }
 
   .control-lab-entry {

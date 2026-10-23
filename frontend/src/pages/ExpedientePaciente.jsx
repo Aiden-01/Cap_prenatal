@@ -1343,6 +1343,7 @@ export default function ExpedientePaciente() {
             isReadOnly={isReadOnly}
             puedeConsultar={puedeConsultarControles}
             puedeCrear={puedeCrearControles}
+            puedeEditar={puedeEditarControles}
             estadoEmbarazo={estadoEmbarazo}
           />
         </div>
