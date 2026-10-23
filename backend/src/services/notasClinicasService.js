@@ -232,4 +232,16 @@ async function finalizarCaptura({ pacienteId, notaId, body, req, dependencies = 
   return mutarBorrador({ pacienteId, notaId, body, req, dependencies, finalizar: true });
 }
 
-module.exports = { listarNotas, obtenerNota, crearBorrador, actualizarBorrador, finalizarCaptura };
+async function obtenerNotaParaPdf({ pacienteId, notaId, req, dependencies = {} }) {
+  ({ pacienteId, notaId } = notaIdParamsSchema.parse({ pacienteId, notaId }));
+  return conContexto({ req, dependencies }, async ({ permisos, repository, db }) => {
+    const row = await repository.obtenerPorId(notaId, db);
+    if (!row || row.paciente_id !== pacienteId) throw noEncontrada();
+    permiso(permisos, row.tipo, 'ver');
+    const paciente = await repository.obtenerPacientePdf(pacienteId, db);
+    if (!paciente) throw noEncontrada();
+    return { nota: seleccionar(row, [...PUBLICOS, 'contenido']), paciente };
+  });
+}
+
+module.exports = { listarNotas, obtenerNota, crearBorrador, actualizarBorrador, finalizarCaptura, obtenerNotaParaPdf };

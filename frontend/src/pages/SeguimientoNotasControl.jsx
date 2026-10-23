@@ -120,7 +120,11 @@ export default function SeguimientoNotasControl() {
         {documento.responsable_nota && documento.responsable_previsto && <p>Profesional previsto al confirmar el seguimiento: {documento.responsable_previsto.nombre_completo}</p>}
       </div>)}
       <p>La captura finalizada es un cierre administrativo. No equivale a firma clínica.</p>
-      <p>El editor narrativo y la impresión aún no están disponibles en esta fase. Puedes volver después a este seguimiento desde el expediente.</p>
+      {Object.entries(TIPOS_NOTA).map(([tipo, titulo]) => {
+        const prefijo = tipo === 'nota_evolucion' ? 'notas_evolucion' : 'notas_enfermeria';
+        return usuario?.permisos?.includes(`${prefijo}.ver`) ? <button key={tipo} type="button" className="btn-secondary"
+          onClick={() => navigate(`/pacientes/${id}/notas?embarazo_id=${embarazoId}&control_id=${controlId}&tipo=${tipo}`)}>Abrir {titulo.toLowerCase()}</button> : null;
+      })}
       <button type="button" className="btn-secondary" onClick={() => navigate(expediente)}>Volver al expediente sin completar una nota</button>
     </ClinicalSection>
     {contexto?.error && <p role="alert">No se pudo cargar el contexto clínico. No se habilitarán confirmaciones.</p>}

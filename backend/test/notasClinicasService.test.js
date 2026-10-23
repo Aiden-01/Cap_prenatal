@@ -37,6 +37,7 @@ function escenario({ permisos = ['pacientes.ver', 'notas_evolucion.registrar'], 
         try { return await fn(db); } catch (err) { row = old; throw err; }
       },
       obtenerPaciente: async () => ({ id: 10 }),
+      obtenerPacientePdf: async () => ({ id: 10, nombres: 'Paciente sintética', apellidos: 'Prueba', no_expediente: 'SYN-120' }),
       obtenerPorClaveIdempotencia: async () => row,
       crear: async data => (row = { id: 7, ...data, estado: 'borrador', version: 1,
         finalizador_usuario_id: null, finalizada_at: null }),
@@ -51,6 +52,19 @@ function escenario({ permisos = ['pacientes.ver', 'notas_evolucion.registrar'], 
   return { crear, req, dependencies, events, calls, get row() { return row; },
     setRow: value => { row = value; } };
 }
+
+test('PDF de nota usa permiso del tipo almacenado, pertenencia y mínimo de paciente en el mismo contexto', async () => {
+  const env = escenario({ permisos: ['pacientes.ver', 'notas_evolucion.registrar', 'notas_evolucion.ver'] });
+  await env.crear();
+  const result = await service.obtenerNotaParaPdf({ pacienteId: 10, notaId: 7, req: env.req, dependencies: env.dependencies });
+  assert.equal(result.nota.contenido, body.contenido); assert.equal(result.paciente.no_expediente, 'SYN-120');
+  assert.ok(!Object.hasOwn(result.nota, 'solicitud_hash'));
+  await assert.rejects(service.obtenerNotaParaPdf({ pacienteId: 11, notaId: 7, req: env.req, dependencies: env.dependencies }), { code: 'NOTA_NO_ENCONTRADA' });
+  const registrar = escenario(); await registrar.crear();
+  await assert.rejects(service.obtenerNotaParaPdf({ pacienteId: 10, notaId: 7, req: registrar.req, dependencies: registrar.dependencies }), { code: 'PERMISO_REQUERIDO' });
+  env.setRow({ ...env.row, tipo: 'nota_enfermeria' });
+  await assert.rejects(service.obtenerNotaParaPdf({ pacienteId: 10, notaId: 7, req: env.req, dependencies: env.dependencies }), { code: 'PERMISO_REQUERIDO' });
+});
 
 test('borrador y replay no exponen contenido, snapshot ni huella a quien solo registra', async () => {
   const env = escenario();

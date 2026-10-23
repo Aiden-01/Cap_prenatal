@@ -1149,6 +1149,9 @@ export default function ExpedientePaciente() {
         <SemaforoCompletitud pacienteId={id} initialData={buildCompletitudFromExp(exp, id)} />
       )}
 
+      {canAccess(usuario, ACCESS.noteFollowup) && <button type="button" className="btn-secondary"
+        onClick={() => navigate(`/pacientes/${id}/notas${embarazoSeleccionado?.id ? `?embarazo_id=${embarazoSeleccionado.id}` : ''}`)}>Notas clínicas</button>}
+
       {/* ── TABS ── */}
       {hasEmbarazo && (
         <div className="content-tabs" style={{ marginBottom: "1.5rem", marginTop: "1.5rem" }}>

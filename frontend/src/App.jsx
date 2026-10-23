@@ -13,6 +13,7 @@ const Pacientes = lazy(() => import("./pages/Pacientes"));
 const NuevaPaciente = lazy(() => import("./pages/NuevaPaciente"));
 const ExpedientePaciente = lazy(() => import("./pages/ExpedientePaciente"));
 const NuevoControl = lazy(() => import("./pages/NuevoControl"));
+const NotasClinicas = lazy(() => import("./pages/NotasClinicas"));
 const SeguimientoNotasControl = lazy(() => import("./pages/SeguimientoNotasControl"));
 const FichaRiesgo = lazy(() => import("./pages/FichaRiesgo"));
 const PlanPartoForm = lazy(() => import("./pages/PlanPartoForm"));
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="pacientes" element={<PrivateRoute access={ACCESS.patients}><LazyPage><Pacientes /></LazyPage></PrivateRoute>} />
           <Route path="pacientes/:id" element={<PrivateRoute access={ACCESS.patients}><LazyPage><ExpedientePaciente /></LazyPage></PrivateRoute>} />
+          <Route path="pacientes/:id/notas" element={<PrivateRoute access={ACCESS.noteFollowup}><LazyPage><NotasClinicas /></LazyPage></PrivateRoute>} />
           <Route path="pacientes/:id/editar" element={<PrivateRoute access={ACCESS.editPatient}><LazyPage><NuevaPaciente /></LazyPage></PrivateRoute>} />
           <Route path="pacientes/:id/controles/nuevo" element={<PrivateRoute access={ACCESS.newControl}><LazyPage><NuevoControl /></LazyPage></PrivateRoute>} />
           <Route path="pacientes/:id/controles/:controlId" element={<PrivateRoute access={ACCESS.patients}><LazyPage><NuevoControl consultationOnly /></LazyPage></PrivateRoute>} />

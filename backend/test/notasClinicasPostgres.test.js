@@ -164,6 +164,24 @@ test('CPREN-118: notas clínicas, seguridad y concurrencia en PostgreSQL tempora
       for (const field of ['contenido', 'responsable_snapshot', 'solicitud_hash', 'clave_idempotencia']) assert.equal(Object.hasOwn(result, field), false, field);
     };
 
+    await t.test('CPREN-120: PDF real médico y enfermería con autorización, logos y auditoría privada', async () => {
+      const { PDFDocument } = require('pdf-lib');
+      for (const [tipo, responsableId, lector] of [['nota_evolucion', 3, 6], ['nota_enfermeria', 4, 7]]) {
+        const note = await create({ tipo, contenido: 'NARRATIVA-PDF-PRIVADA áéíóú ñ', responsable: { tipo: 'usuario', usuario_id: responsableId } });
+        const pdfUrl = `http://127.0.0.1:${server.address().port}/api/${route(note.id)}/pdf`;
+        const denied = await fetch(pdfUrl, { headers: { authorization: `Bearer ${tokens[2]}` } });
+        assert.equal(denied.status, 403, 'registrar no confiere lectura PDF');
+        const response = await fetch(pdfUrl, { headers: { authorization: `Bearer ${tokens[lector]}` } });
+        assert.equal(response.status, 200); assert.equal(response.headers.get('content-type'), 'application/pdf');
+        assert.ok(response.headers.get('cache-control').includes('no-store'));
+        const pdf = await PDFDocument.load(await response.arrayBuffer());
+        assert.equal(pdf.getPage(0).getWidth(), 612); assert.equal(pdf.getPage(0).getHeight(), 792);
+        assert.equal((await send(`${route(note.id, 2)}/pdf`, 'GET', undefined, lector)).status, 404);
+      }
+      const events = (await db.query("SELECT datos_nuevos FROM auditoria_eventos WHERE descripcion='pdf_clinico_generado'")).rows;
+      assert.equal(events.length, 2); assert.ok(!JSON.stringify(events).includes('NARRATIVA-PDF-PRIVADA'));
+      assert.deepEqual(await contextSnapshot(), contextBeforeNotes);
+    });
     await t.test('permisos independientes, autenticación y CSRF sin lectura implícita por registrar/finalizar', async () => {
       assert.equal((await send(route(), 'GET', undefined, null)).status, 401);
       assert.equal((await send(route(), 'POST', freshBody(), 9)).status, 403);
@@ -433,6 +451,7 @@ test('CPREN-118: notas clínicas, seguridad y concurrencia en PostgreSQL tempora
       try { await assertSchemaCompatible(fresh); } finally { await fresh.end(); }
     });
   } finally {
+    await require('../src/services/puppeteerBrowserManager').puppeteerBrowserManager.close();
     if (server) await new Promise(resolve => server.close(resolve));
     appPool.query = previous.query; appPool.connect = previous.connect; dotenv.config = previous.dotenv;
     for (const key of envKeys) {

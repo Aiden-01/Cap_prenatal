@@ -250,12 +250,13 @@ test('CPREN-119: seguimiento, controles y notas en PostgreSQL temporal propio', 
       assert.equal((await send(route(rollbackControl), 'POST', confirmBody())).status, 409);
       await db.query("UPDATE embarazos SET estado='activo' WHERE id=11");
     });
-    await t.test('Chrome real escritorio/móvil conserva control y recupera seguimiento persistido', {
+    await t.test('Chrome real: control/seguimiento y editor CPREN-120 médico, AE y EP', {
       skip: process.env.RUN_SEGUIMIENTO_BROWSER !== '1',
     }, async () => {
       const count = (await db.query('SELECT count(*)::int AS n FROM notas_clinicas')).rows[0].n;
       await require('./helpers/seguimientoNotasBrowser').verificarSeguimientoBrowser({ apiPort: server.address().port, token: tokens[1], t });
-      assert.equal((await db.query('SELECT count(*)::int AS n FROM notas_clinicas')).rows[0].n, count);
+      assert.equal((await db.query('SELECT count(*)::int AS n FROM notas_clinicas')).rows[0].n, count + 3,
+        'Solo tres notas creadas explícitamente; navegar y recuperar principal no duplican');
     });
     await t.test('instalación nueva y bootstrap oficial incluyen 027 y checksums', async () => {
       await db.query('CREATE DATABASE seguimiento_bootstrap');
@@ -274,6 +275,7 @@ test('CPREN-119: seguimiento, controles y notas en PostgreSQL temporal propio', 
       } finally { await empty.end(); }
     });
   } finally {
+    await require('../src/services/puppeteerBrowserManager').puppeteerBrowserManager.close();
     if (server) await new Promise(resolve => server.close(resolve));
     appPool.query = previous.query; appPool.connect = previous.connect; dotenv.config = previous.dotenv;
     for (const key of envKeys) { if (previous.env[key] === undefined) delete process.env[key]; else process.env[key] = previous.env[key]; }

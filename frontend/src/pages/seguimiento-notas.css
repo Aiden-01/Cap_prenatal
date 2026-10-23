@@ -19,3 +19,8 @@
 .prenatal-document-followup { padding: .6rem 1rem; border-top: 1px solid var(--border); }
 .prenatal-document-followup p { margin: .3rem 0; }
 .control-save-confirmation { padding: 1.5rem; display: grid; gap: 1rem; }
+.nota-clinica { min-width: 0; overflow-wrap: anywhere; }
+.nota-clinica textarea { width: 100%; min-width: 0; box-sizing: border-box; resize: vertical; padding: .75rem; font: inherit; line-height: 1.6; }
+.nota-clinica button, .nota-historial button { margin: .4rem .4rem .4rem 0; white-space: normal; }
+.nota-historial { padding: .75rem 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.nota-clinica input[type="checkbox"] { width: auto; }

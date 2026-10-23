@@ -1,0 +1,41 @@
+{
+  "synthetic_only": true,
+  "documents": [
+    {
+      "file": "cpren120-nota_evolucion-sintetica.pdf",
+      "pages": 9,
+      "letter_portrait": true,
+      "logos_each_page": true,
+      "full_narrative_accents_verified": true,
+      "bounds_and_header_footer_separation_verified": true
+    },
+    {
+      "file": "cpren120-nota_enfermeria-sintetica.pdf",
+      "pages": 9,
+      "letter_portrait": true,
+      "logos_each_page": true,
+      "full_narrative_accents_verified": true,
+      "bounds_and_header_footer_separation_verified": true
+    }
+  ],
+  "assets": [
+    {
+      "file": "gobierno-guatemala-mspas.png",
+      "size": [
+        421,
+        151
+      ],
+      "mode": "RGBA",
+      "sha256": "be807ea1e1cbd1109975ed5d04f7a5c9bba0a3d70b36a78ed7c553b962e85425"
+    },
+    {
+      "file": "ddriss-peten-area-sur-oriente.png",
+      "size": [
+        158,
+        151
+      ],
+      "mode": "RGBA",
+      "sha256": "a15796e379264a52c8c6eab68743eb28df1b83ede31d559aef910744e5ca5ef8"
+    }
+  ]
+}

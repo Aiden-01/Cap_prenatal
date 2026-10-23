@@ -88,6 +88,11 @@ async function obtenerPaciente(id, db = pool, { bloquear = true } = {}) {
   return rows[0] || null;
 }
 
+async function obtenerPacientePdf(id, db = pool) {
+  const { rows } = await db.query('SELECT id, nombres, apellidos, no_expediente FROM pacientes WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
 async function obtenerEmbarazo(id, db = pool, { bloquear = true } = {}) {
   const { rows } = await db.query(`SELECT id, paciente_id, estado FROM embarazos WHERE id = $1${bloquear ? ' FOR SHARE' : ''}`, [id]);
   return rows[0] || null;
@@ -108,6 +113,7 @@ module.exports = {
   finalizarCaptura,
   listarPorPaciente,
   obtenerPaciente,
+  obtenerPacientePdf,
   obtenerEmbarazo,
   obtenerControl,
 };

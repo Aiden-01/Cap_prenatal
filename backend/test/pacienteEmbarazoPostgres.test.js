@@ -18,7 +18,7 @@ const diagnosticSql = fs.readFileSync(path.join(__dirname,
 
 test('schema y 021 comparten exactamente el bloque de integridad', () => {
   const schema = fs.readFileSync(path.join(__dirname, '../src/db/schema.sql'), 'utf8');
-  assert.ok(schema.includes(sql.trimEnd()));
+  assert.ok(schema.replace(/\r\n/g, '\n').includes(sql.trimEnd().replace(/\r\n/g, '\n')));
 });
 
 async function isolated(callback) {
