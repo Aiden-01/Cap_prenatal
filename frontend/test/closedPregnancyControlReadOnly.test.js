@@ -57,6 +57,15 @@ test("payload de edicion omite la cita gestionada y conserva NULL a fecha sin ci
   assert.deepEqual(payload, { motivo_consulta: "Actualizado", cita_siguiente: "2026-09-17" });
 });
 
+test("payload omite campos retirados aun si llegan vacios o con datos historicos", () => {
+  for (const value of ["", "Dato historico sintetico"]) {
+    const original = { peso_kg: 63, impresion_clinica: value, tratamiento: value };
+    assert.deepEqual(preparePrenatalControlUpdatePayload(original, null), { peso_kg: 63 });
+    assert.equal(original.impresion_clinica, value);
+    assert.equal(original.tratamiento, value);
+  }
+});
+
 for (const estado of ["activo", "puerperio", "cerrado"]) {
   test(`separa consulta y edicion del control en embarazo ${estado}`, () => {
     const puedeConsultar = canConsultPrenatalControl(controlContext);
@@ -99,7 +108,8 @@ test("Abrir navega por permiso de consulta sin depender del acordeon ni de edici
   assert.match(timeline, /onClick=\{onToggle\}/);
   assert.match(timeline, /isOpen=\{expandedId === control\.id\}/);
   assert.match(timeline, /disabled=\{!puedeConsultar\}/);
-  assert.doesNotMatch(timeline, />Editar</);
+  assert.match(timeline, /canEditPrenatalControl\(/);
+  assert.match(timeline, /navigate\(prenatalControlEditPath/);
   assert.doesNotMatch(timeline, />Eliminar</);
 });
 
@@ -119,13 +129,14 @@ test("el detalle cerrado carga el GET y muestra el formulario en solo lectura", 
   assert.doesNotMatch(detail, />\s*Eliminar\s*</);
 });
 
-test("el expediente entrega permisos separados de lectura y creacion", async () => {
+test("el expediente entrega permisos separados de lectura, creacion y edicion", async () => {
   const expediente = await source("src/pages/ExpedientePaciente.jsx");
 
   assert.match(expediente, /puedeConsultarControles.*"pacientes\.ver"/);
   assert.match(expediente, /puedeCrearControles.*"controles\.crear"/);
   assert.match(expediente, /puedeConsultar=\{puedeConsultarControles\}/);
   assert.match(expediente, /puedeCrear=\{puedeCrearControles\}/);
+  assert.match(expediente, /puedeEditar=\{puedeEditarControles\}/);
   assert.match(expediente, /estadoEmbarazo=\{estadoEmbarazo\}/);
   assert.match(expediente, /const puedeRegistrarPrenatal = canCreatePrenatalControl/);
 });

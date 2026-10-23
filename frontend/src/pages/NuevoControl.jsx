@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useGlobalToast } from "../context/ToastContext";
@@ -11,6 +11,9 @@ import {
   Baby,
   BookOpen,
   CalendarDays,
+  CheckCircle2,
+  ChevronLeft,
+  Circle,
   ClipboardList,
   FileText,
   FlaskConical,
@@ -35,7 +38,6 @@ import {
   canConsultPrenatalControl,
   canEditPrenatalControl,
   preparePrenatalControlUpdatePayload,
-  prenatalControlEditPath,
 } from "../utils/prenatalControlAccess";
 import "./nuevo-control.css";
 import { puedeLeerNotas, seguimientoNotasPath } from "../utils/seguimientoNotas";
@@ -285,8 +287,7 @@ const INIT = {
   orient_vacunacion_nino: false, orient_pre_post_prueba_vih: false,
   orient_importancia_atenciones: false, orient_tratamiento_its_pareja: false,
   orient_otros: "",
-  // IC / Tx
-  impresion_clinica: "", tratamiento: "", cita_siguiente: "",
+  cita_siguiente: "",
 };
 
 const initialControlForm = () => ({
@@ -298,8 +299,8 @@ const initialControlForm = () => ({
 const TABS = [
   { id: "general",       label: "General",       icon: Stethoscope  },
   { id: "laboratorio",   label: "Laboratorios",  icon: FlaskConical },
-  { id: "suplementacion",label: "Suplementación",icon: Pill         },
   { id: "orientaciones", label: "Orientaciones", icon: BookOpen     },
+  { id: "suplementacion",label: "Suplementación",icon: Pill         },
 ];
 
 const CONTROL_FIELD_LABELS = {
@@ -348,6 +349,26 @@ const CONTROL_TAB_BY_FIELD = {
   acido_folico_tabletas: "suplementacion",
 };
 
+// Includes conditional lab fields and the shared foundation fields.
+function controlTabForField(field) {
+  if (/^orient_/.test(field)) return "orientaciones";
+  if (/^(sulfato_ferroso|acido_folico|suplementacion_)/.test(field)) return "suplementacion";
+  if (/^(hematologia_|glicemia_|grupo_rh_|orina_|heces_|vih_|vdrl_|torch_|papanicolau_ivaa_|hepatitis_b_|otros_lab|usg_)/.test(field)) return "laboratorio";
+  return CONTROL_TAB_BY_FIELD[field] || "general";
+}
+
+function SectionReview({ reviewed, needsCorrection, onToggle }) {
+  return (
+    <div className="control-section-review">
+      <span>{needsCorrection ? "Requiere corrección" : reviewed ? "Revisada" : "Por revisar"}</span>
+      <button type="button" className="btn-secondary" aria-pressed={reviewed}
+        disabled={needsCorrection && !reviewed} onClick={onToggle}>
+        {reviewed ? "Volver a revisar sección" : "Marcar sección como revisada"}
+      </button>
+    </div>
+  );
+}
+
 function toDateInputValue(value, fallback = "") {
   if (!value) return fallback;
   const dateOnly = String(value).split("T")[0];
@@ -386,6 +407,7 @@ export default function NuevoControl({ consultationOnly = false }) {
   const expedientePath = hasEmbarazoId
     ? `/pacientes/${id}?embarazo_id=${encodeURIComponent(embarazoId)}&tab=controles`
     : `/pacientes/${id}?tab=controles`;
+  const volverAlExpediente = () => navigate(expedientePath);
   const toast    = useGlobalToast();
   const { usuario } = useAuth();
   const tienePermisoLectura = Boolean(usuario?.permisos?.includes("pacientes.ver"));
@@ -399,6 +421,34 @@ export default function NuevoControl({ consultationOnly = false }) {
   useEffect(() => { if (savedControl) savedHeading.current?.focus(); }, [savedControl]);
   const [loadingData, setLoadingData] = useState(true);
   const [tab, setTab]         = useState("general");
+  const [tabNavigation, setTabNavigation] = useState(0);
+  const navigationRef = useRef(null);
+  const activePanelRef = useRef(null);
+  useLayoutEffect(() => {
+    if (!tabNavigation) return;
+    let cancelled = false;
+    let frame;
+    const revealPanel = () => {
+      if (cancelled) return;
+      frame = requestAnimationFrame(() => {
+        if (!activePanelRef.current || !navigationRef.current) return;
+        const navigation = navigationRef.current;
+        const stickyTop = Number.parseFloat(getComputedStyle(navigation).top) || 0;
+        const top = window.scrollY + activePanelRef.current.getBoundingClientRect().top
+          - navigation.getBoundingClientRect().height - stickyTop - 12;
+        // Measure after the entrance animation; reduced motion has no animation to wait for.
+        window.scrollTo({ top: Math.max(0, top), behavior: "instant" });
+      });
+    };
+    const animations = activePanelRef.current?.getAnimations?.() || [];
+    if (animations.length) Promise.all(animations.map((animation) => animation.finished.catch(() => {}))).then(revealPanel);
+    else revealPanel();
+    return () => { cancelled = true; cancelAnimationFrame(frame); };
+  }, [tabNavigation]);
+  const selectTab = (nextTab) => {
+    setTab(nextTab);
+    setTabNavigation((previous) => previous + 1);
+  };
   useEffect(() => {
     const current = { tab, navigationKey: location.key };
     setScreenTab(current);
@@ -414,6 +464,9 @@ export default function NuevoControl({ consultationOnly = false }) {
   const [pregnancyState, setPregnancyState] = useState(null);
   const [structuredAppointment, setStructuredAppointment] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [reviewedSections, setReviewedSections] = useState({});
+  const sectionHasErrors = (section) => Object.keys(fieldErrors).some((field) => controlTabForField(field) === section);
+  const reviewedCount = TABS.filter(({ id: section }) => reviewedSections[section] && !sectionHasErrors(section)).length;
   const todayInputValue = getGuatemalaDateInputValue();
   const puedeConsultar = editando && canConsultPrenatalControl({
     canRead: tienePermisoLectura,
@@ -439,6 +492,9 @@ export default function NuevoControl({ consultationOnly = false }) {
 
   const set = (k, v) => {
     if (!puedeGuardar) return;
+    if (form[k] !== v) {
+      setReviewedSections((previous) => ({ ...previous, [controlTabForField(k)]: false }));
+    }
     setForm((f) => ({ ...f, [k]: v }));
     setFieldErrors((errors) => {
       if (!errors[k]) return errors;
@@ -462,8 +518,8 @@ export default function NuevoControl({ consultationOnly = false }) {
 
     event.preventDefault();
     const nextTabId = TABS[nextIndex].id;
-    setTab(nextTabId);
-    requestAnimationFrame(() => document.getElementById(`control-tab-${nextTabId}`)?.focus());
+    selectTab(nextTabId);
+    requestAnimationFrame(() => document.getElementById(`control-tab-${nextTabId}`)?.focus({ preventScroll: true }));
   };
   const visibleFieldErrors = Object.entries(fieldErrors).map(([field, message]) => ({
     field,
@@ -497,6 +553,7 @@ export default function NuevoControl({ consultationOnly = false }) {
 
     Promise.all([controlesRequest, api.get(`/pacientes/${id}/expediente`, { params: { embarazo_id: embarazoId } })])
       .then(([{ data }, { data: expediente }]) => {
+        setReviewedSections({});
         const readOnly = Boolean(expediente?.is_read_only);
         const selectedState = expediente?.embarazo_seleccionado?.estado || null;
         setIsReadOnly(readOnly);
@@ -581,6 +638,8 @@ export default function NuevoControl({ consultationOnly = false }) {
       torch_resultado_valor: "",
       papanicolau_ivaa_fecha_toma: "",
     };
+    delete payload.impresion_clinica;
+    delete payload.tratamiento;
     if (editando) {
       payload = preparePrenatalControlUpdatePayload(payload, structuredAppointment);
     }
@@ -605,8 +664,8 @@ export default function NuevoControl({ consultationOnly = false }) {
         : inferControlFieldErrors(err);
       const firstErrorField = Object.keys(nextFieldErrors)[0];
       setFieldErrors(nextFieldErrors);
-      if (firstErrorField && CONTROL_TAB_BY_FIELD[firstErrorField]) {
-        setTab(CONTROL_TAB_BY_FIELD[firstErrorField]);
+      if (firstErrorField) {
+        setTab(controlTabForField(firstErrorField));
       }
       const fieldLabel = CONTROL_FIELD_LABELS[firstErrorField];
       toast(
@@ -630,7 +689,7 @@ export default function NuevoControl({ consultationOnly = false }) {
   return (
     <ClinicalWorkflowShell
       className="control-workflow"
-      onBack={() => navigate(expedientePath)}
+      onBack={volverAlExpediente}
       eyebrow="Atención prenatal"
       title={workflowTitle}
       description={workflowDescription}
@@ -642,10 +701,67 @@ export default function NuevoControl({ consultationOnly = false }) {
       {loadingData ? (
         <ClinicalLoadingSkeleton label="Cargando control prenatal" />
       ) : (
-      <form className="control-workflow-form" onSubmit={handleSubmit} onFocusCapture={(event) => {
+      <form className="control-workflow-form" onSubmit={handleSubmit} onInvalidCapture={(event) => {
+        const { name, validationMessage } = event.target;
+        if (name && validationMessage) {
+          setFieldErrors((previous) => ({ ...previous, [name]: validationMessage }));
+          setTab(controlTabForField(name));
+        }
+      }} onFocusCapture={(event) => {
         const selected = captureControlField(event.target.dataset.chatbotField, tab, location.key);
         if (selected) setFocusedField(selected);
       }}>
+        {/* TABS */}
+        {puedeGuardar && (
+          <p className="control-review-hint" id="control-review-hint">
+            La revisión es una guía para esta captura. No se guarda como revisión clínica y no es necesaria para guardar.
+          </p>
+        )}
+        <div className="control-sticky-navigation" ref={navigationRef}>
+          <div className="control-navigation-summary">
+            <button type="button" className="btn-secondary" onClick={volverAlExpediente}>
+              <ChevronLeft size={16} aria-hidden="true" /> Volver al expediente
+            </button>
+            {puedeGuardar && (
+              <span role="status" aria-live="polite" aria-describedby="control-review-hint">
+                {reviewedCount} de 4 secciones revisadas
+              </span>
+            )}
+          </div>
+        <div className="control-workflow-tabs" role="tablist" aria-label="Áreas del control prenatal" aria-orientation="horizontal">
+          {TABS.map((t) => {
+            const Icon = t.icon;
+            const needsCorrection = sectionHasErrors(t.id);
+            const reviewed = Boolean(reviewedSections[t.id]);
+            const status = needsCorrection ? "Requiere corrección" : reviewed ? "Revisada" : "Por revisar";
+            const StatusIcon = needsCorrection ? AlertTriangle : reviewed ? CheckCircle2 : Circle;
+            return (
+              <button
+                key={t.id}
+                id={`control-tab-${t.id}`}
+                type="button"
+                role="tab"
+                aria-label={t.label}
+                aria-selected={tab === t.id}
+                aria-controls={`control-panel-${t.id}`}
+                aria-describedby={puedeGuardar ? `control-review-${t.id}` : undefined}
+                tabIndex={tab === t.id ? 0 : -1}
+                onClick={() => selectTab(t.id)}
+                onKeyDown={(event) => handleTabKeyDown(event, t.id)}
+                className={`control-workflow-tab ${tab === t.id ? "is-active" : ""}`}
+              >
+                <Icon size={14} aria-hidden="true" />{t.label}
+                {puedeGuardar && (
+                  <span id={`control-review-${t.id}`} className={`control-review-state ${needsCorrection ? "needs-correction" : reviewed ? "is-reviewed" : "is-pending"}`}>
+                    <StatusIcon size={15} aria-hidden="true" /><span className="clinical-sr-only">{status}</span>
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        </div>
+
         {soloLectura && (
           <ClinicalNotice variant="readonly" title="Consulta de solo lectura" className="control-workflow-notice">
             {pregnancyState === "puerperio"
@@ -654,7 +770,7 @@ export default function NuevoControl({ consultationOnly = false }) {
                 ? "Este embarazo está cerrado. Puedes revisar toda la información del control, pero no modificarla."
                 : !tienePermisoEscritura
                   ? "No tienes permiso para editar este control. Puedes consultar la información autorizada, pero no modificarla."
-                  : "Esta vista es de consulta. Para modificar el control, utiliza la acción Editar."}
+                  : "Esta vista es de consulta. Para modificar el control, utiliza Editar en el historial del expediente."}
           </ClinicalNotice>
         )}
 
@@ -737,35 +853,13 @@ export default function NuevoControl({ consultationOnly = false }) {
         </div>
         </fieldset>
 
-        {/* TABS */}
-        <div className="control-workflow-tabs" role="tablist" aria-label="Áreas del control prenatal" aria-orientation="horizontal">
-          {TABS.map((t) => {
-            const Icon = t.icon;
-            return (
-              <button
-                key={t.id}
-                id={`control-tab-${t.id}`}
-                type="button"
-                role="tab"
-                aria-selected={tab === t.id}
-                aria-controls={`control-panel-${t.id}`}
-                tabIndex={tab === t.id ? 0 : -1}
-                onClick={() => setTab(t.id)}
-                onKeyDown={(event) => handleTabKeyDown(event, t.id)}
-                className={`control-workflow-tab ${tab === t.id ? "is-active" : ""}`}
-              >
-                <Icon size={14} aria-hidden="true" />{t.label}
-              </button>
-            );
-          })}
-        </div>
-
         <fieldset disabled={soloLectura} className="control-form-fieldset">
         {/* ── TAB: GENERAL ── */}
         {tab === "general" && (
           <div
             key="general"
             id="control-panel-general"
+            ref={activePanelRef}
             className="control-tab-panel"
             role="tabpanel"
             aria-labelledby="control-tab-general"
@@ -837,23 +931,11 @@ export default function NuevoControl({ consultationOnly = false }) {
             </ClinicalSection>
 
             <ClinicalSection
-              title="Impresión clínica y tratamiento"
-              description="Conclusión de la atención, conducta indicada y seguimiento."
+              title="Seguimiento y próxima cita"
+              description="Fecha del siguiente control prenatal."
               icon={FileText}
             >
               <div className="form-section-body col-2">
-                <Field label="Impresión clínica" htmlFor="control-impresion_clinica" col={2} error={fieldError("impresion_clinica")}>
-                  <textarea id="control-impresion_clinica" name="impresion_clinica" className={inputClass("impresion_clinica")} rows={2} value={form.impresion_clinica}
-                    aria-invalid={Boolean(fieldError("impresion_clinica"))}
-                    aria-describedby={fieldError("impresion_clinica") ? "control-impresion_clinica-error" : undefined}
-                    onChange={(e) => set("impresion_clinica", e.target.value)} />
-                </Field>
-                <Field label="Tratamiento" htmlFor="control-tratamiento" col={2} error={fieldError("tratamiento")}>
-                  <textarea id="control-tratamiento" name="tratamiento" className={inputClass("tratamiento")} rows={2} value={form.tratamiento}
-                    aria-invalid={Boolean(fieldError("tratamiento"))}
-                    aria-describedby={fieldError("tratamiento") ? "control-tratamiento-error" : undefined}
-                    onChange={(e) => set("tratamiento", e.target.value)} />
-                </Field>
                 {editando && structuredAppointment ? (
                   <Field label="Cita siguiente" htmlFor="control-cita_siguiente">
                     <input
@@ -877,6 +959,10 @@ export default function NuevoControl({ consultationOnly = false }) {
                 )}
               </div>
             </ClinicalSection>
+            {puedeGuardar && (
+              <SectionReview reviewed={Boolean(reviewedSections[tab])} needsCorrection={sectionHasErrors(tab)}
+                onToggle={() => setReviewedSections((previous) => ({ ...previous, [tab]: !previous[tab] }))} />
+            )}
           </div>
         )}
 
@@ -885,6 +971,7 @@ export default function NuevoControl({ consultationOnly = false }) {
           <div
             key="laboratorio"
             id="control-panel-laboratorio"
+            ref={activePanelRef}
             className="control-tab-panel"
             role="tabpanel"
             aria-labelledby="control-tab-laboratorio"
@@ -1032,6 +1119,10 @@ export default function NuevoControl({ consultationOnly = false }) {
               </Field>
             </div>
             </ClinicalSection>
+            {puedeGuardar && (
+              <SectionReview reviewed={Boolean(reviewedSections[tab])} needsCorrection={sectionHasErrors(tab)}
+                onToggle={() => setReviewedSections((previous) => ({ ...previous, [tab]: !previous[tab] }))} />
+            )}
           </div>
         )}
 
@@ -1040,6 +1131,7 @@ export default function NuevoControl({ consultationOnly = false }) {
           <div
             key="suplementacion"
             id="control-panel-suplementacion"
+            ref={activePanelRef}
             className="control-tab-panel"
             role="tabpanel"
             aria-labelledby="control-tab-suplementacion"
@@ -1090,6 +1182,10 @@ export default function NuevoControl({ consultationOnly = false }) {
                 </Field>
               </div>
             </ClinicalSection>
+            {puedeGuardar && (
+              <SectionReview reviewed={Boolean(reviewedSections[tab])} needsCorrection={sectionHasErrors(tab)}
+                onToggle={() => setReviewedSections((previous) => ({ ...previous, [tab]: !previous[tab] }))} />
+            )}
           </div>
         )}
 
@@ -1098,6 +1194,7 @@ export default function NuevoControl({ consultationOnly = false }) {
           <div
             key="orientaciones"
             id="control-panel-orientaciones"
+            ref={activePanelRef}
             className="control-tab-panel"
             role="tabpanel"
             aria-labelledby="control-tab-orientaciones"
@@ -1129,6 +1226,10 @@ export default function NuevoControl({ consultationOnly = false }) {
               </Field>
             </div>
             </ClinicalSection>
+            {puedeGuardar && (
+              <SectionReview reviewed={Boolean(reviewedSections[tab])} needsCorrection={sectionHasErrors(tab)}
+                onToggle={() => setReviewedSections((previous) => ({ ...previous, [tab]: !previous[tab] }))} />
+            )}
           </div>
         )}
         </fieldset>
@@ -1139,12 +1240,9 @@ export default function NuevoControl({ consultationOnly = false }) {
           status={loading ? "Guardando control" : soloLectura ? "Modo de consulta" : editando ? "Edición del control" : "Nuevo control"}
           detail={loading ? "Espera mientras se registra la información" : workflowDescription}
         >
-          <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>
+          <button type="button" className="btn-secondary" onClick={volverAlExpediente}>
             {soloLectura ? "Volver" : "Cancelar"}
           </button>
-          {consultationOnly && puedeEditar && (
-            <button type="button" className="btn-secondary" onClick={() => navigate(prenatalControlEditPath({ pacienteId: id, embarazoId, controlId }))}>Editar</button>
-          )}
           {puedeGuardar && (
             <button type="submit" className="btn-primary" disabled={loading}
               style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>

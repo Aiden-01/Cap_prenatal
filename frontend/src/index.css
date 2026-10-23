@@ -2760,7 +2760,7 @@ video {
 .prenatal-controls-head,
 .prenatal-control-row {
   display: grid;
-  grid-template-columns: 2.15rem 0.7fr 1.05fr 0.85fr 0.95fr 0.85fr 0.85fr 1.1fr 1.05fr 0.9fr;
+  grid-template-columns: 2.15rem 0.7fr 1.05fr 0.85fr 0.95fr 0.85fr 0.85fr 1.1fr 1.05fr minmax(11.5rem, max-content);
   align-items: center;
   gap: 0.55rem;
 }
@@ -2777,6 +2777,10 @@ video {
   align-items: center;
   gap: 0.32rem;
   min-width: 0;
+}
+
+.prenatal-controls-head span:last-child {
+  justify-content: center;
 }
 
 .prenatal-control-record {
@@ -2851,21 +2855,36 @@ video {
 
 .prenatal-actions {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  justify-content: center;
 }
 
-.prenatal-open-button {
+.prenatal-actions > .btn-secondary.prenatal-open-button {
   min-height: 2.15rem;
   padding: 0.42rem 0.72rem;
   color: var(--primary);
-  background: transparent;
+  background: color-mix(in srgb, var(--primary-lt) 48%, var(--surface));
   border-color: color-mix(in srgb, var(--primary) 48%, var(--border));
   font-size: 0.8rem;
+  white-space: nowrap;
 }
 
-.prenatal-open-button:hover {
+.prenatal-actions > .prenatal-open-button:hover {
   background: var(--primary-lt);
   border-color: var(--primary);
+}
+
+.prenatal-actions > .prenatal-open-button + .prenatal-open-button {
+  color: var(--text);
+  background: var(--surface2);
+  border-color: var(--border);
+}
+
+.prenatal-actions > .prenatal-open-button + .prenatal-open-button:hover {
+  background: var(--surface3, var(--surface));
+  border-color: var(--text-muted);
 }
 
 .prenatal-observation-panel {
@@ -2998,8 +3017,8 @@ video {
   }
 
   .prenatal-actions {
-    grid-column: 3;
-    grid-row: 1;
+    grid-column: 1 / -1;
+    justify-content: flex-end;
   }
 
   .prenatal-observation-panel {

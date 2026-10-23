@@ -41,11 +41,52 @@ function mount({ entry = '/pacientes/1/controles/nuevo?embarazo_id=2', permisos 
       <Route path="/pacientes/:id/controles/:controlId/editar" element={<NuevoControl />} />
       <Route path="/pacientes/:id/controles/:controlId/seguimiento-notas" element={<SeguimientoNotasControl />} />
       <Route path="/pacientes/:id" element={<TimelineControles pacienteId={1} embarazoId={2} controles={controls}
-        usuario={auth.usuario} puedeConsultar estadoEmbarazo={estado} isReadOnly={estado === 'cerrado'} />} />
+        usuario={auth.usuario} puedeConsultar puedeEditar={auth.usuario.permisos.includes('controles.editar')}
+        estadoEmbarazo={estado} isReadOnly={estado === 'cerrado'} />} />
     </Routes>
   </MemoryRouter></ChatbotScreenProvider></ToastContext.Provider>);
 }
 afterEach(() => { cleanup(); vi.restoreAllMocks(); toast.mockClear(); });
+
+test('revisión UX voluntaria conserva confirmación, ID real y payload independiente de notas', async () => {
+  mount();
+  await screen.findByRole('button', { name: /Guardar control/ });
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent.replace('Por revisar', '')))
+    .toEqual(['General', 'Laboratorios', 'Orientaciones', 'Suplementación']);
+  for (const name of ['General', 'Laboratorios', 'Orientaciones', 'Suplementación']) {
+    fireEvent.click(screen.getByRole('tab', { name }));
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar sección como revisada' }));
+  }
+  expect(screen.getByText('4 de 4 secciones revisadas')).toBeTruthy();
+  fireEvent.submit(document.querySelector('form'));
+  await screen.findByRole('heading', { name: 'Control registrado exitosamente' });
+  const payload = api.post.mock.calls[0][1];
+  for (const field of ['impresion_clinica', 'tratamiento', 'reviewedSections', 'notas']) {
+    expect(payload).not.toHaveProperty(field);
+  }
+  // Main previously navigated after 800 ms; creation must retain its confirmation.
+  await new Promise(resolve => setTimeout(resolve, 900));
+  expect(screen.getByTestId('location').textContent).toBe('/pacientes/1/controles/nuevo?embarazo_id=2');
+  fireEvent.click(screen.getByRole('button', { name: 'Consultar seguimiento de notas' }));
+  await screen.findByRole('heading', { name: 'Seguimiento documental del control' });
+  expect(api.post).toHaveBeenCalledTimes(1);
+});
+
+for (const estado of ['activo', 'cerrado', 'puerperio']) {
+  test(`historial con nota pendiente conserva acceso a control y permiso de edición (${estado})`, async () => {
+    mount({ entry: '/pacientes/1?embarazo_id=2&tab=controles', estado, seguimiento: [row([doc('pendiente')])] });
+    await screen.findByText(/Nota pendiente/);
+    expect(screen.getByText('Completo', { exact: true })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Abrir', exact: true }).disabled).toBe(false);
+    expect(Boolean(screen.queryByRole('button', { name: 'Editar', exact: true }))).toBe(estado === 'activo');
+    if (estado === 'activo') {
+      fireEvent.click(screen.getByRole('button', { name: 'Editar', exact: true }));
+      await screen.findByRole('button', { name: /Guardar cambios/ });
+      expect(screen.getByTestId('location').textContent).toBe('/pacientes/1/controles/3/editar?embarazo_id=2');
+    }
+    expect(api.post).not.toHaveBeenCalled();
+  });
+}
 
 for (const width of [390, 1366]) {
   test(`control nuevo: confirma ID, evita doble envío y vuelve sin nota (${width}px)`, async () => {

@@ -1,5 +1,10 @@
 # CPREN-119 — Seguimiento documental después del control prenatal
 
+Actualización posterior: la sincronización con main de CHECKPOINT-06 y sus
+resultados propios se documentan en
+[CPREN_119_CHECKPOINT_06_SYNC_MAIN.md](CPREN_119_CHECKPOINT_06_SYNC_MAIN.md).
+El resto de este documento conserva el registro histórico de CHECKPOINT-05.
+
 Sesión: 2026-10-22, equipo Trabajo (PC del CAP El Chal), dispositivo Aiden29.
 Jira: CPREN-119, subtarea de CPREN-12 bajo el Epic CPREN-3.
 Base exacta: `e61979c2b6f5817c7853cbb47d075132d381ffdd` (CPREN-118).

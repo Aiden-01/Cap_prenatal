@@ -20,7 +20,7 @@ function initFieldNames(pageSource) {
 
 test("UX-02D protege la cantidad de propiedades clínicas de los seis formularios", async () => {
   const expectations = [
-    ["src/pages/NuevoControl.jsx", 73],
+    ["src/pages/NuevoControl.jsx", 72],
     ["src/pages/FichaRiesgo.jsx", 51],
     ["src/pages/PlanPartoForm.jsx", 68],
     ["src/pages/PuerperioForm.jsx", 23],
