@@ -65,6 +65,23 @@ test('PDF de nota usa permiso del tipo almacenado, pertenencia y mínimo de paci
   await assert.rejects(service.obtenerNotaParaPdf({ pacienteId: 10, notaId: 7, req: env.req, dependencies: env.dependencies }), { code: 'PERMISO_REQUERIDO' });
 });
 
+test('PDF obtiene la referencia real del control y excluye campos personales ajenos al documento', async () => {
+  const env = escenario({ permisos: ['pacientes.ver', 'notas_evolucion.registrar', 'notas_evolucion.ver'] });
+  await env.crear();
+  env.setRow({ ...env.row, embarazo_id: 11, control_prenatal_id: 903 });
+  let lookups = 0;
+  env.dependencies.notasClinicasRepository.obtenerPacientePdf = async (id, _db, reference) => {
+    lookups++; assert.equal(id, 10); assert.deepEqual(reference, { controlId: 903, embarazoId: 11 });
+    return { id: 10, nombres: 'Paciente sintética', apellidos: 'Prueba', no_expediente: 'SYN-120',
+      control_numero: 2, control_fecha: '2026-10-20', email: 'DATO-EXCLUIDO', capturista_nombre_actual: 'NOMBRE-ACTUAL-EXCLUIDO' };
+  };
+  const result = await service.obtenerNotaParaPdf({ pacienteId: 10, notaId: 7, req: env.req, dependencies: env.dependencies });
+  assert.equal(lookups, 1);
+  assert.deepEqual(result.control, { numero: 2, fecha: '2026-10-20' });
+  assert.deepEqual(Object.keys(result.paciente), ['id', 'nombres', 'apellidos', 'no_expediente']);
+  assert.ok(!JSON.stringify(result).includes('EXCLUIDO'));
+});
+
 test('borrador y replay no exponen contenido, snapshot ni huella a quien solo registra', async () => {
   const env = escenario();
   const created = await env.crear();

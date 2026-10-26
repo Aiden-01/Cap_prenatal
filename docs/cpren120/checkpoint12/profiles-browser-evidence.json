@@ -1,0 +1,21 @@
+{
+  "machine": "HUGUITO",
+  "equipo": "Casa",
+  "synthetic_only": true,
+  "widths": [
+    1440,
+    1280,
+    768,
+    390,
+    320
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "name_username_email_cargo_saved": true,
+  "relogin_updated_identity": true,
+  "self_username_revokes_session": true,
+  "self_relogin_success": true,
+  "page_errors": []
+}

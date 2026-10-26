@@ -1,0 +1,12 @@
+{
+  "suite": "profiles",
+  "command": "node --test --test-concurrency=1 test/perfilesProfesionalesPostgres.test.js",
+  "started": "2026-10-25T16:51:34.823Z",
+  "finished": "2026-10-25T16:52:26.878Z",
+  "exit_code": 0,
+  "signal": null,
+  "machine": "HUGUITO",
+  "equipo": "Casa",
+  "synthetic_only": true,
+  "disposable_postgres_only": true
+}

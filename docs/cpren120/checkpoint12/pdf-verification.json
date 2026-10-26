@@ -1,0 +1,87 @@
+{
+  "synthetic_only": true,
+  "machine": "HUGUITO",
+  "equipo": "Casa",
+  "documents": [
+    {
+      "file": "docs\\cpren120\\checkpoint12\\pdf\\cpren120-nota_evolucion-sintetica.pdf",
+      "pages": 10,
+      "size_points": [
+        612,
+        792
+      ],
+      "exact_narrative_verified": true,
+      "paragraphs": 100,
+      "accents_and_unbroken_word_verified": true,
+      "logos_each_page_original_ratio": true,
+      "signature_and_page_numbers_each_page": true,
+      "within_printable_bounds": true,
+      "no_ruling_over_text": true,
+      "rendered_pages": [
+        1,
+        5,
+        10
+      ]
+    },
+    {
+      "file": "docs\\cpren120\\checkpoint12\\pdf\\cpren120-nota_enfermeria-sintetica.pdf",
+      "pages": 10,
+      "size_points": [
+        612,
+        792
+      ],
+      "exact_narrative_verified": true,
+      "paragraphs": 100,
+      "accents_and_unbroken_word_verified": true,
+      "logos_each_page_original_ratio": true,
+      "signature_and_page_numbers_each_page": true,
+      "within_printable_bounds": true,
+      "no_ruling_over_text": true,
+      "rendered_pages": [
+        1,
+        5,
+        10
+      ]
+    },
+    {
+      "file": "docs\\cpren120\\checkpoint12\\pdf\\cpren120-nota_evolucion-limite-sintetica.pdf",
+      "pages": 8,
+      "size_points": [
+        612,
+        792
+      ],
+      "exact_narrative_verified": true,
+      "unbroken_accented_characters": 20000
+    },
+    {
+      "file": "docs\\cpren120\\checkpoint12\\pdf\\cpren120-nota_enfermeria-limite-sintetica.pdf",
+      "pages": 8,
+      "size_points": [
+        612,
+        792
+      ],
+      "exact_narrative_verified": true,
+      "unbroken_accented_characters": 20000
+    }
+  ],
+  "assets": [
+    {
+      "file": "gobierno-guatemala-mspas.png",
+      "size": [
+        421,
+        151
+      ],
+      "mode": "RGBA",
+      "sha256": "be807ea1e1cbd1109975ed5d04f7a5c9bba0a3d70b36a78ed7c553b962e85425"
+    },
+    {
+      "file": "ddriss-peten-area-sur-oriente.png",
+      "size": [
+        158,
+        151
+      ],
+      "mode": "RGBA",
+      "sha256": "a15796e379264a52c8c6eab68743eb28df1b83ede31d559aef910744e5ca5ef8"
+    }
+  ]
+}

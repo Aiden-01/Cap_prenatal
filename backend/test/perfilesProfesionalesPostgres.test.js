@@ -9,6 +9,7 @@ const { once } = require('node:events');
 const { Pool } = require('pg');
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const dotenv = require('dotenv');
 const appPool = require('../src/db/pool');
 const { applyMigration, migrate } = require('../src/db/migrate');
 const { getJwtConfig } = require('../src/config/env');
@@ -16,7 +17,7 @@ const { csrfMiddleware } = require('../src/middleware/auth');
 const { errorHandler } = require('../src/middleware/errorHandler');
 
 test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal propio', {
-  skip: process.env.RUN_PERFILES_TEMP_POSTGRES !== '1', timeout: 120000,
+  skip: process.env.RUN_PERFILES_TEMP_POSTGRES !== '1', timeout: 180000,
 }, async t => {
   // No lee .env ni acepta URLs/servidores configurados; crea un clúster vacío.
   const bin = process.env.PERFILES_POSTGRES_BIN;
@@ -27,7 +28,7 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
     args, { stdio: 'ignore', windowsHide: true, timeout: 30000 });
   const config = { host: '127.0.0.1', port: 55476, user: 'perfiles_test', password: '', ssl: false,
     database: 'postgres', max: 8, connectionTimeoutMillis: 3000 };
-  const previous = { query: appPool.query, connect: appPool.connect, secret: process.env.JWT_SECRET, nodeEnv: process.env.NODE_ENV };
+  const previous = { query: appPool.query, connect: appPool.connect, dotenv: dotenv.config, secret: process.env.JWT_SECRET, nodeEnv: process.env.NODE_ENV };
   let db, server, started = false;
   try {
     run('initdb', ['-D', dataDir, '-U', 'perfiles_test', '-A', 'trust', '--no-locale', '-E', 'UTF8']);
@@ -36,6 +37,7 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
     db = new Pool(config);
     assert.equal(path.resolve((await db.query('SHOW data_directory')).rows[0].data_directory), path.resolve(dataDir));
     appPool.query = db.query.bind(db); appPool.connect = db.connect.bind(db);
+    dotenv.config = () => ({ parsed: {} });
     process.env.JWT_SECRET = 'synthetic-perfiles-test-only-secret-2026-116'; process.env.NODE_ENV = 'test';
     t.diagnostic(`PostgreSQL ${(await db.query('SHOW server_version')).rows[0].server_version}; temporal propio 127.0.0.1:55476`);
     const schema = fs.readFileSync(path.join(__dirname, '../src/db/schema.sql'), 'utf8');
@@ -122,6 +124,7 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       assert.equal((await send('usuarios', 'GET', undefined, 3)).status, 403);
       assert.equal((await send('usuarios/1', 'GET', undefined, 2)).status, 404);
       assert.equal((await send('usuarios/1', 'PUT', { cargo_id: 1 }, 2)).status, 404);
+      assert.equal((await send('usuarios/1', 'PUT', { username: 'director_oculto', nombre_completo: 'No cambiar' }, 2)).status, 404);
       assert.equal((await send('usuarios/3', 'PUT', { cargo_id: 1 }, 3)).status, 403);
       assert.equal((await send('usuarios/3', 'PUT', { cargo_id: 1 }, 2, false)).status, 403);
       assert.equal((await send('usuarios', 'POST', { ...crearBody, rol: 'director' }, 2)).status, 403);
@@ -253,6 +256,11 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       assert.equal(created.status, 201); const identity = await created.json();
       const original = (await db.query('SELECT * FROM usuarios WHERE id=$1', [identity.id])).rows[0];
       const patient=(await db.query(`INSERT INTO pacientes(no_expediente,nombres,apellidos,registrado_por) VALUES('SYN-CP11-IDENTITY','Paciente sintética','Relación por ID',$1) RETURNING id`,[identity.id])).rows[0];
+      const historicalSnapshot = { tipo: 'usuario', usuario_id: identity.id, nombre_completo: original.nombre_completo,
+        cargo_id: original.cargo_id, cargo_nombre: 'Auxiliar de Enfermería', cargo_codigo: 'AE' };
+      const historicalNote = (await db.query(`INSERT INTO notas_clinicas(paciente_id,tipo,responsable_usuario_id,responsable_snapshot,
+        capturista_usuario_id,clave_idempotencia,solicitud_hash) VALUES($1,'nota_enfermeria',$2,$3,$2,$4,$5) RETURNING *`,
+      [patient.id, identity.id, historicalSnapshot, crypto.randomUUID(), 'e'.repeat(64)])).rows[0];
       const grantBefore = (await db.query('SELECT * FROM usuario_permisos WHERE usuario_id=$1 ORDER BY id', [identity.id])).rows;
       const sessions = [];
       for (let i=0;i<2;i++) {
@@ -269,17 +277,42 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       assert.equal((await db.query('SELECT count(*)::int AS n FROM auth_sessions WHERE usuario_id=$1 AND revoked_at IS NULL',[identity.id])).rows[0].n,2);
       const permissionsBefore=(await db.query('SELECT id,nombre FROM roles ORDER BY id')).rows;
       assert.equal((await send('usuarios/'+identity.id,'PUT',{nombre_completo:'Nombre completo sintético nuevo'},2)).status,200);
+      assert.equal((await db.query('SELECT count(*)::int AS n FROM auth_sessions WHERE usuario_id=$1 AND revoked_at IS NULL',[identity.id])).rows[0].n,2, 'Cambiar solo nombre no revoca sesiones');
+      assert.equal((await send('usuarios/'+identity.id,'PUT',{username:original.username},2)).status,200);
+      assert.equal((await db.query('SELECT count(*)::int AS n FROM auth_sessions WHERE usuario_id=$1 AND revoked_at IS NULL',[identity.id])).rows[0].n,2, 'El mismo username no revoca sesiones');
       assert.equal((await send('usuarios/'+identity.id,'PUT',{username:'identity_renamed'},identity.id)).status,200);
       assert.equal((await send('auth/me','GET',undefined,identity.id)).status,401);
       assert.equal((await db.query('SELECT count(*)::int AS n FROM auth_sessions WHERE usuario_id=$1 AND revoked_at IS NOT NULL',[identity.id])).rows[0].n,2);
       const after=(await db.query('SELECT * FROM usuarios WHERE id=$1',[identity.id])).rows[0];
       assert.equal((await db.query('SELECT registrado_por FROM pacientes WHERE id=$1',[patient.id])).rows[0].registrado_por,identity.id);
+      assert.deepEqual((await db.query('SELECT * FROM notas_clinicas WHERE id=$1',[historicalNote.id])).rows[0], historicalNote,
+        'Renombrar conserva IDs de responsable/capturista y su snapshot histórico, sin reescribir la nota');
       assert.equal(after.id,original.id);assert.equal(after.password_hash,original.password_hash);assert.equal(after.email,original.email);assert.equal(after.rol_id,original.rol_id);assert.equal(after.nombre_completo,'Nombre completo sintético nuevo');
       assert.deepEqual((await db.query('SELECT * FROM usuario_permisos WHERE usuario_id=$1 ORDER BY id',[identity.id])).rows,grantBefore);
       assert.deepEqual((await db.query('SELECT id,nombre FROM roles ORDER BY id')).rows,permissionsBefore);
       const events=(await db.query(`SELECT * FROM auditoria_eventos WHERE registro_id=$1 AND descripcion='identidad_usuario_actualizada' ORDER BY id`,[String(identity.id)])).rows;
       assert.equal(events.length,2);const payload=JSON.stringify(events);assert.ok(payload.includes('identity_admin'));assert.ok(payload.includes('identity_renamed'));assert.ok(payload.includes('Nombre completo sintético nuevo'));
       assert.ok(events.every(event=>event.usuario_id && event.created_at));
+      assert.equal((await send('auth/login','POST',{username:original.username,password:crearBody.password},null)).status,401);
+      const relogin=await send('auth/login','POST',{username:'identity_renamed',password:crearBody.password},null);
+      assert.equal(relogin.status,200);
+      const authenticated=(await relogin.json()).usuario;
+      assert.equal(authenticated.id,identity.id);assert.equal(authenticated.username,'identity_renamed');
+      assert.equal(authenticated.nombre_completo,'Nombre completo sintético nuevo');
+      assert.equal((await db.query('SELECT count(*)::int AS n FROM auth_sessions WHERE usuario_id=$1 AND revoked_at IS NULL',[identity.id])).rows[0].n,1);
+    });
+    await t.test('username único bajo concurrencia y renombrado de legado sin email', async () => {
+      const a=await send('usuarios','POST',{...crearBody,username:'rename_race_a',email:'rename-a@example.test'});
+      const b=await send('usuarios','POST',{...crearBody,username:'rename_race_b',email:'rename-b@example.test'});
+      assert.equal(a.status,201);assert.equal(b.status,201);
+      const ids=[(await a.json()).id,(await b.json()).id];
+      const responses=await Promise.all(ids.map(id=>send('usuarios/'+id,'PUT',{username:'rename_race_unique'})));
+      assert.deepEqual(responses.map(r=>r.status).sort(),[200,409]);
+      assert.equal((await db.query("SELECT count(*)::int AS n FROM usuarios WHERE username='rename_race_unique'")).rows[0].n,1);
+      await db.query('UPDATE usuarios SET email=NULL WHERE id=$1',[ids[0]]);
+      assert.equal((await send('usuarios/'+ids[0],'PUT',{username:'legado_renombrado',nombre_completo:'Legado actualizado'})).status,200);
+      const legacy=await (await send('usuarios/'+ids[0])).json();
+      assert.equal(legacy.email,null);assert.equal(legacy.email_pendiente,true);
     });
     await t.test('bootstrap oficial completo y reejecución de 024', async () => {
       await db.query('CREATE DATABASE perfiles_bootstrap');
@@ -294,12 +327,12 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       await require('./helpers/perfilesBrowser').verificarPerfilesBrowser({ apiPort: server.address().port, token: tokens[1], t });
       const row = (await db.query(`SELECT u.cargo_id, u.email, c.nombre AS cargo, c.codigo
         FROM usuarios u JOIN cargos_personal c ON c.id=u.cargo_id
-        WHERE u.username='browser_fixture'`)).rows[0];
+        WHERE u.username='browser_self_renamed'`)).rows[0];
       assert.equal(row.cargo, 'Cargo navegador'); assert.equal(row.email, 'updated@example.test'); assert.equal(row.codigo, 'CP11-TEST');
     });
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));
-    appPool.query = previous.query; appPool.connect = previous.connect;
+    appPool.query = previous.query; appPool.connect = previous.connect; dotenv.config = previous.dotenv;
     for (const [key, value] of [['JWT_SECRET', previous.secret], ['NODE_ENV', previous.nodeEnv]]) {
       if (value === undefined) delete process.env[key]; else process.env[key] = value;
     }

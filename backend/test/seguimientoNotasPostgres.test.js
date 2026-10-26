@@ -225,6 +225,11 @@ test('CPREN-119: seguimiento, controles y notas en PostgreSQL temporal propio', 
       assert.equal((await send(route(rollbackControl), 'POST', confirmBody({ version: 2 }))).status, 409);
       assert.equal((await send(route(rollbackControl), 'POST', confirmBody({ tipo: 'nota_enfermeria', responsable: { tipo: 'usuario', usuario_id: 4 } }))).status, 200);
       assert.equal((await send(route(rollbackControl), 'POST', confirmBody({ responsable: { tipo: 'externo', nombre_completo: 'Médico externo sintético', cargo_codigo: 'MED' } }))).status, 200);
+      const beforeRetry = (await db.query('SELECT * FROM controles_notas_requeridas WHERE control_prenatal_id=$1 ORDER BY tipo', [rollbackControl])).rows;
+      const retry = await send(route(rollbackControl), 'POST', confirmBody({ responsable: { tipo: 'externo', nombre_completo: 'Médico externo sintético', cargo_codigo: 'MED' } }));
+      assert.equal(retry.status, 200, 'La misma identidad externa reutiliza la confirmación');
+      assert.equal(retry.body.reutilizada, true);
+      assert.deepEqual((await db.query('SELECT * FROM controles_notas_requeridas WHERE control_prenatal_id=$1 ORDER BY tipo', [rollbackControl])).rows, beforeRetry);
     });
     await t.test('auditoría privada sin nombres; fallo revierte decisión y versión, sin tocar control/cita', async () => {
       const created = (await db.query(`INSERT INTO controles_prenatales(paciente_id,embarazo_id,numero_control,fecha)
@@ -316,7 +321,7 @@ test('CPREN-119: seguimiento, controles y notas en PostgreSQL temporal propio', 
       const setPregnancyState = estado => db.query('UPDATE embarazos SET estado=$1 WHERE id=11', [estado]);
       const count = (await db.query('SELECT count(*)::int AS n FROM notas_clinicas')).rows[0].n;
       const ids = await require('./helpers/notasCheckpoint09Browser').verificarNotas09({ apiPort: server.address().port, tokens, setMedicalRegistration, setPregnancyState, t,
-        outputDirectory: process.env.RUN_NOTAS_11_BROWSER === '1' ? 'checkpoint11' : process.env.RUN_NOTAS_10_BROWSER === '1' ? 'checkpoint10' : 'checkpoint09' });
+        outputDirectory: process.env.CPREN_CHECKPOINT12 === '1' ? 'checkpoint12' : process.env.RUN_NOTAS_11_BROWSER === '1' ? 'checkpoint11' : process.env.RUN_NOTAS_10_BROWSER === '1' ? 'checkpoint10' : 'checkpoint09' });
       assert.equal(ids.length, 7); assert.equal((await db.query('SELECT count(*)::int AS n FROM notas_clinicas')).rows[0].n, count + 7);
     });
     await t.test('instalación nueva y bootstrap oficial incluyen 027 y checksums', async () => {

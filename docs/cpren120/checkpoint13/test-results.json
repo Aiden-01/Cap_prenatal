@@ -1,0 +1,53 @@
+{
+  "date_local": "2026-10-25",
+  "timezone": "America/Guatemala",
+  "equipo": "Casa",
+  "machine": "HUGUITO",
+  "synthetic_only": true,
+  "suites": {
+    "backend-final": {
+      "tests": 1418,
+      "pass": 1361,
+      "fail": 0,
+      "skipped": 57
+    },
+    "unit": {
+      "tests": 14,
+      "pass": 12,
+      "fail": 0,
+      "skipped": 2
+    },
+    "samples": {
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0
+    },
+    "notes": {
+      "tests": 21,
+      "pass": 21,
+      "fail": 0,
+      "skipped": 0
+    },
+    "tracking": {
+      "tests": 20,
+      "pass": 18,
+      "fail": 0,
+      "skipped": 2
+    }
+  },
+  "frontend": {
+    "notes_dom_passed": 24,
+    "lint": "passed",
+    "build": "passed",
+    "editor_changes": false
+  },
+  "pdf": {
+    "documents": 16,
+    "pages": 65,
+    "rendered": 11,
+    "visual_inspection": "passed",
+    "signature_clearance_points_min": 31.57
+  },
+  "temporary_postgres_listeners_at_close": []
+}

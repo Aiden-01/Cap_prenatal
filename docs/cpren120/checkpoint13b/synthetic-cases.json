@@ -1,0 +1,391 @@
+{
+  "synthetic_only": true,
+  "cases": [
+    {
+      "file": "pdf/01-evolucion-breve.pdf",
+      "pages": 1,
+      "data": {
+        "paciente": {
+          "id": 1,
+          "nombres": "María Elena",
+          "apellidos": "Ejemplo Sintético",
+          "no_expediente": "SIM-CP13-001"
+        },
+        "nota": {
+          "id": 1301,
+          "paciente_id": 1,
+          "embarazo_id": 11,
+          "control_prenatal_id": 903,
+          "tipo": "nota_evolucion",
+          "estado": "captura_finalizada",
+          "version": 1,
+          "fecha_atencion": "2026-10-20",
+          "hora_atencion": "09:30:00",
+          "capturista_usuario_id": 7,
+          "responsable_snapshot": {
+            "tipo": "usuario",
+            "usuario_id": 9,
+            "nombre_completo": "Andrea López, profesional ficticia",
+            "cargo_id": 3,
+            "cargo_nombre": "Médico/a",
+            "cargo_codigo": "MED"
+          },
+          "contenido": "CASO COMPLETAMENTE SINTÉTICO PARA REVISIÓN DEL FORMATO.\n\nPaciente ficticia que acude a consulta prenatal de seguimiento. Refiere bienestar general y movimientos fetales habituales en el contexto del caso simulado. No refiere molestias durante la entrevista.\n\nSe registra una valoración general sin alteraciones descritas para esta demostración. La paciente se encuentra orientada, tranquila y participa en la entrevista. Se revisa la información ficticia del expediente.\n\nSe documenta la atención y la continuidad del seguimiento simulado. Esta narrativa es una muestra de maquetación; no corresponde a una persona ni a una decisión clínica real."
+        },
+        "control": {
+          "numero": 2,
+          "fecha": "2026-10-20"
+        }
+      }
+    },
+    {
+      "file": "pdf/02-enfermeria-breve.pdf",
+      "pages": 1,
+      "data": {
+        "paciente": {
+          "id": 1,
+          "nombres": "María de los Ángeles Alejandra Guadalupe",
+          "apellidos": "Ejemplo Sintético de los Apellidos Compuestos",
+          "no_expediente": "SIM-CP13-001"
+        },
+        "nota": {
+          "id": 1301,
+          "paciente_id": 1,
+          "embarazo_id": null,
+          "control_prenatal_id": null,
+          "tipo": "nota_enfermeria",
+          "estado": "captura_finalizada",
+          "version": 1,
+          "fecha_atencion": "2026-10-20",
+          "hora_atencion": "09:30:00",
+          "capturista_usuario_id": 7,
+          "responsable_snapshot": {
+            "tipo": "usuario",
+            "usuario_id": 9,
+            "nombre_completo": "Lucía María Fernanda de los Ángeles Pérez Ejemplo, profesional ficticia de nombre extenso",
+            "cargo_id": 3,
+            "cargo_nombre": "Enfermera Profesional responsable de atención prenatal, cargo de demostración",
+            "cargo_codigo": "EP"
+          },
+          "contenido": "CASO COMPLETAMENTE SINTÉTICO PARA REVISIÓN DEL FORMATO.\n\nSe recibe a la paciente ficticia en el área de atención prenatal. Se identifica con los datos simulados del expediente y se explica el propósito de la entrevista. Permanece despierta, orientada y colaboradora.\n\nSe registran observaciones de confort e higiene y se prepara el espacio de atención. Durante la interacción no se describen cambios en su estado general. Se facilita la comunicación con la profesional responsable.\n\nSe deja constancia de la atención de enfermería y del cierre del registro simulado. No se realizaron procedimientos ni se atendió a una persona real."
+        },
+        "control": null
+      }
+    },
+    {
+      "file": "pdf/03-evolucion-dos-paginas.pdf",
+      "pages": 2,
+      "data": {
+        "paciente": {
+          "id": 1,
+          "nombres": "María Elena",
+          "apellidos": "Ejemplo Sintético",
+          "no_expediente": "SIM-CP13-001"
+        },
+        "nota": {
+          "id": 1301,
+          "paciente_id": 1,
+          "embarazo_id": 11,
+          "control_prenatal_id": 903,
+          "tipo": "nota_evolucion",
+          "estado": "captura_finalizada",
+          "version": 1,
+          "fecha_atencion": "2026-10-20",
+          "hora_atencion": "09:30:00",
+          "capturista_usuario_id": 7,
+          "responsable_snapshot": {
+            "tipo": "usuario",
+            "usuario_id": 9,
+            "nombre_completo": "Andrea López, profesional ficticia",
+            "cargo_id": 3,
+            "cargo_nombre": "Médico/a",
+            "cargo_codigo": "MED"
+          },
+          "contenido": "Sección 1 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua.\n\nSección 2 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua.\n\nSección 3 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua.\n\nSección 4 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua.\n\nSección 5 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua.\n\nSección 6 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua.\n\nSección 7 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua.\n\nSección 8 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua.\n\nSección 9 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua.\n\nSección 10 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua.\n\nSección 11 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua.\n\nSección 12 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua.\n\nSección 13 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua.\n\nSección 14 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua.\n\nSección 15 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua.\n\nSección 16 del caso sintético. Se amplía el registro narrativo de la misma atención ficticia, conservando su fecha y hora originales. La paciente simulada permanece orientada y colaboradora; se organiza la información para su lectura continua."
+        },
+        "control": {
+          "numero": 2,
+          "fecha": "2026-10-20"
+        }
+      }
+    },
+    {
+      "file": "pdf/04-enfermeria-estres.pdf",
+      "pages": 12,
+      "data": {
+        "paciente": {
+          "id": 1,
+          "nombres": "María Elena",
+          "apellidos": "Ejemplo Sintético",
+          "no_expediente": "SIM-CP13-001"
+        },
+        "nota": {
+          "id": 1301,
+          "paciente_id": 1,
+          "embarazo_id": null,
+          "control_prenatal_id": null,
+          "tipo": "nota_enfermeria",
+          "estado": "captura_finalizada",
+          "version": 1,
+          "fecha_atencion": "2026-10-20",
+          "hora_atencion": "09:30:00",
+          "capturista_usuario_id": 7,
+          "responsable_snapshot": {
+            "tipo": "usuario",
+            "usuario_id": 9,
+            "nombre_completo": "Lucía Pérez, profesional ficticia",
+            "cargo_id": 3,
+            "cargo_nombre": "Enfermera Profesional",
+            "cargo_codigo": "EP"
+          },
+          "contenido": "Párrafo sintético 1: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 1: registro de demostración, sin datos reales.\n\nPárrafo sintético 2: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 2: registro de demostración, sin datos reales.\n\nPárrafo sintético 3: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 3: registro de demostración, sin datos reales.\n\nPárrafo sintético 4: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 4: registro de demostración, sin datos reales.\n\nPárrafo sintético 5: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 5: registro de demostración, sin datos reales.\n\nPárrafo sintético 6: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 6: registro de demostración, sin datos reales.\n\nPárrafo sintético 7: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 7: registro de demostración, sin datos reales.\n\nPárrafo sintético 8: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 8: registro de demostración, sin datos reales.\n\nPárrafo sintético 9: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 9: registro de demostración, sin datos reales.\n\nPárrafo sintético 10: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 10: registro de demostración, sin datos reales.\n\nPárrafo sintético 11: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 11: registro de demostración, sin datos reales.\n\nPárrafo sintético 12: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 12: registro de demostración, sin datos reales.\n\nPárrafo sintético 13: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 13: registro de demostración, sin datos reales.\n\nPárrafo sintético 14: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 14: registro de demostración, sin datos reales.\n\nPárrafo sintético 15: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 15: registro de demostración, sin datos reales.\n\nPárrafo sintético 16: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 16: registro de demostración, sin datos reales.\n\nPárrafo sintético 17: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 17: registro de demostración, sin datos reales.\n\nPárrafo sintético 18: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 18: registro de demostración, sin datos reales.\n\nPárrafo sintético 19: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 19: registro de demostración, sin datos reales.\n\nPárrafo sintético 20: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 20: registro de demostración, sin datos reales.\n\nPárrafo sintético 21: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 21: registro de demostración, sin datos reales.\n\nPárrafo sintético 22: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 22: registro de demostración, sin datos reales.\n\nPárrafo sintético 23: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 23: registro de demostración, sin datos reales.\n\nPárrafo sintético 24: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 24: registro de demostración, sin datos reales.\n\nPárrafo sintético 25: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 25: registro de demostración, sin datos reales.\n\nPárrafo sintético 26: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 26: registro de demostración, sin datos reales.\n\nPárrafo sintético 27: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 27: registro de demostración, sin datos reales.\n\nPárrafo sintético 28: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 28: registro de demostración, sin datos reales.\n\nPárrafo sintético 29: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 29: registro de demostración, sin datos reales.\n\nPárrafo sintético 30: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 30: registro de demostración, sin datos reales.\n\nPárrafo sintético 31: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 31: registro de demostración, sin datos reales.\n\nPárrafo sintético 32: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 32: registro de demostración, sin datos reales.\n\nPárrafo sintético 33: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 33: registro de demostración, sin datos reales.\n\nPárrafo sintético 34: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 34: registro de demostración, sin datos reales.\n\nPárrafo sintético 35: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 35: registro de demostración, sin datos reales.\n\nPárrafo sintético 36: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 36: registro de demostración, sin datos reales.\n\nPárrafo sintético 37: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 37: registro de demostración, sin datos reales.\n\nPárrafo sintético 38: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 38: registro de demostración, sin datos reales.\n\nPárrafo sintético 39: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 39: registro de demostración, sin datos reales.\n\nPárrafo sintético 40: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 40: registro de demostración, sin datos reales.\n\nPárrafo sintético 41: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 41: registro de demostración, sin datos reales.\n\nPárrafo sintético 42: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 42: registro de demostración, sin datos reales.\n\nPárrafo sintético 43: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 43: registro de demostración, sin datos reales.\n\nPárrafo sintético 44: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 44: registro de demostración, sin datos reales.\n\nPárrafo sintético 45: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 45: registro de demostración, sin datos reales.\n\nPárrafo sintético 46: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 46: registro de demostración, sin datos reales.\n\nPárrafo sintético 47: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 47: registro de demostración, sin datos reales.\n\nPárrafo sintético 48: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 48: registro de demostración, sin datos reales.\n\nPárrafo sintético 49: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 49: registro de demostración, sin datos reales.\n\nPárrafo sintético 50: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 50: registro de demostración, sin datos reales.\n\nPárrafo sintético 51: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 51: registro de demostración, sin datos reales.\n\nPárrafo sintético 52: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 52: registro de demostración, sin datos reales.\n\nPárrafo sintético 53: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 53: registro de demostración, sin datos reales.\n\nPárrafo sintético 54: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 54: registro de demostración, sin datos reales.\n\nPárrafo sintético 55: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 55: registro de demostración, sin datos reales.\n\nPárrafo sintético 56: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 56: registro de demostración, sin datos reales.\n\nPárrafo sintético 57: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 57: registro de demostración, sin datos reales.\n\nPárrafo sintético 58: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 58: registro de demostración, sin datos reales.\n\nPárrafo sintético 59: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 59: registro de demostración, sin datos reales.\n\nPárrafo sintético 60: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 60: registro de demostración, sin datos reales.\n\nPárrafo sintético 61: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 61: registro de demostración, sin datos reales.\n\nPárrafo sintético 62: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 62: registro de demostración, sin datos reales.\n\nPárrafo sintético 63: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 63: registro de demostración, sin datos reales.\n\nPárrafo sintético 64: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 64: registro de demostración, sin datos reales.\n\nPárrafo sintético 65: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 65: registro de demostración, sin datos reales.\n\nPárrafo sintético 66: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 66: registro de demostración, sin datos reales.\n\nPárrafo sintético 67: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 67: registro de demostración, sin datos reales.\n\nPárrafo sintético 68: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 68: registro de demostración, sin datos reales.\n\nPárrafo sintético 69: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 69: registro de demostración, sin datos reales.\n\nPárrafo sintético 70: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 70: registro de demostración, sin datos reales.\n\nPárrafo sintético 71: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 71: registro de demostración, sin datos reales.\n\nPárrafo sintético 72: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 72: registro de demostración, sin datos reales.\n\nPárrafo sintético 73: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 73: registro de demostración, sin datos reales.\n\nPárrafo sintético 74: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 74: registro de demostración, sin datos reales.\n\nPárrafo sintético 75: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 75: registro de demostración, sin datos reales.\n\nPárrafo sintético 76: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 76: registro de demostración, sin datos reales.\n\nPárrafo sintético 77: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 77: registro de demostración, sin datos reales.\n\nPárrafo sintético 78: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 78: registro de demostración, sin datos reales.\n\nPárrafo sintético 79: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 79: registro de demostración, sin datos reales.\n\nPárrafo sintético 80: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 80: registro de demostración, sin datos reales.\n\nPárrafo sintético 81: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 81: registro de demostración, sin datos reales.\n\nPárrafo sintético 82: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 82: registro de demostración, sin datos reales.\n\nPárrafo sintético 83: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 83: registro de demostración, sin datos reales.\n\nPárrafo sintético 84: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 84: registro de demostración, sin datos reales.\n\nPárrafo sintético 85: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 85: registro de demostración, sin datos reales.\n\nPárrafo sintético 86: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 86: registro de demostración, sin datos reales.\n\nPárrafo sintético 87: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 87: registro de demostración, sin datos reales.\n\nPárrafo sintético 88: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 88: registro de demostración, sin datos reales.\n\nPárrafo sintético 89: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 89: registro de demostración, sin datos reales.\n\nPárrafo sintético 90: Atención de enfermería con tildes áéíóú, ñ y Ñ. Se conserva cada observación ficticia, su orden y sus espacios.\nContinuación 90: registro de demostración, sin datos reales.\n\nPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑPalabraMuyExtensaSinEspaciosÁÑ\nÚltima línea clínica sintética."
+        },
+        "control": null
+      }
+    },
+    {
+      "file": "boundaries/nombres-limite-historico.pdf",
+      "pages": 1,
+      "data": {
+        "paciente": {
+          "id": 1,
+          "nombres": "Nombres Sintéticos Nombres Sintéticos Nombres Sintéticos Nombres Sintéticos Nombres Sintéticos Nombr",
+          "apellidos": "Apellidos de Prueba Apellidos de Prueba Apellidos de Prueba Apellidos de Prueba Apellidos de Prueba ",
+          "no_expediente": "SIM-CP13-001"
+        },
+        "nota": {
+          "id": 1301,
+          "paciente_id": 1,
+          "embarazo_id": null,
+          "control_prenatal_id": null,
+          "tipo": "nota_enfermeria",
+          "estado": "captura_finalizada",
+          "version": 1,
+          "fecha_atencion": "2026-10-20",
+          "hora_atencion": "09:30:00",
+          "capturista_usuario_id": 7,
+          "responsable_snapshot": {
+            "tipo": "usuario",
+            "usuario_id": 9,
+            "nombre_completo": "Profesional Sintético Ángela Peña Profesional Sintético Ángela Peña Profesional Sintético Ángela Peña Profesional Sintético Ángela Peña Profesional Si",
+            "cargo_id": 3,
+            "cargo_nombre": "Cargo sintético de responsabilidad profesional Cargo sintético de responsabilidad profesional Cargo sintético de responsabilidad profesional Cargo sin",
+            "cargo_codigo": "EP"
+          },
+          "contenido": "Línea sintética para comprobar identificación extensa.\nSegunda línea, sin datos reales."
+        },
+        "control": null,
+        "capturistaHistorico": {
+          "usuario_id": 7,
+          "nombre_completo": "Camila Registro Sintético de Identidad Histórica",
+          "fuente": "snapshot_captura",
+          "verificado": true
+        }
+      }
+    },
+    {
+      "file": "boundaries/lineas-32.pdf",
+      "pages": 1,
+      "data": {
+        "paciente": {
+          "id": 1,
+          "nombres": "María Elena",
+          "apellidos": "Ejemplo Sintético",
+          "no_expediente": "SIM-CP13-001"
+        },
+        "nota": {
+          "id": 1301,
+          "paciente_id": 1,
+          "embarazo_id": null,
+          "control_prenatal_id": null,
+          "tipo": "nota_evolucion",
+          "estado": "captura_finalizada",
+          "version": 1,
+          "fecha_atencion": "2026-10-20",
+          "hora_atencion": "09:30:00",
+          "capturista_usuario_id": 7,
+          "responsable_snapshot": {
+            "tipo": "usuario",
+            "usuario_id": 9,
+            "nombre_completo": "Andrea López, profesional ficticia",
+            "cargo_id": 3,
+            "cargo_nombre": "Médico/a",
+            "cargo_codigo": "MED"
+          },
+          "contenido": "Línea sintética 1, sin duplicaciones.\nLínea sintética 2, sin duplicaciones.\nLínea sintética 3, sin duplicaciones.\nLínea sintética 4, sin duplicaciones.\nLínea sintética 5, sin duplicaciones.\nLínea sintética 6, sin duplicaciones.\nLínea sintética 7, sin duplicaciones.\nLínea sintética 8, sin duplicaciones.\nLínea sintética 9, sin duplicaciones.\nLínea sintética 10, sin duplicaciones.\nLínea sintética 11, sin duplicaciones.\nLínea sintética 12, sin duplicaciones.\nLínea sintética 13, sin duplicaciones.\nLínea sintética 14, sin duplicaciones.\nLínea sintética 15, sin duplicaciones.\nLínea sintética 16, sin duplicaciones.\nLínea sintética 17, sin duplicaciones.\nLínea sintética 18, sin duplicaciones.\nLínea sintética 19, sin duplicaciones.\nLínea sintética 20, sin duplicaciones.\nLínea sintética 21, sin duplicaciones.\nLínea sintética 22, sin duplicaciones.\nLínea sintética 23, sin duplicaciones.\nLínea sintética 24, sin duplicaciones.\nLínea sintética 25, sin duplicaciones.\nLínea sintética 26, sin duplicaciones.\nLínea sintética 27, sin duplicaciones.\nLínea sintética 28, sin duplicaciones.\nLínea sintética 29, sin duplicaciones.\nLínea sintética 30, sin duplicaciones.\nLínea sintética 31, sin duplicaciones.\nLínea sintética 32, sin duplicaciones."
+        },
+        "control": null
+      }
+    },
+    {
+      "file": "boundaries/lineas-33.pdf",
+      "pages": 1,
+      "data": {
+        "paciente": {
+          "id": 1,
+          "nombres": "María Elena",
+          "apellidos": "Ejemplo Sintético",
+          "no_expediente": "SIM-CP13-001"
+        },
+        "nota": {
+          "id": 1301,
+          "paciente_id": 1,
+          "embarazo_id": null,
+          "control_prenatal_id": null,
+          "tipo": "nota_evolucion",
+          "estado": "captura_finalizada",
+          "version": 1,
+          "fecha_atencion": "2026-10-20",
+          "hora_atencion": "09:30:00",
+          "capturista_usuario_id": 7,
+          "responsable_snapshot": {
+            "tipo": "usuario",
+            "usuario_id": 9,
+            "nombre_completo": "Andrea López, profesional ficticia",
+            "cargo_id": 3,
+            "cargo_nombre": "Médico/a",
+            "cargo_codigo": "MED"
+          },
+          "contenido": "Línea sintética 1, sin duplicaciones.\nLínea sintética 2, sin duplicaciones.\nLínea sintética 3, sin duplicaciones.\nLínea sintética 4, sin duplicaciones.\nLínea sintética 5, sin duplicaciones.\nLínea sintética 6, sin duplicaciones.\nLínea sintética 7, sin duplicaciones.\nLínea sintética 8, sin duplicaciones.\nLínea sintética 9, sin duplicaciones.\nLínea sintética 10, sin duplicaciones.\nLínea sintética 11, sin duplicaciones.\nLínea sintética 12, sin duplicaciones.\nLínea sintética 13, sin duplicaciones.\nLínea sintética 14, sin duplicaciones.\nLínea sintética 15, sin duplicaciones.\nLínea sintética 16, sin duplicaciones.\nLínea sintética 17, sin duplicaciones.\nLínea sintética 18, sin duplicaciones.\nLínea sintética 19, sin duplicaciones.\nLínea sintética 20, sin duplicaciones.\nLínea sintética 21, sin duplicaciones.\nLínea sintética 22, sin duplicaciones.\nLínea sintética 23, sin duplicaciones.\nLínea sintética 24, sin duplicaciones.\nLínea sintética 25, sin duplicaciones.\nLínea sintética 26, sin duplicaciones.\nLínea sintética 27, sin duplicaciones.\nLínea sintética 28, sin duplicaciones.\nLínea sintética 29, sin duplicaciones.\nLínea sintética 30, sin duplicaciones.\nLínea sintética 31, sin duplicaciones.\nLínea sintética 32, sin duplicaciones.\nLínea sintética 33, sin duplicaciones."
+        },
+        "control": null
+      }
+    },
+    {
+      "file": "boundaries/lineas-34.pdf",
+      "pages": 2,
+      "data": {
+        "paciente": {
+          "id": 1,
+          "nombres": "María Elena",
+          "apellidos": "Ejemplo Sintético",
+          "no_expediente": "SIM-CP13-001"
+        },
+        "nota": {
+          "id": 1301,
+          "paciente_id": 1,
+          "embarazo_id": null,
+          "control_prenatal_id": null,
+          "tipo": "nota_evolucion",
+          "estado": "captura_finalizada",
+          "version": 1,
+          "fecha_atencion": "2026-10-20",
+          "hora_atencion": "09:30:00",
+          "capturista_usuario_id": 7,
+          "responsable_snapshot": {
+            "tipo": "usuario",
+            "usuario_id": 9,
+            "nombre_completo": "Andrea López, profesional ficticia",
+            "cargo_id": 3,
+            "cargo_nombre": "Médico/a",
+            "cargo_codigo": "MED"
+          },
+          "contenido": "Línea sintética 1, sin duplicaciones.\nLínea sintética 2, sin duplicaciones.\nLínea sintética 3, sin duplicaciones.\nLínea sintética 4, sin duplicaciones.\nLínea sintética 5, sin duplicaciones.\nLínea sintética 6, sin duplicaciones.\nLínea sintética 7, sin duplicaciones.\nLínea sintética 8, sin duplicaciones.\nLínea sintética 9, sin duplicaciones.\nLínea sintética 10, sin duplicaciones.\nLínea sintética 11, sin duplicaciones.\nLínea sintética 12, sin duplicaciones.\nLínea sintética 13, sin duplicaciones.\nLínea sintética 14, sin duplicaciones.\nLínea sintética 15, sin duplicaciones.\nLínea sintética 16, sin duplicaciones.\nLínea sintética 17, sin duplicaciones.\nLínea sintética 18, sin duplicaciones.\nLínea sintética 19, sin duplicaciones.\nLínea sintética 20, sin duplicaciones.\nLínea sintética 21, sin duplicaciones.\nLínea sintética 22, sin duplicaciones.\nLínea sintética 23, sin duplicaciones.\nLínea sintética 24, sin duplicaciones.\nLínea sintética 25, sin duplicaciones.\nLínea sintética 26, sin duplicaciones.\nLínea sintética 27, sin duplicaciones.\nLínea sintética 28, sin duplicaciones.\nLínea sintética 29, sin duplicaciones.\nLínea sintética 30, sin duplicaciones.\nLínea sintética 31, sin duplicaciones.\nLínea sintética 32, sin duplicaciones.\nLínea sintética 33, sin duplicaciones.\nLínea sintética 34, sin duplicaciones."
+        },
+        "control": null
+      }
+    },
+    {
+      "file": "boundaries/lineas-65.pdf",
+      "pages": 2,
+      "data": {
+        "paciente": {
+          "id": 1,
+          "nombres": "María Elena",
+          "apellidos": "Ejemplo Sintético",
+          "no_expediente": "SIM-CP13-001"
+        },
+        "nota": {
+          "id": 1301,
+          "paciente_id": 1,
+          "embarazo_id": null,
+          "control_prenatal_id": null,
+          "tipo": "nota_evolucion",
+          "estado": "captura_finalizada",
+          "version": 1,
+          "fecha_atencion": "2026-10-20",
+          "hora_atencion": "09:30:00",
+          "capturista_usuario_id": 7,
+          "responsable_snapshot": {
+            "tipo": "usuario",
+            "usuario_id": 9,
+            "nombre_completo": "Andrea López, profesional ficticia",
+            "cargo_id": 3,
+            "cargo_nombre": "Médico/a",
+            "cargo_codigo": "MED"
+          },
+          "contenido": "Línea sintética 1, sin duplicaciones.\nLínea sintética 2, sin duplicaciones.\nLínea sintética 3, sin duplicaciones.\nLínea sintética 4, sin duplicaciones.\nLínea sintética 5, sin duplicaciones.\nLínea sintética 6, sin duplicaciones.\nLínea sintética 7, sin duplicaciones.\nLínea sintética 8, sin duplicaciones.\nLínea sintética 9, sin duplicaciones.\nLínea sintética 10, sin duplicaciones.\nLínea sintética 11, sin duplicaciones.\nLínea sintética 12, sin duplicaciones.\nLínea sintética 13, sin duplicaciones.\nLínea sintética 14, sin duplicaciones.\nLínea sintética 15, sin duplicaciones.\nLínea sintética 16, sin duplicaciones.\nLínea sintética 17, sin duplicaciones.\nLínea sintética 18, sin duplicaciones.\nLínea sintética 19, sin duplicaciones.\nLínea sintética 20, sin duplicaciones.\nLínea sintética 21, sin duplicaciones.\nLínea sintética 22, sin duplicaciones.\nLínea sintética 23, sin duplicaciones.\nLínea sintética 24, sin duplicaciones.\nLínea sintética 25, sin duplicaciones.\nLínea sintética 26, sin duplicaciones.\nLínea sintética 27, sin duplicaciones.\nLínea sintética 28, sin duplicaciones.\nLínea sintética 29, sin duplicaciones.\nLínea sintética 30, sin duplicaciones.\nLínea sintética 31, sin duplicaciones.\nLínea sintética 32, sin duplicaciones.\nLínea sintética 33, sin duplicaciones.\nLínea sintética 34, sin duplicaciones.\nLínea sintética 35, sin duplicaciones.\nLínea sintética 36, sin duplicaciones.\nLínea sintética 37, sin duplicaciones.\nLínea sintética 38, sin duplicaciones.\nLínea sintética 39, sin duplicaciones.\nLínea sintética 40, sin duplicaciones.\nLínea sintética 41, sin duplicaciones.\nLínea sintética 42, sin duplicaciones.\nLínea sintética 43, sin duplicaciones.\nLínea sintética 44, sin duplicaciones.\nLínea sintética 45, sin duplicaciones.\nLínea sintética 46, sin duplicaciones.\nLínea sintética 47, sin duplicaciones.\nLínea sintética 48, sin duplicaciones.\nLínea sintética 49, sin duplicaciones.\nLínea sintética 50, sin duplicaciones.\nLínea sintética 51, sin duplicaciones.\nLínea sintética 52, sin duplicaciones.\nLínea sintética 53, sin duplicaciones.\nLínea sintética 54, sin duplicaciones.\nLínea sintética 55, sin duplicaciones.\nLínea sintética 56, sin duplicaciones.\nLínea sintética 57, sin duplicaciones.\nLínea sintética 58, sin duplicaciones.\nLínea sintética 59, sin duplicaciones.\nLínea sintética 60, sin duplicaciones.\nLínea sintética 61, sin duplicaciones.\nLínea sintética 62, sin duplicaciones.\nLínea sintética 63, sin duplicaciones.\nLínea sintética 64, sin duplicaciones.\nLínea sintética 65, sin duplicaciones."
+        },
+        "control": null
+      }
+    },
+    {
+      "file": "boundaries/lineas-66.pdf",
+      "pages": 2,
+      "data": {
+        "paciente": {
+          "id": 1,
+          "nombres": "María Elena",
+          "apellidos": "Ejemplo Sintético",
+          "no_expediente": "SIM-CP13-001"
+        },
+        "nota": {
+          "id": 1301,
+          "paciente_id": 1,
+          "embarazo_id": null,
+          "control_prenatal_id": null,
+          "tipo": "nota_evolucion",
+          "estado": "captura_finalizada",
+          "version": 1,
+          "fecha_atencion": "2026-10-20",
+          "hora_atencion": "09:30:00",
+          "capturista_usuario_id": 7,
+          "responsable_snapshot": {
+            "tipo": "usuario",
+            "usuario_id": 9,
+            "nombre_completo": "Andrea López, profesional ficticia",
+            "cargo_id": 3,
+            "cargo_nombre": "Médico/a",
+            "cargo_codigo": "MED"
+          },
+          "contenido": "Línea sintética 1, sin duplicaciones.\nLínea sintética 2, sin duplicaciones.\nLínea sintética 3, sin duplicaciones.\nLínea sintética 4, sin duplicaciones.\nLínea sintética 5, sin duplicaciones.\nLínea sintética 6, sin duplicaciones.\nLínea sintética 7, sin duplicaciones.\nLínea sintética 8, sin duplicaciones.\nLínea sintética 9, sin duplicaciones.\nLínea sintética 10, sin duplicaciones.\nLínea sintética 11, sin duplicaciones.\nLínea sintética 12, sin duplicaciones.\nLínea sintética 13, sin duplicaciones.\nLínea sintética 14, sin duplicaciones.\nLínea sintética 15, sin duplicaciones.\nLínea sintética 16, sin duplicaciones.\nLínea sintética 17, sin duplicaciones.\nLínea sintética 18, sin duplicaciones.\nLínea sintética 19, sin duplicaciones.\nLínea sintética 20, sin duplicaciones.\nLínea sintética 21, sin duplicaciones.\nLínea sintética 22, sin duplicaciones.\nLínea sintética 23, sin duplicaciones.\nLínea sintética 24, sin duplicaciones.\nLínea sintética 25, sin duplicaciones.\nLínea sintética 26, sin duplicaciones.\nLínea sintética 27, sin duplicaciones.\nLínea sintética 28, sin duplicaciones.\nLínea sintética 29, sin duplicaciones.\nLínea sintética 30, sin duplicaciones.\nLínea sintética 31, sin duplicaciones.\nLínea sintética 32, sin duplicaciones.\nLínea sintética 33, sin duplicaciones.\nLínea sintética 34, sin duplicaciones.\nLínea sintética 35, sin duplicaciones.\nLínea sintética 36, sin duplicaciones.\nLínea sintética 37, sin duplicaciones.\nLínea sintética 38, sin duplicaciones.\nLínea sintética 39, sin duplicaciones.\nLínea sintética 40, sin duplicaciones.\nLínea sintética 41, sin duplicaciones.\nLínea sintética 42, sin duplicaciones.\nLínea sintética 43, sin duplicaciones.\nLínea sintética 44, sin duplicaciones.\nLínea sintética 45, sin duplicaciones.\nLínea sintética 46, sin duplicaciones.\nLínea sintética 47, sin duplicaciones.\nLínea sintética 48, sin duplicaciones.\nLínea sintética 49, sin duplicaciones.\nLínea sintética 50, sin duplicaciones.\nLínea sintética 51, sin duplicaciones.\nLínea sintética 52, sin duplicaciones.\nLínea sintética 53, sin duplicaciones.\nLínea sintética 54, sin duplicaciones.\nLínea sintética 55, sin duplicaciones.\nLínea sintética 56, sin duplicaciones.\nLínea sintética 57, sin duplicaciones.\nLínea sintética 58, sin duplicaciones.\nLínea sintética 59, sin duplicaciones.\nLínea sintética 60, sin duplicaciones.\nLínea sintética 61, sin duplicaciones.\nLínea sintética 62, sin duplicaciones.\nLínea sintética 63, sin duplicaciones.\nLínea sintética 64, sin duplicaciones.\nLínea sintética 65, sin duplicaciones.\nLínea sintética 66, sin duplicaciones."
+        },
+        "control": null
+      }
+    },
+    {
+      "file": "boundaries/lineas-67.pdf",
+      "pages": 3,
+      "data": {
+        "paciente": {
+          "id": 1,
+          "nombres": "María Elena",
+          "apellidos": "Ejemplo Sintético",
+          "no_expediente": "SIM-CP13-001"
+        },
+        "nota": {
+          "id": 1301,
+          "paciente_id": 1,
+          "embarazo_id": null,
+          "control_prenatal_id": null,
+          "tipo": "nota_evolucion",
+          "estado": "captura_finalizada",
+          "version": 1,
+          "fecha_atencion": "2026-10-20",
+          "hora_atencion": "09:30:00",
+          "capturista_usuario_id": 7,
+          "responsable_snapshot": {
+            "tipo": "usuario",
+            "usuario_id": 9,
+            "nombre_completo": "Andrea López, profesional ficticia",
+            "cargo_id": 3,
+            "cargo_nombre": "Médico/a",
+            "cargo_codigo": "MED"
+          },
+          "contenido": "Línea sintética 1, sin duplicaciones.\nLínea sintética 2, sin duplicaciones.\nLínea sintética 3, sin duplicaciones.\nLínea sintética 4, sin duplicaciones.\nLínea sintética 5, sin duplicaciones.\nLínea sintética 6, sin duplicaciones.\nLínea sintética 7, sin duplicaciones.\nLínea sintética 8, sin duplicaciones.\nLínea sintética 9, sin duplicaciones.\nLínea sintética 10, sin duplicaciones.\nLínea sintética 11, sin duplicaciones.\nLínea sintética 12, sin duplicaciones.\nLínea sintética 13, sin duplicaciones.\nLínea sintética 14, sin duplicaciones.\nLínea sintética 15, sin duplicaciones.\nLínea sintética 16, sin duplicaciones.\nLínea sintética 17, sin duplicaciones.\nLínea sintética 18, sin duplicaciones.\nLínea sintética 19, sin duplicaciones.\nLínea sintética 20, sin duplicaciones.\nLínea sintética 21, sin duplicaciones.\nLínea sintética 22, sin duplicaciones.\nLínea sintética 23, sin duplicaciones.\nLínea sintética 24, sin duplicaciones.\nLínea sintética 25, sin duplicaciones.\nLínea sintética 26, sin duplicaciones.\nLínea sintética 27, sin duplicaciones.\nLínea sintética 28, sin duplicaciones.\nLínea sintética 29, sin duplicaciones.\nLínea sintética 30, sin duplicaciones.\nLínea sintética 31, sin duplicaciones.\nLínea sintética 32, sin duplicaciones.\nLínea sintética 33, sin duplicaciones.\nLínea sintética 34, sin duplicaciones.\nLínea sintética 35, sin duplicaciones.\nLínea sintética 36, sin duplicaciones.\nLínea sintética 37, sin duplicaciones.\nLínea sintética 38, sin duplicaciones.\nLínea sintética 39, sin duplicaciones.\nLínea sintética 40, sin duplicaciones.\nLínea sintética 41, sin duplicaciones.\nLínea sintética 42, sin duplicaciones.\nLínea sintética 43, sin duplicaciones.\nLínea sintética 44, sin duplicaciones.\nLínea sintética 45, sin duplicaciones.\nLínea sintética 46, sin duplicaciones.\nLínea sintética 47, sin duplicaciones.\nLínea sintética 48, sin duplicaciones.\nLínea sintética 49, sin duplicaciones.\nLínea sintética 50, sin duplicaciones.\nLínea sintética 51, sin duplicaciones.\nLínea sintética 52, sin duplicaciones.\nLínea sintética 53, sin duplicaciones.\nLínea sintética 54, sin duplicaciones.\nLínea sintética 55, sin duplicaciones.\nLínea sintética 56, sin duplicaciones.\nLínea sintética 57, sin duplicaciones.\nLínea sintética 58, sin duplicaciones.\nLínea sintética 59, sin duplicaciones.\nLínea sintética 60, sin duplicaciones.\nLínea sintética 61, sin duplicaciones.\nLínea sintética 62, sin duplicaciones.\nLínea sintética 63, sin duplicaciones.\nLínea sintética 64, sin duplicaciones.\nLínea sintética 65, sin duplicaciones.\nLínea sintética 66, sin duplicaciones.\nLínea sintética 67, sin duplicaciones."
+        },
+        "control": null
+      }
+    }
+  ]
+}

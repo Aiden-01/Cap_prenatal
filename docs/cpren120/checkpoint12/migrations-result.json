@@ -1,0 +1,12 @@
+{
+  "suite": "migrations",
+  "command": "node --test --test-concurrency=1 test/checkpoint10MigracionesPostgres.test.js",
+  "started": "2026-10-25T17:06:29.348Z",
+  "finished": "2026-10-25T17:06:39.423Z",
+  "exit_code": 0,
+  "signal": null,
+  "machine": "HUGUITO",
+  "equipo": "Casa",
+  "synthetic_only": true,
+  "disposable_postgres_only": true
+}

@@ -238,9 +238,13 @@ async function obtenerNotaParaPdf({ pacienteId, notaId, req, dependencies = {} }
     const row = await repository.obtenerPorId(notaId, db);
     if (!row || row.paciente_id !== pacienteId) throw noEncontrada();
     permiso(permisos, row.tipo, 'ver');
-    const paciente = await repository.obtenerPacientePdf(pacienteId, db);
+    const contexto = await repository.obtenerPacientePdf(pacienteId, db,
+      { controlId: row.control_prenatal_id, embarazoId: row.embarazo_id });
+    const paciente = contexto && seleccionar(contexto, ['id', 'nombres', 'apellidos', 'no_expediente']);
     if (!paciente) throw noEncontrada();
-    return { nota: seleccionar(row, [...PUBLICOS, 'contenido']), paciente };
+    return { nota: seleccionar(row, [...PUBLICOS, 'contenido']), paciente,
+      control: contexto.control_numero != null || contexto.control_fecha != null
+        ? { numero: contexto.control_numero, fecha: contexto.control_fecha } : null };
   });
 }
 

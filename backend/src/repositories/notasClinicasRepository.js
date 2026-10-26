@@ -88,8 +88,14 @@ async function obtenerPaciente(id, db = pool, { bloquear = true } = {}) {
   return rows[0] || null;
 }
 
-async function obtenerPacientePdf(id, db = pool) {
-  const { rows } = await db.query('SELECT id, nombres, apellidos, no_expediente FROM pacientes WHERE id = $1', [id]);
+async function obtenerPacientePdf(id, db = pool, { controlId = null, embarazoId = null } = {}) {
+  // Amplía la consulta mínima existente, después de autorizar la nota. No une
+  // usuarios actuales: la nota no conserva el nombre histórico del capturista.
+  const { rows } = await db.query(`SELECT p.id, p.nombres, p.apellidos, p.no_expediente,
+      c.numero_control AS control_numero, to_char(c.fecha, 'YYYY-MM-DD') AS control_fecha
+    FROM pacientes p LEFT JOIN controles_prenatales c
+      ON c.id = $2 AND c.paciente_id = p.id AND c.embarazo_id = $3
+    WHERE p.id = $1`, [id, controlId, embarazoId]);
   return rows[0] || null;
 }
 

@@ -8,7 +8,7 @@ const { Pool } = require('pg');
 const { applyMigration, migrate } = require('../src/db/migrate');
 const { assertSchemaCompatible } = require('../src/db/schemaCompatibility');
 
-test('CHECKPOINT-10: upgrade 027→029 y esquema final en PostgreSQL desechable', {
+test('CHECKPOINT-11: upgrade 027→030 y esquema final en PostgreSQL desechable', {
   skip: process.env.RUN_CHECKPOINT10_TEMP_POSTGRES !== '1', timeout: 120000,
 }, async t => {
   // Destino creado aquí, jamás .env, DATABASE_URL ni un servidor existente.
@@ -45,6 +45,12 @@ test('CHECKPOINT-10: upgrade 027→029 y esquema final en PostgreSQL desechable'
       cargo_id: 3, cargo_nombre: 'Médico/a', clasificacion_profesional: 'medico',
       especialidad_id: 1, especialidad_nombre: 'Histórico sintético' };
     const current = Object.fromEntries(Object.entries(historical).filter(([key]) => !key.startsWith('especialidad')));
+    await db.query(`INSERT INTO embarazos(id,paciente_id,numero_embarazo,estado) VALUES(1,1,1,'activo');
+      INSERT INTO controles_prenatales(id,paciente_id,embarazo_id,numero_control,fecha) VALUES(1,1,1,1,CURRENT_DATE)`);
+    await db.query(`INSERT INTO controles_notas_requeridas(control_prenatal_id,tipo,responsable_snapshot,confirmado_por)
+        VALUES(1,'nota_evolucion',$1,1)`, [historical]);
+    const confirmationsBefore = (await db.query('SELECT * FROM controles_notas_requeridas ORDER BY control_prenatal_id,tipo')).rows;
+    const permissionsBefore = (await db.query('SELECT * FROM usuario_permisos ORDER BY id')).rows;
     for (const finalized of [false, true]) {
       await db.query(`INSERT INTO notas_clinicas(paciente_id,tipo,contenido,fecha_atencion,hora_atencion,
         responsable_usuario_id,responsable_snapshot,capturista_usuario_id,estado,finalizador_usuario_id,
@@ -108,6 +114,13 @@ test('CHECKPOINT-10: upgrade 027→029 y esquema final en PostgreSQL desechable'
     });
     await t.test('CHECKPOINT-11: 029→030 elimina clasificación, no asigna códigos y preserva historia',async()=>{
       const filename='030_cargos_autoria_estable.sql';
+      // Simula un catálogo inconsistente preexistente; nunca cambia una base persistente.
+      await db.query('DROP INDEX ux_cargos_personal_codigo');
+      await db.query(`INSERT INTO cargos_personal(nombre,codigo,clasificacion_profesional) VALUES('Duplicado sintético',' ae ','enfermeria_ae')`);
+      await assert.rejects(applyMigration({db,filename,sql:migration(filename)}),/duplicados/);
+      assert.equal((await db.query(`SELECT count(*)::int n FROM information_schema.columns WHERE table_name='cargos_personal' AND column_name='clasificacion_profesional'`)).rows[0].n,1);
+      await db.query(`DELETE FROM cargos_personal WHERE nombre='Duplicado sintético';
+        CREATE UNIQUE INDEX ux_cargos_personal_codigo ON cargos_personal(catalogo_personal_clave(codigo)) WHERE codigo IS NOT NULL`);
       await db.query(`INSERT INTO cargos_personal(nombre,codigo,clasificacion_profesional) VALUES('Contradicción sintética','MED','no_clinico')`);
       await assert.rejects(applyMigration({db,filename,sql:migration(filename)}),/contradictorio/);
       assert.equal((await db.query(`SELECT count(*)::int n FROM information_schema.columns WHERE table_name='cargos_personal' AND column_name='clasificacion_profesional'`)).rows[0].n,1);
@@ -115,10 +128,22 @@ test('CHECKPOINT-10: upgrade 027→029 y esquema final en PostgreSQL desechable'
       const cargosBefore=(await db.query('SELECT id,codigo,nombre,activo FROM cargos_personal ORDER BY id')).rows;
       const legacy=(await db.query(`INSERT INTO notas_clinicas(paciente_id,tipo,responsable_usuario_id,responsable_snapshot,capturista_usuario_id,clave_idempotencia,solicitud_hash)
         VALUES(1,'nota_evolucion',1,$1,1,$2,$3) RETURNING id`,[current,require('node:crypto').randomUUID(),'c'.repeat(64)])).rows[0].id;
+      const notesBefore030 = (await db.query('SELECT * FROM notas_clinicas ORDER BY id')).rows;
       assert.equal(await applyMigration({db,filename,sql:migration(filename)}),true);
       assert.equal(await applyMigration({db,filename,sql:migration(filename)}),false);
+      const repeatClient = await db.connect();
+      try {
+        await repeatClient.query('BEGIN'); await repeatClient.query(migration(filename)); await repeatClient.query('COMMIT');
+      } catch (error) { await repeatClient.query('ROLLBACK'); throw error; }
+      finally { repeatClient.release(); }
       assert.equal((await db.query(`SELECT count(*)::int n FROM information_schema.columns WHERE table_name='cargos_personal' AND column_name='clasificacion_profesional'`)).rows[0].n,0);
       assert.deepEqual((await db.query('SELECT id,codigo,nombre,activo FROM cargos_personal ORDER BY id')).rows,cargosBefore);
+      assert.deepEqual((await db.query('SELECT * FROM notas_clinicas ORDER BY id')).rows,notesBefore030);
+      assert.deepEqual((await db.query('SELECT * FROM usuario_permisos ORDER BY id')).rows,permissionsBefore);
+      assert.deepEqual((await db.query('SELECT * FROM controles_notas_requeridas ORDER BY control_prenatal_id,tipo')).rows,confirmationsBefore);
+      await assert.rejects(db.query(`INSERT INTO cargos_personal(nombre,codigo) VALUES('Duplicado posterior',' ae ')`),{code:'23505'});
+      await assert.rejects(db.query('DELETE FROM cargos_personal WHERE id=3'), error => ['23503', '23001'].includes(error.code));
+      await assert.rejects(db.query('UPDATE controles_notas_requeridas SET responsable_snapshot=responsable_snapshot WHERE control_prenatal_id=1'),{code:'23514'});
       await db.query(`UPDATE notas_clinicas SET contenido='Historia preservada',fecha_atencion='2026-10-23',hora_atencion='09:30',version=version+1 WHERE id=$1`,[legacy]);
       await db.query(`UPDATE notas_clinicas SET estado='captura_finalizada',finalizador_usuario_id=1,finalizada_at=NOW(),version=version+1 WHERE id=$1`,[legacy]);
       assert.deepEqual((await db.query('SELECT responsable_snapshot FROM notas_clinicas WHERE id=$1',[legacy])).rows[0].responsable_snapshot,current);
@@ -139,6 +164,7 @@ test('CHECKPOINT-10: upgrade 027→029 y esquema final en PostgreSQL desechable'
         await assertSchemaCompatible(fresh);
         assert.equal((await fresh.query("SELECT to_regclass('public.especialidades_personal') tabla")).rows[0].tabla, null);
         assert.equal((await fresh.query("SELECT count(*)::int n FROM information_schema.columns WHERE table_name='usuarios' AND column_name='especialidad_id'")).rows[0].n, 0);
+        assert.equal((await fresh.query("SELECT count(*)::int n FROM information_schema.columns WHERE table_name='cargos_personal' AND column_name='clasificacion_profesional'")).rows[0].n, 0);
       } finally { await fresh.end(); }
     });
   } finally {

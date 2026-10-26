@@ -1,0 +1,12 @@
+{
+  "suite": "pdf",
+  "command": "node --test --test-concurrency=1 test/notaClinicaPdf.test.js",
+  "started": "2026-10-25T16:42:51.090Z",
+  "finished": "2026-10-25T16:42:55.718Z",
+  "exit_code": 0,
+  "signal": null,
+  "machine": "HUGUITO",
+  "equipo": "Casa",
+  "synthetic_only": true,
+  "disposable_postgres_only": false
+}

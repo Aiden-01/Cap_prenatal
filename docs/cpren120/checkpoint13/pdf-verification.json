@@ -1,0 +1,291 @@
+{
+  "synthetic_only": true,
+  "equipo": "Casa",
+  "machine": "HUGUITO",
+  "documents": [
+    {
+      "file": "pdf/01-evolucion-breve.pdf",
+      "pages": 1,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": [
+        "pages\\01-evolucion-breve-pagina-1.png"
+      ]
+    },
+    {
+      "file": "pdf/02-enfermeria-breve.pdf",
+      "pages": 1,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": [
+        "pages\\02-enfermeria-breve-pagina-1.png"
+      ]
+    },
+    {
+      "file": "pdf/03-evolucion-dos-paginas.pdf",
+      "pages": 2,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": [
+        "pages\\03-evolucion-dos-paginas-pagina-1.png",
+        "pages\\03-evolucion-dos-paginas-pagina-2.png"
+      ]
+    },
+    {
+      "file": "pdf/04-enfermeria-estres.pdf",
+      "pages": 12,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": [
+        "pages\\04-enfermeria-estres-pagina-1.png",
+        "pages\\04-enfermeria-estres-pagina-6.png",
+        "pages\\04-enfermeria-estres-pagina-12.png"
+      ]
+    },
+    {
+      "file": "boundaries/lineas-32.pdf",
+      "pages": 1,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": []
+    },
+    {
+      "file": "boundaries/lineas-33.pdf",
+      "pages": 1,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": [
+        "pages\\lineas-33-pagina-1.png"
+      ]
+    },
+    {
+      "file": "boundaries/lineas-34.pdf",
+      "pages": 2,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": []
+    },
+    {
+      "file": "boundaries/lineas-65.pdf",
+      "pages": 2,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": []
+    },
+    {
+      "file": "boundaries/lineas-66.pdf",
+      "pages": 2,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": [
+        "pages\\lineas-66-pagina-2.png"
+      ]
+    },
+    {
+      "file": "boundaries/lineas-67.pdf",
+      "pages": 3,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": []
+    },
+    {
+      "file": "endpoint/nota_evolucion.pdf",
+      "pages": 1,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": []
+    },
+    {
+      "file": "endpoint/nota_enfermeria.pdf",
+      "pages": 1,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": []
+    },
+    {
+      "file": "regression/cpren120-nota_evolucion-sintetica.pdf",
+      "pages": 10,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": []
+    },
+    {
+      "file": "regression/cpren120-nota_evolucion-limite-sintetica.pdf",
+      "pages": 8,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": [
+        "pages\\cpren120-nota_evolucion-limite-sintetica-pagina-1.png",
+        "pages\\cpren120-nota_evolucion-limite-sintetica-pagina-8.png"
+      ]
+    },
+    {
+      "file": "regression/cpren120-nota_enfermeria-sintetica.pdf",
+      "pages": 10,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": []
+    },
+    {
+      "file": "regression/cpren120-nota_enfermeria-limite-sintetica.pdf",
+      "pages": 8,
+      "letter_points": [
+        612,
+        792
+      ],
+      "narrative_exact": true,
+      "original_date_time_each_page": true,
+      "human_control_reference": true,
+      "neutral_capturer": true,
+      "end_marker_last_page_only": true,
+      "no_ruling_over_text": true,
+      "signature_clearance_points_min": 31.57,
+      "rendered": []
+    }
+  ],
+  "assets": [
+    {
+      "file": "gobierno-guatemala-mspas.png",
+      "sha256": "be807ea1e1cbd1109975ed5d04f7a5c9bba0a3d70b36a78ed7c553b962e85425"
+    },
+    {
+      "file": "ddriss-peten-area-sur-oriente.png",
+      "sha256": "a15796e379264a52c8c6eab68743eb28df1b83ede31d559aef910744e5ca5ef8"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "initial_files": 128,
+  "unchanged_files": 124,
+  "intentional_pdf_scope_changes": [
+    "backend/src/repositories/notasClinicasRepository.js",
+    "backend/src/services/notaClinicaPdf.js",
+    "backend/src/services/notasClinicasService.js",
+    "backend/test/notaClinicaPdf.test.js"
+  ],
+  "checkpoint12_evidence_unchanged": true,
+  "prior_local_changes_preserved": true
+}

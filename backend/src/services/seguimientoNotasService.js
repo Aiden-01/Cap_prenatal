@@ -64,8 +64,9 @@ async function confirmar({ pacienteId, controlId, body, req, dependencies = {} }
       const mismo = identity.tipo === 'autenticado' ? snapshot.usuario_id === actor.id
         : identity.tipo === 'usuario' ? snapshot.usuario_id === identity.usuario_id
           : snapshot.tipo === 'externo' && snapshot.nombre_completo === identity.nombre_completo
-            && snapshot.cargo_nombre === identity.cargo
-            && (snapshot.cargo_codigo === undefined || snapshot.cargo_codigo === identity.cargo_codigo);
+            && (snapshot.cargo_codigo === undefined
+              ? snapshot.clasificacion_profesional === ({ MED: 'medico', AE: 'enfermeria_ae', EP: 'enfermeria_ep' })[identity.cargo_codigo]
+              : snapshot.cargo_codigo === identity.cargo_codigo);
       if (mismo) return { reutilizada: true, tipo: body.tipo };
       throw error(409, 'SEGUIMIENTO_YA_CONFIRMADO', 'El responsable de este tipo ya fue confirmado. No se reemplazará.');
     }

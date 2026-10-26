@@ -42,7 +42,11 @@ async function verificarSeguimientoBrowser({ apiPort, token, t }) {
     for (const width of [1440, 390]) {
       await page.setViewport({ width, height: 1000 });
       await page.goto(`${base}/pacientes/1/controles/nuevo?embarazo_id=11`, { waitUntil: 'networkidle0' });
-      await page.waitForSelector('button[type="submit"]:not([disabled])');
+      await page.waitForSelector('button[type="submit"]:not([disabled])').catch(async error => {
+        t.diagnostic(JSON.stringify({ stage: 'nuevo-control', url: page.url(), errors,
+          body: await page.$eval('body', el => el.innerText.slice(0, 2500)) }));
+        throw error;
+      });
       const created = page.waitForResponse(response => new URL(response.url()).pathname === '/api/pacientes/1/controles' && response.request().method() === 'POST');
       await page.click('button[type="submit"]');
       const response = await created; assert.equal(response.status(), 201);

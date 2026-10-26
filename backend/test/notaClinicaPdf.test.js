@@ -24,18 +24,20 @@ test('PDF nota: logos originales embebidos y narrativa escapada, sin firmas simu
       assert.ok(header.includes(fs.readFileSync(path.join(__dirname, '../src/assets/institucional', name)).toString('base64')));
     }
     assert.ok(header.includes('CAP El Chal')); assert.ok(header.includes('Área Sur Oriente'));
-    assert.ok(footer.includes('No equivale a firma clínica'));
+    assert.ok(!footer.includes('No equivale a firma clínica'));
+    assert.ok(!footer.includes('Captura finalizada'));
     assert.ok(footer.includes('Nombre y firma del responsable'));
     assert.ok(html.includes('FECHA / HORA'));
     assert.ok(!html.includes('Firmado por')); assert.ok(header.includes('height:auto'));
   }
   const draft = sample('nota_evolucion'); draft.nota.estado = 'borrador';
-  assert.ok(crearDocumentoNota(draft).footer.includes('BORRADOR - Captura no finalizada'));
+  assert.ok(!crearDocumentoNota(draft).footer.includes('Captura no finalizada'));
+  assert.equal(draft.nota.estado,'borrador');
 });
 
 test('PDF nota real carta multipágina, texto extenso y logos', { skip: process.env.RUN_NOTA_PDF_BROWSER !== '1', timeout: 60000 }, async t => {
   const browserManager = createPuppeteerBrowserManager();
-  const output = path.join(__dirname, '../../output/pdf'); fs.mkdirSync(output, { recursive: true });
+  const output = path.join(__dirname, process.env.CPREN_CHECKPOINT13B === '1' ? '../../docs/cpren120/checkpoint13b/regression' : process.env.CPREN_CHECKPOINT13 === '1' ? '../../docs/cpren120/checkpoint13/regression' : process.env.CPREN_CHECKPOINT12 === '1' ? '../../docs/cpren120/checkpoint12/pdf' : '../../output/pdf'); fs.mkdirSync(output, { recursive: true });
   try {
     for (const tipo of ['nota_evolucion', 'nota_enfermeria']) {
       const data = sample(tipo);
@@ -49,6 +51,16 @@ test('PDF nota real carta multipágina, texto extenso y logos', { skip: process.
       const target = path.join(output, `cpren120-${tipo}-sintetica.pdf`);
       fs.writeFileSync(target, bytes);
       t.diagnostic(`${tipo}: ${pdf.getPageCount()} páginas carta; muestra sintética: ${target}`);
+      if (process.env.CPREN_CHECKPOINT12 === '1' || process.env.CPREN_CHECKPOINT13 === '1') {
+        // Límite real del contrato, con acentos y una palabra de 20 000 caracteres.
+        const extreme = sample(tipo); extreme.nota.contenido = 'ÁéíóúÑñ'.repeat(2858).slice(0, 20000);
+        assert.equal(extreme.nota.contenido.length, 20000);
+        const extremeBytes = await generarNotaClinicaPdf(extreme, { browserManager });
+        const extremePdf = await PDFDocument.load(extremeBytes);
+        assert.ok(extremePdf.getPageCount() >= 3);
+        fs.writeFileSync(path.join(output, `cpren120-${tipo}-limite-sintetica.pdf`), extremeBytes);
+        t.diagnostic(`${tipo}: límite de ${extreme.nota.contenido.length} caracteres, ${extremePdf.getPageCount()} páginas`);
+      }
     }
   } finally { await browserManager.close(); }
 });

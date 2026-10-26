@@ -1,0 +1,109 @@
+{
+  "date_local": "2026-10-25",
+  "timezone": "America/Guatemala",
+  "machine": "HUGUITO",
+  "equipo": "Casa",
+  "base_commit": "375da7a5b06f40f3fc0c828f39df326d0ea0c1f9",
+  "node": "24.11.1",
+  "npm": "11.21.0",
+  "postgres": "18.3",
+  "chrome": "155.0.8059.85",
+  "synthetic_only": true,
+  "suites": {
+    "backend-final": {
+      "tests": 1415,
+      "pass": 1359,
+      "fail": 0,
+      "skipped": 56
+    },
+    "migrations": {
+      "tests": 7,
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0
+    },
+    "catalogs": {
+      "tests": 7,
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0
+    },
+    "profiles": {
+      "tests": 16,
+      "pass": 16,
+      "fail": 0,
+      "skipped": 0
+    },
+    "authorship": {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0
+    },
+    "notes": {
+      "tests": 21,
+      "pass": 21,
+      "fail": 0,
+      "skipped": 0
+    },
+    "tracking": {
+      "tests": 20,
+      "pass": 20,
+      "fail": 0,
+      "skipped": 0
+    },
+    "pdf": {
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "frontend": {
+    "logical_passed": 191,
+    "dom_passed": 300,
+    "dom_files_passed": 26,
+    "failed": 0
+  },
+  "frontend_lint": "passed",
+  "frontend_build": "passed",
+  "pdf_geometry_and_text": "passed",
+  "manual_visual_review": {
+    "widths": [
+      1440,
+      1280,
+      768,
+      390,
+      320
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "groups": [
+      "usuarios",
+      "nuevo-usuario",
+      "perfil-usuario",
+      "catalogo-cargos",
+      "editar-cargo",
+      "notas"
+    ],
+    "pdf_pages": [
+      1,
+      5,
+      10
+    ],
+    "limit_pdf_pages": [
+      1,
+      4,
+      8
+    ],
+    "correction": "Acciones de usuario sin palabras partidas a 320 px"
+  },
+  "history_verified": {
+    "all_notes_unchanged_by_030": true,
+    "confirmation_snapshots_preserved": true,
+    "user_rename_preserves_historical_note_and_ids": true
+  },
+  "temporary_postgres_listeners_at_close": []
+}

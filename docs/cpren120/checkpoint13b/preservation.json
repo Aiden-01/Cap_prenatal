@@ -1,0 +1,15 @@
+{
+  "initial_files": 271,
+  "unchanged_files": 265,
+  "intentional_changes": [
+    "backend/scripts/validateCheckpoint13.cjs",
+    "backend/src/services/notaClinicaPdf.js",
+    "backend/test/notaClinicaPdf.test.js",
+    "backend/test/notaClinicaPdfCheckpoint13.test.js",
+    "backend/test/notasClinicasPostgres.test.js",
+    "docs/CPREN_120_CHECKPOINT_13_AJUSTES_FINALES_PDF.md"
+  ],
+  "checkpoint11_12_13_evidence_unchanged": true,
+  "authoring_services_repositories_unchanged_since_13": true,
+  "prior_local_changes_preserved": true
+}

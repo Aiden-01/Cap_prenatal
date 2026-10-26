@@ -1,0 +1,242 @@
+[
+  {
+    "path": "backend-final.log",
+    "bytes": 149699,
+    "sha256": "c6df13f23bcb5b66d9167b70d75849a05db09297124f20489e252c58d89e3f4c"
+  },
+  {
+    "path": "boundaries/lineas-32.pdf",
+    "bytes": 136570,
+    "sha256": "465a95de63a5fc81d6dfadbac26aa26ddf705aedee48dd9a618ab6ed2b90ab41"
+  },
+  {
+    "path": "boundaries/lineas-33.pdf",
+    "bytes": 136640,
+    "sha256": "aafcda94153e1ba3f2447763059f9ed06a08fde3399f8bf71f226db5c98859fe"
+  },
+  {
+    "path": "boundaries/lineas-34.pdf",
+    "bytes": 137915,
+    "sha256": "88e49f21a99a2f89bc732e83ce14359d2877b8d550e6369c5d6e7a8b1daaa7c5"
+  },
+  {
+    "path": "boundaries/lineas-65.pdf",
+    "bytes": 140592,
+    "sha256": "2cb1e0b5cb15001974077f2596e68fae068f62bb285fb455436a4275111e2652"
+  },
+  {
+    "path": "boundaries/lineas-66.pdf",
+    "bytes": 140655,
+    "sha256": "3274285b325ffeb67aedefba981d7ad2d5dcc7b442df5a44fdd52e3dc6687cf4"
+  },
+  {
+    "path": "boundaries/lineas-67.pdf",
+    "bytes": 141909,
+    "sha256": "4546fa19675759f014b39c907a6b98f95c4c8c4f99edf551f5e283cbc0341390"
+  },
+  {
+    "path": "boundaries/nombres-limite-historico.pdf",
+    "bytes": 133743,
+    "sha256": "b682e855413730256d2149b78db5496cc83ad7a3d136c52c925c457c1f0b34f0"
+  },
+  {
+    "path": "contact-sheet.png",
+    "bytes": 511812,
+    "sha256": "91948127ff8bc990b0c1e5ec3911f478a4818c7fb471a49bb2bece4bec58915a"
+  },
+  {
+    "path": "endpoint/nota_enfermeria.pdf",
+    "bytes": 133783,
+    "sha256": "f008a902c2ce2890ecbb94de1d782f1fc152b2ab8c54313d1668979a80f49ec7"
+  },
+  {
+    "path": "endpoint/nota_evolucion.pdf",
+    "bytes": 134457,
+    "sha256": "8404fee4a7185c250192e13b75c446855850745bcddc887e542d8593ae63541a"
+  },
+  {
+    "path": "endpoint-cases.json",
+    "bytes": 2679,
+    "sha256": "578166c00a66738e6bfb2024be978477fd0ed90c231b804de828cbb2d9b86df6"
+  },
+  {
+    "path": "frontend-build.log",
+    "bytes": 6697,
+    "sha256": "1e729c7677a494431985a60a5e17e0aaff3627b50da4e960f61163c3bf441c01"
+  },
+  {
+    "path": "frontend-lint.log",
+    "bytes": 39,
+    "sha256": "98cdc628d09a5242698fda93e945f0e0efa0645207f11c522f5bffab308bd486"
+  },
+  {
+    "path": "git-state.json",
+    "bytes": 298,
+    "sha256": "920fef6daaae5b18b28c44763c7fa01a4f0618461c05ce7068a0c75f37568575"
+  },
+  {
+    "path": "initial-file-hashes.json",
+    "bytes": 34485,
+    "sha256": "954a0580b4e89de0c7084b9b57f08c9e2745934876e4213f08749c93936cd03d"
+  },
+  {
+    "path": "notes-result.json",
+    "bytes": 161,
+    "sha256": "91f50535c6e10fcc02bc20889ee0bdadd358e75f08f8887c3534db5bba59f51b"
+  },
+  {
+    "path": "notes.log",
+    "bytes": 9990,
+    "sha256": "97e2cf01176d8c0f1811b5734dc1a123f74470c272cbdef2d28fa071e5208a05"
+  },
+  {
+    "path": "pages/01-evolucion-breve-pagina-1.png",
+    "bytes": 129642,
+    "sha256": "7420537a4a6e9396ee7dab58c02ff8b18974b157844924b0b338a0342c7678b9"
+  },
+  {
+    "path": "pages/02-enfermeria-breve-pagina-1.png",
+    "bytes": 142306,
+    "sha256": "ac2f04481b62473df26cdd54a5828d5df63d709b5b4bde751e721d88c40a807c"
+  },
+  {
+    "path": "pages/03-evolucion-dos-paginas-pagina-1.png",
+    "bytes": 253352,
+    "sha256": "83abb10b8f151c0c3584a677571510688c8f073bd05e5166981deca2e596b133"
+  },
+  {
+    "path": "pages/03-evolucion-dos-paginas-pagina-2.png",
+    "bytes": 243224,
+    "sha256": "93e8068cbf1f443acb78acea4c8cbef72407c75f3428ea3c345d1ac3751ae35e"
+  },
+  {
+    "path": "pages/04-enfermeria-estres-pagina-1.png",
+    "bytes": 228778,
+    "sha256": "5c0db3583415395c90d66ca850a953d93bddef1b9dd25dfb1647c4888a69dd7d"
+  },
+  {
+    "path": "pages/04-enfermeria-estres-pagina-12.png",
+    "bytes": 217213,
+    "sha256": "fe0b5efbad06f7e1d90a7551ce332afdc1e3b273c8c6e5c57eb4635c615cdd41"
+  },
+  {
+    "path": "pages/04-enfermeria-estres-pagina-6.png",
+    "bytes": 231922,
+    "sha256": "5e911b43164838f690c222aa8df57b959e52e362565bdc65ed63a749d2e6397a"
+  },
+  {
+    "path": "pages/cpren120-nota_evolucion-limite-sintetica-pagina-1.png",
+    "bytes": 274599,
+    "sha256": "2cc83ba56e331b32fae157599e5f6664ce23cb0100710b07413cfce4a37abe2d"
+  },
+  {
+    "path": "pages/cpren120-nota_evolucion-limite-sintetica-pagina-8.png",
+    "bytes": 183310,
+    "sha256": "019e09bf1c18861ff9688f2d98ec0cf2a4356ef357b5738f69bcaec3bcc1ee4d"
+  },
+  {
+    "path": "pages/lineas-33-pagina-1.png",
+    "bytes": 224680,
+    "sha256": "efdfe165e4e347a214ffda941309ea885aec2d8970ba9982a655ebd88bc28e7a"
+  },
+  {
+    "path": "pages/lineas-66-pagina-2.png",
+    "bytes": 235652,
+    "sha256": "1deac89942124ae71ccdd5ebc46d56b736610f03710621c3f66707c8fed8c489"
+  },
+  {
+    "path": "pages/nombres-limite-historico-pagina-1.png",
+    "bytes": 116177,
+    "sha256": "def7e471dec3caf54a7103ac33745129f6b00b7f527abbf1c70ad820ffe58cc1"
+  },
+  {
+    "path": "pdf/01-evolucion-breve.pdf",
+    "bytes": 137052,
+    "sha256": "32ee36797f5661d1da7a0594edbf744083f1b2a85b94ca31765f1b9dbea8034d"
+  },
+  {
+    "path": "pdf/02-enfermeria-breve.pdf",
+    "bytes": 136862,
+    "sha256": "28d34c3f911ad03b0bfabd2481773cb9b287607df2f779e6124c1bb23a05a36d"
+  },
+  {
+    "path": "pdf/03-evolucion-dos-paginas.pdf",
+    "bytes": 142180,
+    "sha256": "a62014e27a1227c8d5c2fb7da9a365e2b90d16888584e3418b920b2d60b82eca"
+  },
+  {
+    "path": "pdf/04-enfermeria-estres.pdf",
+    "bytes": 183725,
+    "sha256": "5f7d6f3caa175544cd78023a5bee91ce9902df2d2c08a84e75ac6b42b181a5b8"
+  },
+  {
+    "path": "pdf-verification.json",
+    "bytes": 8619,
+    "sha256": "ca67b0c2ea43e0692c4db72f45d79fb0650057af868c4a7d356af071e0f96d55"
+  },
+  {
+    "path": "pdf-verification.log",
+    "bytes": 48,
+    "sha256": "09e2d5befda7560f0486de96676f138e3ed637f826974327c150d2f9576a655a"
+  },
+  {
+    "path": "preservation.json",
+    "bytes": 552,
+    "sha256": "6d5b6d3af4027a2091757a19c2a66b88d65eb9e621aa80effd575ca89c00169f"
+  },
+  {
+    "path": "README.md",
+    "bytes": 1511,
+    "sha256": "5a4a3a584ed7d1f91425d0d3973bc48f5e7a4b97e6e3594b5e48f5264d57032a"
+  },
+  {
+    "path": "regression/cpren120-nota_enfermeria-limite-sintetica.pdf",
+    "bytes": 165634,
+    "sha256": "f637a6e0901b7076e0f0e4e70d1fd21e01d2dc55a5b853df6970eb058bcde4cd"
+  },
+  {
+    "path": "regression/cpren120-nota_enfermeria-sintetica.pdf",
+    "bytes": 175596,
+    "sha256": "f6c8f3ebf04e7f01c37d6513e3e6b0321591a83255e295551c8786e5bd7c3a5e"
+  },
+  {
+    "path": "regression/cpren120-nota_evolucion-limite-sintetica.pdf",
+    "bytes": 165798,
+    "sha256": "f151272d7334de7dd8a94b4a020e4cccc82f63f2b68991a4f646e677c361fa8b"
+  },
+  {
+    "path": "regression/cpren120-nota_evolucion-sintetica.pdf",
+    "bytes": 175752,
+    "sha256": "8a69e2aeb7df15f656275734ae1f01eb0117f0f402f047fcbbf22d6fd45b97a1"
+  },
+  {
+    "path": "samples-result.json",
+    "bytes": 163,
+    "sha256": "6a1364916554e6985abc43b4d176392dc8ec5c3def8903e1686291f88ec8f897"
+  },
+  {
+    "path": "samples.log",
+    "bytes": 1159,
+    "sha256": "971b827823545b7a716436dd74f033916dd4870643fa18a378c5ff64709282d9"
+  },
+  {
+    "path": "synthetic-cases.json",
+    "bytes": 50236,
+    "sha256": "a703fddc078558025e5b2b84ca75b66d057077cee5a85876224185dd83abcc8a"
+  },
+  {
+    "path": "test-results.json",
+    "bytes": 910,
+    "sha256": "083fb34b3ec9d81d6157d8b849d608e5c05d535148d8e47f78d0fde3079468c5"
+  },
+  {
+    "path": "unit-result.json",
+    "bytes": 160,
+    "sha256": "0fec2f265c6ed5f702dc847020925ff0d735c14640a701f72a8bf65e04e26b68"
+  },
+  {
+    "path": "unit.log",
+    "bytes": 2961,
+    "sha256": "e40513600dda72c0e4193289242e0f5633710db362934388d94240fc4d77e58a"
+  }
+]

@@ -1,0 +1,91 @@
+{
+  "synthetic_only": true,
+  "cases": [
+    {
+      "file": "endpoint/nota_evolucion.pdf",
+      "pages": 1,
+      "data": {
+        "nota": {
+          "id": 1,
+          "paciente_id": 1,
+          "embarazo_id": 11,
+          "control_prenatal_id": 114,
+          "tipo": "nota_evolucion",
+          "fecha_atencion": "2026-06-01",
+          "hora_atencion": "08:30:00",
+          "estado": "borrador",
+          "es_principal": true,
+          "responsable_usuario_id": 3,
+          "responsable_snapshot": {
+            "tipo": "usuario",
+            "cargo_id": 101,
+            "usuario_id": 3,
+            "cargo_codigo": "MED",
+            "cargo_nombre": "Médico sintético de notas",
+            "nombre_completo": "Médico sintético responsable"
+          },
+          "capturista_usuario_id": 2,
+          "finalizador_usuario_id": null,
+          "created_at": "2026-10-25T17:43:31.156Z",
+          "updated_at": "2026-10-25T17:43:31.156Z",
+          "finalizada_at": null,
+          "version": 1,
+          "contenido": "NARRATIVA-PDF-PRIVADA áéíóú ñ"
+        },
+        "paciente": {
+          "id": 1,
+          "nombres": "Paciente sintética",
+          "apellidos": "Prueba uno",
+          "no_expediente": "SYN-NOTAS-1"
+        },
+        "control": {
+          "numero": 4,
+          "fecha": "2026-09-01"
+        }
+      }
+    },
+    {
+      "file": "endpoint/nota_enfermeria.pdf",
+      "pages": 1,
+      "data": {
+        "nota": {
+          "id": 2,
+          "paciente_id": 1,
+          "embarazo_id": 11,
+          "control_prenatal_id": 114,
+          "tipo": "nota_enfermeria",
+          "fecha_atencion": "2026-06-01",
+          "hora_atencion": "08:30:00",
+          "estado": "borrador",
+          "es_principal": true,
+          "responsable_usuario_id": 4,
+          "responsable_snapshot": {
+            "tipo": "usuario",
+            "cargo_id": 102,
+            "usuario_id": 4,
+            "cargo_codigo": "AE",
+            "cargo_nombre": "AE sintética de notas",
+            "nombre_completo": "AE sintética responsable"
+          },
+          "capturista_usuario_id": 2,
+          "finalizador_usuario_id": null,
+          "created_at": "2026-10-25T17:43:32.179Z",
+          "updated_at": "2026-10-25T17:43:32.179Z",
+          "finalizada_at": null,
+          "version": 1,
+          "contenido": "NARRATIVA-PDF-PRIVADA áéíóú ñ"
+        },
+        "paciente": {
+          "id": 1,
+          "nombres": "Paciente sintética",
+          "apellidos": "Prueba uno",
+          "no_expediente": "SYN-NOTAS-1"
+        },
+        "control": {
+          "numero": 4,
+          "fecha": "2026-09-01"
+        }
+      }
+    }
+  ]
+}
