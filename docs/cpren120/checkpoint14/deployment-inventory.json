@@ -1,0 +1,2078 @@
+{
+  "generated_utc": "2026-10-26T03:01:00.398Z",
+  "local_only": true,
+  "production_access": false,
+  "production_state": "No verificable: no acceso AWS ni respaldo productivo",
+  "equipo": "Casa",
+  "machine": "HUGUITO",
+  "refs": {
+    "branch": "feature/cpren-120-editor-pdf-notas-clinicas",
+    "head": "0f341d78d9fcfa6bb8178cd1a36bec141adf7b5e",
+    "origin_clinical": "0f341d78d9fcfa6bb8178cd1a36bec141adf7b5e",
+    "origin_main": "d5fae677fa462af9ca5b7174a46d3ebf21e12196",
+    "local_main": "d5fae677fa462af9ca5b7174a46d3ebf21e12196"
+  },
+  "ahead_commits": [
+    "0f341d78d9fcfa6bb8178cd1a36bec141adf7b5e fix(cpren-120): cerrar validacion tecnica de checkpoints 11-13B",
+    "375da7a5b06f40f3fc0c828f39df326d0ea0c1f9 wip(cpren-120): checkpoints 09-11 pendientes de revision",
+    "b00ddf3e881abfa784e2262aceabaabef00bb465 feat(cpren-120): editor compartido y PDF institucional de notas clinicas",
+    "0be423033f4928f3e2a7409b5541dc5976fbc3cd merge(cpren-119): integrar main y preservar seguimiento clinico",
+    "6f15fef6dbc61a2355ef5f0f3f0c69e9c44eb821 feat(cpren-119): implementar seguimiento de notas clinicas",
+    "e61979c2b6f5817c7853cbb47d075132d381ffdd feat(cpren-118): implementar modelo y api de notas clinicas",
+    "e75ebfdee770f72a272c784785b0e3396bf06799 feat(cpren-117): implementar permisos y autoria clinica",
+    "9cd23aed8bf07ad47c97c72b997b2612d1cdd176 feat(cpren-116): integrar perfiles profesionales de usuarios",
+    "055e873338f1a363c78efa0030a40b4d813bf962 feat(cpren-115): implementar catalogos profesionales"
+  ],
+  "categories": {
+    "backend": {
+      "added": 51,
+      "modified": 22,
+      "deleted": 0,
+      "other": 0
+    },
+    "migrations": {
+      "added": 8,
+      "modified": 0,
+      "deleted": 0,
+      "other": 0
+    },
+    "docs": {
+      "added": 283,
+      "modified": 2,
+      "deleted": 0,
+      "other": 0
+    },
+    "frontend": {
+      "added": 23,
+      "modified": 8,
+      "deleted": 0,
+      "other": 0
+    },
+    "output": {
+      "added": 2,
+      "modified": 0,
+      "deleted": 0,
+      "other": 0
+    }
+  },
+  "committed_file_count": 399,
+  "committed_files_vs_main": [
+    {
+      "status": "A",
+      "path": "backend/scripts/validateCheckpoint11.cjs"
+    },
+    {
+      "status": "A",
+      "path": "backend/scripts/validateCheckpoint13.cjs"
+    },
+    {
+      "status": "A",
+      "path": "backend/scripts/verifyCheckpoint11Pdf.py"
+    },
+    {
+      "status": "A",
+      "path": "backend/scripts/verifyCheckpoint13Pdf.py"
+    },
+    {
+      "status": "A",
+      "path": "backend/scripts/verifyCheckpoint13bPdf.py"
+    },
+    {
+      "status": "A",
+      "path": "backend/scripts/verifyNotaClinicaPdf.py"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/assets/institucional/README.md"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/assets/institucional/ddriss-peten-area-sur-oriente.png"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/assets/institucional/gobierno-guatemala-mspas.png"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/controllers/catalogosController.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/controllers/notasClinicasController.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/controllers/notasClinicasPdfController.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/controllers/usuariosController.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/023_catalogos_profesionales.sql"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/024_usuarios_perfiles_profesionales.sql"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/025_permisos_autoria_clinica.sql"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/026_notas_clinicas.sql"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/027_seguimiento_notas_controles.sql"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/028_retirar_especialidades.sql"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/029_usuarios_email.sql"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/030_cargos_autoria_estable.sql"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/db/schema.sql"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/db/schemaCompatibility.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/db/seed.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/index.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/middleware/errorHandler.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/repositories/catalogosRepository.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/repositories/notasClinicasRepository.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/repositories/permisosRepository.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/repositories/profesionalesRepository.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/repositories/seguimientoNotasRepository.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/repositories/usuariosRepository.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/routes/catalogos.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/routes/controles.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/routes/notasClinicas.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/routes/pacientes.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/routes/profesionales.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/routes/seguimientoNotas.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/routes/usuarios.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/security/clinicalPermissions.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/services/audit/auditFieldPolicy.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/services/audit/auditHistorySanitizer.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/services/auditService.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/services/autoriaClinicaService.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/services/catalogosService.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/services/notaClinicaPdf.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/services/notasClinicasService.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/services/seguimientoNotasService.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/services/usuariosService.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/validations/catalogos.schemas.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/validations/notasClinicas.schemas.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/validations/profesionales.schemas.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/src/validations/seguimientoNotas.schemas.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/src/validations/usuarios.schemas.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/test/auditHistorySanitizer.test.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/test/auditPrivacyIntegration.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/autoriaClinica.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/autoriaClinicaPostgres.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/catalogos.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/catalogosPostgres.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/checkpoint10MigracionesPostgres.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/helpers/notasCheckpoint09Browser.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/helpers/notasPdfCheckpoint13Fixtures.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/helpers/perfilesBrowser.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/helpers/seguimientoNotasBrowser.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/notaClinicaPdf.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/notaClinicaPdfCheckpoint13.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/notaClinicaPdfHttp.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/notasClinicasHttp.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/notasClinicasPostgres.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/notasClinicasService.test.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/test/pacienteEmbarazoPostgres.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/perfilesProfesionales.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/perfilesProfesionalesPostgres.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/permisosClinicos.test.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/test/retiroReferencias.test.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/test/rolePermissionsAudit.test.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/test/schemaCompatibility.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/seguimientoNotas.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/seguimientoNotasPostgres.test.js"
+    },
+    {
+      "status": "A",
+      "path": "backend/test/usuariosEmail.test.js"
+    },
+    {
+      "status": "M",
+      "path": "docs/API.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/BASE_DATOS.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/CPREN_115_CATALOGOS_PROFESIONALES.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/CPREN_115_REGISTRO_SESION.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/CPREN_116_PERFILES_PROFESIONALES.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/CPREN_117_PERMISOS_AUTORIA_CLINICA.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/CPREN_118_MODELO_NOTAS_CLINICAS.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/CPREN_119_CHECKPOINT_06_SYNC_MAIN.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/CPREN_119_SEGUIMIENTO_NOTAS_CONTROLES.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/CPREN_120_CHECKPOINT_07_EDITOR_NOTAS.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/CPREN_120_CHECKPOINT_08_LOGOS_PDF.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/CPREN_120_CHECKPOINT_09_REDISENO_NOTAS.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/CPREN_120_CHECKPOINT_10_PROFESIONALES_USUARIOS.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/CPREN_120_CHECKPOINT_11_SIMPLIFICACION_NOTAS_USUARIOS.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/CPREN_120_CHECKPOINT_13_AJUSTES_FINALES_PDF.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/PUBLICACION_CHECKPOINT_11_13B.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint09/http-evidence.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint09/local-diagnostic.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint09/notas-1280-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint09/notas-1280-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint09/notas-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint09/notas-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint09/notas-320-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint09/notas-320-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint09/notas-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint09/notas-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint09/notas-768-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint09/notas-768-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/catalogo-cargos-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/catalogo-cargos-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/catalogo-cargos-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/catalogo-cargos-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/clasificar-cargo-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/clasificar-cargo-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/clasificar-cargo-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/clasificar-cargo-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/http-evidence.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/notas-1280-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/notas-1280-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/notas-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/notas-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/notas-320-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/notas-320-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/notas-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/notas-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/notas-768-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/notas-768-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/nuevo-usuario-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/nuevo-usuario-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/nuevo-usuario-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/nuevo-usuario-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/perfil-usuario-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/perfil-usuario-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/perfil-usuario-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/perfil-usuario-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/test-results.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/usuarios-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/usuarios-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/usuarios-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint10/usuarios-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/catalogo-cargos-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/catalogo-cargos-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/catalogo-cargos-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/catalogo-cargos-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/editar-cargo-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/editar-cargo-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/editar-cargo-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/editar-cargo-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/http-evidence.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/nota_enfermeria-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/nota_enfermeria-pagina-10.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/nota_enfermeria-pagina-5.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/nota_evolucion-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/nota_evolucion-pagina-10.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/nota_evolucion-pagina-5.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/notas-1280-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/notas-1280-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/notas-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/notas-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/notas-320-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/notas-320-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/notas-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/notas-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/notas-768-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/notas-768-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/nuevo-usuario-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/nuevo-usuario-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/nuevo-usuario-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/nuevo-usuario-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/pdf-verification.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/perfil-usuario-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/perfil-usuario-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/perfil-usuario-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/perfil-usuario-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/usuarios-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/usuarios-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/usuarios-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint11/usuarios-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/README.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/authorship-result.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/catalogo-cargos-1280-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/catalogo-cargos-1280-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/catalogo-cargos-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/catalogo-cargos-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/catalogo-cargos-320-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/catalogo-cargos-320-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/catalogo-cargos-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/catalogo-cargos-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/catalogo-cargos-768-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/catalogo-cargos-768-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/catalogs-result.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/editar-cargo-1280-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/editar-cargo-1280-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/editar-cargo-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/editar-cargo-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/editar-cargo-320-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/editar-cargo-320-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/editar-cargo-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/editar-cargo-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/editar-cargo-768-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/editar-cargo-768-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/evidence-manifest.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/git-state.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/http-evidence.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/migrations-result.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/notas-1280-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/notas-1280-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/notas-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/notas-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/notas-320-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/notas-320-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/notas-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/notas-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/notas-768-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/notas-768-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/notes-result.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/nuevo-usuario-1280-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/nuevo-usuario-1280-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/nuevo-usuario-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/nuevo-usuario-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/nuevo-usuario-320-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/nuevo-usuario-320-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/nuevo-usuario-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/nuevo-usuario-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/nuevo-usuario-768-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/nuevo-usuario-768-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf-contact-sheet.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf-pages/nota_enfermeria-limite-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf-pages/nota_enfermeria-limite-pagina-4.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf-pages/nota_enfermeria-limite-pagina-8.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf-pages/nota_enfermeria-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf-pages/nota_enfermeria-pagina-10.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf-pages/nota_enfermeria-pagina-5.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf-pages/nota_evolucion-limite-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf-pages/nota_evolucion-limite-pagina-4.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf-pages/nota_evolucion-limite-pagina-8.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf-pages/nota_evolucion-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf-pages/nota_evolucion-pagina-10.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf-pages/nota_evolucion-pagina-5.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf-result.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf-verification.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf/cpren120-nota_enfermeria-limite-sintetica.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf/cpren120-nota_enfermeria-sintetica.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf/cpren120-nota_evolucion-limite-sintetica.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/pdf/cpren120-nota_evolucion-sintetica.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/perfil-usuario-1280-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/perfil-usuario-1280-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/perfil-usuario-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/perfil-usuario-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/perfil-usuario-320-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/perfil-usuario-320-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/perfil-usuario-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/perfil-usuario-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/perfil-usuario-768-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/perfil-usuario-768-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/profiles-browser-evidence.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/profiles-result.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/test-results.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/tracking-result.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/usuarios-1280-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/usuarios-1280-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/usuarios-1440-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/usuarios-1440-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/usuarios-320-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/usuarios-320-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/usuarios-390-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/usuarios-390-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/usuarios-768-claro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/usuarios-768-oscuro.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/visual-comparisons/catalogo-cargos-contact.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/visual-comparisons/editar-cargo-contact.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/visual-comparisons/notas-contact.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/visual-comparisons/notas-editor-contact.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/visual-comparisons/nuevo-usuario-contact.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/visual-comparisons/perfil-320-oscuro-detalle.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/visual-comparisons/perfil-usuario-contact.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint12/visual-comparisons/usuarios-contact.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/README.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/boundaries/lineas-32.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/boundaries/lineas-33.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/boundaries/lineas-34.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/boundaries/lineas-65.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/boundaries/lineas-66.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/boundaries/lineas-67.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/contact-sheet.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/endpoint-cases.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/endpoint/nota_enfermeria.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/endpoint/nota_evolucion.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/evidence-manifest.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/git-state.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/initial-file-hashes.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/notes-result.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pages/01-evolucion-breve-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pages/02-enfermeria-breve-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pages/03-evolucion-dos-paginas-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pages/03-evolucion-dos-paginas-pagina-2.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pages/04-enfermeria-estres-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pages/04-enfermeria-estres-pagina-12.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pages/04-enfermeria-estres-pagina-6.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pages/cpren120-nota_evolucion-limite-sintetica-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pages/cpren120-nota_evolucion-limite-sintetica-pagina-8.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pages/lineas-33-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pages/lineas-66-pagina-2.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pdf-verification.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pdf/01-evolucion-breve.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pdf/02-enfermeria-breve.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pdf/03-evolucion-dos-paginas.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/pdf/04-enfermeria-estres.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/preservation.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/regression/cpren120-nota_enfermeria-limite-sintetica.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/regression/cpren120-nota_enfermeria-sintetica.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/regression/cpren120-nota_evolucion-limite-sintetica.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/regression/cpren120-nota_evolucion-sintetica.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/samples-result.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/synthetic-cases.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/test-results.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/tracking-result.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13/unit-result.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/README.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/boundaries/lineas-32.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/boundaries/lineas-33.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/boundaries/lineas-34.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/boundaries/lineas-65.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/boundaries/lineas-66.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/boundaries/lineas-67.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/boundaries/nombres-limite-historico.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/contact-sheet.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/endpoint-cases.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/endpoint/nota_enfermeria.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/endpoint/nota_evolucion.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/evidence-manifest.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/git-state.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/initial-file-hashes.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/notes-result.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pages/01-evolucion-breve-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pages/02-enfermeria-breve-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pages/03-evolucion-dos-paginas-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pages/03-evolucion-dos-paginas-pagina-2.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pages/04-enfermeria-estres-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pages/04-enfermeria-estres-pagina-12.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pages/04-enfermeria-estres-pagina-6.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pages/cpren120-nota_evolucion-limite-sintetica-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pages/cpren120-nota_evolucion-limite-sintetica-pagina-8.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pages/lineas-33-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pages/lineas-66-pagina-2.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pages/nombres-limite-historico-pagina-1.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pdf-verification.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pdf/01-evolucion-breve.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pdf/02-enfermeria-breve.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pdf/03-evolucion-dos-paginas.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/pdf/04-enfermeria-estres.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/preservation.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/regression/cpren120-nota_enfermeria-limite-sintetica.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/regression/cpren120-nota_enfermeria-sintetica.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/regression/cpren120-nota_evolucion-limite-sintetica.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/regression/cpren120-nota_evolucion-sintetica.pdf"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/samples-result.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/synthetic-cases.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/test-results.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/checkpoint13b/unit-result.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/desktop.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/mobile.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/pdf-contact-sheet.png"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/pdf-validation.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/cpren120/publicacion-checkpoints11-13b.json"
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/App.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/api/catalogos.js"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/api/notasClinicas.js"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/components/EditorNotaClinica.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/components/ResponsableNota.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/components/SeguimientoNotaEstado.jsx"
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/components/TimelineControles.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/components/usuarios/AdminDialog.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/components/usuarios/CatalogoCargos.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/components/usuarios/ModalPerfilProfesional.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/components/usuarios/PerfilProfesionalFields.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/components/usuarios/profesionales.css"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/hooks/useSeguimientoNotas.js"
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/pages/ExpedientePaciente.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/pages/NotasClinicas.jsx"
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/pages/NuevoControl.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/pages/SeguimientoNotasControl.jsx"
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/pages/Usuarios.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/pages/seguimiento-notas.css"
+    },
+    {
+      "status": "M",
+      "path": "frontend/src/utils/accessRules.js"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/utils/notasClinicas.js"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/utils/seguimientoNotas.js"
+    },
+    {
+      "status": "A",
+      "path": "frontend/src/utils/usuarioEmail.js"
+    },
+    {
+      "status": "M",
+      "path": "frontend/test-browser/prenatalUx.cjs"
+    },
+    {
+      "status": "A",
+      "path": "frontend/test-dom/notasClinicas.test.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/test-dom/notasClinicasNavegacion.test.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/test-dom/perfilesProfesionales.test.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/test-dom/seguimientoNotas.test.jsx"
+    },
+    {
+      "status": "M",
+      "path": "frontend/test-dom/usuariosAuditoriaPermission.test.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/test-dom/usuariosEmail.test.jsx"
+    },
+    {
+      "status": "A",
+      "path": "frontend/test/notasClinicasFecha.test.js"
+    },
+    {
+      "status": "A",
+      "path": "output/pdf/cpren120-nota_enfermeria-sintetica.pdf"
+    },
+    {
+      "status": "A",
+      "path": "output/pdf/cpren120-nota_evolucion-sintetica.pdf"
+    }
+  ],
+  "local_checkpoint14_files": [
+    {
+      "status": "M",
+      "path": "backend/src/services/notaClinicaPdf.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/test/notaClinicaPdf.test.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/test/notaClinicaPdfCheckpoint13.test.js"
+    },
+    {
+      "status": "M",
+      "path": "backend/test/notasClinicasPostgres.test.js"
+    },
+    {
+      "status": "?",
+      "path": "backend/scripts/auditClinicalDeployment14.cjs"
+    },
+    {
+      "status": "?",
+      "path": "backend/scripts/validateCheckpoint14.cjs"
+    },
+    {
+      "status": "?",
+      "path": "backend/scripts/verifyCheckpoint14Pdf.py"
+    },
+    {
+      "status": "?",
+      "path": "backend/test/checkpoint14MigracionesPostgres.test.js"
+    },
+    {
+      "status": "?",
+      "path": "docs/CPREN_120_CHECKPOINT_14_FIRMA_ULTIMA_HOJA.md"
+    },
+    {
+      "status": "?",
+      "path": "docs/CPREN_PLAN_DESPLIEGUE_CLINICO_115_126.md"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/README.md"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/authorship-result.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/backend-result.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/boundaries/enfermeria-ae.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/boundaries/lineas-32.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/boundaries/lineas-33.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/boundaries/lineas-34.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/boundaries/lineas-65.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/boundaries/lineas-66.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/boundaries/lineas-67.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/boundaries/nombres-limite-historico.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/build-result.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/catalogs-result.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/contact-sheet.png"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/deployment-inventory.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/endpoint-cases.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/endpoint/nota_enfermeria.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/endpoint/nota_evolucion.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/evidence-manifest.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/frontend-result.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/git-state.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/lint-result.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/migration-readiness.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/migrations-result.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/notes-result.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pages/01-evolucion-breve-pagina-1.png"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pages/02-enfermeria-breve-pagina-1.png"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pages/03-evolucion-dos-paginas-pagina-1.png"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pages/03-evolucion-dos-paginas-pagina-2.png"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pages/04-enfermeria-estres-pagina-1.png"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pages/04-enfermeria-estres-pagina-12.png"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pages/04-enfermeria-estres-pagina-6.png"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pages/05-evolucion-limite-ultima-hoja-pagina-1.png"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pages/05-evolucion-limite-ultima-hoja-pagina-2.png"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pages/cpren120-nota_evolucion-limite-sintetica-pagina-1.png"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pages/cpren120-nota_evolucion-limite-sintetica-pagina-8.png"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pages/lineas-33-pagina-1.png"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pages/lineas-66-pagina-2.png"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pages/nombres-limite-historico-pagina-1.png"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pdf-verification.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pdf/01-evolucion-breve.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pdf/02-enfermeria-breve.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pdf/03-evolucion-dos-paginas.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pdf/04-enfermeria-estres.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/pdf/05-evolucion-limite-ultima-hoja.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/preservation.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/profiles-result.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/regression/cpren120-nota_enfermeria-limite-sintetica.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/regression/cpren120-nota_enfermeria-sintetica.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/regression/cpren120-nota_evolucion-limite-sintetica.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/regression/cpren120-nota_evolucion-sintetica.pdf"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/samples-result.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/synthetic-cases.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/test-results.json"
+    },
+    {
+      "status": "?",
+      "path": "docs/cpren120/checkpoint14/tracking-result.json"
+    }
+  ],
+  "migrations": [
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/023_catalogos_profesionales.sql",
+      "sha256_git_content": "fd3b0ba33246e117df6ff938185abf888f353a8785ea4d906535261d92679235",
+      "unchanged_in_checkpoint14": true
+    },
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/024_usuarios_perfiles_profesionales.sql",
+      "sha256_git_content": "5cf41b3498912350a2edcad16f2bfb54c26679824df06e0ae7c0f57619caddaf",
+      "unchanged_in_checkpoint14": true
+    },
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/025_permisos_autoria_clinica.sql",
+      "sha256_git_content": "1cd0bf35669dafb551ab0076b3650b5758da79d9b9cac49c65d523cfe3ffe011",
+      "unchanged_in_checkpoint14": true
+    },
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/026_notas_clinicas.sql",
+      "sha256_git_content": "4c07ee7e3523c8bdd24352bb637e19313444e33b14d5cbb942feb0cb95820fe8",
+      "unchanged_in_checkpoint14": true
+    },
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/027_seguimiento_notas_controles.sql",
+      "sha256_git_content": "9942e19c533b3db660752ee8a0100f1b368ef03d20c7c101a0a02fdb561d98b8",
+      "unchanged_in_checkpoint14": true
+    },
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/028_retirar_especialidades.sql",
+      "sha256_git_content": "39df9c6dc050cfc467db9fcbf187874c36fd5c9ef3b8aa0913ba26e5bdad374c",
+      "unchanged_in_checkpoint14": true
+    },
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/029_usuarios_email.sql",
+      "sha256_git_content": "ce56676666ece282719d8f65b10b30943222825e700e954ebcdd1b50a1f0aa09",
+      "unchanged_in_checkpoint14": true
+    },
+    {
+      "status": "A",
+      "path": "backend/src/db/migrations/030_cargos_autoria_estable.sql",
+      "sha256_git_content": "1d03121d23af925799742e20453f4ca8ae54982bd3bf679d520b9e3ee74bb95d",
+      "unchanged_in_checkpoint14": true
+    }
+  ],
+  "package_dependency_differences": [],
+  "environment_template_differences": [],
+  "deployment_or_n8n_differences": [],
+  "prior_evidence_preserved": true,
+  "historical_migrations_preserved": true,
+  "active_obsolete_field_references": [
+    {
+      "file": "backend/src/db/schemaCompatibility.js",
+      "reason": "Nombre de migración histórica requerida, sin funcionalidad de Especialidades"
+    },
+    {
+      "file": "backend/src/services/seguimientoNotasService.js",
+      "reason": "Lectura de snapshot legado para reintento idempotente, sin reescritura ni clasificación activa"
+    }
+  ],
+  "clinical_codes": [
+    "MED",
+    "AE",
+    "EP"
+  ],
+  "clinical_grants_automatic": false,
+  "new_environment_variables": [],
+  "new_runtime_dependencies": [],
+  "endpoints": [
+    {
+      "path": "/api/catalogos/cargos",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/catalogos/cargos/:id",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "path": "/api/catalogos/cargos/:id/desactivar",
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/catalogos/cargos/:id/reactivar",
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
+      "path": "/api/profesionales",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/usuarios",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/usuarios/:id",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "path": "/api/pacientes/:pacienteId/notas-clinicas",
+      "methods": [
+        "GET",
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/pacientes/:pacienteId/notas-clinicas/:notaId",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "path": "/api/pacientes/:pacienteId/notas-clinicas/:notaId/finalizar",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/api/pacientes/:pacienteId/notas-clinicas/:notaId/pdf",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/pacientes/:pacienteId/controles/seguimiento-notas",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "path": "/api/pacientes/:pacienteId/controles/:id/seguimiento-notas",
+      "methods": [
+        "POST"
+      ]
+    }
+  ]
+}

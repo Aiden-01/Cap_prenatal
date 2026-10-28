@@ -1,0 +1,462 @@
+{
+  "schema": 1,
+  "publication_date_local": "2026-10-27",
+  "timezone": "America/Guatemala",
+  "equipo": "Casa",
+  "machine": "HUGUITO",
+  "branch": "feature/cpren-120-editor-pdf-notas-clinicas",
+  "base_commit": "0f341d78d9fcfa6bb8178cd1a36bec141adf7b5e",
+  "origin_before": "0f341d78d9fcfa6bb8178cd1a36bec141adf7b5e",
+  "owner_visual_approval": "PDF de evolución de dos páginas de CHECKPOINT-14; comunicado por el propietario",
+  "predeploy_decision": "GO condicionado para preparación; NO-GO para desplegar",
+  "clinical_approval": false,
+  "publication_production_access": false,
+  "published_file_count": 68,
+  "hash_scope": "Bytes canónicos del índice Git. El checkout Windows puede convertir LF a CRLF. Este JSON excluye su propio hash; Git identifica su contenido.",
+  "files": [
+    {
+      "path": "backend/scripts/auditClinicalDeployment14.cjs",
+      "git_blob_oid": "12b107a8475cd271cc050a1027630562bf8e67ab",
+      "bytes": 4949,
+      "sha256": "8f0bf2cb9eefc4b9589d792220b14e57820414922e111a9d86b67d24fca5bf83"
+    },
+    {
+      "path": "backend/scripts/validateCheckpoint14.cjs",
+      "git_blob_oid": "af9fd499edddcd3eef6d2303b266ca7298ed4b8b",
+      "bytes": 3791,
+      "sha256": "6a9a4f1a5dedfe43dc35d6d6344bcf50a4a67815ce6695c9c9100f0c7b2c1c1b"
+    },
+    {
+      "path": "backend/scripts/verifyCheckpoint14Pdf.py",
+      "git_blob_oid": "d7489fa6f4ae530acfca54d03d02b8bbdb34fa56",
+      "bytes": 9266,
+      "sha256": "fffb326dc330f498d41984a867661354f250f41555c2101bb3cfc47c624d46f2"
+    },
+    {
+      "path": "backend/src/services/notaClinicaPdf.js",
+      "git_blob_oid": "8b87ad70ed979be20a04a619654440a35574e755",
+      "bytes": 8634,
+      "sha256": "5ff463f600abfc05d0e8976e9e6ee852640668ca63ab32f6c8bc57d910edf143"
+    },
+    {
+      "path": "backend/test/checkpoint14MigracionesPostgres.test.js",
+      "git_blob_oid": "bdc15173ec8cb898625611598dc8ff2187fe2218",
+      "bytes": 10128,
+      "sha256": "3ae890a3376dbee0983520c1dcc972e77ee38168f7bb2d38033214e054235dd5"
+    },
+    {
+      "path": "backend/test/notaClinicaPdf.test.js",
+      "git_blob_oid": "9c17d0134f3fb2a7e259e6b35de029e8f63e784b",
+      "bytes": 5010,
+      "sha256": "d8c0c72278085920f714249e12f5f2e3c5f8cec329b3da76508a1ec97cad1d75"
+    },
+    {
+      "path": "backend/test/notaClinicaPdfCheckpoint13.test.js",
+      "git_blob_oid": "21482896199eeb689d6099c4ed1f8d9bc58a4aa9",
+      "bytes": 7356,
+      "sha256": "c4d21186c4133de7540a96929028617697da7d4a583cb9d6fab6b08797ccf35d"
+    },
+    {
+      "path": "backend/test/notasClinicasPostgres.test.js",
+      "git_blob_oid": "4fdc23e4a8537e6a011930449e366482205f3131",
+      "bytes": 40091,
+      "sha256": "d6090fe132694cfa618c8cb2bbfbc66a03c659c107583ba2fee24d62b74a09b4"
+    },
+    {
+      "path": "docs/CPREN_120_CHECKPOINT_14_FIRMA_ULTIMA_HOJA.md",
+      "git_blob_oid": "e7c121eeb6ccbaf76cd60a5132bd968df8be5185",
+      "bytes": 9750,
+      "sha256": "9ed6ea43848e420f0ee0d30cdcb89d64ebbb5b6f4a0f274b404b42fc9a6ba421"
+    },
+    {
+      "path": "docs/CPREN_PLAN_DESPLIEGUE_CLINICO_115_126.md",
+      "git_blob_oid": "0cd35933f61c79e1244a96bde4885257fba7cbdf",
+      "bytes": 23812,
+      "sha256": "bcf677b2d2652e9acd30676c34fd3e5297c70f3c0292dad04cc535536decd310"
+    },
+    {
+      "path": "docs/CPREN_PREDEPLOY_01_AUDITORIA_AWS.md",
+      "git_blob_oid": "220a3cd36e93c1a42f83d380be1b30e8a2849183",
+      "bytes": 28424,
+      "sha256": "1dc4c13521c1f2a3720e81c48eb78110b320522c05a44e9b384d7aa4241c4e64"
+    },
+    {
+      "path": "docs/cpren120/PUBLICACION_CHECKPOINT14_PREDEPLOY01.md",
+      "git_blob_oid": "fb9029e66b0f3d012bbccdc495612489e8907d9d",
+      "bytes": 6473,
+      "sha256": "e04f067f1046e3615d19fd0c603539de2789f8fcc6acd0d16ae0188fc11e4418"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/README.md",
+      "git_blob_oid": "cb1f2b546044e2d914551f0f041f02b50ba878c2",
+      "bytes": 2002,
+      "sha256": "9133f0ed5a76952314d5d3697eeae90b7f8da6f4998eccf081c644261e2241d3"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/authorship-result.json",
+      "git_blob_oid": "02328848938e21f356aa2d1eaeec8590885f3c53",
+      "bytes": 522,
+      "sha256": "f4a643084a9ee6c2b19ccf288267bba3adcd9e882011c19b3f36bc9960eaca6b"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/backend-result.json",
+      "git_blob_oid": "e1f09d05858cc7e58ed87d4e1d76c6195fb2378a",
+      "bytes": 462,
+      "sha256": "d7f6aff5c621990c2b2c89c1e172ad037d1f3b01e3efdc23c82077b81e5422d8"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/boundaries/enfermeria-ae.pdf",
+      "git_blob_oid": "5b81ef78b99b543cf79edef7a37ce0ff70fa7775",
+      "bytes": 132015,
+      "sha256": "f400c1826ee2328770a5c051c043688f386c4fe1e1869fefda7493f6a804c37e"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/boundaries/lineas-32.pdf",
+      "git_blob_oid": "0a0784c5aa5a89a97e5508b310c56ea7fde22aa5",
+      "bytes": 135677,
+      "sha256": "be1ba170757e010b36545ef81519f59b1dbdbeacd475cf58b385260c38ff62b3"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/boundaries/lineas-33.pdf",
+      "git_blob_oid": "ef62b4a9f68dbd204e206a3925d6e144206d849b",
+      "bytes": 135740,
+      "sha256": "09a5d654034534bfcb0b3cad202ed888451411ec23d2145899b789897e13b07e"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/boundaries/lineas-34.pdf",
+      "git_blob_oid": "42d7e283a7fc5ec4012b091ec39e760e7213707b",
+      "bytes": 136959,
+      "sha256": "320df6c3bf3055f40fcf592d5c52c462bd8ecf054ef453aefbe9b355a05a8475"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/boundaries/lineas-65.pdf",
+      "git_blob_oid": "11e5508958df9ea7aba0e6c0a60abd9255153473",
+      "bytes": 139629,
+      "sha256": "e52a58c89acfe141080787033495a7ebcbc8ae6270cf490dc3a380db29e77ce1"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/boundaries/lineas-66.pdf",
+      "git_blob_oid": "1b41cedd6b2479047291831099eded4878b3b8de",
+      "bytes": 139693,
+      "sha256": "35fdb633d2ea390c24c8a36a316089fb0d422f6f9d9d84e40906112e820fb460"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/boundaries/lineas-67.pdf",
+      "git_blob_oid": "6b3ef40a60f88a28f8b9b097c8cbf3df917aa49b",
+      "bytes": 140890,
+      "sha256": "017812fcd1fa00a5a49d2905a1cd2822b3c023c92d47046c68cbd9053166e812"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/boundaries/nombres-limite-historico.pdf",
+      "git_blob_oid": "59e9186fb7117fb3b54f7ae9826356cdc653c2a1",
+      "bytes": 133256,
+      "sha256": "556ca41997f946d2d90ad044696f4b1f4798b15ea5f4df199f9e45a2b76c5203"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/build-result.json",
+      "git_blob_oid": "a7e2346df8b856098bd0ee2a2fa5c35bc46ebd26",
+      "bytes": 371,
+      "sha256": "71d3b37de009fcb1e21656c58cb7085ffb78a1a4f9c7578b5fa972d26f11c311"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/catalogs-result.json",
+      "git_blob_oid": "2e4661c322b37bc102ef1eac226a027c07ec6d0f",
+      "bytes": 511,
+      "sha256": "fa7190092bbf8f244bdacbc6ed6682724366e6a853cc69360ddffcab9dee0667"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/contact-sheet.png",
+      "git_blob_oid": "71b6eb8a4c680eda35472253dbed2155823fb93d",
+      "bytes": 591511,
+      "sha256": "e4894b8684bf5bd84a1e62feb918dc0fa1f63107733c72b684fd70ce83e7c632"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/deployment-inventory.json",
+      "git_blob_oid": "92122e9152efaa5742434c4d18e8e6bbc2b78adb",
+      "bytes": 53931,
+      "sha256": "9a917851435c57e14c9dc0761ad79520044fbacd6fdd200fffff6d3778ed6d2e"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/endpoint-cases.json",
+      "git_blob_oid": "4b03137eacbf1a1ef70d5bcfd69d6fb1c2bfbabb",
+      "bytes": 2679,
+      "sha256": "6aabd16a0ddecdf9eae540e6ab2249cfdab02179c4b5133bac81259708e6b95e"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/endpoint/nota_enfermeria.pdf",
+      "git_blob_oid": "704497833271459ec13ca356b5244a3a4e341eb0",
+      "bytes": 132491,
+      "sha256": "6dbe76bd022681d23aecc688b981c053b54d704343512ae9a776084efc073ad7"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/endpoint/nota_evolucion.pdf",
+      "git_blob_oid": "cdfec26a2bc3f333e0c209db4f74cfda5b3a9923",
+      "bytes": 133157,
+      "sha256": "379b20cab7dffdce469a0fafc37088c1b38b7e02cb516ebb98e29c5d9abc2594"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/evidence-manifest.json",
+      "git_blob_oid": "c84a3683b3045bd7b79a84fd08a3a5934ef5c0af",
+      "bytes": 8429,
+      "sha256": "6fa5cc95b822b1398819fe4bda7cfd480eebd23c813e9d71588b4ff771fd65e4"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/frontend-result.json",
+      "git_blob_oid": "c89ddbfefcf000586c73613f5a06a9678b40e9ff",
+      "bytes": 504,
+      "sha256": "88fc78f687a2d8e2b9bb59ef7ca58bd38b97a066f88b23a58d0bc55a4fae8525"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/git-state.json",
+      "git_blob_oid": "8ead4dfcb4202e8ba40a71293b3ad9de59aaaeae",
+      "bytes": 5026,
+      "sha256": "a90ddab6aca16b6cfe4e8c4bc8f9202df5d98b227e35aff525863b403b753b67"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/lint-result.json",
+      "git_blob_oid": "7af43a322f9dc9028f76b7fc39da0dd178ec7e72",
+      "bytes": 368,
+      "sha256": "eb1d071104b7af7ae0bbf0eb9d2582fb0cba2ab7720157f9eeeb6cdbef5fe36e"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/migration-readiness.json",
+      "git_blob_oid": "129cddff8bf7af5c37a741eee871259282b62e42",
+      "bytes": 1655,
+      "sha256": "80a4981a7e13a7e185d5697160279a99696ddbd4af9e31928634d70a222f14d4"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/migrations-result.json",
+      "git_blob_oid": "d1559dc20a224edaf514b13ee88cae3a5a7312c4",
+      "bytes": 576,
+      "sha256": "0b41317e803a88286e1df7591f2161c2f50bd6e8815826dc3c24d4da4b090912"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/notes-result.json",
+      "git_blob_oid": "cbd29124d9527eb7f1957097211cb35e0c4afa68",
+      "bytes": 511,
+      "sha256": "7cf3f03640c17cd4ad135f53f2ff7e6fe6e55f4be2f2f1971614f24e8c93b158"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pages/01-evolucion-breve-pagina-1.png",
+      "git_blob_oid": "d3157a322b52888c85fcde738e78bf3a15c43540",
+      "bytes": 129618,
+      "sha256": "129eb404c6fb74e0ee2256637c5772e6180382240f875d99ea4bae0c8fb9ce84"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pages/02-enfermeria-breve-pagina-1.png",
+      "git_blob_oid": "a9b417808d76e2925dcc4761014d92f30e848760",
+      "bytes": 142296,
+      "sha256": "d871cf98728d55856b9a1181b15201697b0edcfafe47d6e42d47c12b436a5113"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pages/03-evolucion-dos-paginas-pagina-1.png",
+      "git_blob_oid": "96f2466cc367cd3e050158a5272f26df628d9bd7",
+      "bytes": 251175,
+      "sha256": "1d5cd8c34f6234444773d5a4044aec23016e4349b3feebeb12d5033829c391ec"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pages/03-evolucion-dos-paginas-pagina-2.png",
+      "git_blob_oid": "8fcab555ada24adc9bb24a4c633ce8dd918ef696",
+      "bytes": 243209,
+      "sha256": "6a00b3858ba0d4f1507c9b48379929db61f84e236ed31be7a35963903ca7ff75"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pages/04-enfermeria-estres-pagina-1.png",
+      "git_blob_oid": "d2c3b214ba7e0c7f7b959d96b65776ac7c225155",
+      "bytes": 226606,
+      "sha256": "b085c5e38d30133be547d0f460d0354d8a189ca77ec383836fb38a83d5e09b79"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pages/04-enfermeria-estres-pagina-12.png",
+      "git_blob_oid": "13053d860bedabb62dc450848077ab4cf52f4b14",
+      "bytes": 217196,
+      "sha256": "b1fa387015495e6f63d8f90aebcd8695bf06408ad506e3ee8711d4b46727a433"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pages/04-enfermeria-estres-pagina-6.png",
+      "git_blob_oid": "32c486ced6a720b4602f22bdc1f7ccc15436d95f",
+      "bytes": 229733,
+      "sha256": "11cff72f756ed85ab7ada818c4def2099d7019b3c70efb5603931d73ebb68c91"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pages/05-evolucion-limite-ultima-hoja-pagina-1.png",
+      "git_blob_oid": "14fae41146eac0b2506fd272da9412790ab28bbf",
+      "bytes": 217651,
+      "sha256": "612cb0c0819dc679b05363b472a5c9a8e3110a1c91629b7033325bbfcfdb4a1f"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pages/05-evolucion-limite-ultima-hoja-pagina-2.png",
+      "git_blob_oid": "2a23737176b56e9fe048eb66d895e9faec01b2fe",
+      "bytes": 227136,
+      "sha256": "7314ac932cdfbcab984fd9ba923f5f99f034841406f3b780ec395648affe1a73"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pages/cpren120-nota_evolucion-limite-sintetica-pagina-1.png",
+      "git_blob_oid": "b237becf454529eed59d2f4cd4e16bd8812d0d00",
+      "bytes": 272429,
+      "sha256": "5f18070024065561f7378a6dd5bc1f4dfd5c95e505809dbe30f5f5efe6d42818"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pages/cpren120-nota_evolucion-limite-sintetica-pagina-8.png",
+      "git_blob_oid": "241446c79a91b791ce1338e73e369a2cb7ea7b3e",
+      "bytes": 183297,
+      "sha256": "5196d6a737166cede67d7a695b007283841db72470b3bbb580b9283567aa9d61"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pages/lineas-33-pagina-1.png",
+      "git_blob_oid": "a5400b2f9282c0bc54b5c09f3d45d5cfa9f910b6",
+      "bytes": 224661,
+      "sha256": "4c1584f67ebf2e2056fd59fb45ca885e77b54ac13253e39f5a9c2a3fb07b7898"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pages/lineas-66-pagina-2.png",
+      "git_blob_oid": "02282a5cdf410135d277a881702bb7ac1c5e1f6f",
+      "bytes": 235636,
+      "sha256": "0d2ff679a78fde2b45a82d25523265abc7c8a10f9f62e578f7e2b32642110819"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pages/nombres-limite-historico-pagina-1.png",
+      "git_blob_oid": "cbd3a49e863ae1c1ceecb8d8ee8e8b659c3d7183",
+      "bytes": 116165,
+      "sha256": "6ae148c6d16b7e74f5da79026b1e2b4c51e9cbcd2adf13c861627f924367a2a3"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pdf-verification.json",
+      "git_blob_oid": "494c5f24251104866e547d3cb6269a875a402af5",
+      "bytes": 12143,
+      "sha256": "545b1a98d3e5b880f0688a6e6d534c8e53fbdaf3589c855d5385750fcd5f8f01"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pdf/01-evolucion-breve.pdf",
+      "git_blob_oid": "ed9badefdb3c2dd81c2aa0217022f13bd6cb3252",
+      "bytes": 137119,
+      "sha256": "dea1ce4be00d232509a61a337944c3b4d43946fad1a9898ceea6a87903954d86"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pdf/02-enfermeria-breve.pdf",
+      "git_blob_oid": "35ed197c99ed9643d296f1676b386da44eb28644",
+      "bytes": 136932,
+      "sha256": "79493f03df1192cc8db68c5f3a4c4a9edd825b7806a4c2db720b50e27e978862"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pdf/03-evolucion-dos-paginas.pdf",
+      "git_blob_oid": "d673165c994dac7caaac992c075cd434cb7a07a9",
+      "bytes": 142186,
+      "sha256": "4d723f1c5501160015f3aa28e796d56c457b0c4c49f833807b84f581772454e7"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pdf/04-enfermeria-estres.pdf",
+      "git_blob_oid": "cdb30e9bec83a16f13a1a857df6ec785b1e6a68f",
+      "bytes": 183109,
+      "sha256": "f21f20f42c0b865bab20fc883153b3029d9052f9ddd13a918876feb715153025"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/pdf/05-evolucion-limite-ultima-hoja.pdf",
+      "git_blob_oid": "ef341df64305a4b97d69f5cd33559453ad4665d5",
+      "bytes": 139785,
+      "sha256": "0345b6ba8b69adf4709193a5f890cc682858a6a46ef4e529f9b069df3a7a9b0b"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/preservation.json",
+      "git_blob_oid": "b0b8e8488923dd09107d3600ccf3f3f010d8dd99",
+      "bytes": 604,
+      "sha256": "76c9d54b997652696ec451e3dd14e16685f25fe7a76bdee2ea94ba0e277372b4"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/profiles-result.json",
+      "git_blob_oid": "3b66e3d6d7e1bd75f3f7b1867a09e15b874108bb",
+      "bytes": 525,
+      "sha256": "0167d7b317e342de0fb6c9948f27a751fb049cdaff563cdaa20f5680a1fb0930"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/regression/cpren120-nota_enfermeria-limite-sintetica.pdf",
+      "git_blob_oid": "fd400b8b08bdc9daa53a50e2d0674241b5a80bca",
+      "bytes": 163467,
+      "sha256": "a07fa357fce45903ebbd085be20f2b00dde22f0a159ee812b514244c4cf7c89c"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/regression/cpren120-nota_enfermeria-sintetica.pdf",
+      "git_blob_oid": "5a2912ef9d2a5577bbcf485e27bc0d5908d73542",
+      "bytes": 174773,
+      "sha256": "6d7698c9f4ee67fc28e955058b24f93682aaf239332923eb29c7fa1b2465248d"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/regression/cpren120-nota_evolucion-limite-sintetica.pdf",
+      "git_blob_oid": "2c8dcc64d58b47eaee1e09bbac6dede0a3e189dc",
+      "bytes": 164392,
+      "sha256": "8e1c05455d7baf2572671eecd25ba8e2b8bd744c7c647580e77560d6c8994f26"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/regression/cpren120-nota_evolucion-sintetica.pdf",
+      "git_blob_oid": "ae819ec77ae46bee8601111d7183231d03d23a55",
+      "bytes": 175282,
+      "sha256": "a5f5a7cdc565a62f00f5a105757beb692a3595e44900befcc8cfaf20a73ad883"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/samples-result.json",
+      "git_blob_oid": "d1bdd7b57db0233bb56aa28da2776912ea51dedb",
+      "bytes": 547,
+      "sha256": "806942acd95c4396a11f861a52435f5705141b661cb597409938b07ecb94e1ae"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/synthetic-cases.json",
+      "git_blob_oid": "7f8b678e382e0b8efaef6145730f7c0ef28ab739",
+      "bytes": 55303,
+      "sha256": "c0e405e98ea2a93a8652c6deb656ef9ba401a3378916e6bbcfa65fb913c3749d"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/test-results.json",
+      "git_blob_oid": "35f06266b3e4b8c620cb8289ed15c0cd15054c0a",
+      "bytes": 7423,
+      "sha256": "1cca12fc6c8f847ccbee77069aeade88d51ea4a62f2bad80dbaad2216731fa36"
+    },
+    {
+      "path": "docs/cpren120/checkpoint14/tracking-result.json",
+      "git_blob_oid": "66c2447c4fcf64090054ad90b896d5538c38736b",
+      "bytes": 520,
+      "sha256": "7e8cdf26f17bd7b7e0233205c856676ba6cbb77c3352aae20f4c10cf6d1d3281"
+    }
+  ],
+  "verification": {
+    "publication_unit_http": {
+      "date_local": "2026-10-27",
+      "exit_code": 0,
+      "counts": {
+        "tests": 18,
+        "pass": 16,
+        "fail": 0,
+        "skipped": 2
+      },
+      "command": "node --test test/notaClinicaPdf.test.js test/notaClinicaPdfCheckpoint13.test.js test/notaClinicaPdfHttp.test.js test/notasClinicasService.test.js test/seguimientoNotas.test.js",
+      "synthetic_only": true
+    },
+    "pdf_read_only": {
+      "documents": 19,
+      "pages": 69,
+      "signature_last_page_only": true
+    },
+    "evidence_manifest_hashes_verified": 54,
+    "previous_checkpoint14_paths_preserved": 65,
+    "predeploy_original_sha256": "1dc4c13521c1f2a3720e81c48eb78110b320522c05a44e9b384d7aa4241c4e64",
+    "secrets_review": "Sin credenciales reales; coincidencias sintéticas de JWT/CSRF y nombres systemd",
+    "diff_check": "passed"
+  },
+  "original_results": "docs/cpren120/checkpoint14/test-results.json",
+  "local_only_excluded": [
+    "tmp_cpren14/",
+    "tmp_predeploy01/",
+    "tmp_publish14/"
+  ],
+  "preserved_refs": {
+    "main": "d5fae677fa462af9ca5b7174a46d3ebf21e12196",
+    "origin_main": "d5fae677fa462af9ca5b7174a46d3ebf21e12196",
+    "cpren119": "0be423033f4928f3e2a7409b5541dc5976fbc3cd"
+  },
+  "pending": [
+    "Revisión y cierre institucional",
+    "Integración autorizada posterior",
+    "Restauración real aislada",
+    "Ensayo Linux/PG16/Chrome",
+    "Cargos/permisos y ventana de recuperación aprobados"
+  ]
+}

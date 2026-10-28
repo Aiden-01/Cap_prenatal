@@ -1,0 +1,272 @@
+[
+  {
+    "path": "authorship-result.json",
+    "bytes": 522,
+    "sha256": "f4a643084a9ee6c2b19ccf288267bba3adcd9e882011c19b3f36bc9960eaca6b"
+  },
+  {
+    "path": "backend-result.json",
+    "bytes": 462,
+    "sha256": "d7f6aff5c621990c2b2c89c1e172ad037d1f3b01e3efdc23c82077b81e5422d8"
+  },
+  {
+    "path": "boundaries/enfermeria-ae.pdf",
+    "bytes": 132015,
+    "sha256": "f400c1826ee2328770a5c051c043688f386c4fe1e1869fefda7493f6a804c37e"
+  },
+  {
+    "path": "boundaries/lineas-32.pdf",
+    "bytes": 135677,
+    "sha256": "be1ba170757e010b36545ef81519f59b1dbdbeacd475cf58b385260c38ff62b3"
+  },
+  {
+    "path": "boundaries/lineas-33.pdf",
+    "bytes": 135740,
+    "sha256": "09a5d654034534bfcb0b3cad202ed888451411ec23d2145899b789897e13b07e"
+  },
+  {
+    "path": "boundaries/lineas-34.pdf",
+    "bytes": 136959,
+    "sha256": "320df6c3bf3055f40fcf592d5c52c462bd8ecf054ef453aefbe9b355a05a8475"
+  },
+  {
+    "path": "boundaries/lineas-65.pdf",
+    "bytes": 139629,
+    "sha256": "e52a58c89acfe141080787033495a7ebcbc8ae6270cf490dc3a380db29e77ce1"
+  },
+  {
+    "path": "boundaries/lineas-66.pdf",
+    "bytes": 139693,
+    "sha256": "35fdb633d2ea390c24c8a36a316089fb0d422f6f9d9d84e40906112e820fb460"
+  },
+  {
+    "path": "boundaries/lineas-67.pdf",
+    "bytes": 140890,
+    "sha256": "017812fcd1fa00a5a49d2905a1cd2822b3c023c92d47046c68cbd9053166e812"
+  },
+  {
+    "path": "boundaries/nombres-limite-historico.pdf",
+    "bytes": 133256,
+    "sha256": "556ca41997f946d2d90ad044696f4b1f4798b15ea5f4df199f9e45a2b76c5203"
+  },
+  {
+    "path": "build-result.json",
+    "bytes": 371,
+    "sha256": "71d3b37de009fcb1e21656c58cb7085ffb78a1a4f9c7578b5fa972d26f11c311"
+  },
+  {
+    "path": "catalogs-result.json",
+    "bytes": 511,
+    "sha256": "fa7190092bbf8f244bdacbc6ed6682724366e6a853cc69360ddffcab9dee0667"
+  },
+  {
+    "path": "contact-sheet.png",
+    "bytes": 591511,
+    "sha256": "e4894b8684bf5bd84a1e62feb918dc0fa1f63107733c72b684fd70ce83e7c632"
+  },
+  {
+    "path": "deployment-inventory.json",
+    "bytes": 53931,
+    "sha256": "9a917851435c57e14c9dc0761ad79520044fbacd6fdd200fffff6d3778ed6d2e"
+  },
+  {
+    "path": "endpoint-cases.json",
+    "bytes": 2679,
+    "sha256": "6aabd16a0ddecdf9eae540e6ab2249cfdab02179c4b5133bac81259708e6b95e"
+  },
+  {
+    "path": "endpoint/nota_enfermeria.pdf",
+    "bytes": 132491,
+    "sha256": "6dbe76bd022681d23aecc688b981c053b54d704343512ae9a776084efc073ad7"
+  },
+  {
+    "path": "endpoint/nota_evolucion.pdf",
+    "bytes": 133157,
+    "sha256": "379b20cab7dffdce469a0fafc37088c1b38b7e02cb516ebb98e29c5d9abc2594"
+  },
+  {
+    "path": "frontend-result.json",
+    "bytes": 504,
+    "sha256": "88fc78f687a2d8e2b9bb59ef7ca58bd38b97a066f88b23a58d0bc55a4fae8525"
+  },
+  {
+    "path": "git-state.json",
+    "bytes": 5026,
+    "sha256": "a90ddab6aca16b6cfe4e8c4bc8f9202df5d98b227e35aff525863b403b753b67"
+  },
+  {
+    "path": "lint-result.json",
+    "bytes": 368,
+    "sha256": "eb1d071104b7af7ae0bbf0eb9d2582fb0cba2ab7720157f9eeeb6cdbef5fe36e"
+  },
+  {
+    "path": "migration-readiness.json",
+    "bytes": 1655,
+    "sha256": "80a4981a7e13a7e185d5697160279a99696ddbd4af9e31928634d70a222f14d4"
+  },
+  {
+    "path": "migrations-result.json",
+    "bytes": 576,
+    "sha256": "0b41317e803a88286e1df7591f2161c2f50bd6e8815826dc3c24d4da4b090912"
+  },
+  {
+    "path": "notes-result.json",
+    "bytes": 511,
+    "sha256": "7cf3f03640c17cd4ad135f53f2ff7e6fe6e55f4be2f2f1971614f24e8c93b158"
+  },
+  {
+    "path": "pages/01-evolucion-breve-pagina-1.png",
+    "bytes": 129618,
+    "sha256": "129eb404c6fb74e0ee2256637c5772e6180382240f875d99ea4bae0c8fb9ce84"
+  },
+  {
+    "path": "pages/02-enfermeria-breve-pagina-1.png",
+    "bytes": 142296,
+    "sha256": "d871cf98728d55856b9a1181b15201697b0edcfafe47d6e42d47c12b436a5113"
+  },
+  {
+    "path": "pages/03-evolucion-dos-paginas-pagina-1.png",
+    "bytes": 251175,
+    "sha256": "1d5cd8c34f6234444773d5a4044aec23016e4349b3feebeb12d5033829c391ec"
+  },
+  {
+    "path": "pages/03-evolucion-dos-paginas-pagina-2.png",
+    "bytes": 243209,
+    "sha256": "6a00b3858ba0d4f1507c9b48379929db61f84e236ed31be7a35963903ca7ff75"
+  },
+  {
+    "path": "pages/04-enfermeria-estres-pagina-1.png",
+    "bytes": 226606,
+    "sha256": "b085c5e38d30133be547d0f460d0354d8a189ca77ec383836fb38a83d5e09b79"
+  },
+  {
+    "path": "pages/04-enfermeria-estres-pagina-12.png",
+    "bytes": 217196,
+    "sha256": "b1fa387015495e6f63d8f90aebcd8695bf06408ad506e3ee8711d4b46727a433"
+  },
+  {
+    "path": "pages/04-enfermeria-estres-pagina-6.png",
+    "bytes": 229733,
+    "sha256": "11cff72f756ed85ab7ada818c4def2099d7019b3c70efb5603931d73ebb68c91"
+  },
+  {
+    "path": "pages/05-evolucion-limite-ultima-hoja-pagina-1.png",
+    "bytes": 217651,
+    "sha256": "612cb0c0819dc679b05363b472a5c9a8e3110a1c91629b7033325bbfcfdb4a1f"
+  },
+  {
+    "path": "pages/05-evolucion-limite-ultima-hoja-pagina-2.png",
+    "bytes": 227136,
+    "sha256": "7314ac932cdfbcab984fd9ba923f5f99f034841406f3b780ec395648affe1a73"
+  },
+  {
+    "path": "pages/cpren120-nota_evolucion-limite-sintetica-pagina-1.png",
+    "bytes": 272429,
+    "sha256": "5f18070024065561f7378a6dd5bc1f4dfd5c95e505809dbe30f5f5efe6d42818"
+  },
+  {
+    "path": "pages/cpren120-nota_evolucion-limite-sintetica-pagina-8.png",
+    "bytes": 183297,
+    "sha256": "5196d6a737166cede67d7a695b007283841db72470b3bbb580b9283567aa9d61"
+  },
+  {
+    "path": "pages/lineas-33-pagina-1.png",
+    "bytes": 224661,
+    "sha256": "4c1584f67ebf2e2056fd59fb45ca885e77b54ac13253e39f5a9c2a3fb07b7898"
+  },
+  {
+    "path": "pages/lineas-66-pagina-2.png",
+    "bytes": 235636,
+    "sha256": "0d2ff679a78fde2b45a82d25523265abc7c8a10f9f62e578f7e2b32642110819"
+  },
+  {
+    "path": "pages/nombres-limite-historico-pagina-1.png",
+    "bytes": 116165,
+    "sha256": "6ae148c6d16b7e74f5da79026b1e2b4c51e9cbcd2adf13c861627f924367a2a3"
+  },
+  {
+    "path": "pdf-verification.json",
+    "bytes": 12506,
+    "sha256": "499cae2ead80dfe96e242c78f7d171fe215d19a06f659ece6db5f9692b77e22b"
+  },
+  {
+    "path": "pdf/01-evolucion-breve.pdf",
+    "bytes": 137119,
+    "sha256": "dea1ce4be00d232509a61a337944c3b4d43946fad1a9898ceea6a87903954d86"
+  },
+  {
+    "path": "pdf/02-enfermeria-breve.pdf",
+    "bytes": 136932,
+    "sha256": "79493f03df1192cc8db68c5f3a4c4a9edd825b7806a4c2db720b50e27e978862"
+  },
+  {
+    "path": "pdf/03-evolucion-dos-paginas.pdf",
+    "bytes": 142186,
+    "sha256": "4d723f1c5501160015f3aa28e796d56c457b0c4c49f833807b84f581772454e7"
+  },
+  {
+    "path": "pdf/04-enfermeria-estres.pdf",
+    "bytes": 183109,
+    "sha256": "f21f20f42c0b865bab20fc883153b3029d9052f9ddd13a918876feb715153025"
+  },
+  {
+    "path": "pdf/05-evolucion-limite-ultima-hoja.pdf",
+    "bytes": 139785,
+    "sha256": "0345b6ba8b69adf4709193a5f890cc682858a6a46ef4e529f9b069df3a7a9b0b"
+  },
+  {
+    "path": "preservation.json",
+    "bytes": 604,
+    "sha256": "76c9d54b997652696ec451e3dd14e16685f25fe7a76bdee2ea94ba0e277372b4"
+  },
+  {
+    "path": "profiles-result.json",
+    "bytes": 525,
+    "sha256": "0167d7b317e342de0fb6c9948f27a751fb049cdaff563cdaa20f5680a1fb0930"
+  },
+  {
+    "path": "README.md",
+    "bytes": 2002,
+    "sha256": "9133f0ed5a76952314d5d3697eeae90b7f8da6f4998eccf081c644261e2241d3"
+  },
+  {
+    "path": "regression/cpren120-nota_enfermeria-limite-sintetica.pdf",
+    "bytes": 163467,
+    "sha256": "a07fa357fce45903ebbd085be20f2b00dde22f0a159ee812b514244c4cf7c89c"
+  },
+  {
+    "path": "regression/cpren120-nota_enfermeria-sintetica.pdf",
+    "bytes": 174773,
+    "sha256": "6d7698c9f4ee67fc28e955058b24f93682aaf239332923eb29c7fa1b2465248d"
+  },
+  {
+    "path": "regression/cpren120-nota_evolucion-limite-sintetica.pdf",
+    "bytes": 164392,
+    "sha256": "8e1c05455d7baf2572671eecd25ba8e2b8bd744c7c647580e77560d6c8994f26"
+  },
+  {
+    "path": "regression/cpren120-nota_evolucion-sintetica.pdf",
+    "bytes": 175282,
+    "sha256": "a5f5a7cdc565a62f00f5a105757beb692a3595e44900befcc8cfaf20a73ad883"
+  },
+  {
+    "path": "samples-result.json",
+    "bytes": 547,
+    "sha256": "806942acd95c4396a11f861a52435f5705141b661cb597409938b07ecb94e1ae"
+  },
+  {
+    "path": "synthetic-cases.json",
+    "bytes": 55303,
+    "sha256": "c0e405e98ea2a93a8652c6deb656ef9ba401a3378916e6bbcfa65fb913c3749d"
+  },
+  {
+    "path": "test-results.json",
+    "bytes": 7423,
+    "sha256": "1cca12fc6c8f847ccbee77069aeade88d51ea4a62f2bad80dbaad2216731fa36"
+  },
+  {
+    "path": "tracking-result.json",
+    "bytes": 520,
+    "sha256": "7e8cdf26f17bd7b7e0233205c856676ba6cbb77c3352aae20f4c10cf6d1d3281"
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "suite": "lint",
+  "started_utc": "2026-10-26T02:44:13.330Z",
+  "finished_utc": "2026-10-26T02:44:40.990Z",
+  "exit_code": 0,
+  "signal": null,
+  "counts": {},
+  "synthetic_only": true,
+  "disposable_postgres_only": false,
+  "equipo": "Casa",
+  "machine": "HUGUITO",
+  "command": "npm run lint",
+  "cwd": "frontend",
+  "local_log": "tmp_cpren14\\logs\\lint.log"
+}

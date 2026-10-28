@@ -46,13 +46,16 @@ test('CHECKPOINT-13B: solo una proyección histórica verificada y del mismo ID 
 test('CHECKPOINT-13: cuatro muestras reales y cierres en límites de página', {
   skip: process.env.RUN_CHECKPOINT13_PDF !== '1', timeout: 120000,
 }, async t => {
-  const output = path.resolve(__dirname, process.env.CPREN_CHECKPOINT13B === '1' ? '../../docs/cpren120/checkpoint13b' : '../../docs/cpren120/checkpoint13');
+  const output = path.resolve(__dirname, process.env.CPREN_CHECKPOINT14 === '1' ? '../../docs/cpren120/checkpoint14' : process.env.CPREN_CHECKPOINT13B === '1' ? '../../docs/cpren120/checkpoint13b' : '../../docs/cpren120/checkpoint13');
   fs.mkdirSync(path.join(output, 'pdf'), { recursive: true });
   fs.mkdirSync(path.join(output, 'boundaries'), { recursive: true });
   const browserManager = createPuppeteerBrowserManager();
   const cases = [];
   try {
-    for (const fixture of fixtures()) {
+    const samples=fixtures();
+    if(process.env.CPREN_CHECKPOINT14==='1')samples.push({name:'05-evolucion-limite-ultima-hoja',pages:2,
+      data:base('nota_evolucion',Array.from({length:66},(_,i)=>`Línea sintética ${i+1}, última hoja completa.`).join('\n'))});
+    for (const fixture of samples) {
       if(process.env.CPREN_CHECKPOINT13B==='1'&&fixture.name==='02-enfermeria-breve'){
         fixture.data.paciente.nombres='María de los Ángeles Alejandra Guadalupe';
         fixture.data.paciente.apellidos='Ejemplo Sintético de los Apellidos Compuestos';
@@ -80,6 +83,13 @@ test('CHECKPOINT-13: cuatro muestras reales y cierres en límites de página', {
       assert.deepEqual(data,before);const pdf=await PDFDocument.load(bytes);assert.equal(pdf.getPageCount(),1);
       const file='boundaries/nombres-limite-historico.pdf';fs.writeFileSync(path.join(output,file),bytes);
       cases.push({file,pages:1,data});
+    }
+    if(process.env.CPREN_CHECKPOINT14==='1'){
+      const data=base('nota_enfermeria','Caso sintético de Auxiliar de Enfermería, sin datos reales.');
+      data.nota.responsable_snapshot.cargo_codigo='AE';data.nota.responsable_snapshot.cargo_nombre='Auxiliar de Enfermería';
+      const before=structuredClone(data),bytes=await generarNotaClinicaPdf(data,{browserManager});
+      assert.deepEqual(data,before);assert.equal((await PDFDocument.load(bytes)).getPageCount(),1);
+      const file='boundaries/enfermeria-ae.pdf';fs.writeFileSync(path.join(output,file),bytes);cases.push({file,pages:1,data});
     }
     for (const count of [32, 33, 34, 65, 66, 67]) {
       const data = base('nota_evolucion', Array.from({ length: count }, (_, i) => `Línea sintética ${i + 1}, sin duplicaciones.`).join('\n'));

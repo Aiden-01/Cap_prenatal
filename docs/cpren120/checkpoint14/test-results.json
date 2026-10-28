@@ -1,0 +1,253 @@
+{
+  "date_local": "2026-10-25",
+  "timezone": "America/Guatemala",
+  "equipo": "Casa",
+  "machine": "HUGUITO",
+  "synthetic_only": true,
+  "node": "24.11.1",
+  "npm": "11.21.0",
+  "chrome": "155.0.8059.85",
+  "postgres": "18.3",
+  "suites": {
+    "backend": {
+      "suite": "backend",
+      "started_utc": "2026-10-26T02:47:57.816Z",
+      "finished_utc": "2026-10-26T02:48:12.337Z",
+      "exit_code": 0,
+      "signal": null,
+      "counts": {
+        "tests": 1420,
+        "pass": 1362,
+        "fail": 0,
+        "skipped": 58,
+        "cancelled": 0
+      },
+      "synthetic_only": true,
+      "disposable_postgres_only": false,
+      "equipo": "Casa",
+      "machine": "HUGUITO",
+      "command": "npm test",
+      "cwd": "backend",
+      "local_log": "tmp_cpren14\\logs\\backend.log"
+    },
+    "samples": {
+      "suite": "samples",
+      "started_utc": "2026-10-26T02:40:04.259Z",
+      "finished_utc": "2026-10-26T02:40:19.315Z",
+      "exit_code": 0,
+      "signal": null,
+      "counts": {
+        "tests": 5,
+        "pass": 5,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "synthetic_only": true,
+      "disposable_postgres_only": false,
+      "equipo": "Casa",
+      "machine": "HUGUITO",
+      "command": "node --test --test-concurrency=1 test/notaClinicaPdf.test.js test/notaClinicaPdfCheckpoint13.test.js",
+      "cwd": "backend",
+      "local_log": "tmp_cpren14\\logs\\samples.log"
+    },
+    "migrations": {
+      "suite": "migrations",
+      "started_utc": "2026-10-26T02:46:19.965Z",
+      "finished_utc": "2026-10-26T02:46:41.682Z",
+      "exit_code": 0,
+      "signal": null,
+      "counts": {
+        "tests": 12,
+        "pass": 12,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "synthetic_only": true,
+      "disposable_postgres_only": true,
+      "equipo": "Casa",
+      "machine": "HUGUITO",
+      "command": "node --test --test-concurrency=1 test/checkpoint10MigracionesPostgres.test.js test/checkpoint14MigracionesPostgres.test.js",
+      "cwd": "backend",
+      "local_log": "tmp_cpren14\\logs\\migrations.log"
+    },
+    "catalogs": {
+      "suite": "catalogs",
+      "started_utc": "2026-10-26T02:44:10.336Z",
+      "finished_utc": "2026-10-26T02:44:24.172Z",
+      "exit_code": 0,
+      "signal": null,
+      "counts": {
+        "tests": 7,
+        "pass": 7,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "synthetic_only": true,
+      "disposable_postgres_only": true,
+      "equipo": "Casa",
+      "machine": "HUGUITO",
+      "command": "node --test --test-concurrency=1 test/catalogosPostgres.test.js",
+      "cwd": "backend",
+      "local_log": "tmp_cpren14\\logs\\catalogs.log"
+    },
+    "profiles": {
+      "suite": "profiles",
+      "started_utc": "2026-10-26T02:44:12.849Z",
+      "finished_utc": "2026-10-26T02:44:30.616Z",
+      "exit_code": 0,
+      "signal": null,
+      "counts": {
+        "tests": 16,
+        "pass": 15,
+        "fail": 0,
+        "skipped": 1,
+        "cancelled": 0
+      },
+      "synthetic_only": true,
+      "disposable_postgres_only": true,
+      "equipo": "Casa",
+      "machine": "HUGUITO",
+      "command": "node --test --test-concurrency=1 test/perfilesProfesionalesPostgres.test.js",
+      "cwd": "backend",
+      "local_log": "tmp_cpren14\\logs\\profiles.log"
+    },
+    "authorship": {
+      "suite": "authorship",
+      "started_utc": "2026-10-26T02:44:12.296Z",
+      "finished_utc": "2026-10-26T02:44:26.659Z",
+      "exit_code": 0,
+      "signal": null,
+      "counts": {
+        "tests": 15,
+        "pass": 15,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "synthetic_only": true,
+      "disposable_postgres_only": true,
+      "equipo": "Casa",
+      "machine": "HUGUITO",
+      "command": "node --test --test-concurrency=1 test/autoriaClinicaPostgres.test.js",
+      "cwd": "backend",
+      "local_log": "tmp_cpren14\\logs\\authorship.log"
+    },
+    "notes": {
+      "suite": "notes",
+      "started_utc": "2026-10-26T02:40:56.446Z",
+      "finished_utc": "2026-10-26T02:41:24.914Z",
+      "exit_code": 0,
+      "signal": null,
+      "counts": {
+        "tests": 21,
+        "pass": 21,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "synthetic_only": true,
+      "disposable_postgres_only": true,
+      "equipo": "Casa",
+      "machine": "HUGUITO",
+      "command": "node --test --test-concurrency=1 test/notasClinicasPostgres.test.js",
+      "cwd": "backend",
+      "local_log": "tmp_cpren14\\logs\\notes.log"
+    },
+    "tracking": {
+      "suite": "tracking",
+      "started_utc": "2026-10-26T02:44:11.743Z",
+      "finished_utc": "2026-10-26T02:44:28.496Z",
+      "exit_code": 0,
+      "signal": null,
+      "counts": {
+        "tests": 20,
+        "pass": 18,
+        "fail": 0,
+        "skipped": 2,
+        "cancelled": 0
+      },
+      "synthetic_only": true,
+      "disposable_postgres_only": true,
+      "equipo": "Casa",
+      "machine": "HUGUITO",
+      "command": "node --test --test-concurrency=1 test/seguimientoNotasPostgres.test.js",
+      "cwd": "backend",
+      "local_log": "tmp_cpren14\\logs\\tracking.log"
+    },
+    "frontend": {
+      "suite": "frontend",
+      "started_utc": "2026-10-26T02:40:55.969Z",
+      "finished_utc": "2026-10-26T02:42:13.987Z",
+      "exit_code": 0,
+      "signal": null,
+      "counts": {
+        "tests": 191,
+        "pass": 191,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "dom_pass": 300,
+        "dom_files": 26
+      },
+      "synthetic_only": true,
+      "disposable_postgres_only": false,
+      "equipo": "Casa",
+      "machine": "HUGUITO",
+      "command": "npm test",
+      "cwd": "frontend",
+      "local_log": "tmp_cpren14\\logs\\frontend.log"
+    },
+    "lint": {
+      "suite": "lint",
+      "started_utc": "2026-10-26T02:44:13.330Z",
+      "finished_utc": "2026-10-26T02:44:40.990Z",
+      "exit_code": 0,
+      "signal": null,
+      "counts": {},
+      "synthetic_only": true,
+      "disposable_postgres_only": false,
+      "equipo": "Casa",
+      "machine": "HUGUITO",
+      "command": "npm run lint",
+      "cwd": "frontend",
+      "local_log": "tmp_cpren14\\logs\\lint.log"
+    },
+    "build": {
+      "suite": "build",
+      "started_utc": "2026-10-26T02:47:57.401Z",
+      "finished_utc": "2026-10-26T02:48:05.902Z",
+      "exit_code": 0,
+      "signal": null,
+      "counts": {},
+      "synthetic_only": true,
+      "disposable_postgres_only": false,
+      "equipo": "Casa",
+      "machine": "HUGUITO",
+      "command": "npm run build",
+      "cwd": "frontend",
+      "local_log": "tmp_cpren14\\logs\\build.log"
+    }
+  },
+  "pdf": {
+    "documents": 19,
+    "pages": 69,
+    "rendered": 14,
+    "signature_label_and_line_last_page_only": true,
+    "signature_clearance_points_min": 31.09,
+    "narrative_complete": true,
+    "visual_review": "passed"
+  },
+  "notes": "Los conteos de suites se solapan. Los tres recorridos UI opt-in omitidos no se presentan como ejecutados nuevamente.",
+  "harness_incidents": [
+    "Sandbox bloqueó initdb: repetición fuera del sandbox aprobada",
+    "Fixture nueva con parámetro integer/text 42P08 corregida: ensayo 12/12 aprobado",
+    "Runner build heredaba NODE_ENV=test; corregido a production y repetido"
+  ],
+  "production_access": false,
+  "persistent_migrations": false,
+  "commit_created": false,
+  "push": false
+}

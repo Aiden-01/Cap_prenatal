@@ -1,0 +1,21 @@
+{
+  "suite": "authorship",
+  "started_utc": "2026-10-26T02:44:12.296Z",
+  "finished_utc": "2026-10-26T02:44:26.659Z",
+  "exit_code": 0,
+  "signal": null,
+  "counts": {
+    "tests": 15,
+    "pass": 15,
+    "fail": 0,
+    "skipped": 0,
+    "cancelled": 0
+  },
+  "synthetic_only": true,
+  "disposable_postgres_only": true,
+  "equipo": "Casa",
+  "machine": "HUGUITO",
+  "command": "node --test --test-concurrency=1 test/autoriaClinicaPostgres.test.js",
+  "cwd": "backend",
+  "local_log": "tmp_cpren14\\logs\\authorship.log"
+}

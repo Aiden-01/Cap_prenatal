@@ -1,0 +1,21 @@
+{
+  "suite": "backend",
+  "started_utc": "2026-10-26T02:47:57.816Z",
+  "finished_utc": "2026-10-26T02:48:12.337Z",
+  "exit_code": 0,
+  "signal": null,
+  "counts": {
+    "tests": 1420,
+    "pass": 1362,
+    "fail": 0,
+    "skipped": 58,
+    "cancelled": 0
+  },
+  "synthetic_only": true,
+  "disposable_postgres_only": false,
+  "equipo": "Casa",
+  "machine": "HUGUITO",
+  "command": "npm test",
+  "cwd": "backend",
+  "local_log": "tmp_cpren14\\logs\\backend.log"
+}

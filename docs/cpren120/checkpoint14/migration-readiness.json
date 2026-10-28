@@ -1,0 +1,65 @@
+{
+  "synthetic_only": true,
+  "production_access": false,
+  "baseline_main": "d5fae677fa462af9ca5b7174a46d3ebf21e12196",
+  "postgres_port": 55481,
+  "checks": [
+    "backup_restore_before_upgrade",
+    "upgrade_022_to_030_no_core_data_loss_no_clinical_grants",
+    "final_schema_and_idempotence",
+    "fresh_final_and_post_upgrade_restore"
+  ],
+  "snapshots": [
+    {
+      "stage": "core_before_after",
+      "sha256": "91e6fc958fde604e85beee336807e9626262e3efa29a4ea63dc8c98faf4fb8b7",
+      "tables": [
+        {
+          "table": "roles",
+          "rows": 3
+        },
+        {
+          "table": "pacientes",
+          "rows": 1
+        },
+        {
+          "table": "embarazos",
+          "rows": 1
+        },
+        {
+          "table": "controles_prenatales",
+          "rows": 1
+        },
+        {
+          "table": "citas_prenatales",
+          "rows": 1
+        },
+        {
+          "table": "auth_sessions",
+          "rows": 1
+        }
+      ]
+    }
+  ],
+  "postgres_version": "18.3",
+  "applied_clinical_migrations": [
+    "023_catalogos_profesionales.sql",
+    "024_usuarios_perfiles_profesionales.sql",
+    "025_permisos_autoria_clinica.sql",
+    "026_notas_clinicas.sql",
+    "027_seguimiento_notas_controles.sql",
+    "028_retirar_especialidades.sql",
+    "029_usuarios_email.sql",
+    "030_cargos_autoria_estable.sql"
+  ],
+  "synthetic_dump_sha256": [
+    {
+      "name": "main-synthetic.dump",
+      "sha256": "6d9bbee8d3ea5f3ed662aded4f0f2b96ff623a6e3fb7a118d19cb43a87bfbcf2"
+    },
+    {
+      "name": "final-synthetic.dump",
+      "sha256": "739f49d046da3cf79819fbaca031426dd668c322cccd6c95eb82448a8b46ac36"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "suite": "catalogs",
+  "started_utc": "2026-10-26T02:44:10.336Z",
+  "finished_utc": "2026-10-26T02:44:24.172Z",
+  "exit_code": 0,
+  "signal": null,
+  "counts": {
+    "tests": 7,
+    "pass": 7,
+    "fail": 0,
+    "skipped": 0,
+    "cancelled": 0
+  },
+  "synthetic_only": true,
+  "disposable_postgres_only": true,
+  "equipo": "Casa",
+  "machine": "HUGUITO",
+  "command": "node --test --test-concurrency=1 test/catalogosPostgres.test.js",
+  "cwd": "backend",
+  "local_log": "tmp_cpren14\\logs\\catalogs.log"
+}

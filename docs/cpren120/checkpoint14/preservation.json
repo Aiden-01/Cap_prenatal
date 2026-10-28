@@ -1,0 +1,19 @@
+{
+  "base_commit": "0f341d78d9fcfa6bb8178cd1a36bec141adf7b5e",
+  "unchanged_paths": [
+    "backend/src/db/migrations",
+    "docs/cpren120/checkpoint09",
+    "docs/cpren120/checkpoint10",
+    "docs/cpren120/checkpoint11",
+    "docs/cpren120/checkpoint12",
+    "docs/cpren120/checkpoint13",
+    "docs/cpren120/checkpoint13b",
+    "docs/cpren120/PUBLICACION_CHECKPOINT_11_13B.md",
+    "docs/cpren120/publicacion-checkpoints11-13b.json",
+    "frontend",
+    "n8n"
+  ],
+  "git_diff_empty": true,
+  "main": "d5fae677fa462af9ca5b7174a46d3ebf21e12196",
+  "cpren119": "0be423033f4928f3e2a7409b5541dc5976fbc3cd"
+}

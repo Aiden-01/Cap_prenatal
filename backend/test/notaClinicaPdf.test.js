@@ -26,7 +26,7 @@ test('PDF nota: logos originales embebidos y narrativa escapada, sin firmas simu
     assert.ok(header.includes('CAP El Chal')); assert.ok(header.includes('Área Sur Oriente'));
     assert.ok(!footer.includes('No equivale a firma clínica'));
     assert.ok(!footer.includes('Captura finalizada'));
-    assert.ok(footer.includes('Nombre y firma del responsable'));
+    assert.ok(!footer.includes('Nombre y firma del responsable'), 'La firma se estampa solo después de paginar');
     assert.ok(html.includes('FECHA / HORA'));
     assert.ok(!html.includes('Firmado por')); assert.ok(header.includes('height:auto'));
   }
@@ -37,7 +37,7 @@ test('PDF nota: logos originales embebidos y narrativa escapada, sin firmas simu
 
 test('PDF nota real carta multipágina, texto extenso y logos', { skip: process.env.RUN_NOTA_PDF_BROWSER !== '1', timeout: 60000 }, async t => {
   const browserManager = createPuppeteerBrowserManager();
-  const output = path.join(__dirname, process.env.CPREN_CHECKPOINT13B === '1' ? '../../docs/cpren120/checkpoint13b/regression' : process.env.CPREN_CHECKPOINT13 === '1' ? '../../docs/cpren120/checkpoint13/regression' : process.env.CPREN_CHECKPOINT12 === '1' ? '../../docs/cpren120/checkpoint12/pdf' : '../../output/pdf'); fs.mkdirSync(output, { recursive: true });
+  const output = path.join(__dirname, process.env.CPREN_CHECKPOINT14 === '1' ? '../../docs/cpren120/checkpoint14/regression' : process.env.CPREN_CHECKPOINT13B === '1' ? '../../docs/cpren120/checkpoint13b/regression' : process.env.CPREN_CHECKPOINT13 === '1' ? '../../docs/cpren120/checkpoint13/regression' : process.env.CPREN_CHECKPOINT12 === '1' ? '../../docs/cpren120/checkpoint12/pdf' : '../../output/pdf'); fs.mkdirSync(output, { recursive: true });
   try {
     for (const tipo of ['nota_evolucion', 'nota_enfermeria']) {
       const data = sample(tipo);

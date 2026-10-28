@@ -30,7 +30,7 @@ function crearDocumentoNota({nota:n,paciente:p,control,capturistaHistorico}){
  <b>Servicio:</b> CAP El Chal${nombreCapturista?`<br><b>Capturista:</b> ${esc(nombreCapturista)}`:''}</div>
  <div style="width:43%;min-width:0;overflow-wrap:anywhere"><b>Responsable:</b> ${esc(r.nombre_completo)}<br>
  <b>Cargo:</b> ${esc(r.cargo_nombre)}${r.tipo==='externo'?'<br>Identidad externa declarada, no verificada':''}</div></div>
- <div style="margin-top:46px;text-align:center;font:9px/10px Arial"><span style="border-top:1px solid #555;padding:4px 35px">Nombre y firma del responsable</span></div>
+ <div style="margin-top:46px;height:10px"></div>
  <div style="text-align:right;margin-top:7px;font:8px/10px Arial">Hoja No. <span class="pageNumber"></span> de <span class="totalPages"></span></div></div>`;
  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src 'none'"><style>*{box-sizing:border-box}html{font-family:Arial,sans-serif;color:#111}body{margin:0}table{border-collapse:collapse;width:100%;table-layout:fixed;border:1px solid #777}thead{display:table-header-group}th{font-size:11px;height:26px;border:1px solid #777;padding:4px}th:first-child{width:88px}td{border-left:1px solid #777;border-right:1px solid #777;padding:0 7px;vertical-align:top}tr.line{break-inside:avoid;height:22px}tr.line td{height:22px;line-height:22px;border-bottom:1px solid #bbb;font-size:14px;white-space:pre}td.time{font-size:10px!important;text-align:center}.narrativa{white-space:pre-wrap;overflow-wrap:anywhere;line-height:22px;font-size:14px}</style></head><body><table><thead><tr><th>FECHA / HORA</th><th>${TITULOS[n.tipo]}</th></tr></thead><tbody><tr><td class="time">${esc(n.fecha_atencion)}<br>${esc(n.hora_atencion)}</td><td class="narrativa">${esc(n.contenido)}</td></tr></tbody></table></body></html>`;
  const datedHtml=html.replace('<th>FECHA / HORA</th>',`<th style="font-weight:normal;line-height:13px"><span style="display:block;font-size:9px;font-weight:bold;white-space:nowrap">FECHA / HORA</span><span style="display:block;font-size:10px">${esc(fechaClinica(n.fecha_atencion))}</span><span style="display:block;font-size:10px">${esc(horaClinica(n.hora_atencion))}</span></th>`)
@@ -62,7 +62,14 @@ async function generarNotaClinicaPdf(data,{browserManager=puppeteerBrowserManage
  const lastRows=lines.length-(pdf.getPageCount()-1)*capacity;
  const baseline=792-(MARGEN.top+metrics.firstRowTop+lastRows*metrics.rowHeight+13)*.75;
  const font=await pdf.embedFont(StandardFonts.Helvetica);
- pdf.getPages().at(-1).drawText('FIN DE NOTA',{x:580-font.widthOfTextAtSize('FIN DE NOTA',8),y:baseline,size:8,font,color:rgb(.35,.35,.35)});
+ const last=pdf.getPages().at(-1);
+ last.drawText('FIN DE NOTA',{x:580-font.widthOfTextAtSize('FIN DE NOTA',8),y:baseline,size:8,font,color:rgb(.35,.35,.35)});
+ // El hueco del pie conserva la geometría aprobada (carta); solo esta hoja
+ // recibe la firma. Coordenadas medidas en 13B: línea a 39 pt del borde
+ // inferior, rótulo a 29.25 pt. La identificación extensa crece hacia arriba.
+ const label='Nombre y firma del responsable',size=6.75;
+ last.drawLine({start:{x:231.75,y:39},end:{x:380.25,y:39},thickness:.75,color:rgb(.33,.33,.33)});
+ last.drawText(label,{x:(last.getWidth()-font.widthOfTextAtSize(label,size))/2,y:29.25,size,font,color:rgb(.07,.07,.07)});
  return pdf.save();
  });
 }
