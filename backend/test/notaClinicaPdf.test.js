@@ -37,7 +37,7 @@ test('PDF nota: logos originales embebidos y narrativa escapada, sin firmas simu
 
 test('PDF nota real carta multipágina, texto extenso y logos', { skip: process.env.RUN_NOTA_PDF_BROWSER !== '1', timeout: 60000 }, async t => {
   const browserManager = createPuppeteerBrowserManager();
-  const output = path.join(__dirname, process.env.CPREN_CHECKPOINT14 === '1' ? '../../docs/cpren120/checkpoint14/regression' : process.env.CPREN_CHECKPOINT13B === '1' ? '../../docs/cpren120/checkpoint13b/regression' : process.env.CPREN_CHECKPOINT13 === '1' ? '../../docs/cpren120/checkpoint13/regression' : process.env.CPREN_CHECKPOINT12 === '1' ? '../../docs/cpren120/checkpoint12/pdf' : '../../output/pdf'); fs.mkdirSync(output, { recursive: true });
+  const output = require('./helpers/predeploy02Service').evidenceDirectory(path.join(__dirname, process.env.CPREN_CHECKPOINT14 === '1' ? '../../docs/cpren120/checkpoint14/regression' : process.env.CPREN_CHECKPOINT13B === '1' ? '../../docs/cpren120/checkpoint13b/regression' : process.env.CPREN_CHECKPOINT13 === '1' ? '../../docs/cpren120/checkpoint13/regression' : process.env.CPREN_CHECKPOINT12 === '1' ? '../../docs/cpren120/checkpoint12/pdf' : '../../output/pdf'), 'regression'); fs.mkdirSync(output, { recursive: true });
   try {
     for (const tipo of ['nota_evolucion', 'nota_enfermeria']) {
       const data = sample(tipo);

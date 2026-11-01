@@ -1,0 +1,83 @@
+name: Clinical PREDEPLOY-02 (Linux, synthetic only)
+
+on:
+  push:
+    branches: [feature/cpren-120-editor-pdf-notas-clinicas]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clinical-predeploy02-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clinical:
+    if: github.repository == 'Aiden-01/Cap_prenatal' && github.ref == 'refs/heads/feature/cpren-120-editor-pdf-notas-clinicas'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16.15-bookworm@sha256:cf5d353f55240ecc2f811827a15c7d1f2d562f08019b49dca12b5a59f4ab5962
+        env:
+          POSTGRES_USER: predeploy02
+          POSTGRES_PASSWORD: synthetic-predeploy02-only
+          POSTGRES_DB: cap_predeploy02_control
+          POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C.UTF-8
+        ports:
+          - 127.0.0.1:55432:5432
+        options: >-
+          --health-cmd "pg_isready -U predeploy02 -d cap_predeploy02_control"
+          --health-interval 10s --health-timeout 5s --health-retries 6
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Record Node 24 runtime for Vitest only
+        run: printf 'PREDEPLOY_NODE24_BIN=%s\n' "$(dirname "$(command -v node)")" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20.20.2
+      - name: Install locked dependencies (runner only)
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+        run: |
+          npm ci --prefix backend --ignore-scripts --no-audit --no-fund
+          PATH="$PREDEPLOY_NODE24_BIN:$PATH" npm ci --prefix frontend --ignore-scripts --no-audit --no-fund
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends poppler-utils
+          python3 -m venv "$RUNNER_TEMP/predeploy02-python"
+          "$RUNNER_TEMP/predeploy02-python/bin/pip" install -r .github/clinical/predeploy02-requirements.txt
+      - name: Prepare isolated runtime and Chrome sandbox
+        env:
+          POSTGRES_SERVICE_ID: ${{ job.services.postgres.id }}
+        run: bash .github/clinical/prepare-predeploy02.sh
+      - name: Run clinical checks without external network access
+        env:
+          CAP_PREDEPLOY02_SERVICE: '1'
+          NODE_ENV: test
+        run: |
+          sudo -u clinical-ci env -i \
+            PATH="$PATH" HOME=/home/clinical-ci NODE_ENV=test TZ=America/Guatemala \
+            GITHUB_ACTIONS=true GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_REF="$GITHUB_REF" \
+            GITHUB_SHA="$GITHUB_SHA" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
+            RUNNER_ENVIRONMENT=github-hosted ImageOS="$ImageOS" ImageVersion="$ImageVersion" \
+            CAP_PREDEPLOY02_SERVICE=1 PUPPETEER_EXECUTABLE_PATH="$PREDEPLOY_CHROME" \
+            PUPPETEER_CACHE_DIR="$RUNNER_TEMP/predeploy02-chrome" \
+            PREDEPLOY_PYTHON="$RUNNER_TEMP/predeploy02-python/bin/python" \
+            PREDEPLOY_POSTGRES_IMAGE="$PREDEPLOY_POSTGRES_IMAGE" \
+            PREDEPLOY_NODE24_BIN="$PREDEPLOY_NODE24_BIN" \
+            node .github/clinical/run-predeploy02.cjs
+      - name: Upload synthetic evidence only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: clinical-predeploy02-${{ github.sha }}-${{ github.run_attempt }}
+          path: tmp_predeploy02/publish/
+          if-no-files-found: warn
+          retention-days: 7
+          include-hidden-files: false

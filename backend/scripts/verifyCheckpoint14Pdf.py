@@ -3,12 +3,17 @@ import hashlib
 import json
 import shutil
 import subprocess
+import argparse
 from pathlib import Path
 import pdfplumber
 from PIL import Image, ImageDraw, ImageOps
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / 'docs/cpren120/checkpoint14'
+parser = argparse.ArgumentParser()
+parser.add_argument('--output', type=Path, default=ROOT / 'docs/cpren120/checkpoint14')
+parser.add_argument('--ci', action='store_true')
+args = parser.parse_args()
+OUT = args.output.resolve()
 RENDER = OUT / 'pages'
 RENDER.mkdir(parents=True, exist_ok=True)
 norm = lambda value: ''.join(value.split())
@@ -20,7 +25,7 @@ for kind in ['nota_evolucion', 'nota_enfermeria']:
         cases.append({'file': f'regression/cpren120-{kind}-' + ('limite-' if limit else '') + 'sintetica.pdf',
                       'data': {'nota': {'contenido': ('ÁéíóúÑñ' * 2858)[:20000] if limit else expected,
                                        'control_prenatal_id': 3 if kind == 'nota_evolucion' else None}}})
-report = {'synthetic_only': True, 'equipo': 'Casa', 'machine': 'HUGUITO', 'documents': [], 'assets': []}
+report = {'synthetic_only': True, 'environment': 'github-actions-linux' if args.ci else 'local', 'documents': [], 'assets': []}
 renderer = shutil.which('pdftoppm')
 assert renderer
 cards = []
@@ -29,7 +34,7 @@ for case in cases:
     with pdfplumber.open(target) as pdf:
         if 'pages' in case:
             assert len(pdf.pages) == case['pages']
-        narrative, clearances, renders = [], [], []
+        narrative, clearances, renders, baseline_deltas = [], [], [], []
         for index, page in enumerate(pdf.pages, 1):
             assert (page.width, page.height) == (612, 792)
             text = page.extract_text()
@@ -91,12 +96,18 @@ for case in cases:
                 assert marker['top'] > max(c['bottom'] for c in body)
                 assert marker['bottom'] + 3 < start
             previous = ROOT / 'docs/cpren120/checkpoint13b' / case['file']
+            # Paginación 13B sigue siendo obligatoria también en Linux. Las
+            # diferencias de posición entre SO/fuentes se miden, sin confundir
+            # esa comparación histórica con la geometría absoluta exigida arriba.
             if previous.exists():
                 with pdfplumber.open(previous) as before:
                     assert len(before.pages) == len(pdf.pages), ('Regresión de paginación', case['file'])
                     old = before.pages[index - 1]
                     for field in ['Paciente:', 'Responsable:', 'Hoja No.']:
-                        assert abs(old.search(field)[-1]['top'] - page.search(field)[-1]['top']) < .1, ('Pie desplazado', field, case['file'])
+                        delta = abs(old.search(field)[-1]['top'] - page.search(field)[-1]['top'])
+                        baseline_deltas.append({'page': index, 'field': field, 'delta_points': round(delta, 4)})
+                        if not args.ci:
+                            assert delta < .1, ('Pie desplazado', field, case['file'])
             render = case['file'].startswith('pdf/') and index in {1, len(pdf.pages), (len(pdf.pages) + 1) // 2}
             render |= case['file'].endswith(('nombres-limite-historico.pdf', 'lineas-33.pdf', 'lineas-66.pdf')) and index == len(pdf.pages)
             render |= case['file'].endswith('nota_evolucion-limite-sintetica.pdf') and index in {1, len(pdf.pages)}
@@ -117,6 +128,7 @@ for case in cases:
             'administrative_legend_absent': True, 'original_date_time_each_page': True,
             'end_marker_last_page_only': True, 'signature_last_page_only': True, 'signature_label_count': 1,
             'signature_line_count': 1, 'pagination_13b_preserved': previous.exists(),
+            'windows_13b_geometry_deltas_points': baseline_deltas,
             'signature_clearance_points_min': min(clearances), 'rendered': renders})
 for name in ['gobierno-guatemala-mspas.png', 'ddriss-peten-area-sur-oriente.png']:
     report['assets'].append({'file': name, 'sha256': hashlib.sha256((ROOT / 'backend/src/assets/institucional' / name).read_bytes()).hexdigest()})

@@ -12,7 +12,7 @@ async function verificarPerfilesBrowser({ apiPort, token, t }) {
   const { createServer } = await import(pathToFileURL(require.resolve('vite', { paths: [frontendRoot] })).href);
   const { default: react } = await import(pathToFileURL(require.resolve('@vitejs/plugin-react', { paths: [frontendRoot] })).href);
   const artifacts = fs.mkdtempSync(path.join(os.tmpdir(), 'cpren116-ui-'));
-  const evidence = path.resolve(__dirname, '../../../docs/cpren120', process.env.CPREN_CHECKPOINT12 === '1' ? 'checkpoint12' : 'checkpoint11');
+  const evidence = require('./predeploy02Service').evidenceDirectory(path.resolve(__dirname, '../../../docs/cpren120', process.env.CPREN_CHECKPOINT12 === '1' ? 'checkpoint12' : 'checkpoint11'));
   fs.mkdirSync(evidence, { recursive: true });
   const emptyEnv = path.join(artifacts, 'empty-env'); fs.mkdirSync(emptyEnv);
   let vite, browser;
@@ -26,7 +26,7 @@ async function verificarPerfilesBrowser({ apiPort, token, t }) {
     await vite.listen();
     const port = vite.httpServer.address().port;
     const base = `http://127.0.0.1:${port}`;
-    browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+    browser = await puppeteer.launch(require('../../src/utils/puppeteerLaunch').buildPuppeteerLaunchOptions());
     const page = await browser.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));

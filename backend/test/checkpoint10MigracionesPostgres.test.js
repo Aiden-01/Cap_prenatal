@@ -11,7 +11,7 @@ const { assertSchemaCompatible } = require('../src/db/schemaCompatibility');
 test('CHECKPOINT-11: upgrade 027→030 y esquema final en PostgreSQL desechable', {
   skip: process.env.RUN_CHECKPOINT10_TEMP_POSTGRES !== '1', timeout: 120000,
 }, async t => {
-  // Destino creado aquí, jamás .env, DATABASE_URL ni un servidor existente.
+  // Destino temporal local o service CI verificado; jamás .env ni DATABASE_URL.
   const bin = process.env.CHECKPOINT10_POSTGRES_BIN;
   assert.ok(bin, 'Falta CHECKPOINT10_POSTGRES_BIN');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cap-checkpoint10-'));
@@ -21,13 +21,17 @@ test('CHECKPOINT-11: upgrade 027→030 y esquema final en PostgreSQL desechable'
   const run = (name, args) => execFileSync(path.join(bin, name + (process.platform === 'win32' ? '.exe' : '')),
     args, { windowsHide: true, stdio: 'ignore', timeout: 30000 });
   const migration = filename => fs.readFileSync(path.join(__dirname, '../src/db/migrations', filename), 'utf8');
+  const service = require('./helpers/predeploy02Service').serviceFixture('checkpoint10', config);
   let started = false, db;
   try {
-    run('initdb', ['-D', data, '-U', config.user, '-A', 'trust', '--no-locale', '-E', 'UTF8']);
-    run('pg_ctl', ['-D', data, '-l', path.join(root, 'postgres.log'), '-o', '-h 127.0.0.1 -p 55480', '-w', 'start']);
-    started = true; db = new Pool(config);
-    assert.equal(path.resolve((await db.query('SHOW data_directory')).rows[0].data_directory), path.resolve(data));
-    t.diagnostic(`PostgreSQL ${(await db.query('SHOW server_version')).rows[0].server_version}; clúster propio 55480`);
+    if (service) await service.start(); else {
+      run('initdb', ['-D', data, '-U', config.user, '-A', 'trust', '--no-locale', '-E', 'UTF8']);
+      run('pg_ctl', ['-D', data, '-l', path.join(root, 'postgres.log'), '-o', '-h 127.0.0.1 -p 55480', '-w', 'start']);
+      started = true;
+    }
+    db = new Pool(config);
+    if (service) await service.verify(db); else { assert.equal(path.resolve((await db.query('SHOW data_directory')).rows[0].data_directory), path.resolve(data)); }
+    t.diagnostic(`PostgreSQL ${(await db.query('SHOW server_version')).rows[0].server_version}; destino sintético ${config.port}`);
     const schema = fs.readFileSync(path.join(__dirname, '../src/db/schema.sql'), 'utf8');
     await db.query(schema.slice(0, schema.indexOf('-- CPREN-115:')));
     for (const filename of ['023_catalogos_profesionales.sql', '024_usuarios_perfiles_profesionales.sql',
@@ -169,7 +173,7 @@ test('CHECKPOINT-11: upgrade 027→030 y esquema final en PostgreSQL desechable'
     });
   } finally {
     if (db) await db.end();
-    if (started) run('pg_ctl', ['-D', data, '-m', 'immediate', '-w', 'stop']);
+    if (service) await service.close(); else if (started) run('pg_ctl', ['-D', data, '-m', 'immediate', '-w', 'stop']);
     assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
     fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }

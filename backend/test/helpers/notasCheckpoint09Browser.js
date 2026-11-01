@@ -6,7 +6,7 @@ const puppeteer = require('puppeteer');
 
 async function verificarNotas09({ apiPort, tokens, setMedicalRegistration, setPregnancyState, t, outputDirectory = 'checkpoint09' }) {
   const frontend = path.resolve(__dirname, '../../../frontend');
-  const output = path.resolve(__dirname, '../../../docs/cpren120', outputDirectory);
+  const output = require('./predeploy02Service').evidenceDirectory(path.resolve(__dirname, '../../../docs/cpren120', outputDirectory));
   fs.mkdirSync(output, { recursive: true });
   const { createServer } = await import(pathToFileURL(require.resolve('vite', { paths: [frontend] })).href);
   const { default: react } = await import(pathToFileURL(require.resolve('@vitejs/plugin-react', { paths: [frontend] })).href);
@@ -20,7 +20,7 @@ async function verificarNotas09({ apiPort, tokens, setMedicalRegistration, setPr
       server: { host: '127.0.0.1', port: 0, hmr: false, proxy: { '/api': `http://127.0.0.1:${apiPort}` } }, logLevel: 'error' });
     server.middlewares.use('/__cpren09/session', (_req, res) => { res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><html><body></body></html>'); });
     await server.listen(); const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
-    browser = await puppeteer.launch({ headless: true }); const page = await browser.newPage();
+    browser = await puppeteer.launch(require('../../src/utils/puppeteerLaunch').buildPuppeteerLaunchOptions()); const page = await browser.newPage();
     await page.emulateTimezone('Asia/Tokyo');
     page.on('pageerror', error => errors.push(error.message)); page.on('dialog', dialog => dialog.accept());
     await page.setRequestInterception(true);

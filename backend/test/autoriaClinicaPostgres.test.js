@@ -27,7 +27,7 @@ const CLINICAL_CODES = [
 test('CPREN-117: permisos, autoría y directorio en PostgreSQL temporal propio', {
   skip: process.env.RUN_AUTORIA_TEMP_POSTGRES !== '1', timeout: 120000,
 }, async t => {
-  // El único destino es este initdb; no acepta DATABASE_URL, PGHOST ni .env.
+  // initdb local o service CI verificado; no acepta DATABASE_URL, PGHOST ni .env.
   const bin = process.env.AUTORIA_POSTGRES_BIN;
   assert.ok(bin, 'Falta AUTORIA_POSTGRES_BIN');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cap-autoria-'));
@@ -41,20 +41,24 @@ test('CPREN-117: permisos, autoría y directorio en PostgreSQL temporal propio',
     'SESSION_WARNING_MINUTES', 'SESSION_ABSOLUTE_HOURS', 'SESSION_ACTIVITY_UPDATE_SECONDS'];
   const previous = { query: appPool.query, connect: appPool.connect, dotenv: dotenv.config,
     env: Object.fromEntries(envKeys.map(key => [key, process.env[key]])) };
+  const service = require('./helpers/predeploy02Service').serviceFixture('autoria', config);
   let db, server, started = false;
   try {
-    run('initdb', ['-D', dataDir, '-U', 'autoria_test', '-A', 'trust', '--no-locale', '-E', 'UTF8']);
-    run('pg_ctl', ['-D', dataDir, '-l', path.join(root, 'postgres.log'), '-o', `-h 127.0.0.1 -p ${port}`, '-w', 'start']);
-    started = true;
+    if (service) await service.start(); else {
+      run('initdb', ['-D', dataDir, '-U', 'autoria_test', '-A', 'trust', '--no-locale', '-E', 'UTF8']);
+      run('pg_ctl', ['-D', dataDir, '-l', path.join(root, 'postgres.log'), '-o', `-h 127.0.0.1 -p ${port}`, '-w', 'start']);
+      started = true;
+    }
+
     db = new Pool(config);
-    assert.equal(path.resolve((await db.query('SHOW data_directory')).rows[0].data_directory), path.resolve(dataDir));
+    if (service) await service.verify(db); else { assert.equal(path.resolve((await db.query('SHOW data_directory')).rows[0].data_directory), path.resolve(dataDir)); }
     appPool.query = db.query.bind(db); appPool.connect = db.connect.bind(db);
     // Los getters de autenticación conservan su validación y reciben solamente configuración sintética.
     dotenv.config = () => ({ parsed: {} });
     Object.assign(process.env, { NODE_ENV: 'test', JWT_SECRET: 'synthetic-autoria-test-only-secret-2026-117',
       ACCESS_TOKEN_TTL_MINUTES: '10', SESSION_IDLE_TIMEOUT_MINUTES: '15', SESSION_WARNING_MINUTES: '13',
       SESSION_ABSOLUTE_HOURS: '8', SESSION_ACTIVITY_UPDATE_SECONDS: '60' });
-    t.diagnostic(`PostgreSQL ${(await db.query('SHOW server_version')).rows[0].server_version}; clúster propio 127.0.0.1:${port}; .env deshabilitado`);
+    t.diagnostic(`PostgreSQL ${(await db.query('SHOW server_version')).rows[0].server_version}; destino sintético 127.0.0.1:${config.port}; .env deshabilitado`);
     const schema = fs.readFileSync(path.join(__dirname, '../src/db/schema.sql'), 'utf8');
     const boundary = schema.indexOf('-- CPREN-117:');
     assert.ok(boundary > 0, 'schema.sql debe conservar el límite aditivo CPREN-117');
@@ -369,7 +373,7 @@ test('CPREN-117: permisos, autoría y directorio en PostgreSQL temporal propio',
       if (previous.env[key] === undefined) delete process.env[key]; else process.env[key] = previous.env[key];
     }
     if (db) await db.end();
-    if (started || fs.existsSync(path.join(dataDir, 'postmaster.pid'))) {
+    if (service) await service.close(); else if (started || fs.existsSync(path.join(dataDir, 'postmaster.pid'))) {
       run('pg_ctl', ['-D', dataDir, '-m', 'immediate', '-w', 'stop']);
     }
     // Validar el destino generado antes de borrarlo recursivamente.

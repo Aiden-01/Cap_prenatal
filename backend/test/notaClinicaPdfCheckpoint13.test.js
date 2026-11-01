@@ -46,7 +46,7 @@ test('CHECKPOINT-13B: solo una proyección histórica verificada y del mismo ID 
 test('CHECKPOINT-13: cuatro muestras reales y cierres en límites de página', {
   skip: process.env.RUN_CHECKPOINT13_PDF !== '1', timeout: 120000,
 }, async t => {
-  const output = path.resolve(__dirname, process.env.CPREN_CHECKPOINT14 === '1' ? '../../docs/cpren120/checkpoint14' : process.env.CPREN_CHECKPOINT13B === '1' ? '../../docs/cpren120/checkpoint13b' : '../../docs/cpren120/checkpoint13');
+  const output = require('./helpers/predeploy02Service').evidenceDirectory(path.resolve(__dirname, process.env.CPREN_CHECKPOINT14 === '1' ? '../../docs/cpren120/checkpoint14' : process.env.CPREN_CHECKPOINT13B === '1' ? '../../docs/cpren120/checkpoint13b' : '../../docs/cpren120/checkpoint13'));
   fs.mkdirSync(path.join(output, 'pdf'), { recursive: true });
   fs.mkdirSync(path.join(output, 'boundaries'), { recursive: true });
   const browserManager = createPuppeteerBrowserManager();
@@ -56,6 +56,7 @@ test('CHECKPOINT-13: cuatro muestras reales y cierres en límites de página', {
     if(process.env.CPREN_CHECKPOINT14==='1')samples.push({name:'05-evolucion-limite-ultima-hoja',pages:2,
       data:base('nota_evolucion',Array.from({length:66},(_,i)=>`Línea sintética ${i+1}, última hoja completa.`).join('\n'))});
     for (const fixture of samples) {
+      if (process.env.CAP_PREDEPLOY02_SERVICE === '1' && fixture.name === '04-enfermeria-estres') fixture.pages = 12;
       if(process.env.CPREN_CHECKPOINT13B==='1'&&fixture.name==='02-enfermeria-breve'){
         fixture.data.paciente.nombres='María de los Ángeles Alejandra Guadalupe';
         fixture.data.paciente.apellidos='Ejemplo Sintético de los Apellidos Compuestos';

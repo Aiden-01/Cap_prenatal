@@ -17,7 +17,7 @@ const { errorHandler } = require('../src/middleware/errorHandler');
 test('CPREN-115: migración, HTTP, integridad, auditoría y concurrencia en clúster desechable', {
   skip: process.env.RUN_CATALOGOS_TEMP_POSTGRES !== '1', timeout: 120000,
 }, async (t) => {
-  // Nunca lee .env, PGHOST ni DATABASE_URL; initdb crea el único destino permitido.
+  // initdb local o service CI explícito; nunca destinos .env/PGHOST/DATABASE_URL.
   const bin = process.env.CATALOGOS_POSTGRES_BIN;
   assert.ok(bin, 'Falta CATALOGOS_POSTGRES_BIN');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cap-catalogos-'));
@@ -27,17 +27,23 @@ test('CPREN-115: migración, HTTP, integridad, auditoría y concurrencia en clú
     args, { windowsHide: true, stdio: 'ignore', timeout: 30000 });
   const config = { host: '127.0.0.1', port, user: 'catalogos_test', database: 'postgres',
     password: '', ssl: false, connectionTimeoutMillis: 3000, max: 8 };
+  const service = require('./helpers/predeploy02Service').serviceFixture('catalogos', config);
   let started = false;
   let db;
   let server;
   try {
-    run('initdb', ['-D', data, '-U', 'catalogos_test', '-A', 'trust', '--no-locale', '-E', 'UTF8']);
-    run('pg_ctl', ['-D', data, '-l', path.join(root, 'postgres.log'), '-o', `-h 127.0.0.1 -p ${port}`, '-w', 'start']);
-    started = true;
+    if (service) await service.start(); else {
+      run('initdb', ['-D', data, '-U', 'catalogos_test', '-A', 'trust', '--no-locale', '-E', 'UTF8']);
+      run('pg_ctl', ['-D', data, '-l', path.join(root, 'postgres.log'), '-o', `-h 127.0.0.1 -p ${port}`, '-w', 'start']);
+      started = true;
+    }
+
     db = new Pool(config);
-    const actualDir = (await db.query('SHOW data_directory')).rows[0].data_directory;
-    assert.equal(path.resolve(actualDir), path.resolve(data));
-    t.diagnostic(`PostgreSQL ${(await db.query('SHOW server_version')).rows[0].server_version}; clúster temporal propio, puerto ${port}`);
+    if (service) await service.verify(db); else {
+      const actualDir = (await db.query('SHOW data_directory')).rows[0].data_directory;
+      assert.equal(path.resolve(actualDir), path.resolve(data));
+    }
+    t.diagnostic(`PostgreSQL ${(await db.query('SHOW server_version')).rows[0].server_version}; destino sintético, puerto ${config.port}`);
     const filename = '023_catalogos_profesionales.sql';
     const sql = fs.readFileSync(path.join(__dirname, '../src/db/migrations', filename), 'utf8');
     const schema = fs.readFileSync(path.join(__dirname, '../src/db/schema.sql'), 'utf8');
@@ -173,7 +179,7 @@ test('CPREN-115: migración, HTTP, integridad, auditoría y concurrencia en clú
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));
     if (db) await db.end();
-    if (started) run('pg_ctl', ['-D', data, '-m', 'immediate', '-w', 'stop']);
+    if (service) await service.close(); else if (started) run('pg_ctl', ['-D', data, '-m', 'immediate', '-w', 'stop']);
     // Directorio generado por mkdtemp, nunca un destino configurable.
     fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }

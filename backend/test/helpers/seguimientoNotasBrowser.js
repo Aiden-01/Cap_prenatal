@@ -21,7 +21,7 @@ async function verificarSeguimientoBrowser({ apiPort, token, t }) {
     await vite.listen();
     const port = vite.httpServer.address().port;
     const base = `http://127.0.0.1:${port}`;
-    browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+    browser = await puppeteer.launch(require('../../src/utils/puppeteerLaunch').buildPuppeteerLaunchOptions());
     const page = await browser.newPage();
     const errors = [], requests = [], createdControls = [];
     page.on('pageerror', error => errors.push(error.message));

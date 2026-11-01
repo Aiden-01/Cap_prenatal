@@ -21,7 +21,7 @@ const { errorHandler } = require('../src/middleware/errorHandler');
 test('CPREN-118: notas clínicas, seguridad y concurrencia en PostgreSQL temporal propio', {
   skip: process.env.RUN_NOTAS_TEMP_POSTGRES !== '1', timeout: 120000,
 }, async t => {
-  // No acepta destinos de configuración: initdb genera el único clúster permitido.
+  // initdb local o service CI verificado; no acepta destinos de configuración.
   const bin = process.env.NOTAS_POSTGRES_BIN;
   assert.ok(bin, 'Falta NOTAS_POSTGRES_BIN');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cap-notas-'));
@@ -35,18 +35,22 @@ test('CPREN-118: notas clínicas, seguridad y concurrencia en PostgreSQL tempora
     'SESSION_WARNING_MINUTES', 'SESSION_ABSOLUTE_HOURS', 'SESSION_ACTIVITY_UPDATE_SECONDS'];
   const previous = { query: appPool.query, connect: appPool.connect, dotenv: dotenv.config,
     env: Object.fromEntries(envKeys.map(key => [key, process.env[key]])) };
+  const service = require('./helpers/predeploy02Service').serviceFixture('notas', config);
   let db, server, started = false;
   try {
-    run('initdb', ['-D', dataDir, '-U', 'notas_test', '-A', 'trust', '--no-locale', '-E', 'UTF8']);
-    run('pg_ctl', ['-D', dataDir, '-l', path.join(root, 'postgres.log'), '-o', `-h 127.0.0.1 -p ${port}`, '-w', 'start']);
-    started = true; db = new Pool(config);
-    assert.equal(path.resolve((await db.query('SHOW data_directory')).rows[0].data_directory), path.resolve(dataDir));
+    if (service) await service.start(); else {
+      run('initdb', ['-D', dataDir, '-U', 'notas_test', '-A', 'trust', '--no-locale', '-E', 'UTF8']);
+      run('pg_ctl', ['-D', dataDir, '-l', path.join(root, 'postgres.log'), '-o', `-h 127.0.0.1 -p ${port}`, '-w', 'start']);
+      started = true;
+    }
+    db = new Pool(config);
+    if (service) await service.verify(db); else { assert.equal(path.resolve((await db.query('SHOW data_directory')).rows[0].data_directory), path.resolve(dataDir)); }
     appPool.query = db.query.bind(db); appPool.connect = db.connect.bind(db);
     dotenv.config = () => ({ parsed: {} });
     Object.assign(process.env, { NODE_ENV: 'test', JWT_SECRET: 'synthetic-notas-test-only-secret-2026-118',
       ACCESS_TOKEN_TTL_MINUTES: '10', SESSION_IDLE_TIMEOUT_MINUTES: '15', SESSION_WARNING_MINUTES: '13',
       SESSION_ABSOLUTE_HOURS: '8', SESSION_ACTIVITY_UPDATE_SECONDS: '60' });
-    t.diagnostic(`PostgreSQL ${(await db.query('SHOW server_version')).rows[0].server_version}; clúster propio 127.0.0.1:${port}; .env deshabilitado`);
+    t.diagnostic(`PostgreSQL ${(await db.query('SHOW server_version')).rows[0].server_version}; destino sintético 127.0.0.1:${config.port}; .env deshabilitado`);
     const schema = fs.readFileSync(path.join(__dirname, '../src/db/schema.sql'), 'utf8');
     const boundary = schema.indexOf('-- CPREN-118:');
     assert.ok(boundary > 0, 'Falta el bloque aditivo CPREN-118 en schema.sql');
@@ -191,12 +195,12 @@ test('CPREN-118: notas clínicas, seguridad y concurrencia en PostgreSQL tempora
         assert.deepEqual(data.control, { numero: 4, fecha: '2026-09-01' });
         assert.equal(Object.hasOwn(data, 'capturista_nombre_actual'), false);
         if (process.env.CPREN_CHECKPOINT13 === '1') {
-          const target = path.resolve(__dirname, '../../docs/cpren120', process.env.CPREN_CHECKPOINT14 === '1' ? 'checkpoint14' : process.env.CPREN_CHECKPOINT13B === '1' ? 'checkpoint13b' : 'checkpoint13', 'endpoint'); fs.mkdirSync(target, { recursive: true });
+          const target = path.join(require('./helpers/predeploy02Service').evidenceDirectory(path.resolve(__dirname, '../../docs/cpren120', process.env.CPREN_CHECKPOINT14 === '1' ? 'checkpoint14' : process.env.CPREN_CHECKPOINT13B === '1' ? 'checkpoint13b' : 'checkpoint13')), 'endpoint'); fs.mkdirSync(target, { recursive: true });
           const file = `endpoint/${tipo}.pdf`; fs.writeFileSync(path.join(target, `${tipo}.pdf`), bytes);
           evidence.push({ file, pages: pdf.getPageCount(), data });
         }
       }
-      if (process.env.CPREN_CHECKPOINT13 === '1') fs.writeFileSync(path.resolve(__dirname, '../../docs/cpren120', process.env.CPREN_CHECKPOINT14 === '1' ? 'checkpoint14' : process.env.CPREN_CHECKPOINT13B === '1' ? 'checkpoint13b' : 'checkpoint13', 'endpoint-cases.json'), JSON.stringify({ synthetic_only: true, cases: evidence }, null, 2) + '\n');
+      if (process.env.CPREN_CHECKPOINT13 === '1') fs.writeFileSync(path.join(require('./helpers/predeploy02Service').evidenceDirectory(path.resolve(__dirname, '../../docs/cpren120', process.env.CPREN_CHECKPOINT14 === '1' ? 'checkpoint14' : process.env.CPREN_CHECKPOINT13B === '1' ? 'checkpoint13b' : 'checkpoint13')), 'endpoint-cases.json'), JSON.stringify({ synthetic_only: true, cases: evidence }, null, 2) + '\n');
       const events = (await db.query("SELECT datos_nuevos FROM auditoria_eventos WHERE descripcion='pdf_clinico_generado'")).rows;
       assert.equal(events.length, 2); assert.ok(!JSON.stringify(events).includes('NARRATIVA-PDF-PRIVADA'));
       const repository = require('../src/repositories/notasClinicasRepository');
@@ -478,7 +482,7 @@ test('CPREN-118: notas clínicas, seguridad y concurrencia en PostgreSQL tempora
       if (previous.env[key] === undefined) delete process.env[key]; else process.env[key] = previous.env[key];
     }
     if (db) await db.end();
-    if (started || fs.existsSync(path.join(dataDir, 'postmaster.pid'))) run('pg_ctl', ['-D', dataDir, '-m', 'immediate', '-w', 'stop']);
+    if (service) await service.close(); else if (started || fs.existsSync(path.join(dataDir, 'postmaster.pid'))) run('pg_ctl', ['-D', dataDir, '-m', 'immediate', '-w', 'stop']);
     assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir())); assert.ok(path.basename(root).startsWith('cap-notas-'));
     fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }

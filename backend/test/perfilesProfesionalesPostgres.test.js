@@ -19,7 +19,7 @@ const { errorHandler } = require('../src/middleware/errorHandler');
 test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal propio', {
   skip: process.env.RUN_PERFILES_TEMP_POSTGRES !== '1', timeout: 180000,
 }, async t => {
-  // No lee .env ni acepta URLs/servidores configurados; crea un clúster vacío.
+  // initdb local o service CI verificado; no acepta URLs de configuración.
   const bin = process.env.PERFILES_POSTGRES_BIN;
   assert.ok(bin, 'Falta PERFILES_POSTGRES_BIN');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cap-perfiles-'));
@@ -29,17 +29,21 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
   const config = { host: '127.0.0.1', port: 55476, user: 'perfiles_test', password: '', ssl: false,
     database: 'postgres', max: 8, connectionTimeoutMillis: 3000 };
   const previous = { query: appPool.query, connect: appPool.connect, dotenv: dotenv.config, secret: process.env.JWT_SECRET, nodeEnv: process.env.NODE_ENV };
+  const service = require('./helpers/predeploy02Service').serviceFixture('perfiles', config);
   let db, server, started = false;
   try {
-    run('initdb', ['-D', dataDir, '-U', 'perfiles_test', '-A', 'trust', '--no-locale', '-E', 'UTF8']);
-    run('pg_ctl', ['-D', dataDir, '-l', path.join(root, 'postgres.log'), '-o', '-h 127.0.0.1 -p 55476', '-w', 'start']);
-    started = true;
+    if (service) await service.start(); else {
+      run('initdb', ['-D', dataDir, '-U', 'perfiles_test', '-A', 'trust', '--no-locale', '-E', 'UTF8']);
+      run('pg_ctl', ['-D', dataDir, '-l', path.join(root, 'postgres.log'), '-o', '-h 127.0.0.1 -p 55476', '-w', 'start']);
+      started = true;
+    }
+
     db = new Pool(config);
-    assert.equal(path.resolve((await db.query('SHOW data_directory')).rows[0].data_directory), path.resolve(dataDir));
+    if (service) await service.verify(db); else { assert.equal(path.resolve((await db.query('SHOW data_directory')).rows[0].data_directory), path.resolve(dataDir)); }
     appPool.query = db.query.bind(db); appPool.connect = db.connect.bind(db);
     dotenv.config = () => ({ parsed: {} });
     process.env.JWT_SECRET = 'synthetic-perfiles-test-only-secret-2026-116'; process.env.NODE_ENV = 'test';
-    t.diagnostic(`PostgreSQL ${(await db.query('SHOW server_version')).rows[0].server_version}; temporal propio 127.0.0.1:55476`);
+    t.diagnostic(`PostgreSQL ${(await db.query('SHOW server_version')).rows[0].server_version}; destino sintético 127.0.0.1:${config.port}`);
     const schema = fs.readFileSync(path.join(__dirname, '../src/db/schema.sql'), 'utf8');
     await db.query(schema.slice(0, schema.indexOf('-- CPREN-115:')));
     const catalogoFilename = '023_catalogos_profesionales.sql';
@@ -337,7 +341,7 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       if (value === undefined) delete process.env[key]; else process.env[key] = value;
     }
     if (db) await db.end();
-    if (started) run('pg_ctl', ['-D', dataDir, '-m', 'immediate', '-w', 'stop']);
+    if (service) await service.close(); else if (started) run('pg_ctl', ['-D', dataDir, '-m', 'immediate', '-w', 'stop']);
     assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
     fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }

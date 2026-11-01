@@ -14,9 +14,13 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
  const config={host:'127.0.0.1',port:55481,user:'checkpoint14_test',password:'',database:'postgres',ssl:false,max:4,connectionTimeoutMillis:3000};
  const env={...process.env};for(const key of Object.keys(env))if(/^PG|DATABASE_URL|^DB_/i.test(key))delete env[key];
  const run=(name,args)=>execFileSync(path.join(bin,name+(process.platform==='win32'?'.exe':'')),args,{env,windowsHide:true,stdio:'ignore',timeout:30000});
- const connection=['--host=127.0.0.1','--port=55481','--username=checkpoint14_test','--no-password'];
- const output=path.resolve(__dirname,'../../docs/cpren120/checkpoint14');fs.mkdirSync(output,{recursive:true});
+
+ const output=require('./helpers/predeploy02Service').evidenceDirectory(path.resolve(__dirname,'../../docs/cpren120/checkpoint14'));fs.mkdirSync(output,{recursive:true});
  const report={synthetic_only:true,production_access:false,baseline_main:baseline,postgres_port:55481,checks:[],snapshots:[]};
+  const service = require('./helpers/predeploy02Service').serviceFixture('checkpoint14', config);
+ report.postgres_port=config.port;
+ const connection=['--host=127.0.0.1',`--port=${config.port}`,`--username=${config.user}`,'--no-password'];
+ if(service)env.PGPASSWORD=config.password;
  let db,started=false;
  const hash=value=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
  const tables=['roles','pacientes','embarazos','controles_prenatales','citas_prenatales','auth_sessions'];
@@ -26,9 +30,12 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
   assert.equal(result.ok,true,result.error?.message);
  };
  try{
+  if (service) await service.start(); else {
   run('initdb',['-D',data,'-U',config.user,'-A','trust','--no-locale','-E','UTF8']);
   run('pg_ctl',['-D',data,'-l',path.join(root,'postgres.log'),'-o','-h 127.0.0.1 -p 55481','-w','start']);started=true;
-  db=new Pool(config);assert.equal(path.resolve((await db.query('SHOW data_directory')).rows[0].data_directory),path.resolve(data));
+  }
+
+  db=new Pool(config);if (service) await service.verify(db); else { assert.equal(path.resolve((await db.query('SHOW data_directory')).rows[0].data_directory),path.resolve(data)); }
   report.postgres_version=(await db.query('SHOW server_version')).rows[0].server_version;
   const schema=execFileSync('git',['show',baseline+':backend/src/db/schema.sql'],{cwd:path.resolve(__dirname,'../..'),encoding:'utf8',maxBuffer:2000000});
   const schemaPath=path.join(root,'main-schema.sql'),migrationsDir=path.join(root,'main-migrations');
@@ -40,7 +47,7 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
    fs.writeFileSync(path.join(migrationsDir,name),sql);
   }
   // Solo este bootstrap anterior al módulo clínico usa su contrato histórico.
-  await migrateDb('postgres',{schemaPath,migrationsDir,verifyCompatibility:async()=>{}});
+  await migrateDb(config.database,{schemaPath,migrationsDir,verifyCompatibility:async()=>{}});
   const passwordHash=await bcrypt.hash('synthetic-checkpoint14-login',4);
   await db.query(`INSERT INTO roles(id,nombre) VALUES(1,'director'),(2,'admin'),(3,'personal_salud') ON CONFLICT DO NOTHING;
    INSERT INTO permisos(codigo,descripcion,categoria) VALUES('pacientes.ver','Sintético','pacientes') ON CONFLICT DO NOTHING`);
@@ -54,7 +61,7 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
    INSERT INTO auth_sessions(usuario_id,refresh_token_hash,absolute_expires_at) VALUES(3,repeat('a',64),NOW()+INTERVAL '1 day')`);
   const before=await snapshot(db),users=(await db.query('SELECT * FROM usuarios ORDER BY id')).rows;
   const grants=(await db.query('SELECT * FROM usuario_permisos WHERE usuario_id=3 ORDER BY id')).rows;
-  const dump=path.join(root,'main-synthetic.dump');run('pg_dump',[...connection,'--dbname=postgres','--format=custom','--file='+dump]);
+  const dump=path.join(root,'main-synthetic.dump');run('pg_dump',[...connection,'--dbname='+config.database,'--format=custom','--file='+dump]);
   await t.test('respaldo main sintético restaurable antes de actualizar',async()=>{
    await db.query('CREATE DATABASE restored_before');
    run('pg_restore',[...connection,'--dbname=restored_before','--exit-on-error',dump]);
@@ -63,7 +70,7 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
    report.checks.push('backup_restore_before_upgrade');
   });
   await t.test('023–030 en orden preservan expedientes, embarazos, controles, citas, sesiones y cuentas',async()=>{
-   await migrateDb('postgres');await assertSchemaCompatible(db);
+   await migrateDb(config.database);await assertSchemaCompatible(db);
    assert.deepEqual(await snapshot(db),before);
    for(const user of users){const now=(await db.query('SELECT * FROM usuarios WHERE id=$1',[user.id])).rows[0];
     for(const key of Object.keys(user))assert.deepEqual(now[key],user[key],key);
@@ -83,14 +90,20 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
    assert.equal((await db.query("SELECT to_regclass('public.especialidades_personal') AS tab")).rows[0].tab,null);
    assert.equal((await db.query("SELECT count(*)::int n FROM information_schema.columns WHERE table_schema='public' AND ((table_name='usuarios' AND column_name='especialidad_id') OR (table_name='cargos_personal' AND column_name='clasificacion_profesional'))")).rows[0].n,0);
    const registry=(await db.query('SELECT * FROM schema_migrations ORDER BY filename')).rows;
-   await migrateDb('postgres');assert.deepEqual((await db.query('SELECT * FROM schema_migrations ORDER BY filename')).rows,registry);
-   assert.deepEqual(await snapshot(db),before);report.checks.push('final_schema_and_idempotence');
+   const {isMigrationChecksumCompatible}=require('../src/db/migrationChecksum');
+   for(const row of registry)assert.ok(isMigrationChecksumCompatible(row.checksum,fs.readFileSync(path.join(source,row.filename),'utf8')),row.filename);
+   const filename='030_cargos_autoria_estable.sql';
+   await assert.rejects(require('../src/db/migrate').applyMigration({db,filename,
+    sql:fs.readFileSync(path.join(source,filename),'utf8')+'\n-- synthetic checksum mismatch\n'}),/fue modificada/);
+   assert.deepEqual((await db.query('SELECT * FROM schema_migrations ORDER BY filename')).rows,registry);
+   await migrateDb(config.database);assert.deepEqual((await db.query('SELECT * FROM schema_migrations ORDER BY filename')).rows,registry);
+   assert.deepEqual(await snapshot(db),before);report.checks.push('final_schema_checksums_tamper_rejection_and_idempotence');
   });
   await t.test('instalación nueva del esquema final y restauración posterior equivalentes',async()=>{
    await db.query('CREATE DATABASE fresh_final');await migrateDb('fresh_final');
    const fresh=new Pool({...config,database:'fresh_final'});
    try{await assertSchemaCompatible(fresh);assert.equal((await fresh.query('SELECT count(*)::int n FROM usuarios')).rows[0].n,0)}finally{await fresh.end()}
-   const afterDump=path.join(root,'final-synthetic.dump');run('pg_dump',[...connection,'--dbname=postgres','--format=custom','--file='+afterDump]);
+   const afterDump=path.join(root,'final-synthetic.dump');run('pg_dump',[...connection,'--dbname='+config.database,'--format=custom','--file='+afterDump]);
    await db.query('CREATE DATABASE restored_after');run('pg_restore',[...connection,'--dbname=restored_after','--exit-on-error',afterDump]);
    const restored=new Pool({...config,database:'restored_after'});
    try{await assertSchemaCompatible(restored);assert.deepEqual(await snapshot(restored),before);assert.deepEqual((await restored.query('SELECT * FROM usuarios ORDER BY id')).rows,(await db.query('SELECT * FROM usuarios ORDER BY id')).rows)}finally{await restored.end()}
@@ -100,7 +113,7 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
   fs.writeFileSync(path.join(output,'migration-readiness.json'),JSON.stringify(report,null,2)+'\n');
   t.diagnostic('PostgreSQL '+report.postgres_version+'; baseline Git main 022 sintético; no AWS ni respaldo real');
  }finally{
-  if(db)await db.end();if(started)run('pg_ctl',['-D',data,'-m','immediate','-w','stop']);
+  if(db)await db.end();if(service)await service.close();else if(started)run('pg_ctl',['-D',data,'-m','immediate','-w','stop']);
   assert.equal(path.dirname(path.resolve(root)),path.resolve(os.tmpdir()));assert.equal(path.dirname(path.resolve(data)),path.resolve(root));
   fs.rmSync(root,{recursive:true,force:true,maxRetries:5,retryDelay:200});
  }
