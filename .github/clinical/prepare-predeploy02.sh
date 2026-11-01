@@ -46,7 +46,42 @@ fi
 # El usuario de pruebas carece de sudo, credenciales de Actions y red exterior.
 sudo useradd --system --create-home --shell /bin/bash clinical-ci
 sudo chown -R clinical-ci:clinical-ci "$GITHUB_WORKSPACE" "$RUNNER_TEMP/predeploy02-chrome" "$RUNNER_TEMP/predeploy02-python"
-sudo chmod o+x "$RUNNER_TEMP"
+# Primer run: chown del checkout no garantiza atravesar sus directorios padre.
+# Conceder solo búsqueda (--x) al UID de pruebas, sin lectura/listado ni escritura
+# en los ancestros; sin chmod global, sudo para clinical-ci ni cambios de sandbox.
+grant_parent_traversal() {
+  local parent current_acl current_mask
+  parent=$(dirname "$(realpath "$1")")
+  while [[ "$parent" != / ]]; do
+    current_acl=$(getfacl -cp "$parent")
+    current_mask=$(awk -F: '$1 == "mask" { print substr($3,1,3) }' <<< "$current_acl")
+    if [[ -n "$current_mask" && "$current_mask" != *x ]]; then
+      echo "Existing restrictive ACL mask requires review: $parent"; exit 1
+    fi
+    if [[ -z "$current_mask" ]]; then
+      current_mask=$(awk -F: '$1 == "group" && $2 == "" { print substr($3,1,3) }' <<< "$current_acl")
+      [[ "$current_mask" =~ ^[r-][w-][x-]$ ]]
+      current_mask="${current_mask:0:2}x"
+    fi
+    # No recalcular la máscara ni ampliar permisos efectivos de entradas previas.
+    sudo setfacl -n -m "u:clinical-ci:--x,m::$current_mask" "$parent"
+    parent=$(dirname "$parent")
+  done
+}
+command -v setfacl >/dev/null
+grant_parent_traversal "$GITHUB_WORKSPACE"
+grant_parent_traversal "$RUNNER_TEMP/predeploy02-chrome"
+grant_parent_traversal "$RUNNER_TEMP/predeploy02-python"
+namei -l "$GITHUB_WORKSPACE"
+sudo -H -u clinical-ci test -r "$GITHUB_WORKSPACE/.github/clinical/run-predeploy02.cjs"
+sudo -H -u clinical-ci test -x "$chrome"
+sudo -H -u clinical-ci "$PREDEPLOY_NODE24_BIN/node" --version
+sudo -H -u clinical-ci "$(command -v node)" --version
+sudo -H -u clinical-ci "$RUNNER_TEMP/predeploy02-python/bin/python" --version
+sudo -H -u clinical-ci /usr/lib/postgresql/16/bin/pg_dump --version
+sudo -H -u clinical-ci /usr/lib/postgresql/16/bin/pg_restore --version
+sudo -H -u clinical-ci git -C "$GITHUB_WORKSPACE" rev-parse --is-inside-work-tree
+echo 'clinical-ci checkout and executable access: verified'
 sudo -H -u clinical-ci git config --global --add safe.directory "$GITHUB_WORKSPACE"
 uid=$(id -u clinical-ci)
 pg_ip=$(docker inspect "$POSTGRES_SERVICE_ID" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')

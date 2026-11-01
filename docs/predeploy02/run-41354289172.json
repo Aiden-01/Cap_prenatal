@@ -1,0 +1,378 @@
+{
+  "schema_version": 1,
+  "synthetic_only": true,
+  "repository": "Aiden-01/Cap_prenatal",
+  "branch": "feature/cpren-120-editor-pdf-notas-clinicas",
+  "sha": "607866cf015939edabb928a14014f6b7078e64e4",
+  "workflow_url": "https://github.com/Aiden-01/Cap_prenatal/blob/607866cf015939edabb928a14014f6b7078e64e4/.github/workflows/clinical-predeploy02.yml",
+  "run_url": "https://github.com/Aiden-01/Cap_prenatal/actions/runs/41354289172",
+  "run_id": 41354289172,
+  "attempt": 1,
+  "event": "push",
+  "status": "completed",
+  "conclusion": "failure",
+  "job": {
+    "id": 124990919916,
+    "labels": [
+      "ubuntu-24.04"
+    ],
+    "started_utc": "2026-11-01T21:53:23Z",
+    "completed_utc": "2026-11-01T21:55:02Z",
+    "duration_seconds": 99,
+    "steps": [
+      {
+        "number": 1,
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "started_utc": "2026-11-01T21:53:24Z",
+        "completed_utc": "2026-11-01T21:53:25Z",
+        "duration_seconds": 1
+      },
+      {
+        "number": 2,
+        "name": "Initialize containers",
+        "status": "completed",
+        "conclusion": "success",
+        "started_utc": "2026-11-01T21:53:25Z",
+        "completed_utc": "2026-11-01T21:53:49Z",
+        "duration_seconds": 24
+      },
+      {
+        "number": 3,
+        "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "started_utc": "2026-11-01T21:53:49Z",
+        "completed_utc": "2026-11-01T21:53:53Z",
+        "duration_seconds": 4
+      },
+      {
+        "number": 4,
+        "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "started_utc": "2026-11-01T21:53:53Z",
+        "completed_utc": "2026-11-01T21:53:54Z",
+        "duration_seconds": 1
+      },
+      {
+        "number": 5,
+        "name": "Record Node 24 runtime for Vitest only",
+        "status": "completed",
+        "conclusion": "success",
+        "started_utc": "2026-11-01T21:53:54Z",
+        "completed_utc": "2026-11-01T21:53:54Z",
+        "duration_seconds": 0
+      },
+      {
+        "number": 6,
+        "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "started_utc": "2026-11-01T21:53:54Z",
+        "completed_utc": "2026-11-01T21:53:58Z",
+        "duration_seconds": 4
+      },
+      {
+        "number": 7,
+        "name": "Install locked dependencies (runner only)",
+        "status": "completed",
+        "conclusion": "success",
+        "started_utc": "2026-11-01T21:53:58Z",
+        "completed_utc": "2026-11-01T21:54:29Z",
+        "duration_seconds": 31
+      },
+      {
+        "number": 8,
+        "name": "Prepare isolated runtime and Chrome sandbox",
+        "status": "completed",
+        "conclusion": "failure",
+        "started_utc": "2026-11-01T21:54:29Z",
+        "completed_utc": "2026-11-01T21:54:57Z",
+        "duration_seconds": 28
+      },
+      {
+        "number": 9,
+        "name": "Run clinical checks without external network access",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_utc": "2026-11-01T21:54:57Z",
+        "completed_utc": "2026-11-01T21:54:57Z",
+        "duration_seconds": 0
+      },
+      {
+        "number": 10,
+        "name": "Upload synthetic evidence only",
+        "status": "completed",
+        "conclusion": "success",
+        "started_utc": "2026-11-01T21:54:57Z",
+        "completed_utc": "2026-11-01T21:54:57Z",
+        "duration_seconds": 0
+      },
+      {
+        "number": 17,
+        "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_utc": "2026-11-01T21:54:57Z",
+        "completed_utc": "2026-11-01T21:54:57Z",
+        "duration_seconds": 0
+      },
+      {
+        "number": 18,
+        "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_utc": "2026-11-01T21:54:57Z",
+        "completed_utc": "2026-11-01T21:54:57Z",
+        "duration_seconds": 0
+      },
+      {
+        "number": 19,
+        "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "started_utc": "2026-11-01T21:54:57Z",
+        "completed_utc": "2026-11-01T21:54:57Z",
+        "duration_seconds": 0
+      },
+      {
+        "number": 20,
+        "name": "Stop containers",
+        "status": "completed",
+        "conclusion": "success",
+        "started_utc": "2026-11-01T21:54:57Z",
+        "completed_utc": "2026-11-01T21:55:00Z",
+        "duration_seconds": 3
+      },
+      {
+        "number": 21,
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "started_utc": "2026-11-01T21:55:00Z",
+        "completed_utc": "2026-11-01T21:55:00Z",
+        "duration_seconds": 0
+      }
+    ]
+  },
+  "verified_versions": {
+    "os": "Ubuntu24.04.5 LTS",
+    "runner_image": "ubuntu-24.04 20261025.353.1",
+    "runner": "2.338.2",
+    "node_application": "v20.20.2",
+    "npm_application": "10.8.2",
+    "node_vitest": "v24.22.1",
+    "npm_vitest": "11.19.1",
+    "postgresql": "16.15 (Debian16.15-1.pgdg12+2)",
+    "chrome_binary": "Chrome for Testing148.0.7778.97"
+  },
+  "security": {
+    "github_token_permissions": {
+      "contents": "read",
+      "metadata": "read"
+    },
+    "hosted_runner": true,
+    "production_credentials_configured": false,
+    "chrome_sandbox_runtime": "not_verified",
+    "test_uid_firewall": "not_installed: preparation failed before firewall setup",
+    "aws_access": false,
+    "persistent_db_access": false
+  },
+  "failure": {
+    "classification": "harness filesystem permissions",
+    "step": "Prepare isolated runtime and Chrome sandbox",
+    "exit_code": 128,
+    "error": "fatal: failed to stat '/home/runner/work/Cap_prenatal/Cap_prenatal': Permission denied",
+    "cause_confirmed": "clinical-ci cannot traverse/access checkout; recursive chown of workspace was insufficient",
+    "exact_ancestor": "not inventoried in first run",
+    "correction_local_only": "named-user execute-only ACLs on ancestor directories, explicit traversal/runtime checks; no sudo for test UID or sandbox/network bypass"
+  },
+  "phases": [
+    {
+      "name": "backend",
+      "status": "not_executed",
+      "runtime_planned": "Node20.20.2",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    },
+    {
+      "name": "frontend-logic",
+      "status": "not_executed",
+      "runtime_planned": "Node20.20.2",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    },
+    {
+      "name": "frontend-dom",
+      "status": "not_executed",
+      "runtime_planned": "Node24",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    },
+    {
+      "name": "lint",
+      "status": "not_executed",
+      "runtime_planned": "Node20.20.2",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    },
+    {
+      "name": "build",
+      "status": "not_executed",
+      "runtime_planned": "Node20.20.2",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    },
+    {
+      "name": "pdf-samples",
+      "status": "not_executed",
+      "runtime_planned": "Node20.20.2",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    },
+    {
+      "name": "checkpoint10",
+      "status": "not_executed",
+      "runtime_planned": "Node20.20.2",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    },
+    {
+      "name": "checkpoint14",
+      "status": "not_executed",
+      "runtime_planned": "Node20.20.2",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    },
+    {
+      "name": "catalogos",
+      "status": "not_executed",
+      "runtime_planned": "Node20.20.2",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    },
+    {
+      "name": "perfiles",
+      "status": "not_executed",
+      "runtime_planned": "Node20.20.2",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    },
+    {
+      "name": "autoria",
+      "status": "not_executed",
+      "runtime_planned": "Node20.20.2",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    },
+    {
+      "name": "notas",
+      "status": "not_executed",
+      "runtime_planned": "Node20.20.2",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    },
+    {
+      "name": "seguimiento",
+      "status": "not_executed",
+      "runtime_planned": "Node20.20.2",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    },
+    {
+      "name": "auth-sessions",
+      "status": "not_executed",
+      "runtime_planned": "Node20.20.2",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    },
+    {
+      "name": "citas-postgres",
+      "status": "not_executed",
+      "runtime_planned": "Node20.20.2",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    },
+    {
+      "name": "pdf-geometry",
+      "status": "not_executed",
+      "runtime_planned": "Python",
+      "pass": null,
+      "fail": null,
+      "skipped": null,
+      "exit_code": null,
+      "duration_ms": null
+    }
+  ],
+  "artifacts_count": 0,
+  "new_pdf_or_screenshots": false,
+  "n8n_policy_run": {
+    "id": 41354289073,
+    "url": "https://github.com/Aiden-01/Cap_prenatal/actions/runs/41354289073",
+    "conclusion": "success",
+    "workflow_unchanged": true
+  },
+  "recommendation": "NO-GO to private staging until harness is corrected and a complete Linux run is reviewed",
+  "additional_runs": 0,
+  "log_excerpts": [
+    "2026-11-01T21:53:24.7285962Z Contents: read",
+    "2026-11-01T21:53:24.7286734Z Metadata: read",
+    "2026-11-01T21:53:54.1172842Z node: v24.22.1",
+    "2026-11-01T21:53:54.1173275Z npm: 11.19.1",
+    "2026-11-01T21:53:58.3971636Z node: v20.20.2",
+    "2026-11-01T21:53:58.3972126Z npm: 10.8.2",
+    "2026-11-01T21:54:34.5023861Z Google Chrome for Testing 148.0.7778.97 ",
+    "2026-11-01T21:54:57.2507657Z fatal: failed to stat '/home/runner/work/Cap_prenatal/Cap_prenatal': Permission denied",
+    "2026-11-01T21:54:57.2533898Z ##[error]Process completed with exit code 128.",
+    "2026-11-01T21:54:57.4354532Z ##[warning]No files were found with the provided path: tmp_predeploy02/publish/. No artifacts will be uploaded.",
+    "2026-11-01T21:54:57.7045911Z  waiting for server to start....2026-11-01 21:53:34.954 UTC [48] LOG:  starting PostgreSQL 16.15 (Debian 16.15-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit",
+    "2026-11-01T21:54:57.7062316Z  2026-11-01 21:53:35.262 UTC [1] LOG:  starting PostgreSQL 16.15 (Debian 16.15-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit"
+  ]
+}
