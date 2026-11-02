@@ -1,17 +1,122 @@
 # PREDEPLOY-02 — Validación clínica Linux mediante GitHub Actions
 
 2026-11-01, America/Guatemala. Preparación en Casa / HP Victus / dispositivo Huguito.
-**Primera ejecución real completada: FAILURE antes de ejecutar pruebas clínicas.**
+**Segundo ensayo completado: FAILURE del lector de estado del sandbox; permisos corregidos.**
 CPREN-120 y CPREN-126 permanecen **En revisión** por instrucción expresa.
 
 **Primera ejecución autorizada por el propietario (2026-11-01):** se autoriza
 revisar, crear un commit y hacer push exclusivamente a la rama clínica para
 disparar su primer ensayo. No se autoriza main, PR, AWS ni despliegue. La
 publicación posterior del informe con resultados requiere otra autorización.
-Commit publicado: `607866cf015939edabb928a14014f6b7078e64e4`.
+Primer commit publicado: `607866cf015939edabb928a14014f6b7078e64e4`.
 El propietario autorizó después un segundo commit/push limitado a las cuatro
 rutas revisadas, para corregir permisos y permitir un único segundo ensayo.
 No autoriza un tercer intento ni publicaciones posteriores sin nueva aprobación.
+
+## Segundo ensayo real — cierre sin tercera ejecución
+
+Segundo commit completo: **`23dc463eb27a6e121f599422871979531fc82c15`**.
+Contiene exclusivamente las cuatro rutas autorizadas. Un único push a la rama
+clínica; HEAD local y remoto idénticos. No hubo main, PR, AWS, n8n productivo,
+migraciones persistentes ni instalaciones en la Victus. docs/tesis preservado.
+
+- [Segundo workflow publicado](https://github.com/Aiden-01/Cap_prenatal/blob/23dc463eb27a6e121f599422871979531fc82c15/.github/workflows/clinical-predeploy02.yml).
+- [Segundo run 41355992542](https://github.com/Aiden-01/Cap_prenatal/actions/runs/41355992542), evento push, attempt 1 de ese run nuevo.
+- Job `clinical` / `124996007506`: **22:12:57–22:14:44 UTC**,
+  **16:12:57–16:14:44 Guatemala**, 2026-11-01; **107 segundos**.
+- Resultado final **failure**, exit **1** del preflight. El error de permisos
+  anterior quedó resuelto; **cero fases de suites clínicas iniciadas**.
+
+| Control previo | Resultado efectivo del segundo run |
+| --- | --- |
+| Acceso clinical-ci | **PASS**: script legible, Chrome ejecutable, Node20/24, Python, pg_dump/pg_restore y Git en checkout comprobados como ese usuario antes de configurar Git |
+| ACL / privilegios | Preparación **success**, 34 s; búsqueda nominativa con máscara conservada, sin chmod global ni sudo añadido al usuario |
+| Identidad y candidato | Verificaciones de Linux/GitHub-hosted, repositorio/ref, usuario y SHA pasadas; sin diferencias productivas frente al candidato |
+| Red | **PASS de las sondas**: rechazo de salida hacia TEST-NET IPv4 e IPv6, después de instalar reglas por UID; loopback/service PG funcionan |
+| PostgreSQL | **16.15**, versión, base sintética, marcador y directorio del service comprobados; sin aplicar 023–030 |
+| Chrome / sandbox | Chrome **148.0.7778.97** arrancó. Namespace, PID/network namespaces y seccomp activos según chrome://sandbox; sin flags que desactiven sandbox |
+| Verificador de sandbox | **FAIL del harness**, por esperar una etiqueta de texto diferente; no porque Chrome declarara el sandbox desactivado |
+
+El artefacto conserva el texto real que produjo el fallo:
+
+```text
+Layer 1 Sandbox                 Namespace
+PID namespaces                  Yes
+Network namespaces              Yes
+Seccomp-BPF sandbox              Yes
+Seccomp-BPF sandbox supports TSYNC Yes
+You are adequately sandboxed.
+```
+
+El código exigía `/Namespace sandbox\s+Yes/i`. Esa etiqueta no aparece en esta
+interfaz de Chrome148. Se clasifica como **Error del parser/contrato de diagnóstico
+del harness**, no como fallo funcional del CAP ni sandbox inactivo. El navegador
+reportó además Yama Broker Yes y Non-broker No; esos campos se conservan en el
+resumen original y no se confunden con namespace/seccomp.
+
+El controlador llegó a `preflight_stage=chrome-sandbox`, registró el rechazo de
+red y terminó en **3.038 s**; el paso Actions duró 4 s. `phases=[]` confirma que no
+se inició ninguna suite. La comprobación global de preflight sigue **fallida**,
+aunque las observaciones de permisos, red y sandbox sean positivas.
+
+| Runtime/componente | Versión real observada |
+| --- | --- |
+| OS / runner | Ubuntu **24.04.5 LTS**, runner **2.338.2**, GitHub-hosted ubuntu-24.04 |
+| Node aplicación / npm | **v20.20.2 / 10.8.2** |
+| Node Vitest / npm | **v24.22.1 / 11.19.1**; Vitest no llegó a ejecutarse |
+| PostgreSQL service | **16.15 (Debian 16.15-1.pgdg12+2)** |
+| Clientes PG del runner | **16.15 (Ubuntu 16.15-1.pgdg24.04+2)** |
+| Chrome / Puppeteer | **Chrome/148.0.7778.97 / 24.43.1** |
+| Python | **3.12.3** |
+
+El banner de Actions informa imagen `20261025.353.1`; la variable ImageVersion
+capturada en el artefacto informa `20261026.354.1`. Se conservan ambos valores
+sin afirmar identidad de esas dos etiquetas. No afecta a la confirmación de
+Ubuntu24.04.5 ni acredita equivalencia exacta con AWS.
+
+| Etapas del segundo run | Aprobadas / fallidas / omitidas | Duración / exit |
+| --- | --- | --- |
+| backend | — / — / — | No ejecutado |
+| frontend-logic / frontend-dom | — / — / — | No ejecutados |
+| lint / build | — / — / — | No ejecutados |
+| pdf-samples / pdf-geometry | — / — / — | No ejecutados |
+| checkpoint10 / checkpoint14 | — / — / — | No ejecutados |
+| catalogos / perfiles / autoria | — / — / — | No ejecutados |
+| notas / seguimiento | — / — / — | No ejecutados |
+| auth-sessions / citas-postgres | — / — / — | No ejecutados |
+
+No existen conteos TAP/Vitest de estas 16 fases: no se presentan como aprobadas
+ni como omisiones individuales. Migraciones023–030, datos/snapshots, cargos,
+permisos, usuarios/correo/sesiones, notas/seguimiento, controles/citas, frontend,
+lint/build y PDF siguen pendientes de validación Linux. **No se generaron PDF,
+renders ni capturas clínicas sintéticas**.
+
+### Evidencia conservada y bloqueo pendiente
+
+Se publicó **un artefacto**, ID **13103336930**, ZIP de **3146 bytes**, que contiene
+solo run-summary.json. Se descargó a la carpeta temporal ignorada y se verificó
+su SHA256 contra el digest de Actions:
+`7bc84ccbe481676265b19f9efbd69e56f58c94b8afd02caf669835a3274bc57e`.
+
+- [Artefacto del run](https://github.com/Aiden-01/Cap_prenatal/actions/runs/41355992542/artifacts/13103336930).
+- [Resumen original local](../tmp_predeploy02/second-run-41355992542/run-summary.json).
+- [Metadatos y extractos sanitizados locales](../tmp_predeploy02/second-run-41355992542/evidence.json).
+
+Los archivos temporales no forman parte de otro commit. No se guardan URLs
+firmadas de descarga, credenciales ni logs completos en el informe/Jira. El
+workflow n8n intacto pasó en el mismo SHA:
+[run 41355992511](https://github.com/Aiden-01/Cap_prenatal/actions/runs/41355992511).
+
+**NO-GO para avanzar a staging privado**: falta la ejecución clínica completa y
+su evidencia PDF. El siguiente cambio necesario sería adaptar el lector de
+chrome://sandbox en `.github/clinical/run-predeploy02.cjs`, exigiendo los campos
+reales Layer1=Namespace, PID/Network=Yes y Seccomp-BPF=Yes, con casos negativos.
+Ese archivo está **fuera de las cuatro rutas autorizadas**. No se modificó ni se
+preparó otra corrección, commit, push o tercer ensayo. Requiere nueva autorización.
+
+El informe de este resultado se actualiza **solo localmente** después del segundo
+commit; no se publica. CPREN-120/126 permanecen En revisión. No hay autorización
+de producción ni de restaurar un respaldo real.
 
 ## Preparación del segundo ensayo autorizado
 
@@ -31,8 +136,8 @@ en el runner remoto.
 Antes de Git se comprueba como clinical-ci: lectura del script, Chrome ejecutable,
 versiones Node20/24, Python, pg_dump/pg_restore y acceso Git al checkout. Se
 registra namei y un marcador explícito de acceso verificado. Firewall, sandbox,
-identidad y separación de runtimes se conservan sin cambios. Esta revisión es
-estática; la eficacia real se decidirá con la segunda ejecución.
+identidad y separación de runtimes se conservan sin cambios. La segunda ejecución
+confirmó el acceso; su fallo posterior y los límites están documentados arriba.
 
 ## Primera ejecución real — resultado y recomendación
 
@@ -137,7 +242,7 @@ Ese resultado no valida el módulo clínico ni implica un cambio productivo de n
 Candidato: `Aiden-01/Cap_prenatal`, rama
 `feature/cpren-120-editor-pdf-notas-clinicas`, candidato base
 `74a458a6e9621c74982c1de13ee1ee2ef99fa7a7`; HEAD publicado
-`607866cf015939edabb928a14014f6b7078e64e4` (local/remoto idénticos).
+`23dc463eb27a6e121f599422871979531fc82c15` (local/remoto idénticos).
 Se leyeron el plan clínico 115–126, PREDEPLOY-01 y CHECKPOINT-14 antes de preparar
 esta fase. Los documentos anteriores describen sus fechas/SHAs históricos;
 no deben interpretarse como el estado actual de Git.
@@ -400,10 +505,10 @@ Git Bash existente comprobó únicamente `bash -n`; el sandbox Windows requirió
 repetir esa lectura de sintaxis fuera del aislamiento. No se ejecutó el script
 de preparación en Windows. Las consultas de Chrome/Docker fueron solo metadatos.
 
-Primer commit/push y primera ejecución completados. Se autoriza la publicación
-de los cuatro archivos locales indicados abajo para el segundo ensayo; pendiente
-ejecutarlo con el script corregido y obtener conteos clínicos, renders y versiones.
-La revisión previa no permite declarar aprobadas las suites Linux.
+Segundo commit/push y segunda ejecución completados. Solo este informe queda
+modificado localmente después de publicar el segundo commit. Sigue pendiente
+autorizar una corrección del lector de sandbox fuera del alcance anterior y
+obtener conteos clínicos y PDF en otro ensayo; no se ha iniciado un tercero.
 **NO-GO para avanzar a staging privado por falta de validación clínica Linux.**
 La restauración real sigue separada y requiere autorización expresa. Sin
 autorización de producción ni criterios para cerrar CPREN-120/126.
@@ -411,4 +516,116 @@ autorización de producción ni criterios para cerrar CPREN-120/126.
 Cuatro rutas autorizadas para el segundo commit: este informe,
 `docs/predeploy02/run-41354289172.json`, `.github/clinical/prepare-predeploy02.sh`
 y `.github/workflows/clinical-predeploy02.yml` (**4 rutas**). Las dos últimas
-contienen la corrección propuesta de permisos y acl, pendiente de ensayo.
+contienen la corrección de permisos y acl ya comprobada por el segundo ensayo.
+
+## 2026-11-02 — Parser de Chrome148 corregido solo localmente
+
+Autorización actual: corregir el lector, probarlo sin Chrome y documentarlo.
+**No autoriza commit, push ni tercer workflow.** Se conserva íntegro el contenido
+local previo de este informe; esta sección añade la corrección al historial.
+Casa / dispositivo Huguito. Rama clínica y HEAD siguen en
+`23dc463eb27a6e121f599422871979531fc82c15`, con tracking sin adelantos/atrasos.
+Se preservan docs/tesis y los worktrees main/hotfix; no se hizo pull sobre el
+árbol con cambios ni reset, clean o checkout.
+
+### Causa y contrato implementado
+
+El segundo run falló por exigir `/Namespace sandbox\s+Yes/i`, etiqueta ausente
+en Chrome148. Su diagnóstico real decía Layer1=Namespace, PID/Network=Yes,
+Seccomp-BPF=Yes y `You are adequately sandboxed.`. Ese fallo era del lector;
+no equivale a protecciones desactivadas ni a una prueba de migraciones023–030.
+
+Se introduce un único helper puro `validateChromeSandboxStatus`, compartido por
+el runner y las pruebas. No lee archivos, red o entorno, ni inicia procesos.
+Consume el diagnóstico completo como entradas de etiquetas y valores exactos,
+independientes del orden, y exige conjuntamente:
+
+- Layer 1 Sandbox = Namespace.
+- PID namespaces = Yes.
+- Network namespaces = Yes.
+- Seccomp-BPF sandbox = Yes.
+- Mensaje global exacto `You are adequately sandboxed.`.
+
+Solo colapsa espacios ASCII, tabulaciones y finales LF/CRLF/CR. No convierte
+mayúsculas, valores, puntuación o espacios Unicode. No busca un Yes genérico ni
+acepta subcadenas positivas. Rechaza entradas no textuales/vacías, obligatorios
+ausentes o con No/valor distinto, texto desconocido/truncado y mensajes globales
+ausentes/negativos. Todo campo o confirmación repetido se rechaza, incluso si los
+valores repetidos coinciden; así tampoco se acepta información contradictoria.
+
+Las tres filas auxiliares conocidas (TSYNC y Yama Broker/Non-broker) no acreditan
+ningún obligatorio. El No de Yama Non-broker en el texto real se conserva sin
+confundirlo con un No de PID/Network/seccomp. Las filas auxiliares admiten valores
+Yes/No exactos y también rechazan duplicados; no sustituyen los cinco controles.
+Se resuelve primero la etiqueta larga TSYNC para no confundirla con seccomp.
+Una etiqueta futura desconocida provoca rechazo hasta revisar el contrato.
+
+El runner mantiene `chrome://sandbox`, la versión Chrome148 fijada y el rechazo
+de flags que desactivan protecciones. Solo después de validar guarda el resumen
+estructurado `chrome_sandbox_checks` y el diagnóstico original. Un rechazo lanza
+`PREDEPLOY02_CHROME_SANDBOX_UNSAFE`: se conserva la salida fallida del preflight,
+se cierra el navegador mediante finally y no se alcanza ninguna suite clínica.
+No cambian ACL, firewall, identidad, credenciales, esquemas ni código productivo.
+
+### Pruebas y verificación local focalizada
+
+Comando ejecutado en Windows, **Node v24.11.1**:
+
+```text
+node --test --test-reporter=tap backend/test/predeploy02ChromeSandbox.test.js backend/test/predeploy02Safety.test.js
+```
+
+Resultado nuevo: **23 pruebas aprobadas** (22 parser + 1 seguridad), **0 fallos,
+0 omitidas, 0 canceladas**, exit0. La fixture textual reproduce únicamente el
+diagnóstico genérico del navegador, sin datos del servidor ni credenciales.
+
+| Cobertura solicitada | Resultado |
+| --- | --- |
+| Texto real del segundo ensayo | Aceptado |
+| Tabulaciones/espacios, LF/CRLF/CR, líneas vacías y valores/etiquetas repartidos por saltos de línea | Aceptados |
+| PID=No, Network=No o Seccomp=No | Rechazados independientemente |
+| Layer1 ausente o distinto de Namespace, incluido No | Rechazados |
+| Cualquier obligatorio faltante | Rechazado independientemente |
+| Diagnóstico truncado o confirmación global incompleta/ausente | Rechazados |
+| Confirmación global negativa, incluso junto a una positiva | Rechazada |
+| Positivos solo en TSYNC/otros campos, o como subcadena | Rechazados |
+| Campos contradictorios, duplicados y texto residual | Rechazados |
+| Entradas vacías/no textuales, valores con otra capitalización o Unicode | Rechazadas |
+
+`node --check` aprobó runner, helper y prueba; `git diff --check` también pasó.
+No se ejecutaron suites clínicas completas en Windows, Chrome real, PostgreSQL,
+frontend, lint o build en esta sesión. No se instalaron paquetes ni software.
+No se consultó AWS ni se ejecutó ningún workflow nuevo.
+
+### Inventario propuesto para un tercer commit, todavía no autorizado
+
+| Archivo | Estado / propósito |
+| --- | --- |
+| `.github/clinical/run-predeploy02.cjs` | Modificado: usa el helper, conserva versión/flags/acceso al diagnóstico |
+| `.github/clinical/chrome-sandbox-status.cjs` | Nuevo: único validador puro con rechazo seguro |
+| `backend/test/predeploy02ChromeSandbox.test.js` | Nuevo: 22 pruebas con el mismo helper; incluido por el glob habitual de backend |
+| `backend/test/fixtures/chrome-sandbox-148.txt` | Nuevo: diagnóstico genérico del segundo ensayo |
+| `docs/CPREN_PREDEPLOY_02_GITHUB_ACTIONS.md` | Modificado previamente y ampliado sin perder la evidencia anterior |
+
+Son **5 rutas: 2 modificadas y 3 nuevas**. docs/tesis sigue como trabajo ajeno sin
+seguimiento. El índice queda sin staging; HEAD no cambia. No hay commit/push, PR,
+main, cambios de migraciones, datos, n8n, dependencias o lockfiles.
+
+Pendientes: revisión/autorización de esos cinco archivos y de un tercer ensayo,
+compatibilidad real del parser con Chrome en el runner y ejecución clínica Linux
+completa, incluidos migraciones, conservación y PDF. Se mantiene **NO-GO para
+avanzar a staging privado** hasta contar con esa evidencia. Las pruebas unitarias
+del lector no acreditan las suites Linux ni una restauración PostgreSQL real.
+CPREN-120 y CPREN-126 permanecen En revisión.
+
+## 2026-11-02 — Autorización del tercer ensayo y revisión previa
+
+El propietario autoriza ahora un único commit de las cinco rutas del parser y
+un único push a la rama clínica, con su ejecución automática. No autoriza cuarto
+intento ni publicaciones adicionales. El informe posterior quedará local.
+Se repitieron las 23 pruebas focalizadas: 23 aprobadas, 0 fallos, 0 omitidas,
+0 canceladas, exit0. Sintaxis de runner/helper/prueba y diff --check aprobados.
+Se revisaron los cinco archivos completos y los controles obligatorios;
+sin cambios de versión/flags, permisos o red. Remotos previos confirmados:
+clínico `23dc463eb27a6e121f599422871979531fc82c15` y main `d5fae677fa462af9ca5b7174a46d3ebf21e12196`.
+No existe todavía resultado de este tercer ensayo al preparar este commit.

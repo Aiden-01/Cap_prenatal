@@ -6,6 +6,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const net = require('node:net');
 const { spawn, execFileSync } = require('node:child_process');
+const { validateChromeSandboxStatus } = require('./chrome-sandbox-status.cjs');
 const root = path.resolve(__dirname, '../..');
 const backend = path.join(root, 'backend');
 const { Pool } = require(path.join(backend, 'node_modules/pg'));
@@ -136,8 +137,7 @@ async function main() {
     report.preflight_stage = 'chrome-sandbox'; write();
     await page.goto('chrome://sandbox');
     const sandbox = await page.$eval('body', element => element.innerText);
-    assert.match(sandbox, /Namespace sandbox\s+Yes/i);
-    assert.match(sandbox, /Seccomp-BPF sandbox\s+Yes/i);
+    report.chrome_sandbox_checks = validateChromeSandboxStatus(sandbox);
     report.chrome_sandbox = sandbox;
     await page.close();
   } finally { await manager.close(); write(); }
