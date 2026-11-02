@@ -5,8 +5,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const net = require('node:net');
+const { pathToFileURL } = require('node:url');
 const { spawn, execFileSync } = require('node:child_process');
 const { validateChromeSandboxStatus } = require('./chrome-sandbox-status.cjs');
+const { failureDiagnostic } = require('./test-failure-diagnostics.cjs');
+const { verifyReviewedLayout } = require('./candidate-integrity.cjs');
 const root = path.resolve(__dirname, '../..');
 const backend = path.join(root, 'backend');
 const { Pool } = require(path.join(backend, 'node_modules/pg'));
@@ -18,8 +21,10 @@ const candidate = '74a458a6e9621c74982c1de13ee1ee2ef99fa7a7';
 const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 assert.equal(git(['rev-parse', 'HEAD']), process.env.GITHUB_SHA);
 git(['merge-base', '--is-ancestor', candidate, 'HEAD']);
-git(['diff', '--exit-code', candidate, '--', 'backend/src', 'frontend/src',
+git(['diff', '--exit-code', candidate, '--', 'backend/src',
   'backend/package.json', 'backend/package-lock.json', 'frontend/package.json', 'frontend/package-lock.json']);
+const reviewedLayout = verifyReviewedLayout(git(['diff', '--name-only', candidate, '--', 'frontend/src']).split('\n').filter(Boolean),
+  fs.readFileSync(path.join(root, 'frontend/src/index.css'), 'utf8'));
 
 const out = path.join(root, 'tmp_predeploy02/evidence');
 const logs = path.join(root, 'tmp_predeploy02/logs');
@@ -34,7 +39,7 @@ const report = { synthetic_only: true, production_access: false, candidate,
   sha: process.env.GITHUB_SHA, branch: process.env.GITHUB_REF,
   run_id: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT,
   started_utc: new Date().toISOString(), phases: [], versions: {}, status: 'running',
-  visual_review: 'pending human review of Linux renders', real_restore: 'out of scope' };
+  visual_review: 'pending human review of Linux renders', real_restore: 'out of scope', reviewed_layout: reviewedLayout };
 const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const write = () => fs.writeFileSync(path.join(out, 'run-summary.json'), JSON.stringify(report, null, 2) + '\n');
 write();
@@ -44,8 +49,13 @@ async function phase(name, executable, args, cwd, extra = {}, noSkips = false, r
   const logPath = path.join(logs, `${name}.log`);
   const fd = fs.openSync(logPath, 'w');
   const env = { ...process.env, ...extra };
+  const diagnosticsPath = path.join(logs, `${name}-failures.jsonl`);
+  const isNodeTest = executable === process.execPath && args.includes('--test');
+  const commandArgs = isNodeTest ? ['--test-reporter=tap',
+    `--test-reporter=${pathToFileURL(path.join(__dirname, 'node-test-reporter.cjs')).href}`,
+    '--test-reporter-destination=stdout', `--test-reporter-destination=${diagnosticsPath}`, ...args] : args;
   const result = await new Promise(resolve => {
-    const child = spawn(executable, args, { cwd, env, detached: true, stdio: ['ignore', fd, fd] });
+    const child = spawn(executable, commandArgs, { cwd, env, detached: true, stdio: ['ignore', fd, fd] });
     const timer = setTimeout(() => {
       try { process.kill(-child.pid, 'SIGKILL'); } catch { /* Puede haber terminado. */ }
     }, 10 * 60 * 1000);
@@ -55,6 +65,10 @@ async function phase(name, executable, args, cwd, extra = {}, noSkips = false, r
   fs.closeSync(fd);
   const text = fs.readFileSync(logPath, 'utf8');
   const counts = {};
+  const diagnostics = isNodeTest && fs.existsSync(diagnosticsPath)
+    ? fs.readFileSync(diagnosticsPath, 'utf8').trim().split('\n').filter(Boolean)
+      .map(line => ({ ...JSON.parse(line), stage: name, exit_code: result.code })) : [];
+  const failures = diagnostics.filter(row => row.record === 'failure');
   for (const field of ['tests', 'pass', 'fail', 'cancelled', 'skipped']) {
     const match = [...text.matchAll(new RegExp(`^# ${field} (\\d+)`, 'gm'))].at(-1);
     if (match) counts[field] = Number(match[1]);
@@ -66,6 +80,10 @@ async function phase(name, executable, args, cwd, extra = {}, noSkips = false, r
       Object.assign(counts, { tests: result.numTotalTests, pass: result.numPassedTests,
         fail: result.numFailedTests, skipped: result.numPendingTests + (result.numTodoTests || 0),
         suite_errors: result.numFailedTestSuites, cancelled: 0 });
+      for (const suite of result.testResults || []) for (const assertion of suite.assertionResults || []) {
+        if (assertion.status === 'failed' && failures.length < 30) failures.push(failureDiagnostic({
+          file: suite.name, name: assertion.title, error: {} }, { stage: name, exitCode: result.code }));
+      }
     }
   }
   // Los opt-in seleccionados no pueden quedar verdes por omisión.
@@ -74,7 +92,8 @@ async function phase(name, executable, args, cwd, extra = {}, noSkips = false, r
     runtime, duration_ms: Date.now() - Date.parse(start),
     command: [executable === process.execPath ? 'node' : path.basename(executable), ...args],
     exit_code: result.code, signal: result.signal, counts, required_no_skips: noSkips,
-    failed_tests: text.split('\n').filter(line => /^\s*not ok \d+ - /.test(line)).slice(0, 30),
+    failed_tests: failures.map(failure => failure.test_name), failures,
+    process_diagnostics: diagnostics.filter(row => row.record === 'process-diagnostic'),
     status: result.code === 0 && complete ? 'passed' : 'failed' };
   report.phases.push(row); write();
   console.log(`${name}: ${row.status}; exit=${result.code}; ${JSON.stringify(counts)}`);
@@ -143,7 +162,9 @@ async function main() {
   } finally { await manager.close(); write(); }
 
   report.preflight_stage = 'complete'; write();
-  await phase('backend', 'npm', ['test'], backend);
+  // Mismos archivos que npm test, con un segundo reporter de metadatos seguros.
+  const backendTests = fs.readdirSync(path.join(backend, 'test')).filter(file => file.endsWith('.test.js')).sort().map(file => `test/${file}`);
+  await phase('backend', process.execPath, ['--test', ...backendTests], backend);
   const frontend = path.join(root, 'frontend');
   const logicFiles = fs.readdirSync(path.join(frontend, 'test')).filter(file => file.endsWith('.test.js')).sort().map(file => `test/${file}`);
   await phase('frontend-logic', process.execPath, ['--test', ...logicFiles], frontend, {}, true);
@@ -212,9 +233,7 @@ async function main() {
 
 main().catch(error => {
   report.status = 'failed';
-  report.failure = { type: error.name, code: error.code || 'PREDEPLOY02_PREFLIGHT_OR_HARNESS',
-    message: String(error.message).replace(/(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]+|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[REDACTED]')
-      .replace(/synthetic-predeploy02-(?:auth-only-2026-ci|only)/g, '[SYNTHETIC_CREDENTIAL]').slice(0, 1000) };
+  report.failure = failureDiagnostic({ error }, { stage: report.preflight_stage || 'harness', exitCode: 1 });
   report.finished_utc = new Date().toISOString(); write();
   // Si falla preflight o el filtro de publicación, solo se entrega el resumen.
   const publish = path.join(root, 'tmp_predeploy02/publish');

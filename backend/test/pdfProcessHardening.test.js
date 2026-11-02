@@ -14,14 +14,10 @@ const {
 const { buildPuppeteerLaunchOptions } = require('../src/utils/puppeteerLaunch');
 const { withPdfTempDir } = require('../src/utils/pdfTemp');
 const { exportExcelTemplateToPdf } = require('../src/controllers/pdfController');
+const { inspectProcess, parseLinuxProcessState } = require('./helpers/syntheticProcessState');
 
 function isProcessRunning(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
+  return inspectProcess(pid).running;
 }
 
 async function waitUntilStopped(pid, timeoutMs = 3_000) {
@@ -128,43 +124,94 @@ test('fallo de LibreOffice se sanea y elimina el XLSX temporal', async () => {
   }
 });
 
-test('timeout termina padre e hijo y withPdfTempDir elimina temporales', async () => {
+test('timeout termina padre e hijo y withPdfTempDir elimina temporales', { timeout: 15000 }, async t => {
   const testRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'cap-process-timeout-'));
   let generatedDir;
   let childPid;
+  let parent;
+  let ready = false;
 
   try {
     await assert.rejects(
       withPdfTempDir(async (tempDir) => {
         generatedDir = tempDir;
-        const pidFile = path.join(tempDir, 'child.pid');
-        const childScript = 'setInterval(() => {}, 1000)';
-        const parentScript = [
-          "const { spawn } = require('child_process');",
-          "const fs = require('fs');",
-          `const child = spawn(process.execPath, ['-e', ${JSON.stringify(childScript)}], { stdio: 'ignore' });`,
-          `fs.writeFileSync(${JSON.stringify(pidFile)}, String(child.pid));`,
-          'setInterval(() => {}, 1000);',
-        ].join(' ');
-
-        try {
-          await runDocumentProcess(process.execPath, ['-e', parentScript], { timeoutMs: 450 });
-        } catch (error) {
-          childPid = Number(fs.readFileSync(pidFile, 'utf8'));
-          throw error;
-        }
+        const fixture = path.join(__dirname, 'fixtures/document-process-tree.cjs');
+        parent = spawn(process.execPath, [fixture], { detached: process.platform !== 'win32',
+          stdio: ['ignore', 'ignore', 'ignore', 'ipc'], windowsHide: true });
+        // Separar arranque del ensayo de timeout: 450 ms conserva su valor.
+        // El límite de arranque solo evita colgar el harness; nunca da un PASS.
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(Object.assign(new Error('Synthetic process readiness failed'), { code: 'FIXTURE_NOT_READY' })), 5000);
+          parent.once('error', error => { clearTimeout(timer); reject(error); });
+          parent.once('message', message => {
+            clearTimeout(timer);
+            if (message.ready !== true || !Number.isInteger(message.childPid) || message.childPid <= 0) {
+              reject(Object.assign(new Error('Invalid synthetic process readiness'), { code: 'FIXTURE_NOT_READY' }));
+              return;
+            }
+            childPid = message.childPid; ready = true; resolve();
+          });
+        });
+        assert.equal(isProcessRunning(parent.pid), true);
+        assert.equal(isProcessRunning(childPid), true);
+        await runDocumentProcess(process.execPath, [fixture], { timeoutMs: 450,
+          execFileImpl: (file, args, options, callback) => {
+            assert.equal(file, process.execPath); assert.deepEqual(args, [fixture]);
+            assert.equal(options.detached, process.platform !== 'win32');
+            // Proceso real ya listo; runDocumentProcess y su terminación son reales.
+            parent.once('error', callback);
+            parent.once('close', (code, signal) => callback(code === 0 ? null : { code, signal }));
+            return parent;
+          } });
       }, { tmpRoot: testRoot }),
       (error) => error instanceof DocumentProcessError && error.code === 'DOCUMENT_PROCESS_TIMEOUT'
     );
 
     assert.equal(fs.existsSync(generatedDir), false);
+    assert.equal(await waitUntilStopped(parent.pid), true);
     assert.equal(await waitUntilStopped(childPid), true);
   } finally {
+    t.diagnostic(JSON.stringify({ stage: 'document-timeout', ready,
+      parent: inspectProcess(parent?.pid).state, child: inspectProcess(childPid).state,
+      tempRemoved: generatedDir ? !fs.existsSync(generatedDir) : null }));
+    if (isProcessRunning(parent?.pid)) await terminateProcessByPid(parent.pid);
     if (isProcessRunning(childPid)) {
       await terminateProcessByPid(childPid);
     }
     fs.rmSync(testRoot, { recursive: true, force: true });
   }
+});
+
+test('sonda sintética distingue zombi Linux de proceso ejecutable y falla cerrado ante estado desconocido', () => {
+  assert.equal(parseLinuxProcessState('123 (synthetic (child)) Z 1 123 0'), 'Z');
+  for (const state of ['Z', 'X', 'S', 'R']) {
+    const result = inspectProcess(123, { platform: 'linux', kill() {}, readFile: () => `123 (synthetic) ${state} 1 123 0` });
+    assert.equal(result.running, !['Z', 'X'].includes(state));
+  }
+  assert.equal(inspectProcess(123, { platform: 'linux', kill() {}, readFile: () => 'truncated' }).running, true);
+  assert.equal(inspectProcess(123, { kill() { throw Object.assign(new Error(), { code: 'EPERM' }); } }).running, true);
+});
+
+test('withPdfTempDir limpia también cuando la fixture falla antes del timeout', async () => {
+  const testRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'cap-process-startup-'));
+  let directory;
+  try {
+    await assert.rejects(withPdfTempDir(async tempDir => {
+      directory = tempDir; throw Object.assign(new Error('Synthetic startup failure'), { code: 'FIXTURE_NOT_READY' });
+    }, { tmpRoot: testRoot }), { code: 'FIXTURE_NOT_READY' });
+    assert.equal(fs.existsSync(directory), false);
+  } finally { fs.rmSync(testRoot, { recursive: true, force: true }); }
+});
+
+test('arranque sintético lento reproduce child.pid ausente sin perder el error de timeout', { timeout: 15000 }, async () => {
+  const testRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'cap-slow-start-'));
+  const pidFile = path.join(testRoot, 'child.pid');
+  try {
+    await assert.rejects(runDocumentProcess(process.execPath, ['-e',
+      `setTimeout(() => require('fs').writeFileSync(${JSON.stringify(pidFile)},String(process.pid)),1500);setInterval(()=>{},1000)`],
+    { timeoutMs: 450 }), { code: 'DOCUMENT_PROCESS_TIMEOUT' });
+    assert.throws(() => fs.readFileSync(pidFile), { code: 'ENOENT' });
+  } finally { fs.rmSync(testRoot, { recursive: true, force: true }); }
 });
 
 test('cleanup adicional de timeout termina solo el PID externo indicado', async () => {
@@ -198,4 +245,11 @@ test('Windows usa kill directo del mismo PID si taskkill no esta disponible', as
     killImpl: (pid, signal) => signals.push({ pid, signal }),
   });
   assert.deepEqual(signals, [{ pid: 43210, signal: 'SIGKILL' }]);
+});
+
+test('POSIX dirige TERM y KILL al grupo del proceso documental', async () => {
+  const signals = [];
+  await terminateProcessByPid(43210, { platform: 'linux', graceMs: 0,
+    killImpl: (pid, signal) => signals.push({ pid, signal }) });
+  assert.deepEqual(signals, [{ pid: -43210, signal: 'SIGTERM' }, { pid: -43210, signal: 'SIGKILL' }]);
 });

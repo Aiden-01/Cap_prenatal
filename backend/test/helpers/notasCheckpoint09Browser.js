@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const puppeteer = require('puppeteer');
+const { collectLayoutDiagnostics } = require('./layoutDiagnostics');
 
 async function verificarNotas09({ apiPort, tokens, setMedicalRegistration, setPregnancyState, t, outputDirectory = 'checkpoint09' }) {
   const frontend = path.resolve(__dirname, '../../../frontend');
@@ -123,9 +124,10 @@ async function verificarNotas09({ apiPort, tokens, setMedicalRegistration, setPr
       await page.evaluate(() => Promise.all(document.getAnimations().filter(animation => animation.effect?.getTiming().iterations !== Infinity)
         .map(animation => animation.finished.catch(() => {}))));
       await page.screenshot({ path: path.join(output, `notas-${width}-${dark ? 'oscuro' : 'claro'}.png`), fullPage: true });
-      const overflow = await page.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth,
-        elements: [...document.querySelectorAll('body *')].filter(el => el.offsetParent && el.getBoundingClientRect().right > innerWidth + 1).slice(0, 10).map(el => ({ tag: el.tagName, class: el.className, right: el.getBoundingClientRect().right })) }));
-      assert.ok(overflow.scroll <= width + 1, `${width}: sin overflow ${JSON.stringify(overflow)}`);
+      const layout = await page.evaluate(collectLayoutDiagnostics);
+      // Se conserva antes de las assertions, incluso si aborta el recorrido.
+      fs.writeFileSync(path.join(output, `layout-notas-${width}-${dark ? 'oscuro' : 'claro'}.json`), JSON.stringify(layout, null, 2));
+      assert.ok(layout.viewport.scrollWidth <= width + 1, 'Document layout exceeds viewport; see sanitized layout JSON');
       assert.ok(await page.$eval('.nota-editor-header > div', el => el.getBoundingClientRect().width >= 120), `${width}: título legible sin columna comprimida`);
     }
     // Rechazo real de permisos conserva el borrador local; no se inventa éxito.

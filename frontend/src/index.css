@@ -730,7 +730,7 @@ input[type="date"].input-field {
   font-size: 1.62rem;
   line-height: 1.08;
   font-weight: 850;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .patient-hero-title.is-medium {

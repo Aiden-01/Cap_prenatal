@@ -1,8 +1,250 @@
 # PREDEPLOY-02 — Validación clínica Linux mediante GitHub Actions
 
-2026-11-01, America/Guatemala. Preparación en Casa / HP Victus / dispositivo Huguito.
-**Segundo ensayo completado: FAILURE del lector de estado del sandbox; permisos corregidos.**
+2026-11-02, America/Guatemala. Equipo Casa / HP Victus / dispositivo Huguito.
+**Estado vigente: tercer ensayo completado, FAILURE global; preflight, migraciones y PDF aprobados. NO-GO.**
 CPREN-120 y CPREN-126 permanecen **En revisión** por instrucción expresa.
+
+**Preparación local posterior, PREDEPLOY-03 (2026-11-02):** se corrigió la colisión
+de fixture de seguimiento, se preparó diagnóstico/readiness para timeout y se
+permitió wrap del título que sobresale a768px. El detalle, pruebas locales,
+inventario y límites están en [PREDEPLOY-03](CPREN_PREDEPLOY_03_CORRECCIONES_LINUX.md).
+Sin commit/push ni cuarto workflow. El tercer run sigue **failure** y su evidencia
+histórica se conserva íntegra; no se declara validada la corrección en Linux.
+
+## Tercer ensayo real — resultado posterior al push autorizado
+
+Este apartado es el cierre vigente. Los apartados posteriores conservan la
+historia de preparación y de los dos primeros ensayos, incluidas sus restricciones
+de publicación de entonces. El propietario autorizó expresamente el tercer
+commit, un push a la rama clínica y su ejecución automática; tras aplazar el push,
+lo reanudó con «listo hagamos el push». No autoriza un cuarto ensayo.
+
+- Commit completo: **`adff7e11e76a1e3ca67e02251746eedb76200654`**.
+- Rama exclusiva: `feature/cpren-120-editor-pdf-notas-clinicas`.
+- [Tercer run 41489452026](https://github.com/Aiden-01/Cap_prenatal/actions/runs/41489452026):
+  evento `push`, run_number **3**, attempt **1**, estado **completed / failure**.
+- Job `clinical`, ID `125428299414`, Ubuntu GitHub-hosted `ubuntu-24.04`:
+  **2026-11-02 17:15:39–17:19:49 UTC**, **11:15:39–11:19:49 Guatemala**,
+  **250 segundos**. Paso de comprobaciones clínicas: exit **1**.
+- Controlador: **17:17:07.395–17:19:44.138 UTC**, **156.743 segundos**.
+  Ejecutó las **16 fases**; ninguna fase completa quedó omitida o cancelada.
+- El workflow n8n de política existente también se activó, sin cambios:
+  [41489452088, success](https://github.com/Aiden-01/Cap_prenatal/actions/runs/41489452088).
+  No ejecuta ni modifica n8n productivo.
+
+### Publicación, controles y versiones efectivas
+
+Antes del commit se revisaron exclusivamente las cinco rutas autorizadas:
+
+1. `.github/clinical/run-predeploy02.cjs`.
+2. `.github/clinical/chrome-sandbox-status.cjs`.
+3. `backend/test/predeploy02ChromeSandbox.test.js`.
+4. `backend/test/fixtures/chrome-sandbox-148.txt`.
+5. `docs/CPREN_PREDEPLOY_02_GITHUB_ACTIONS.md`.
+
+Las **23 pruebas focalizadas locales** (22 del parser y una de seguridad), la
+sintaxis JavaScript y `git diff --check` aprobaron antes de publicar. No se
+repitieron suites clínicas completas en Windows. HEAD local y remoto quedaron
+en el SHA del tercer commit. Main se conserva en
+`d5fae677fa462af9ca5b7174a46d3ebf21e12196`; worktrees y `docs/tesis/` preservados.
+
+| Control | Resultado real del tercer run |
+| --- | --- |
+| Preflight global | **PASS**, `preflight_stage=complete`; las suites comenzaron después |
+| clinical-ci / ACL | Preparación aprobada; acceso efectivo al checkout, Git y ejecutables comprobado como clinical-ci antes de configurar Git; ACL de recorrido nominativa, sin chmod 777 ni lectura/escritura global |
+| Identidad / integridad | Linux, runner, usuario, ref, SHA y candidato comprobados; verificaciones de integridad de código productivo, lockfiles y migraciones conservadas |
+| Red | Reglas de salida por UID y sondas IPv4/IPv6 rechazadas; loopback y PostgreSQL efímero disponibles. Evidencia de esas sondas, sin afirmar una auditoría exhaustiva de todo destino |
+| Chrome / flags | Chrome **148.0.7778.97**, acceso real a `chrome://sandbox`, sin flags que desactiven el sandbox |
+| Parser compartido | **PASS**: Layer 1 Sandbox=Namespace; PID namespaces=Yes; Network namespaces=Yes; Seccomp-BPF sandbox=Yes; «You are adequately sandboxed.» |
+| PostgreSQL | Service exclusivo **16.15**, marcador y base sintética comprobados antes de ejecutar migraciones |
+| Seguridad productiva | Sin secretos productivos, SSH/AWS ni servicios externos del CAP; sin despliegue, PR o main; sin datos reales ni instalaciones en la Victus |
+
+El diagnóstico también contiene `Ptrace Protection with Yama LSM (Non-broker)
+No`. Es un campo diferente, conservado en el artefacto; no contradice los cinco
+requisitos independientes de namespace/seccomp. El helper estricto mantuvo su
+rechazo de campos requeridos negativos, ausentes, duplicados, contradictorios y
+diagnósticos truncados. No se debilitó el sandbox ni el aislamiento para pasar.
+
+| Runtime/componente | Versión real |
+| --- | --- |
+| OS / imagen | Ubuntu **24.04.5 LTS**, `ImageOS=ubuntu24`; entorno `ImageVersion=20261026.354.1`; banner del job `20261025.353.1`, runner **2.338.2** |
+| Node aplicación / npm | **v20.20.2 / 10.8.2** |
+| Node DOM | **v24.22.1**; Vitest **5.0.0**, jsdom **29.1.1** |
+| Build | Vite **8.2.1**, ejecutado con Node20 |
+| PostgreSQL service | **16.15 (Debian 16.15-1.pgdg12+2)**, x86_64 |
+| Chrome / Puppeteer | **148.0.7778.97 / 24.43.1** |
+| Geometría PDF | Python **3.12.3** |
+
+Se conservan ambos identificadores de imagen: el entorno y el banner de GitHub
+no coinciden. Su causa no está confirmada; no se presenta una revisión exacta
+de imagen como inequívoca. Las versiones de los ejecutables se midieron realmente.
+
+Se reprodujo Chrome148 en este runner. Esto no acredita equivalencia completa
+con AWS: la imagen Ubuntu, bibliotecas, PostgreSQL, sistema de archivos y
+entorno de ejecución son los del runner. Node24 se limita a DOM por los engines
+de Vitest; aplicación, lógica, lint, build y PDF se validaron con Node20.
+
+### Resultados efectivos por fase
+
+Fuente: `run-summary.json` del artefacto del tercer run. Duraciones del
+controlador, en segundos. «—» significa que no existe conteo de casos para un
+comando; no se inventan aprobaciones unitarias. Las suites pueden compartir
+pruebas: los conteos no se suman como cobertura única.
+
+| Fase | Aprobadas | Fallidas | Omitidas | Canceladas | Exit | Runtime | Segundos |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |
+| backend | 1384 | 1 | 58 | 0 | 1 | Node20.20.2 | 14.071 |
+| frontend-logic | 191 | 0 | 0 | 0 | 0 | Node20.20.2 | 0.650 |
+| frontend-dom | 300 | 0 | 0 | 0 | 0 | Node24.22.1 | 21.382 |
+| lint | — | — | — | — | 0 | Node20.20.2 | 8.146 |
+| build | — | — | — | — | 0 | Node20.20.2 | 1.064 |
+| pdf-samples | 5 | 0 | 0 | 0 | 0 | Node20.20.2 | 4.819 |
+| checkpoint10 | 7 | 0 | 0 | 0 | 0 | Node20.20.2 | 0.945 |
+| checkpoint14 | 5 | 0 | 0 | 0 | 0 | Node20.20.2 | 1.778 |
+| catalogos | 7 | 0 | 0 | 0 | 0 | Node20.20.2 | 0.833 |
+| perfiles | 16 | 0 | 0 | 0 | 0 | Node20.20.2 | 39.347 |
+| autoria | 15 | 0 | 0 | 0 | 0 | Node20.20.2 | 1.398 |
+| notas | 21 | 0 | 0 | 0 | 0 | Node20.20.2 | 2.357 |
+| seguimiento | 16 | 4 | 0 | 0 | 1 | Node20.20.2 | 47.242 |
+| auth-sessions | 2 | 0 | 0 | 0 | 0 | Node20.20.2 | 0.310 |
+| citas-postgres | 12 | 0 | 0 | 0 | 0 | Node20.20.2 | 0.364 |
+| pdf-geometry | — | — | — | — | 0 | Python3.12.3 | 10.022 |
+
+Los **58 skips de backend no son aprobaciones**. Las suites específicas de
+PostgreSQL se ejecutaron después y tienen sus propios resultados anteriores.
+Tampoco se consideran verificadas las acciones posteriores al punto donde
+abortó un subtest de navegador, aunque el contador de casos omitidos sea cero.
+
+### Fallos y clasificación de la evidencia
+
+1. **Backend, causa raíz pendiente / No verificable con el detalle conservado.**
+   Falló `timeout termina padre e hijo y withPdfTempDir elimina temporales`,
+   `backend/test/pdfProcessHardening.test.js:131`. Comprueba timeout, terminación
+   de padre/hijo y eliminación de temporales; usa un plazo de 450 ms. El resumen
+   identifica la prueba, pero no conserva el error/assertion ni stack del TAP.
+   No se puede distinguir todavía un problema real de limpieza en Linux de un
+   problema de temporización del test. No se declara que la protección pasó ni
+   se altera código productivo. Se necesita diagnóstico focalizado autorizado.
+2. **Error confirmado del harness de seguimiento, encontrado por inspección.**
+   En `backend/test/seguimientoNotasPostgres.test.js:19` se importa el servicio
+   clínico como `service`; en la línea36, la adaptación PREDEPLOY vuelve a declarar
+   `const service = serviceFixture(...)` dentro del callback y oculta el import.
+   La fixture expone `start/verify/close`, sin los métodos clínicos; las llamadas directas a
+   `service.confirmar` (línea242) y `service.listar` (línea294) no pueden invocar
+   el servicio real. Esto afecta los subtests de auditoría privada/rollback y
+   revocación/inactividad. Es un error de la preparación del ensayo, no evidencia
+   de un defecto del servicio clínico. Propuesta para revisión futura: nombrar
+   la fixture `postgresFixture` y conservar el import clínico; **no aplicada**.
+3. **Fallo de UI CHECKPOINT-09/10, con desbordamiento observable a 768 px.**
+   El subtest `CHECKPOINT-09/10: rediseño, borrador real recargado, autoría y
+   errores desde expediente` generó capturas 1440/1280 claro y oscuro y luego
+   `notas-768-claro.png` de **808×4154 píxeles**, con viewport configurado a768.
+   Se observa el encabezado extendido fuera del ancho. El helper comprueba
+   overflow inmediatamente después de capturar. La evidencia sitúa el fallo
+   en ese tramo de layout; el assertion exacto y la causa CSS no se conservaron.
+   No existen capturas 768 oscuro, 390/320 ni el `http-evidence.json` final:
+   las verificaciones posteriores de errores HTTP y móvil de ese recorrido
+   **no están acreditadas**. Este fallo es independiente de la variable oculta.
+
+Seguimiento reporta **4 fallidas** porque incluye los **3 subtests anteriores y
+el test contenedor** `CPREN-119: seguimiento, controles y notas en PostgreSQL
+temporal propio`; no son cuatro defectos independientes. Los logs crudos de
+las suites quedaron fuera del artefacto por su política de publicación. Las
+salidas de errores SQL esperados en pruebas negativas no se reclasifican como
+defectos sin una aserción fallida asociada. No se ha corregido ninguno de estos
+nuevos problemas ni iniciado una cuarta ejecución.
+
+### Migraciones realmente verificadas en Linux
+
+`migration-readiness.json` acredita PostgreSQL16.15 y el baseline main
+`d5fae677fa462af9ca5b7174a46d3ebf21e12196`, con estado hasta022 y aplicación real
+de **023, 024, 025, 026, 027, 028, 029 y 030** en bases sintéticas efímeras.
+Checks aprobados: backup/restore sintético previo; upgrade022→030 sin pérdida
+de núcleo ni concesiones clínicas automáticas; esquema final, checksums,
+rechazo de alteración e idempotencia; instalación final limpia y restauración
+sintética posterior. La suite checkpoint10 verificó además snapshots legados
+027→030 (**7/7**).
+
+Se conservaron usuarios legados/credenciales sintéticas, email y cargo NULL sin
+inventar regularizaciones, roles y datos clínicos sintéticos; se comprobaron
+cargos MED/AE/EP, permisos/autoría, auditoría, notas y retirada de Especialidades
+y clasificación del esquema final. Catálogos, perfiles/correo, autoría y notas
+aprobaron sus suites. El fallo parcial de seguimiento limita su propia cobertura.
+
+Snapshot de núcleo antes/después: 3 roles, 1 paciente, 1 embarazo, 1 control,
+1 cita y 1 sesión; SHA256
+`2ae2f85d43998203b5a44f9800a4c70d8a9da68efe8427e5db4d9f2b38bc5be0`.
+Estas son restauraciones de datos generados por el ensayo. **No sustituyen el
+ensayo de restauración real**, pendiente de infraestructura privada separada y
+autorización expresa. No se accedió a bases persistentes ni respaldos reales.
+
+### PDF Linux: evidencia generada y revisión del propietario
+
+`pdf-geometry` aprobó la revisión de **19 PDFs, 69 páginas y 14 renders PNG**;
+las cinco muestras principales CHECKPOINT-14 tienen **1, 1, 2, 12 y 2 páginas**.
+Se verificaron narrativa íntegra, fecha/hora original, caracteres especiales,
+logos, identificación en cada página, nombres completos y numeración, ausencia
+de recortes/páginas extra, FIN DE NOTA solo al terminar y una única línea/etiqueta
+para firma manuscrita en la última hoja. La separación mínima registrada de la
+firma es **31.09 pt**. Donde existe referencia geométrica13B de Windows, el
+delta máximo de los campos comparados fue **0.0 pt**. La muestra límite nueva
+sin referencia13B se evalúa por sus invariantes, sin inventar equivalencia previa.
+
+Se inspeccionó visualmente la hoja de contacto y los renders a página completa
+de la última hoja de evolución, estrés y de la muestra límite: logos y bloques legibles,
+FIN DE NOTA al final y espacio de firma en la última hoja. La hoja de contacto
+incluye páginas intermedias sin firma. Esto no equivale a revisión visual manual
+de las 69 páginas. Permanece pendiente la aceptación visual institucional del
+propietario; los archivos originales del runner no se editaron.
+
+Copias locales sintéticas para revisión (carpeta ignorada, no propuesta para commit):
+
+- [Hoja de contacto](../tmp_predeploy02/third-run-41489452026/evidence/contact-sheet.png).
+- [01 Evolución breve, 1 página](../tmp_predeploy02/third-run-41489452026/evidence/pdf/01-evolucion-breve.pdf).
+- [02 Enfermería breve, 1 página](../tmp_predeploy02/third-run-41489452026/evidence/pdf/02-enfermeria-breve.pdf).
+- [03 Evolución, 2 páginas](../tmp_predeploy02/third-run-41489452026/evidence/pdf/03-evolucion-dos-paginas.pdf).
+- [04 Enfermería estrés, 12 páginas](../tmp_predeploy02/third-run-41489452026/evidence/pdf/04-enfermeria-estres.pdf).
+- [05 Evolución límite última hoja, 2 páginas](../tmp_predeploy02/third-run-41489452026/evidence/pdf/05-evolucion-limite-ultima-hoja.pdf).
+
+Artefacto GitHub **13164346054**,
+`clinical-predeploy02-adff7e11e76a1e3ca67e02251746eedb76200654-1`,
+**17010571 bytes**, expira **2026-11-09 17:19:44 UTC**.
+SHA256 del ZIP descargado verificado contra GitHub:
+`27ad8ffcd0d696e5c33060868a2e3912149d7b9547628fbded6de4a6109fa946`.
+Se verificaron hashes/tamaños de las 95 entradas del manifiesto y el inventario
+extraído; solo JSON/PNG/PDF, sin dumps. Escaneo de patrones de claves privadas,
+tokens GitHub y JWT sin coincidencias. No se guardan URLs firmadas ni secretos
+en este informe o Jira. Las copias locales preservan la evidencia tras caducar
+la retención remota; no se afirma disponibilidad remota indefinida. El run fue
+admitido y ejecutado sin bloqueo de cuota observado; esto no acredita el saldo
+disponible de minutos/almacenamiento ni garantiza capacidad para otro ensayo.
+El saldo de facturación no se pudo verificar con la conexión disponible.
+
+### Decisión y estado local de cierre
+
+**NO-GO para avanzar a la siguiente fase de validación/despliegue privado**:
+hay una prueba backend fallida sin diagnóstico suficiente, dos verificaciones
+directas bloqueadas por el harness y un fallo de layout del recorrido de notas.
+El parser de Chrome quedó validado en Linux y las migraciones/PDF tienen
+evidencia positiva, pero no permiten declarar aprobado todo PREDEPLOY-02.
+
+Próximo trabajo sujeto a revisión: corregir el nombre de fixture, conservar
+diagnóstico sanitario suficiente del fallo de timeout y del layout, revisar
+768px y completar las acciones que quedaron sin ejecutar; revisar visualmente
+las cinco muestras con el propietario. No se publicó ninguna corrección ni se
+solicitó re-run automático. No se inicia CPREN-121.
+
+Después del ensayo, **solo este documento queda modificado localmente**, sin
+stage/commit/push posterior; `docs/tesis/` continúa sin seguimiento y preservado.
+Las descargas y utilidades de inspección están en `tmp_predeploy02/` ignorado.
+El tercer SHA sigue siendo HEAD local/remoto y no cambia main ni sus worktrees.
+CPREN-120 y CPREN-126 conservan **En revisión**; resultados y bloqueadores se
+registraron en Jira: [CPREN-120, comentario10537](https://tareajiraads.atlassian.net/browse/CPREN-120?focusedCommentId=10537)
+y [CPREN-126, comentario10538](https://tareajiraads.atlassian.net/browse/CPREN-126?focusedCommentId=10538).
+Este informe posterior permanece local
+hasta nueva autorización de publicación.
+
+## Historial previo al tercer ensayo
 
 **Primera ejecución autorizada por el propietario (2026-11-01):** se autoriza
 revisar, crear un commit y hacer push exclusivamente a la rama clínica para
