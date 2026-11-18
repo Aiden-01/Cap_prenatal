@@ -9,7 +9,7 @@ const { buildAuditPayload } = require('../src/services/audit/auditDiffBuilder');
 const { validateFinalPayload } = require('../src/services/audit/auditHistorySanitizer');
 
 const nuevo = { nombre_completo: 'Cuenta sintética', username: 'correo.fixture',
-  email: '  CUENTA.SINTETICA@EXAMPLE.TEST  ', password: 'test-only-password', rol: 'personal_salud' };
+  email: '  CUENTA.SINTETICA@EXAMPLE.TEST  ', password: 'Test-only-password9!', rol: 'personal_salud' };
 
 test('correo de alta obligatorio, normalizado y acotado; edición omitida conserva legado', () => {
   assert.equal(usuarioCreateSchema.parse(nuevo).email, 'cuenta.sintetica@example.test');

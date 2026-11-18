@@ -114,7 +114,7 @@ function sessionError(code = 'AUTHENTICATION_REQUIRED') {
   return new HttpError(401, 'Sesion no valida', { code });
 }
 
-async function createSession({ usuarioId, req, dependencies = {} }) {
+async function createSession({ usuarioId, req, validateUser, dependencies = {} }) {
   const repository = dependencies.repository || authSessionsRepository;
   const config = dependencies.config || getSessionConfig();
   const clock = dependencies.clock || Date;
@@ -125,6 +125,7 @@ async function createSession({ usuarioId, req, dependencies = {} }) {
   const absoluteExpiresAt = new Date(createdAt.getTime() + config.absoluteHours * 60 * 60 * 1000);
 
   const record = await repository.enTransaccion(async (db) => {
+    if (validateUser) await validateUser(db);
     const created = await repository.crear({
       id,
       usuarioId,
@@ -232,6 +233,8 @@ async function refreshSession({ refreshToken, req, dependencies = {} }) {
       });
       return { errorCode: 'AUTHENTICATION_REQUIRED' };
     }
+
+    if (record.requiere_cambio_password) return { errorCode: 'AUTHENTICATION_REQUIRED' };
 
     const nextRefreshToken = generateRefreshToken(record.id);
     const rotated = await repository.rotarRefresh({

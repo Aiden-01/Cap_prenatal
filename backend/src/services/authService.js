@@ -34,6 +34,7 @@ async function login({ username, password, req, dependencies = {} }) {
   const permisosRepo = dependencies.permisosRepository || permisosRepository;
   const sessions = dependencies.sessionService || sessionService;
   const audit = dependencies.registrarEventoPrivado || auditService.registrarEventoPrivado;
+  if (typeof password !== 'string' || Buffer.byteLength(password, 'utf8') > 72) throw new HttpError(400, 'Máximo 72 bytes UTF-8');
   const usuario = await authRepo.obtenerUsuarioPorUsername(username);
 
   if (!usuario) {
@@ -57,6 +58,12 @@ async function login({ username, password, req, dependencies = {} }) {
   const created = await sessions.createSession({
     usuarioId: usuario.id,
     req,
+    validateUser: async db => {
+      const current = await authRepo.obtenerCredencialesPorId(usuario.id, db, { bloquear: true });
+      if (!current?.activo || current.password_hash !== usuario.password_hash) {
+        throw new HttpError(401, 'Credenciales modificadas; inicia sesión nuevamente');
+      }
+    },
     dependencies: dependencies.sessionDependencies,
   });
   const csrfToken = crypto.randomBytes(32).toString('hex');
@@ -86,7 +93,8 @@ async function login({ username, password, req, dependencies = {} }) {
       nombre_completo: usuario.nombre_completo,
       username: usuario.username,
       rol: usuario.rol,
-      permisos,
+      permisos: usuario.requiere_cambio_password ? [] : permisos,
+      requiere_cambio_password: Boolean(usuario.requiere_cambio_password),
       ...sessions.publicSessionMetadata(created.record),
     },
   };
@@ -165,7 +173,8 @@ async function me({ usuario, authSession, dependencies = {} }) {
     nombre_completo: usuario.nombre_completo,
     username: usuario.username,
     rol: usuario.rol,
-    permisos,
+    permisos: usuario.requiere_cambio_password ? [] : permisos,
+    requiere_cambio_password: Boolean(usuario.requiere_cambio_password),
     ...(dependencies.sessionService || sessionService).publicSessionMetadata(authSession),
   };
 }
@@ -184,18 +193,17 @@ async function changePassword({ usuarioId, currentPassword, newPassword, req, de
   const sessions = dependencies.sessionService || sessionService;
   const registrarEventoPrivado = dependencies.registrarEventoPrivado
     || auditService.registrarEventoPrivado;
-  const usuario = await authRepo.obtenerCredencialesPorId(usuarioId);
-  if (!usuario) throw new HttpError(404, 'Usuario no encontrado');
-  if (!usuario.activo) throw new HttpError(403, 'Usuario inactivo. Contacte al administrador.');
-  if (!await bcrypt.compare(currentPassword, usuario.password_hash)) {
-    throw new HttpError(401, 'La contrasena actual no es correcta');
-  }
-  if (await bcrypt.compare(newPassword, usuario.password_hash)) {
-    throw new HttpError(400, 'La nueva contrasena debe ser diferente a la actual');
-  }
-
-  const passwordHash = await bcrypt.hash(newPassword, 12);
+  const { passwordIssues } = require('../security/passwordPolicy');
+  if (typeof currentPassword !== 'string' || Buffer.byteLength(currentPassword, 'utf8') > 72) throw new HttpError(400, 'Máximo 72 bytes UTF-8');
+  const issues = passwordIssues(newPassword);
+  if (issues.length) throw new HttpError(400, issues.join('. '), {code:'PASSWORD_POLICY_INVALID'});
   await sessionsRepo.enTransaccion(async (db) => {
+    const usuario = await authRepo.obtenerCredencialesPorId(usuarioId, db, { bloquear: true });
+    if (!usuario) throw new HttpError(404, 'Usuario no encontrado');
+    if (!usuario.activo) throw new HttpError(403, 'Usuario inactivo');
+    if (!await bcrypt.compare(currentPassword, usuario.password_hash)) throw new HttpError(401, 'La contraseña actual no es correcta');
+    if (await bcrypt.compare(newPassword, usuario.password_hash)) throw new HttpError(400, 'La nueva contraseña debe ser diferente de la temporal o actual');
+    const passwordHash = await bcrypt.hash(newPassword, 12);
     await authRepo.actualizarPassword({ id: usuarioId, passwordHash, updatedBy: usuarioId }, db);
     await sessions.revokeAllInTransaction({
       usuarioId,

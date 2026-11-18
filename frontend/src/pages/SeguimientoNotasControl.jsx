@@ -102,7 +102,7 @@ export default function SeguimientoNotasControl() {
   const editable = exp && !exp.is_read_only && ['activo', 'puerperio'].includes(exp.embarazo_seleccionado?.estado);
   const expediente = `/pacientes/${id}?embarazo_id=${encodeURIComponent(embarazoId || '')}&tab=controles`;
   return <ClinicalWorkflowShell title="Seguimiento documental del control" mode={editable ? 'Seguimiento' : 'readonly'}
-    description={`Control ${controlId} · Embarazo ${embarazoId || 'sin seleccionar'}`}
+    description={`Control ${row?.numero_control ?? 'asociado'} · Embarazo ${embarazoId || 'sin seleccionar'}`}
     patientName={exp?.paciente ? `${exp.paciente.nombres} ${exp.paciente.apellidos}` : undefined}
     onBack={() => navigate(expediente)}>
     <ClinicalSection title="Estado de las notas">

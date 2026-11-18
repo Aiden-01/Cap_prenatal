@@ -24,7 +24,7 @@ async function crearForm() {
   await screen.findByRole('option', { name: 'Cargo sintético' });
   fireEvent.change(screen.getByLabelText('Nombre completo'), { target: { value: 'Persona nueva' } });
   fireEvent.change(screen.getByLabelText('Usuario'), { target: { value: 'new_synthetic' } });
-  fireEvent.change(screen.getByLabelText('Contrasena'), { target: { value: 'test-only-password' } });
+  fireEvent.change(screen.getByLabelText('Contraseña temporal'), { target: { value: 'Test-only-password9!' } });
   fireEvent.change(screen.getByLabelText('Cargo laboral *'), { target: { value: '4' } });
   return screen.getByLabelText('Correo electrónico *');
 }
@@ -36,7 +36,7 @@ test.each([['', 'Ingresa un correo electrónico.'], ['correo inválido', 'Ingres
   expect(api.post).not.toHaveBeenCalled();
   expect(screen.getByRole('alert').textContent).toContain(message);
   expect(email.getAttribute('aria-invalid')).toBe('true');
-  expect(document.activeElement).toBe(email);
+  await waitFor(() => expect(document.activeElement).toBe(email));
   expect(email.getAttribute('aria-describedby')).toContain('usuario-create-email-error');
 });
 
@@ -46,7 +46,7 @@ test('nuevo usuario respeta orden, normaliza correo y no envía datos de especia
   expect(fields.map(input => input.name || input.id)).toEqual(['nombre_completo', 'username', 'email', 'password', 'rol', expect.stringMatching(/cargo$/)]);
   fireEvent.change(email, { target: { value: '  CORREO@EXAMPLE.TEST  ' } });
   fireEvent.submit(email.closest('form'));
-  await waitFor(() => expect(api.post).toHaveBeenCalledWith('/usuarios', { nombre_completo: 'Persona nueva', username: 'new_synthetic', email: 'correo@example.test', password: 'test-only-password', rol: 'personal_salud', cargo_id: 4 }));
+  await waitFor(() => expect(api.post).toHaveBeenCalledWith('/usuarios', { nombre_completo: 'Persona nueva', username: 'new_synthetic', email: 'correo@example.test', password: 'Test-only-password9!', rol: 'personal_salud', cargo_id: 4 }));
   expect(api.get.mock.calls.every(([url]) => url === '/usuarios' || url === '/catalogos/cargos')).toBe(true);
 });
 
@@ -101,7 +101,7 @@ test('perfil conserva edición y error específico ante duplicado de servidor', 
   await waitFor(() => expect(email.getAttribute('aria-invalid')).toBe('true'));
   expect(screen.getByRole('dialog')).toBeTruthy();
   expect(email.value).toBe('duplicate@example.test');
-  expect(document.activeElement).toBe(email);
+  await waitFor(() => expect(document.activeElement).toBe(email));
   expect(toast).not.toHaveBeenCalledWith(expect.any(String), 'success');
 });
 

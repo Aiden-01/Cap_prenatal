@@ -606,7 +606,7 @@ test('cambio propio de contrasena actualiza y revoca todo en la misma transaccio
   await authService.changePassword({
     usuarioId: 9,
     currentPassword: 'anterior',
-    newPassword: 'nueva-segura',
+    newPassword: 'Nueva-Segura9!',
     req: { usuario: { id: 9 } },
     dependencies: {
       authRepository: {

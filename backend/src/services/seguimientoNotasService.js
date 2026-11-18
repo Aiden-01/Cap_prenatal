@@ -31,7 +31,7 @@ async function listar({ pacienteId, query, req, dependencies = {} }) {
     const data = new Map();
     for (const row of rows) {
       if (!data.has(row.control_prenatal_id)) data.set(row.control_prenatal_id, {
-        control_prenatal_id: row.control_prenatal_id, elegible: row.version !== null,
+        control_prenatal_id: row.control_prenatal_id, numero_control: row.numero_control, elegible: row.version !== null,
         documentos: [],
       });
       if (row.tipo) data.get(row.control_prenatal_id).documentos.push({ tipo: row.tipo,

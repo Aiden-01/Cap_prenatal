@@ -2452,3 +2452,33 @@ test('productor de controles no conserva escritor legado ni payload crudo', () =
   assert.doesNotMatch(source, /req\.body/);
   assert.doesNotMatch(source, /cambios:\s*\{\s*anteriores:\s*before,\s*nuevos:\s*control/s);
 });
+
+test('captura nueva persiste snapshot de cargo validado y no lo confunde con el actor', async () => {
+  let inserted;
+  await withService({ repository: {
+    obtenerPorNumeroYEmbarazo: async () => null,
+    obtenerCargoAtiende: async (id, client) => { assert.equal(client.transaction, true); assert.equal(id, 9); return { id: 9, nombre: 'Cargo declarado', codigo: 'MED', activo: true }; },
+    upsert: async ({ data }) => { inserted = data; return { id: 301, ...data }; },
+  }, pregnancies: { validarEmbarazoEditable: async () => ({ id: 91, paciente_id: 41, estado: 'activo' }) } }, async service => {
+    await service.crearControl({ pacienteId: 41, embarazoId: 91, body: { ...VALID_CONTROL, nombre_atiende: 'Persona declarada', cargo_atiende_id: 9, situacion_fetal: 'Longitudinal', presentacion_fetal: 'Cefálica' }, req: ACTOR });
+  });
+  assert.equal(inserted.nombre_atiende, 'Persona declarada');
+  assert.deepEqual(inserted.cargo_atiende_snapshot, { id: 9, nombre: 'Cargo declarado', codigo: 'MED' });
+  assert.equal(inserted.registrado_por, ACTOR.usuario.id); assert.equal(inserted.nombre_cargo_atiende, null);
+});
+test('PUT guarda cargo y snapshot juntos, rechaza opciones nuevas inválidas antes de escribir', async () => {
+  const before = { id: 301, paciente_id: 41, embarazo_id: 91, ...VALID_CONTROL, nombre_cargo_atiende: 'Texto histórico', presentacion_fetal: 'Funicular' };
+  let update;
+  await withService({ repository: { obtenerPorId: async () => before,
+    obtenerCargoAtiende: async () => ({ id: 9, nombre: 'Enfermera', codigo: 'EP', activo: true }),
+    actualizar: async args => { update = args; return { ...before, ...args.data }; },
+  }, pregnancies: { validarEmbarazoEditable: async () => ({ id: 91, paciente_id: 41, estado: 'activo' }) } }, async service => {
+    await service.actualizarControl({ pacienteId: 41, embarazoId: 91, id: before.id, body: { nombre_atiende: 'Nombre declarado', cargo_atiende_id: 9, presentacion_fetal: 'Funicular' }, req: ACTOR });
+    assert.ok(update.campos.includes('cargo_atiende_id')); assert.ok(update.campos.includes('cargo_atiende_snapshot'));
+    assert.ok(!update.campos.includes('presentacion_fetal')); assert.ok(!update.campos.includes('nombre_cargo_atiende'));
+    assert.deepEqual(update.data.cargo_atiende_snapshot, { id: 9, nombre: 'Enfermera', codigo: 'EP' });
+    update = null;
+    await assert.rejects(service.actualizarControl({ pacienteId: 41, embarazoId: 91, id: before.id, body: { presentacion_fetal: 'Texto arbitrario' }, req: ACTOR }), error => error.status === 400);
+    assert.equal(update, null);
+  });
+});

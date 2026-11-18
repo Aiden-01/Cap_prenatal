@@ -71,7 +71,7 @@ for case in cases:
             narrative.append(''.join(c['text'] for c in body))
             rules = {round(e['top'], 2) for e in page.horizontal_edges if e['x0'] <= 102 and e['x1'] >= 581}
             assert all(not any(c['top'] + .2 < y < c['bottom'] - .2 for y in rules) for c in body)
-            label = page.search('Nombre y firma del responsable')[0]
+            label = page.search('Firma del responsable')[0]
             sign_y = max(e['top'] for e in page.horizontal_edges if 700 < e['top'] < label['top'] and e['x1'] - e['x0'] > 100)
             start = page.search('Paciente:')[-1]['top']
             metadata = [c for c in page.chars if start - 1 <= c['top'] and c['bottom'] < sign_y]

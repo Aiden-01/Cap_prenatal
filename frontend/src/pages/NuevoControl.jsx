@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
+import ControlProfessionalFields from "../components/ControlProfessionalFields";
+import { FETAL_SITUATION_OPTIONS, FETAL_PRESENTATION_OPTIONS, prepareControlClinicalPayload } from "../utils/controlClinicalFields";
 import { useGlobalToast } from "../context/ToastContext";
 import { useAuth } from "../hooks/useAuth";
 import { useChatbotScreenContext } from "../hooks/useChatbotScreenContext";
@@ -80,6 +82,21 @@ function Inp({ label, name, type = "text", form, set, col, errors = {}, ...rest 
       />
     </Field>
   );
+}
+
+function ClinicalSelect({ label, name, options, form, set, errors = {}, disabled }) {
+  const error = errors[name];
+  const inputId = `control-${name}`;
+  const value = form[name] ?? '';
+  const legacy = value && !options.includes(value);
+  return <Field label={label} htmlFor={inputId} error={error}>
+    <select id={inputId} name={name} className={`input-field ${error ? 'input-error' : ''}`} value={value} disabled={disabled}
+      aria-invalid={Boolean(error)} aria-describedby={error ? `${inputId}-error` : undefined} onChange={event => set(name, event.target.value)}>
+      <option value="">Sin evaluar</option>
+      {legacy && <option value={value}>{value} (valor histórico)</option>}
+      {options.map(option => <option key={option} value={option}>{option}</option>)}
+    </select>
+  </Field>;
 }
 
 function Toggle({ label, name, form, set, disabled = false, chatbotField }) {
@@ -250,7 +267,7 @@ const INIT = {
   peligro_dolor_epigastrico: false, peligro_trastornos_visuales: false,
   peligro_fiebre: false, peligro_otro: "",
   // Info
-  edad_gestacional_semanas: "", nombre_acompanante: "", nombre_cargo_atiende: "",
+  edad_gestacional_semanas: "", nombre_acompanante: "", nombre_atiende: "", cargo_atiende_id: null,
   // Examen físico
   pa_sistolica: "", pa_diastolica: "", frecuencia_cardiaca: "",
   frecuencia_respiratoria: "", temperatura: "", perimetro_braquial_cm: "",
@@ -319,6 +336,10 @@ const CONTROL_FIELD_LABELS = {
   imc: "IMC",
   altura_uterina_cm: "Altura uterina",
   fcf: "FCF",
+  nombre_atiende: "Nombre completo de quien atiende",
+  cargo_atiende_id: "Cargo de quien atiende",
+  situacion_fetal: "Situación fetal",
+  presentacion_fetal: "Presentación fetal",
   cita_siguiente: "Cita siguiente",
   vih_resultado: "Resultado VIH",
   vdrl_resultado: "Resultado VDRL / RPR",
@@ -416,6 +437,7 @@ export default function NuevoControl({ consultationOnly = false }) {
   const puedeCapturarVih = !controlId || puedeVerVih;
   const [loading, setLoading] = useState(false);
   const submitLock = useRef(false);
+  const [originalControl, setOriginalControl] = useState(null);
   const [savedControl, setSavedControl] = useState(null);
   const savedHeading = useRef(null);
   useEffect(() => { if (savedControl) savedHeading.current?.focus(); }, [savedControl]);
@@ -572,9 +594,11 @@ export default function NuevoControl({ consultationOnly = false }) {
         setPaciente(expediente?.paciente || null);
         if (editando) {
           setStructuredAppointment(data?.cita_estructurada || null);
+          setOriginalControl(data);
           setForm(parseControl(data));
           return;
         }
+        setOriginalControl(null);
         const ultimo = Math.max(0, ...(data || []).map((control) => Number(control.numero_control) || 0));
         setForm((f) => ({ ...f, numero_control: ultimo + 1 }));
       })
@@ -640,6 +664,7 @@ export default function NuevoControl({ consultationOnly = false }) {
     };
     delete payload.impresion_clinica;
     delete payload.tratamiento;
+    payload = prepareControlClinicalPayload(payload, editando ? originalControl : null);
     if (editando) {
       payload = preparePrenatalControlUpdatePayload(payload, structuredAppointment);
     }
@@ -826,7 +851,7 @@ export default function NuevoControl({ consultationOnly = false }) {
           <div className="form-section-body col-2" style={{ marginTop: "0.5rem" }}>
             <Inp label="Motivo de consulta" name="motivo_consulta" {...p} />
             <Inp label="Nombre del acompañante" name="nombre_acompanante" data-chatbot-field="acompanante" {...p} />
-            <Inp label="Nombre y cargo de quien atiende" name="nombre_cargo_atiende" {...p} col={2} />
+            <ControlProfessionalFields {...p} originalControl={originalControl} />
           </div>
         </ClinicalSection>
 
@@ -907,8 +932,8 @@ export default function NuevoControl({ consultationOnly = false }) {
               <div className="form-section-body col-4">
                 <Inp label="Altura uterina (cm)" name="altura_uterina_cm" type="number" {...p} />
                 <Inp label="FCF (lpm)" name="fcf" type="number" {...p} />
-                <Inp label="Situación fetal" name="situacion_fetal" {...p} />
-                <Inp label="Presentación fetal" name="presentacion_fetal" {...p} />
+                <ClinicalSelect label="Situación fetal" name="situacion_fetal" options={FETAL_SITUATION_OPTIONS} {...p} />
+                <ClinicalSelect label="Presentación fetal" name="presentacion_fetal" options={FETAL_PRESENTATION_OPTIONS} {...p} />
               </div>
               <div className="control-inline-toggles">
                 <Toggle label="Movimientos fetales" name="movimientos_fetales" {...p} />

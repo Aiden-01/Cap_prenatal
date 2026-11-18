@@ -14,6 +14,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import api from "../api/axios";
+import { controlAttendantName } from "../utils/controlAttendant";
 import {
   ClinicalActionBar,
   ClinicalLoadingSkeleton,
@@ -274,7 +275,7 @@ function defaultsDesdeExpediente(exp) {
     telefono_vehiculo: "",
     responsable_activar: nombreConyuge ? "conyuge" : "",
     nombre_activara_plan: nombreConyuge,
-    nombre_proveedor_salud: ultimoControl.nombre_cargo_atiende || r.nombre_personal_atendio || "",
+    nombre_proveedor_salud: controlAttendantName(ultimoControl) || ultimoControl.nombre_cargo_atiende || r.nombre_personal_atendio || "",
   };
 }
 

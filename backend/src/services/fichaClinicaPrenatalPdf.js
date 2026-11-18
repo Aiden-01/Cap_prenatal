@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const coords = require('../config/fichaClinicaPrenatalCoords');
+const { formatControlAttendant } = require('../utils/controlAttendant');
 
 const DEFAULT_TEMPLATE_PATH = path.join(
   __dirname,
@@ -869,7 +870,7 @@ function drawPage1({ page, font, paciente, embarazo, controles, riesgo, planPart
     drawControlDangerSigns(page, font, control, cfg, `control${idx + 1}`);
     drawTextBox(page, font, control.edad_gestacional_semanas, cfg.edadGestacional, `control${idx + 1}:eg`);
     drawTextBox(page, font, control.nombre_acompanante, cfg.acompanante, `control${idx + 1}:acompanante`);
-    drawTextBox(page, font, control.nombre_cargo_atiende, cfg.atiende, `control${idx + 1}:atiende`);
+    drawTextBox(page, font, formatControlAttendant(control), cfg.atiende, `control${idx + 1}:atiende`);
   });
 
   drawDebugReferences(page, font);

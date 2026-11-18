@@ -100,14 +100,14 @@ export default function NotasClinicas({ embedded = false, expediente }) {
     </div>}
     <section className="notas-history card" aria-label="Historial de notas">
       <div className="notas-history-title"><h3>Historial de notas</h3><span className="nota-muted">{ready && !error ? `${list.total} documentos` : 'Consulta del expediente'}</span></div>
-      {controlId && <p className="nota-muted">Notas asociadas al control {controlId}.</p>}
+      {controlId && <p className="nota-muted">Notas asociadas al control vinculado.</p>}
       {error && <div role="alert" className="nota-error"><p>{error}</p><button className="btn-secondary" onClick={refresh}>Reintentar</button></div>}
       {!ready && !error && <p role="status" className="nota-empty">Cargando historial…</p>}
       {ready && !error && <>
         {!list.data.length && <div className="nota-empty"><FileText size={32} aria-hidden="true" /><h3>Aún no hay notas clínicas</h3><p>Documenta la atención con una nota médica o de enfermería. Puedes guardar un borrador y completarlo después.</p></div>}
         <div className="notas-history-list">{list.data.map(nota => <article className="nota-historial" key={nota.id}>
           <span className="nota-section-icon"><FileText size={20} aria-hidden="true" /></span>
-          <div className="nota-history-details"><strong>{TIPOS_NOTA[nota.tipo]}</strong><p>{nota.fecha_atencion || 'Fecha pendiente'} · {nota.responsable_snapshot?.nombre_completo || 'Responsable no registrado'}</p><small>{nota.control_prenatal_id ? `Control ${nota.control_prenatal_id}` : 'Sin control asociado'} · Nota {nota.id}</small></div>
+          <div className="nota-history-details"><strong>{TIPOS_NOTA[nota.tipo]}</strong><p>{nota.fecha_atencion || 'Fecha pendiente'} · {nota.responsable_snapshot?.nombre_completo || 'Responsable no registrado'}</p><small>{nota.control_prenatal_id ? (nota.numero_control != null ? `Control ${nota.numero_control}` : 'Control asociado; número no disponible') : 'Sin control asociado'} · Nota {nota.id}</small></div>
           <span className={`nota-status ${nota.estado === 'captura_finalizada' ? 'is-final' : ''}`}>{nota.estado === 'borrador' ? 'Borrador' : ESTADOS_NOTA[nota.estado]}</span>
           <div className="nota-action-buttons"><button type="button" className="btn-secondary" onClick={() => open(nota)}>Abrir<ArrowUpRight size={14} aria-hidden="true" /></button>
             <button type="button" className="btn-secondary" disabled={pdfBusy !== null} aria-label={`Descargar PDF de nota ${nota.id}`} onClick={async () => {

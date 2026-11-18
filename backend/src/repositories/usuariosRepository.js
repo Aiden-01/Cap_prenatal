@@ -62,8 +62,8 @@ async function listar({ actorRol } = {}) {
 async function crear({ nombreCompleto, username, email, passwordHash, rol, createdBy = null, cargoId = null }, db = pool) {
   const { rows } = await db.query(
     `WITH nuevo AS (
-      INSERT INTO usuarios (nombre_completo, username, password_hash, rol_id, created_by, cargo_id, email)
-      VALUES ($1, $2, $3, (SELECT id FROM roles WHERE nombre = $4), $5, $6, $7)
+      INSERT INTO usuarios (nombre_completo, username, password_hash, rol_id, created_by, cargo_id, email, requiere_cambio_password)
+      VALUES ($1, $2, $3, (SELECT id FROM roles WHERE nombre = $4), $5, $6, $7, TRUE)
       RETURNING *
     ) SELECT u.id, u.nombre_completo, u.username, u.activo, u.created_at, u.updated_at, u.created_by, u.updated_by,
       r.nombre AS rol, ${PERFIL_COLUMNS} FROM nuevo u JOIN roles r ON r.id=u.rol_id ${PERFIL_JOINS}`,
@@ -116,7 +116,8 @@ async function actualizar({ id, nombreCompleto, activo, rol, passwordHash, updat
     `WITH actualizado AS (
       UPDATE usuarios SET nombre_completo=$1, activo=$2,
         rol_id=(SELECT id FROM roles WHERE nombre=$3),
-        password_hash=COALESCE($4, password_hash), updated_at=NOW(), updated_by=$5,
+        password_hash=COALESCE($4, password_hash),
+        requiere_cambio_password=CASE WHEN $4::text IS NOT NULL THEN TRUE ELSE requiere_cambio_password END, updated_at=NOW(), updated_by=$5,
         cargo_id=CASE WHEN $7::boolean THEN $8::integer ELSE cargo_id END,
         email=CASE WHEN $9::boolean THEN $10::varchar ELSE email END,
         username=COALESCE($11::varchar, username)

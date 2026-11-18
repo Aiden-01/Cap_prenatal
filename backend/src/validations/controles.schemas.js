@@ -21,6 +21,12 @@ const {
 } = require('./common.schemas');
 
 const controlBase = {
+  nombre_atiende: optionalText(150),
+  cargo_atiende_id: z.preprocess(value => value === '' ? null : value, z.union([z.number().int().min(1).max(2147483647), z.string().regex(/^[1-9]\d*$/).transform(Number).pipe(z.number().int().max(2147483647)), z.null()]).optional()),
+  cargo_atiende_snapshot: z.never().optional(),
+  // The service compares legacy values against the locked persisted record.
+  situacion_fetal: z.string().max(50).nullable().optional(),
+  presentacion_fetal: z.string().max(50).nullable().optional(),
   numero_control: optionalInt(1, 20),
   fecha: optionalPastOrTodayDate,
   hora: optionalTime.optional(),

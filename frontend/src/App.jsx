@@ -8,6 +8,7 @@ import { useLocation } from 'react-router-dom';
 import { safeReturn } from './utils/safeReturn';
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import ForcedPasswordChange from "./pages/ForcedPasswordChange";
 
 const Pacientes = lazy(() => import("./pages/Pacientes"));
 const NuevaPaciente = lazy(() => import("./pages/NuevaPaciente"));
@@ -46,6 +47,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginEntry />} />
+        <Route path="/cambiar-password-obligatorio" element={<ForcedPasswordChange />} />
         <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
           <Route index element={<Navigate to="/dashboard" />} />
           <Route path="dashboard" element={<Dashboard />} />

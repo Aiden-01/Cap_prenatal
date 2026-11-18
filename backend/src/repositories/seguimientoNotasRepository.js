@@ -2,7 +2,7 @@ const notas = require('./notasClinicasRepository');
 
 async function listar({ pacienteId, embarazoId, ids, tipos }, db) {
   // Acotado a 100 IDs; una sola sentencia y ningún campo narrativo.
-  const { rows } = await db.query(`SELECT c.id AS control_prenatal_id, s.version,
+  const { rows } = await db.query(`SELECT c.id AS control_prenatal_id, c.numero_control, s.version,
     CASE WHEN r.tipo IS NOT NULL OR n.id IS NOT NULL THEN t.tipo END AS tipo, r.responsable_snapshot AS responsable_previsto,
     n.id AS nota_id, n.estado AS estado_nota, n.version AS nota_version,
     n.responsable_snapshot AS responsable_nota

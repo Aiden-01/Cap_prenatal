@@ -4,6 +4,7 @@ const { diagnosticCode } = require('../utils/safeErrorLog');
 // Campos internos de idempotencia solo aparecen en la consulta específica, nunca en respuestas generales.
 const COLUMNAS_METADATA = `n.id, n.paciente_id, n.embarazo_id, n.control_prenatal_id, n.tipo,
   to_char(n.fecha_atencion, 'YYYY-MM-DD') AS fecha_atencion, n.hora_atencion::text AS hora_atencion,
+  (SELECT c.numero_control FROM controles_prenatales c WHERE c.id=n.control_prenatal_id AND c.paciente_id=n.paciente_id AND c.embarazo_id=n.embarazo_id) AS numero_control,
   n.estado, n.es_principal, n.responsable_usuario_id, n.responsable_snapshot,
   n.capturista_usuario_id, n.finalizador_usuario_id, n.created_at, n.updated_at, n.finalizada_at, n.version`;
 const COLUMNAS_DETALLE = `${COLUMNAS_METADATA}, n.contenido`;

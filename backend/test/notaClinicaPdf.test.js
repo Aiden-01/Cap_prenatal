@@ -26,7 +26,7 @@ test('PDF nota: logos originales embebidos y narrativa escapada, sin firmas simu
     assert.ok(header.includes('CAP El Chal')); assert.ok(header.includes('Área Sur Oriente'));
     assert.ok(!footer.includes('No equivale a firma clínica'));
     assert.ok(!footer.includes('Captura finalizada'));
-    assert.ok(!footer.includes('Nombre y firma del responsable'), 'La firma se estampa solo después de paginar');
+    assert.ok(!footer.includes('Firma del responsable'), 'La firma se estampa solo después de paginar');
     assert.ok(html.includes('FECHA / HORA'));
     assert.ok(!html.includes('Firmado por')); assert.ok(header.includes('height:auto'));
   }

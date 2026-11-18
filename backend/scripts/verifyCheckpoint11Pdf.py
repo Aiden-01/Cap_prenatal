@@ -30,7 +30,7 @@ for kind in ['nota_evolucion', 'nota_enfermeria']:
             assert (page.width, page.height) == (612, 792)
             text = page.extract_text()
             for label in ['CAP El Chal', 'DDRISS Petén Área Sur Oriente', 'FECHA /',
-                          'Nombre y firma del responsable', 'No equivale a firma clínica',
+                          'Firma del responsable', 'No equivale a firma clínica',
                           f'Hoja No. {index} de {len(pdf.pages)}', 'Paciente:', 'Responsable:', 'Cargo:']:
                 assert label in text, (kind, index, label)
             assert 'Hospital de San Benito' not in text
@@ -87,7 +87,7 @@ for kind in ['nota_evolucion', 'nota_enfermeria']:
             content.append(''.join(c['text'] for c in body))
             rules = {round(edge['top'], 2) for edge in page.horizontal_edges if edge['x0'] <= 102 and edge['x1'] >= 581 and 90 < edge['top'] < 691}
             assert all(not any(c['top'] + .2 < y < c['bottom'] - .2 for y in rules) for c in body)
-            assert 'Nombre y firma del responsable' in page.extract_text()
+            assert 'Firma del responsable' in page.extract_text()
             assert len(page.images) == 2
             if index in {1, (len(pdf.pages) + 1) // 2, len(pdf.pages)}:
                 prefix = RENDER / f'{kind}-limite-pagina-{index}'

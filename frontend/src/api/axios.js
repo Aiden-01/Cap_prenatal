@@ -55,11 +55,18 @@ api.interceptors.response.use(
     }
     return response;
   },
-  (error) => handleAuthResponseError(error, {
+  (error) => {
+    if (error.response?.data?.code === 'PASSWORD_CHANGE_REQUIRED') {
+      try { const user = JSON.parse(localStorage.getItem('usuario')); if(user) localStorage.setItem('usuario',JSON.stringify({...user,requiere_cambio_password:true})); } catch { /* Server remains authoritative. */ }
+      if (location.pathname !== '/cambiar-password-obligatorio') location.assign('/cambiar-password-obligatorio');
+      return Promise.reject(error);
+    }
+    return handleAuthResponseError(error, {
     refresh: refreshAccess,
     retry: (config) => api.request(config),
     notifyInvalid: notifyInvalidSession,
-  })
+  });
+  }
 );
 
 export { refreshAccess };

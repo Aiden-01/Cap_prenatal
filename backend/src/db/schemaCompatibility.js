@@ -33,6 +33,8 @@ const REQUIRED_MIGRATIONS = Object.freeze([
   '028_retirar_especialidades.sql',
   '029_usuarios_email.sql',
   '030_cargos_autoria_estable.sql',
+  '031_password_temporal.sql',
+  '032_control_atencion_obstetrica.sql',
 ]);
 const REQUIRED_MIGRATION = REQUIRED_MIGRATIONS[0];
 const MIGRATION_COMMAND = 'npm run db:migrate';
@@ -84,7 +86,7 @@ async function queryMigrationRegistry(db, requiredMigrations) {
     );
     if (relationRows[0]?.migration_registry === null) {
       throw new SchemaCompatibilityError(migrationInstruction(
-        'El backend requiere el registro schema_migrations y las migraciones 008 a 030.'
+        'El backend requiere el registro schema_migrations y las migraciones 008 a 032.'
       ));
     }
 
@@ -138,7 +140,7 @@ async function assertSchemaCompatible(
       ? `Migraciones pendientes o incompatibles: ${pendingOrModified.join(', ')}.`
       : 'El registro schema_migrations es incompatible.';
     throw new SchemaCompatibilityError(migrationInstruction(
-      `El backend requiere las migraciones 008 a 030 aplicadas con su checksum versionado. ${detail}`
+      `El backend requiere las migraciones 008 a 032 aplicadas con su checksum versionado. ${detail}`
     ));
   }
 }

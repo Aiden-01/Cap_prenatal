@@ -18,6 +18,9 @@ import '../components/usuarios/profesionales.css';
 import { requiresVihConfirmation } from "../utils/permissionConfirmation";
 import { hasPermission } from "../utils/accessRules";
 
+import { validPassword } from '../utils/passwordPolicy';
+import PasswordRequirements from '../components/PasswordRequirements';
+import ResetTemporaryPassword from '../components/usuarios/ResetTemporaryPassword';
 const INIT = { nombre_completo: "", username: "", email: "", password: "", rol: "personal_salud", cargo_id: null };
 
 const PERMISSION_UI = {
@@ -540,6 +543,8 @@ export default function Usuarios() {
   const [aEliminar, setAEliminar]       = useState(null); // usuario seleccionado para eliminar
   const [formOpen, setFormOpen]         = useState(false);
   const [perfilUsuario, setPerfilUsuario] = useState(null);
+  const [resetUsuario, setResetUsuario] = useState(null);
+  const [showTemporaryPassword, setShowTemporaryPassword] = useState(false);
   const [catalogosOpen, setCatalogosOpen] = useState(false);
   const [createReady, setCreateReady] = useState(false);
   const createPending = useRef(false);
@@ -601,7 +606,7 @@ export default function Usuarios() {
     if (createPending.current || !createReady) return;
     const errores = Object.entries({ nombre_completo: form.nombre_completo.trim() ? '' : 'Ingresa el nombre completo.',
       username: form.username.trim() ? '' : 'Ingresa el nombre de usuario.', email: validarEmail(form.email),
-      password: form.password ? '' : 'Ingresa una contraseña.', cargo_id: form.cargo_id ? '' : 'Selecciona un cargo laboral.' })
+      password: validPassword(form.password) ? '' : 'La contraseña temporal debe cumplir todos los requisitos.', cargo_id: form.cargo_id ? '' : 'Selecciona un cargo laboral.' })
       .filter(([, message]) => message).map(([campo, mensaje]) => ({ campo, mensaje }));
     if (errores.length) {
       const result = fieldErrors.setErrorsFromResponse({ response: { data: { details: errores } } });
@@ -718,6 +723,7 @@ export default function Usuarios() {
 
   return (
     <>
+      {resetUsuario && <ResetTemporaryPassword usuario={resetUsuario} onClose={() => setResetUsuario(null)} onSaved={cargar} />}
       {perfilUsuario && <ModalPerfilProfesional key={perfilUsuario.id} usuario={perfilUsuario} onClose={() => setPerfilUsuario(null)} onSaved={cargar} />}
       {/* Modal confirmacion eliminar */}
       <ModalEliminar
@@ -904,6 +910,7 @@ export default function Usuarios() {
                         </td>
                         <td className="usuario-actions-cell" data-label="Acciones">
                           <div className="table-actions">
+                            <button className="btn-secondary btn-compact" onClick={() => setResetUsuario(u)}>Restablecer contraseña</button>
                             <button className="btn-secondary btn-compact" onClick={() => setPerfilUsuario(u)} title={`Editar perfil de ${u.nombre_completo}`}><Pencil size={13} /> Perfil</button>
                             {/* Activar / Desactivar */}
                             <button
@@ -1038,26 +1045,27 @@ export default function Usuarios() {
 
               <div className="form-group">
                 <label className="input-label" htmlFor="usuario-create-email">Correo electrónico *</label>
-                <input className={fieldErrors.inputClass('email')} name="email" id="usuario-create-email" type="email" inputMode="email" autoComplete="off" maxLength={254} value={form.email} onChange={event => fieldErrors.setFormValue(setForm, 'email', event.target.value)} required aria-invalid={Boolean(fieldErrors.fieldError('email'))} aria-describedby={`usuario-create-email-help${fieldErrors.fieldError('email') ? ' usuario-create-email-error' : ''}`} />
-                <p id="usuario-create-email-help" className="usuario-email-help">Obligatorio para cuentas nuevas. El acceso continúa con nombre de usuario y contraseña.</p>
+                <input className={fieldErrors.inputClass('email')} name="email" id="usuario-create-email" type="email" inputMode="email" autoComplete="off" maxLength={254} value={form.email} onChange={event => fieldErrors.setFormValue(setForm, 'email', event.target.value)} required aria-invalid={Boolean(fieldErrors.fieldError('email'))} aria-describedby={fieldErrors.fieldError('email') ? 'usuario-create-email-error' : undefined} />
                 {fieldErrors.fieldError('email') && <div id="usuario-create-email-error" className="field-error-text">{fieldErrors.fieldError('email')}</div>}
               </div>
 
               <div className="form-group">
-                <label className="input-label" htmlFor="usuario-create-password">Contrasena</label>
+                <label className="input-label" htmlFor="usuario-create-password">Contraseña temporal</label>
                 <div className="icon-input">
                   <KeyRound size={15} />
                   <input
                     className={fieldErrors.inputClass("password")}
                     name="password"
                     id="usuario-create-password"
-                    type="password"
+                    type={showTemporaryPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={form.password}
                     onChange={(e) => fieldErrors.setFormValue(setForm, "password", e.target.value)}
                     required
                   />
                 </div>
+                <button type="button" className="btn-secondary" aria-pressed={showTemporaryPassword} onClick={() => setShowTemporaryPassword(value => !value)}>{showTemporaryPassword ? "Ocultar" : "Mostrar"} contraseña temporal</button>
+                <PasswordRequirements value={form.password} />
                 {fieldErrors.fieldError("password") && <div className="field-error-text">{fieldErrors.fieldError("password")}</div>}
               </div>
 

@@ -139,6 +139,7 @@ const DEFAULT_PERSONAL_PATTERNS = Object.freeze([
 ]);
 
 const DEFAULT_CLINICAL_PATTERNS = Object.freeze([
+  /(^|_)cargo_atiende_(snapshot|id)($|_)/,
   /vih/,
   /(^|_)(laboratorio|hematologia|glicemia|grupo_rh|orina|heces|vdrl|torch)($|_)/,
   /(^|_)(papanicolau|ivaa|hepatitis|usg)($|_)/,

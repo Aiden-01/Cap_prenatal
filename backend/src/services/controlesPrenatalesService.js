@@ -1,3 +1,4 @@
+const { prepararCapturaControl } = require('../utils/controlPrenatalCapture');
 const controlesRepository = require('../repositories/controlesPrenatalesRepository');
 const citasRepository = require('../repositories/citasPrenatalesRepository');
 const citasInasistenciasService = require('./citasInasistenciasService');
@@ -51,6 +52,7 @@ const CONTROL_FIELDS = [
   'peligro_hipertension', 'peligro_dolor_epigastrico',
   'peligro_trastornos_visuales', 'peligro_fiebre', 'peligro_otro',
   'edad_gestacional_semanas', 'nombre_acompanante', 'nombre_cargo_atiende',
+  'nombre_atiende', 'cargo_atiende_id', 'cargo_atiende_snapshot',
   'pa_sistolica', 'pa_diastolica', 'frecuencia_cardiaca', 'frecuencia_respiratoria',
   'temperatura', 'perimetro_braquial_cm', 'peso_kg', 'talla_cm', 'imc',
   'examen_bucodental', 'examen_mamas',
@@ -295,6 +297,7 @@ async function crearControl({ pacienteId, embarazoId, body, req }) {
       body: dataWithTime,
       usuarioId: req.usuario.id,
     });
+    Object.assign(data, await prepararCapturaControl({ body: dataWithTime, before, db: client, obtenerCargo: controlesRepository.obtenerCargoAtiende }));
     const updateFields = CONTROL_FIELDS.filter((field) =>
       field !== 'numero_control' &&
       (puedeVerVih(req.usuario.permisos) || !VIH_FIELDS.has(field))
@@ -460,6 +463,10 @@ async function actualizarControl({ pacienteId, embarazoId, id, body, req }) {
     if (!before || String(before.embarazo_id) !== String(embarazoId)) {
       throw new HttpError(404, 'Control no encontrado en el embarazo seleccionado');
     }
+
+    const capture = await prepararCapturaControl({ body: bodyPermitido, before, db: client, obtenerCargo: controlesRepository.obtenerCargoAtiende });
+    Object.assign(data, capture);
+    if (Object.hasOwn(bodyPermitido, 'cargo_atiende_id')) campos.push('cargo_atiende_snapshot');
 
     const citaFueEnviada = campos.includes('cita_siguiente');
     const camposClinicos = campos.filter((campo) => campo !== 'cita_siguiente');

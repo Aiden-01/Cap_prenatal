@@ -16,6 +16,7 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { isValidPregnancyId } from "../utils/pregnancyState";
+import { controlAttendantName, controlAttendantRole } from "../utils/controlAttendant";
 import { useSeguimientoNotas } from '../hooks/useSeguimientoNotas';
 import { seguimientoNotasPath } from '../utils/seguimientoNotas';
 import SeguimientoNotaEstado from './SeguimientoNotaEstado';
@@ -160,6 +161,10 @@ function ControlRow({ control, index, pacienteId, embarazoId, puedeConsultarCont
             </div>
           </div>
           <div className="prenatal-detail-grid">
+            {controlAttendantName(control) || controlAttendantRole(control) ? <>
+              <DetailItem label="Nombre registrado de quien atiende" value={controlAttendantName(control)} />
+              <DetailItem label="Cargo registrado" value={controlAttendantRole(control)} />
+            </> : control.nombre_cargo_atiende ? <DetailItem label="Nombre y cargo históricos (sin desglosar)" value={control.nombre_cargo_atiende} /> : null}
             <DetailItem label="Situacion" value={control.situacion || control.situacion_fetal} />
             <DetailItem label="Motivo" value={control.motivo_consulta} />
             <DetailItem label="Altura uterina" value={control.altura_uterina_cm ? `${control.altura_uterina_cm} cm` : null} />

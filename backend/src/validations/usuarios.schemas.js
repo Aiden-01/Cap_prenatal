@@ -1,3 +1,4 @@
+const { passwordSchema } = require('../security/passwordPolicy');
 const {
   z,
   optionalBoolean,
@@ -23,7 +24,7 @@ const usuarioCreateSchema = z.object({
   nombre_completo: requiredText(150),
   username: requiredText(80),
   email: emailSchema,
-  password: z.string({ error: 'Campo requerido' }).min(6, 'La contrasena debe tener al menos 6 caracteres'),
+  password: passwordSchema,
   rol: rolSchema,
   cargo_id: perfilIdSchema,
 }).strict();
@@ -35,7 +36,7 @@ const usuarioUpdateSchema = z.object({
   activo: optionalBoolean,
   password: z.preprocess(
     (value) => (value === '' || value === null ? undefined : value),
-    z.string().min(6, 'La contrasena debe tener al menos 6 caracteres').optional()
+    passwordSchema.optional()
   ),
   rol: rolSchema.optional(),
   cargo_id: perfilIdSchema,

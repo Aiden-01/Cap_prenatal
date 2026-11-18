@@ -3,6 +3,7 @@ const path = require('path');
 const ExcelJS = require('exceljs');
 const { PDFDocument } = require('pdf-lib');
 const pdfService = require('../services/pdfService');
+const { formatControlAttendant } = require('../utils/controlAttendant');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { AppError } = require('../utils/appError');
 const { registrarEventoPrivado } = require('../services/auditService');
@@ -953,7 +954,7 @@ function buildMspasHtml({ paciente, embarazo, controles }) {
       wrapField(c.motivo_consulta, x + 4, 693, 96, 40, 6.2),
       field(c.edad_gestacional_semanas, x + 5, 885, 90, 9, 6.5),
       field(c.nombre_acompanante, x + 5, 899, 90, 9, 6.2),
-      field(c.nombre_cargo_atiende, x + 5, 913, 90, 9, 5.8),
+      field(formatControlAttendant(c), x + 5, 913, 90, 9, 5.8),
     ].join('');
   };
 

@@ -67,7 +67,7 @@ async function generarNotaClinicaPdf(data,{browserManager=puppeteerBrowserManage
  // El hueco del pie conserva la geometría aprobada (carta); solo esta hoja
  // recibe la firma. Coordenadas medidas en 13B: línea a 39 pt del borde
  // inferior, rótulo a 29.25 pt. La identificación extensa crece hacia arriba.
- const label='Nombre y firma del responsable',size=6.75;
+ const label='Firma del responsable',size=6.75;
  last.drawLine({start:{x:231.75,y:39},end:{x:380.25,y:39},thickness:.75,color:rgb(.33,.33,.33)});
  last.drawText(label,{x:(last.getWidth()-font.widthOfTextAtSize(label,size))/2,y:29.25,size,font,color:rgb(.07,.07,.07)});
  return pdf.save();

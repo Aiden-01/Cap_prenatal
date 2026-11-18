@@ -45,7 +45,7 @@ async function obtenerConUsuarioPorId(id, db = pool, { bloquear = false } = {}) 
     `SELECT s.id, s.usuario_id, s.refresh_token_hash,
             s.previous_refresh_token_hash, s.created_at, s.last_activity_at,
             s.absolute_expires_at, s.revoked_at, s.revoked_reason,
-            u.nombre_completo, u.username, u.activo, r.nombre AS rol
+            u.nombre_completo, u.username, u.activo, u.requiere_cambio_password, r.nombre AS rol
      FROM auth_sessions s
      JOIN usuarios u ON u.id = s.usuario_id
      JOIN roles r ON r.id = u.rol_id

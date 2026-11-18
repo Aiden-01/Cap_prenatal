@@ -98,12 +98,19 @@ function createAuthMiddleware({
         return next(authenticationError(state.code));
       }
 
+      const authPath = (req.originalUrl || '').split('?')[0];
+      const allowed = (req.method === 'GET' && authPath === '/api/auth/me')
+        || (req.method === 'POST' && ['/api/auth/cambiar-password','/api/auth/logout','/api/auth/logout-all'].includes(authPath));
+      if (record.requiere_cambio_password && !allowed) {
+        return next(new AppError(403, 'Debes cambiar tu contraseña temporal', { code: 'PASSWORD_CHANGE_REQUIRED' }));
+      }
       req.usuario = {
         id: record.usuario_id,
         nombre_completo: record.nombre_completo,
         username: record.username,
         rol: record.rol,
         activo: record.activo,
+        requiere_cambio_password: Boolean(record.requiere_cambio_password),
       };
       req.authSession = {
         id: record.id,

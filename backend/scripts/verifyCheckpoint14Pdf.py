@@ -76,7 +76,7 @@ for case in cases:
             narrative.append(''.join(c['text'] for c in body))
             rules = {round(e['top'], 2) for e in page.horizontal_edges if e['x0'] <= 102 and e['x1'] >= 581}
             assert all(not any(c['top'] + .2 < y < c['bottom'] - .2 for y in rules) for c in body)
-            labels = page.search('Nombre y firma del responsable')
+            labels = page.search('Firma del responsable')
             signature_lines = [e for e in page.horizontal_edges if abs(e['top'] - 753) < .1
                                and abs(e['x0'] - 231.75) < .1 and abs(e['x1'] - 380.25) < .1]
             assert len(labels) == len(signature_lines) == int(index == len(pdf.pages)), ('Firma repetida/ausente', case['file'], index)

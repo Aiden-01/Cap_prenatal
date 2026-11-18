@@ -54,9 +54,12 @@
 .nota-editor-section { padding: 1.25rem; border-bottom: 1px solid var(--border); min-width: 0; }
 .nota-editor-section h3 { display: flex; align-items: center; gap: .5rem; font-weight: 800; font-size: .9rem; margin-bottom: 1rem; }
 .nota-editor-section h3 svg { color: var(--primary); }
-.nota-fields-grid { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 1rem; }
+.nota-fields-grid { display: flex; flex-wrap: wrap; gap: 1rem; }
+.nota-fields-grid > label { flex: 1 1 12rem; }
+.nota-fields-grid input { min-height: 2.75rem; font-size: 1rem; line-height: 1.5; color-scheme: light; }
+html.dark .nota-fields-grid input { color-scheme: dark; }
 .nota-editor-form label, .nota-create label { font-weight: 600; font-size: .83rem; }
-.nota-field-summary { display: grid; gap: .35rem; padding: .65rem .8rem; background: var(--surface2); border-radius: .65rem; font-size: .8rem; }
+.nota-field-summary { display: grid; flex: 1 0 100%; gap: .35rem; padding: .65rem .8rem; background: var(--surface2); border-radius: .65rem; font-size: .8rem; }
 .nota-field-summary small, .nota-field-summary > span { color: var(--text-muted); }
 .nota-responsable-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
 .nota-responsable-fields > label:first-child, .nota-responsable-fields > p, .nota-responsable-fields > div { grid-column: 1 / -1; }
@@ -89,8 +92,6 @@
   .notas-module:has(.nota-clinica) .nota-historial > .nota-section-icon { display: none; }
   .notas-module:has(.nota-clinica) .nota-history-details { flex-basis: 100%; }
   .notas-module:has(.nota-clinica) .notas-pagination { flex-wrap: wrap; justify-content: center; }
-  .notas-module:has(.nota-clinica) .nota-fields-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .notas-module:has(.nota-clinica) .nota-field-summary { grid-column: 1 / -1; }
 }
 @media (max-width: 1000px) {
   .nota-historial { flex-wrap: wrap; }
@@ -102,7 +103,8 @@
   .notas-history, .nota-create, .nota-editor-header, .nota-editor-section { padding: 1rem; }
   .nota-editor-header { display: grid; grid-template-columns: 2.7rem minmax(0, 1fr); }
   .nota-editor-header > .nota-status { grid-column: 2; margin-left: 0; justify-self: start; }
-  .nota-fields-grid, .nota-responsable-fields, .nota-create { grid-template-columns: minmax(0, 1fr); }
+  .nota-fields-grid > label { flex-basis: 100%; }
+  .nota-responsable-fields, .nota-create { grid-template-columns: minmax(0, 1fr); }
   .nota-editor-actions { padding: 1rem; }
   .nota-editor-actions > .nota-action-buttons { width: 100%; }
   .nota-editor-actions button { flex: 1 1 100%; justify-content: center; margin: 0; }

@@ -129,7 +129,7 @@ export default function EditorNotaClinica({ pacienteId, paciente, usuario, tipo,
           <div className="nota-fields-grid">
             <label>Fecha de atención<input type="date" required value={fecha} onChange={event => setFecha(event.target.value)} /></label>
             <label>Hora de atención<input type="time" required value={hora} onChange={event => setHora(event.target.value)} /></label>
-            <div className="nota-field-summary"><span>Vinculación</span><strong>{controlId || nota?.control_prenatal_id ? `Control ${controlId || nota.control_prenatal_id}` : 'Sin control asociado'}</strong><small>Hora local de Guatemala · ajustable para atenciones anteriores</small></div>
+            <div className="nota-field-summary"><span>Vinculación</span><strong>{controlId || nota?.control_prenatal_id ? (nota?.numero_control != null ? `Control ${nota.numero_control}` : 'Control asociado; número no disponible') : 'Sin control asociado'}</strong><small>Hora local de Guatemala · ajustable para atenciones anteriores</small></div>
           </div>
         </section>
         <section className="nota-editor-section" aria-labelledby="nota-responsable-title">

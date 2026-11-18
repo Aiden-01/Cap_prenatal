@@ -40,6 +40,6 @@ router.post('/logout', optionalLogoutClaims, validateBody(emptyBodySchema), logo
 router.post('/logout-all', authMiddleware, validateBody(emptyBodySchema), logoutAll);
 router.post('/activity', authMiddleware, validateBody(emptyBodySchema), activity);
 router.get('/me', authMiddleware, me);
-router.post('/cambiar-password', authMiddleware, validateBody(changePasswordSchema), changePassword);
+router.post('/cambiar-password', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false }), authMiddleware, validateBody(changePasswordSchema), changePassword);
 
 module.exports = router;

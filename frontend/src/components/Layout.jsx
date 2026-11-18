@@ -1,4 +1,5 @@
-﻿import { Outlet, useNavigate } from "react-router-dom";
+﻿import { validPassword } from "../utils/passwordPolicy";
+import { Outlet, useNavigate } from "react-router-dom";
 import { useCallback, useState, useEffect } from "react";
 import { useLocation } from 'react-router-dom';
 import { safeReturn } from '../utils/safeReturn';
@@ -91,6 +92,9 @@ export default function Layout() {
   const handlePasswordSubmit = async (event) => {
     event.preventDefault();
 
+    if (!validPassword(passwordForm.new_password)) {
+      toast('La contraseña requiere 8 caracteres, mayúscula, minúscula, número y especial; máximo 72 bytes.', 'error'); return;
+    }
     if (passwordForm.new_password !== passwordForm.confirm_password) {
       passwordFieldErrors.setErrorsFromResponse(
         { response: { data: { details: [{ campo: "confirm_password", mensaje: "La confirmación no coincide con la nueva contraseña." }] } } },
@@ -231,7 +235,7 @@ export default function Layout() {
                     type={showPasswords ? "text" : "password"}
                     value={passwordForm.new_password}
                     onChange={(e) => passwordFieldErrors.setFormValue(setPasswordForm, "new_password", e.target.value)}
-                    minLength={6}
+                    minLength={8}
                     required
                   />
                   {passwordFieldErrors.fieldError("new_password") && (
@@ -247,7 +251,7 @@ export default function Layout() {
                     type={showPasswords ? "text" : "password"}
                     value={passwordForm.confirm_password}
                     onChange={(e) => passwordFieldErrors.setFormValue(setPasswordForm, "confirm_password", e.target.value)}
-                    minLength={6}
+                    minLength={8}
                     required
                   />
                   {(passwordMismatch || passwordFieldErrors.fieldError("confirm_password")) && (

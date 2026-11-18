@@ -156,6 +156,11 @@ async function upsert({ data, updateFields }, db = pool) {
   return rows[0] || null;
 }
 
+async function obtenerCargoAtiende(id, db = pool) {
+  const { rows } = await db.query('SELECT id, nombre, codigo, activo FROM cargos_personal WHERE id=$1 FOR SHARE', [id]);
+  return rows[0] || null;
+}
+
 async function enTransaccion(callback) {
   const client = await pool.connect();
   try {
@@ -176,6 +181,7 @@ async function enTransaccion(callback) {
 }
 
 module.exports = {
+  obtenerCargoAtiende,
   listarPorEmbarazo,
   obtenerPorIdYEmbarazo,
   obtenerPorId,

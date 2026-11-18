@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const { formatControlAttendant } = require('../utils/controlAttendant');
 
 const GT_TODAY_SQL = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Guatemala')::date";
 
@@ -11,13 +12,17 @@ function createReportesRepository(db = pool) {
         c.edad_gestacional_semanas AS semanas_gestacion,
         c.peso_kg AS peso, c.pa_sistolica, c.pa_diastolica,
         c.fcf, c.presentacion_fetal AS presentacion,
-        c.nombre_cargo_atiende AS personal_atiende
+        c.nombre_cargo_atiende AS personal_atiende, c.nombre_atiende, c.cargo_atiende_snapshot
       FROM controles_prenatales c
       JOIN pacientes p ON p.id = c.paciente_id
       LEFT JOIN comunidades com ON com.id = p.comunidad_id
       WHERE c.fecha BETWEEN $1::date AND $2::date
       ORDER BY c.fecha DESC, c.id DESC`, [desde, hasta]);
-    return rows;
+    return rows.map(({ nombre_atiende, cargo_atiende_snapshot, ...row }) => ({
+      ...row,
+      personal_atiende: formatControlAttendant({ nombre_atiende, cargo_atiende_snapshot,
+        nombre_cargo_atiende: row.personal_atiende }) || row.personal_atiende,
+    }));
   }
 
   async function obtenerRowsCensoPrimerControl(desde, hasta) {

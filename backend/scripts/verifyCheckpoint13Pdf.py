@@ -64,7 +64,7 @@ for case in cases:
             actual.append(''.join(c['text'] for c in body))
             rules = {round(e['top'], 2) for e in page.horizontal_edges if e['x0'] <= 102 and e['x1'] >= 581}
             assert all(not any(c['top'] + .2 < y < c['bottom'] - .2 for y in rules) for c in body), 'Regla sobre glifo'
-            signature = page.search('Nombre y firma del responsable')[0]
+            signature = page.search('Firma del responsable')[0]
             sign_rules = [e['top'] for e in page.horizontal_edges if 700 < e['top'] < signature['top'] and e['x1'] - e['x0'] > 100]
             assert sign_rules
             sign_y = max(sign_rules)
