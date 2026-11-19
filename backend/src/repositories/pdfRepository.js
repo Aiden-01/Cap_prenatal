@@ -1,12 +1,5 @@
 const pool = require('../db/pool');
-
-async function obtenerPacientePorId(pacienteId) {
-  const { rows } = await pool.query(
-    'SELECT * FROM pacientes WHERE id = $1',
-    [pacienteId]
-  );
-  return rows[0] || null;
-}
+const { obtenerPorId: obtenerPacientePorId } = require('./pacientesRepository');
 
 async function resolverEmbarazoParaPdf({ pacienteId, embarazoId = null }) {
   const { rows } = await pool.query(

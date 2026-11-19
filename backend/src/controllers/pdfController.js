@@ -274,7 +274,7 @@ function buildRiskCellMap({ paciente, embarazo, riesgo }) {
 
   setMapValue(map, 'H7', `${paciente.nombres || ''} ${paciente.apellidos || ''}`.trim());
   setMapValue(map, 'AA7:AB7', edad);
-  setMapValue(map, 'F8', paciente.municipio || paciente.domicilio || paciente.comunidad);
+  setMapValue(map, 'F8', paciente.comunidad || paciente.municipio || paciente.domicilio);
   setMapValue(map, 'V8', cleanCellText(riesgo.telefono || paciente.telefono).replace(/\s+/g, ' '));
   mapChoice(map, riesgo.pueblo || paciente.pueblo, {
     maya: 'F10',

@@ -1,34 +1,36 @@
 const pool = require('../db/pool');
+const ubicacion = require('./ubicacionPacienteSql');
 
 async function listar({ q, limite, offset }) {
   const { rows } = await pool.query(
     `WITH pacientes_pagina AS MATERIALIZED (
        SELECT id, no_expediente, cui, nombres, apellidos,
-              fecha_nacimiento, fur, fpp, municipio, comunidad,
+              fecha_nacimiento, fur, fpp, municipio, comunidad, comunidad_id,
               telefono, created_at, tiene_ficha_riesgo
        FROM pacientes
        WHERE nombres ILIKE $1
           OR apellidos ILIKE $1
           OR no_expediente ILIKE $1
           OR cui ILIKE $1
-       ORDER BY nombres ASC, apellidos ASC
+       ORDER BY nombres ASC, apellidos ASC, id ASC
        LIMIT $2 OFFSET $3
      )
-     SELECT pacientes.id, no_expediente, cui,
+     SELECT p.id, no_expediente, cui,
             nombres, apellidos,
-            fecha_nacimiento, pacientes.fur, pacientes.fpp,
-            municipio, comunidad, telefono,
-            pacientes.created_at,
+            fecha_nacimiento, p.fur, p.fpp,
+            municipio, ${ubicacion.comunidad} AS comunidad, telefono,
+            p.created_at,
             embarazo_actual.id AS embarazo_id,
             embarazo_actual.estado AS embarazo_estado,
             embarazo_actual.fur AS embarazo_fur,
             embarazo_actual.fpp AS embarazo_fpp,
-            COALESCE(riesgo_actual.tiene_riesgo, pacientes.tiene_ficha_riesgo, FALSE) AS tiene_riesgo
-     FROM pacientes_pagina pacientes
+            COALESCE(riesgo_actual.tiene_riesgo, p.tiene_ficha_riesgo, FALSE) AS tiene_riesgo
+     FROM pacientes_pagina p
+     ${ubicacion.join}
      LEFT JOIN LATERAL (
        SELECT id, estado, fur, fpp
        FROM embarazos
-       WHERE paciente_id = pacientes.id
+       WHERE paciente_id = p.id
        ORDER BY
          CASE estado
            WHEN 'activo' THEN 1
@@ -44,7 +46,7 @@ async function listar({ q, limite, offset }) {
        WHERE embarazo_id = embarazo_actual.id
        ORDER BY fecha DESC LIMIT 1
      ) riesgo_actual ON TRUE
-     ORDER BY nombres ASC, apellidos ASC`,
+     ORDER BY nombres ASC, apellidos ASC, p.id ASC`,
     [q, limite, offset]
   );
   return rows;
@@ -61,8 +63,17 @@ async function contar({ q }) {
 }
 
 async function obtenerPorId(id) {
-  const { rows } = await pool.query('SELECT * FROM pacientes WHERE id = $1', [id]);
-  return rows[0] || null;
+  const { rows } = await pool.query(
+    `SELECT p.*, ${ubicacion.comunidad} AS comunidad_vigente,
+            ${ubicacion.territorio} AS territorio_vigente, ${ubicacion.sector} AS sector_vigente
+     FROM pacientes p
+     ${ubicacion.join}
+     WHERE p.id = $1`,
+    [id]
+  );
+  if (!rows.length) return null;
+  const { comunidad_vigente, territorio_vigente, sector_vigente, ...paciente } = rows[0];
+  return { ...paciente, comunidad: comunidad_vigente, territorio: territorio_vigente, sector: sector_vigente };
 }
 
 async function enTransaccion(callback) {
@@ -209,7 +220,7 @@ async function obtenerExpedienteCompleto(pacienteId, embarazoId) {
     planParto,
     vacunas,
   ] = await Promise.all([
-    pool.query('SELECT * FROM pacientes WHERE id = $1', [pacienteId]),
+    obtenerPorId(pacienteId),
     pool.query('SELECT * FROM embarazos WHERE paciente_id = $1 ORDER BY numero_embarazo DESC', [pacienteId]),
     pool.query('SELECT * FROM embarazos WHERE id = $1', [embarazoId]),
     pool.query('SELECT * FROM controles_prenatales WHERE embarazo_id = $1 ORDER BY numero_control', [embarazoId]),
@@ -221,7 +232,7 @@ async function obtenerExpedienteCompleto(pacienteId, embarazoId) {
   ]);
 
   return {
-    paciente: paciente.rows[0] || null,
+    paciente,
     embarazos: embarazos.rows,
     embarazo_activo: embarazoActivo.rows[0] || null,
     controles_prenatales: controles.rows,

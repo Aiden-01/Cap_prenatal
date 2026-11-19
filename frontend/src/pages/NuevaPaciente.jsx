@@ -351,19 +351,21 @@ function ComunidadField({
 }) {
   const { inputClass } = useFormErrorUi();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [busqueda, setBusqueda] = useState(null);
   const municipioElChal = esMunicipioElChal(form.municipio);
-  const query = normalizarBusqueda(form.comunidad);
+  const query = normalizarBusqueda(busqueda ?? form.comunidad);
   const opcionesFiltradas = useMemo(() => {
     return comunidades.filter((comunidad) => {
       const coincideBusqueda = !query || normalizarBusqueda(comunidad.nombre).includes(query);
-      const coincideTerritorio = !form.territorio || String(comunidad.territorio) === String(form.territorio);
-      const coincideSector = !form.sector || String(comunidad.sector) === String(form.sector);
+      const coincideTerritorio = form.comunidad_id || !form.territorio || String(comunidad.territorio) === String(form.territorio);
+      const coincideSector = form.comunidad_id || !form.sector || String(comunidad.sector) === String(form.sector);
       return coincideBusqueda && coincideTerritorio && coincideSector;
     });
-  }, [comunidades, form.sector, form.territorio, query]);
+  }, [comunidades, form.comunidad_id, form.sector, form.territorio, query]);
 
   const seleccionarOpcionLibre = () => {
-    set("comunidad_id", null);
+    set("comunidad", busqueda ?? form.comunidad ?? "");
+    setBusqueda(null);
     setModoLibreElChal(true);
     setDropdownOpen(false);
   };
@@ -374,6 +376,7 @@ function ComunidadField({
         <input
           className={inputClass("comunidad")}
           name="comunidad"
+          maxLength={150}
           value={form.comunidad ?? ""}
           data-chatbot-field={patientFieldId("comunidad")}
           onChange={(e) => set("comunidad", e.target.value)}
@@ -402,14 +405,18 @@ function ComunidadField({
         <input
           className={inputClass("comunidad")}
           name="comunidad"
-          value={form.comunidad ?? ""}
+          maxLength={150}
+          value={busqueda ?? form.comunidad ?? ""}
           data-chatbot-field={patientFieldId("comunidad")}
           onChange={(e) => {
-            set("comunidad", e.target.value);
+            setBusqueda(e.target.value);
             setDropdownOpen(true);
           }}
           onFocus={() => setDropdownOpen(true)}
-          onBlur={() => window.setTimeout(() => setDropdownOpen(false), 120)}
+          onBlur={() => window.setTimeout(() => {
+            setDropdownOpen(false);
+            setBusqueda(null);
+          }, 120)}
           placeholder="Buscar comunidad de El Chal"
           autoComplete="off"
         />
@@ -437,6 +444,7 @@ function ComunidadField({
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
                       onSelectComunidad(comunidad);
+                      setBusqueda(null);
                       setDropdownOpen(false);
                     }}
                   >
@@ -651,7 +659,6 @@ function calcularEdad(fecha) {
 }
 
 function buildPacientePayload(form) {
-  const municipioElChal = esMunicipioElChal(form.municipio);
   const comunidadLinguisticaConfig = getComunidadLinguisticaConfig(form.pueblo);
   const comunidadLinguistica = comunidadLinguisticaConfig.mode === "automatic"
     ? comunidadLinguisticaConfig.value
@@ -660,7 +667,7 @@ function buildPacientePayload(form) {
     ...form,
     pueblo: getPuebloPayloadValue(form.pueblo),
     comunidad_linguistica: comunidadLinguistica,
-    comunidad_id: municipioElChal ? (form.comunidad_id || null) : null,
+    comunidad_id: form.comunidad_id ?? null,
     fpp: form.fpp || calcularFppDesdeFur(form.fur),
     antec_diabetes: Boolean(form.antec_diabetes_tipo),
     fuma_activamente: Boolean(
@@ -685,6 +692,11 @@ function buildPacientePayload(form) {
     ),
     antec_emb_ectopico: Number(form.antec_emb_ectopico_num || 0) > 0,
   };
+  if (payload.comunidad_id) {
+    delete payload.comunidad;
+    delete payload.territorio;
+    delete payload.sector;
+  }
   return payload;
 }
 
@@ -739,7 +751,9 @@ export default function NuevaPaciente() {
       setForm((current) => ({
         ...current,
         municipio: v,
-        comunidad_id: null,
+        ...(current.comunidad_id && !esMunicipioElChal(v)
+          ? { comunidad_id: null, territorio: "", sector: "" }
+          : {}),
       }));
       return;
     }
@@ -749,6 +763,7 @@ export default function NuevaPaciente() {
         ...current,
         comunidad: v,
         comunidad_id: null,
+        ...(current.comunidad_id ? { territorio: "", sector: "" } : {}),
       }));
       return;
     }
@@ -818,7 +833,7 @@ export default function NuevaPaciente() {
       comunidad_linguistica: comunidadConfig.mode === "automatic"
         ? comunidadConfig.value
         : (data.comunidad_linguistica ?? ""),
-      comunidad_id: esMunicipioElChal(data.municipio) ? (data.comunidad_id ?? null) : null,
+      comunidad_id: data.comunidad_id ?? null,
     };
     formularioOriginal.current = loadedForm;
     setForm(loadedForm);
@@ -998,7 +1013,7 @@ export default function NuevaPaciente() {
   };
 
   const p = { form, set };
-  const comunidadCatalogoSeleccionada = esMunicipioElChal(form.municipio) && Boolean(form.comunidad_id);
+  const comunidadCatalogoSeleccionada = Boolean(form.comunidad_id);
   const nombrePaciente = `${form.nombres || ""} ${form.apellidos || ""}`.trim();
   const CurrentStepIcon = STEPS[step].icon;
 

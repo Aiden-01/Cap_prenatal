@@ -49,6 +49,51 @@ test('guardar sin editar envía solo versión sin persistir defaults ni cálculo
   assert.deepEqual(api.put.mock.calls[0][1], { version: 7 });
 });
 
+test('buscar en el catálogo conserva la comunidad vigente hasta elegir otra', async () => {
+  api.get.mockImplementation(async url => ({ data: url === '/comunidades/activas'
+    ? [{ id: 102, nombre: 'Comunidad nueva', territorio: 3, sector: 'B' }]
+    : { ...PATIENT, municipio: 'El Chal', comunidad_id: 101, comunidad: 'Comunidad vigente', territorio: '1', sector: 'A' } }));
+  mount(); await ready();
+  fireEvent.click(screen.getByRole('tab', { name: /Paciente/ }));
+  const buscar = screen.getByPlaceholderText('Buscar comunidad de El Chal');
+  assert.equal(buscar.value, 'Comunidad vigente');
+  fireEvent.change(buscar, { target: { value: 'nueva' } });
+  fireEvent.click(screen.getByRole('tab', { name: /Confirmar/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Guardar cambios/ }));
+  await waitFor(() => assert.equal(api.put.mock.calls.length, 1));
+  assert.deepEqual(api.put.mock.calls[0][1], { version: 7 });
+});
+
+test('seleccionar otra comunidad envía el vínculo sin duplicar nombre, territorio ni sector', async () => {
+  api.get.mockImplementation(async url => ({ data: url === '/comunidades/activas'
+    ? [{ id: 102, nombre: 'Comunidad nueva', territorio: 3, sector: 'B' }]
+    : { ...PATIENT, municipio: 'El Chal', comunidad_id: 101, comunidad: 'Comunidad vigente', territorio: '1', sector: 'A' } }));
+  mount(); await ready();
+  fireEvent.click(screen.getByRole('tab', { name: /Paciente/ }));
+  fireEvent.change(screen.getByPlaceholderText('Buscar comunidad de El Chal'), { target: { value: 'nueva' } });
+  fireEvent.click(await screen.findByRole('button', { name: /Comunidad nueva/ }));
+  fireEvent.click(screen.getByRole('tab', { name: /Confirmar/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Guardar cambios/ }));
+  await waitFor(() => assert.equal(api.put.mock.calls.length, 1));
+  assert.deepEqual(api.put.mock.calls[0][1], { version: 7, comunidad_id: 102 });
+});
+
+test('elegir ubicación libre envía null explícito y conserva el texto declarado', async () => {
+  api.get.mockImplementation(async url => ({ data: url === '/comunidades/activas'
+    ? [] : { ...PATIENT, municipio: 'El Chal', comunidad_id: 101, comunidad: 'Comunidad vigente', territorio: '1', sector: 'A' } }));
+  mount(); await ready();
+  fireEvent.click(screen.getByRole('tab', { name: /Paciente/ }));
+  const comunidad = 'Residencia sin catálogo '.padEnd(150, 'X');
+  fireEvent.change(screen.getByPlaceholderText('Buscar comunidad de El Chal'), { target: { value: comunidad } });
+  fireEvent.click(screen.getByRole('button', { name: 'No aparece en el catálogo' }));
+  assert.equal(document.querySelector('[name="comunidad"]').value, comunidad);
+  fireEvent.click(screen.getByRole('tab', { name: /Confirmar/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Guardar cambios/ }));
+  await waitFor(() => assert.equal(api.put.mock.calls.length, 1));
+  assert.equal(api.put.mock.calls[0][1].comunidad_id, null);
+  assert.equal(api.put.mock.calls[0][1].comunidad, comunidad);
+});
+
 test('FUR modificada conserva FPP manual aunque coincida con el valor original', async () => {
   api.get.mockImplementation(async url => ({ data: url === '/comunidades/activas' ? [] : { ...PATIENT, fur: '2026-01-01', fpp: '2026-10-08' } }));
   mount(); await ready();

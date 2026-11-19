@@ -406,7 +406,7 @@ test('repositorio de expediente con embarazo null ejecuta exclusivamente SELECT'
   const pool = {
     async query(sql, params) {
       queries.push({ sql, params });
-      if (sql === 'SELECT * FROM pacientes WHERE id = $1') {
+      if (/FROM pacientes p\s+LEFT JOIN comunidades com/.test(sql)) {
         return { rows: [{ id: 41, updated_at: 'sin-cambios' }] };
       }
       return { rows: [] };

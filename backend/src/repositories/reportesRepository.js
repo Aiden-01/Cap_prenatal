@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const ubicacion = require('./ubicacionPacienteSql');
 const { formatControlAttendant } = require('../utils/controlAttendant');
 
 const GT_TODAY_SQL = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Guatemala')::date";
@@ -7,7 +8,7 @@ function createReportesRepository(db = pool) {
   async function obtenerControlesPrenatales(desde, hasta) {
     const { rows } = await db.query(`
       SELECT c.id, p.no_expediente, p.nombres || ' ' || p.apellidos AS paciente,
-        COALESCE(com.nombre, p.comunidad) AS comunidad,
+        ${ubicacion.comunidad} AS comunidad,
         c.numero_control, c.fecha AS fecha_control,
         c.edad_gestacional_semanas AS semanas_gestacion,
         c.peso_kg AS peso, c.pa_sistolica, c.pa_diastolica,
@@ -15,7 +16,7 @@ function createReportesRepository(db = pool) {
         c.nombre_cargo_atiende AS personal_atiende, c.nombre_atiende, c.cargo_atiende_snapshot
       FROM controles_prenatales c
       JOIN pacientes p ON p.id = c.paciente_id
-      LEFT JOIN comunidades com ON com.id = p.comunidad_id
+      ${ubicacion.join}
       WHERE c.fecha BETWEEN $1::date AND $2::date
       ORDER BY c.fecha DESC, c.id DESC`, [desde, hasta]);
     return rows.map(({ nombre_atiende, cargo_atiende_snapshot, ...row }) => ({
@@ -36,7 +37,7 @@ function createReportesRepository(db = pool) {
         p.nombres || ' ' || p.apellidos AS nombre_completo,
         DATE_PART('year', AGE(c.fecha, p.fecha_nacimiento))::INTEGER AS edad,
         p.pueblo                        AS etnia,
-        COALESCE(com.nombre, p.comunidad) AS comunidad,
+        ${ubicacion.comunidad} AS comunidad,
         COALESCE(e.fur, p.fur)          AS fur,
         COALESCE(e.fpp, p.fpp)          AS fpp,
         c.fecha                         AS fecha_primer_control,
@@ -56,7 +57,7 @@ function createReportesRepository(db = pool) {
       FROM controles_prenatales c
       JOIN embarazos e ON e.id = c.embarazo_id
       JOIN pacientes p ON p.id = c.paciente_id
-      LEFT JOIN comunidades com ON com.id = p.comunidad_id
+      ${ubicacion.join}
       LEFT JOIN fichas_riesgo_obstetrico r ON r.embarazo_id = e.id
       WHERE c.numero_control = 1
         AND c.fecha BETWEEN $1::date AND $2::date
@@ -79,7 +80,7 @@ function createReportesRepository(db = pool) {
         p.nombres || ' ' || p.apellidos AS nombre_completo,
         DATE_PART('year', AGE(${GT_TODAY_SQL}, p.fecha_nacimiento))::INTEGER AS edad,
         p.pueblo                        AS etnia,
-        COALESCE(com.nombre, p.comunidad) AS comunidad,
+        ${ubicacion.comunidad} AS comunidad,
         COALESCE(e.fur, p.fur)          AS fur,
         COALESCE(e.fpp, p.fpp)          AS fpp,
         CASE
@@ -94,7 +95,7 @@ function createReportesRepository(db = pool) {
         COALESCE(r.tiene_riesgo, FALSE) AS tiene_riesgo
       FROM embarazos e
       JOIN pacientes p ON p.id = e.paciente_id
-      LEFT JOIN comunidades com ON com.id = p.comunidad_id
+      ${ubicacion.join}
       LEFT JOIN fichas_riesgo_obstetrico r ON r.embarazo_id = e.id
       WHERE e.estado = 'activo'
       ORDER BY p.apellidos ASC, p.nombres ASC, e.numero_embarazo ASC
@@ -139,7 +140,7 @@ function createReportesRepository(db = pool) {
         p.nombres || ' ' || p.apellidos AS nombre,
         p.no_expediente,
         DATE_PART('year', AGE(${GT_TODAY_SQL}, p.fecha_nacimiento))::INTEGER AS edad,
-        COALESCE(com.nombre, p.comunidad) AS comunidad,
+        ${ubicacion.comunidad} AS comunidad,
         COALESCE(e.fpp, p.fpp) AS fpp,
         CASE
           WHEN COALESCE(e.fur, p.fur) IS NOT NULL
@@ -153,7 +154,7 @@ function createReportesRepository(db = pool) {
       FROM embarazos e
       JOIN pacientes p ON p.id = e.paciente_id
       JOIN fichas_riesgo_obstetrico r ON r.embarazo_id = e.id
-      LEFT JOIN comunidades com ON com.id = p.comunidad_id
+      ${ubicacion.join}
       WHERE e.estado = 'activo' AND r.tiene_riesgo = TRUE
       ORDER BY p.apellidos ASC, p.nombres ASC
     `);
@@ -167,7 +168,7 @@ function createReportesRepository(db = pool) {
         p.nombres || ' ' || p.apellidos AS nombre,
         p.no_expediente,
         p.telefono,
-        COALESCE(com.nombre, p.comunidad) AS comunidad,
+        ${ubicacion.comunidad} AS comunidad,
         COALESCE(e.fpp, p.fpp) AS fpp,
         (COALESCE(e.fpp, p.fpp) - ${GT_TODAY_SQL})::INTEGER AS dias_restantes,
         CASE
@@ -180,7 +181,7 @@ function createReportesRepository(db = pool) {
         ultimo.numero_control AS ultimo_control
       FROM embarazos e
       JOIN pacientes p ON p.id = e.paciente_id
-      LEFT JOIN comunidades com ON com.id = p.comunidad_id
+      ${ubicacion.join}
       LEFT JOIN fichas_riesgo_obstetrico r ON r.embarazo_id = e.id
       LEFT JOIN LATERAL (
         SELECT c.numero_control
@@ -205,7 +206,7 @@ function createReportesRepository(db = pool) {
         p.nombres || ' ' || p.apellidos AS nombre,
         p.no_expediente,
         p.telefono,
-        COALESCE(com.nombre, p.comunidad) AS comunidad,
+        ${ubicacion.comunidad} AS comunidad,
         COALESCE(e.fpp, p.fpp) AS fpp,
         COALESCE(r.tiene_riesgo, FALSE) AS tiene_riesgo,
         ultimo.fecha AS ultimo_control_fecha,
@@ -220,7 +221,7 @@ function createReportesRepository(db = pool) {
         END AS estado_seguimiento
       FROM embarazos e
       JOIN pacientes p ON p.id = e.paciente_id
-      LEFT JOIN comunidades com ON com.id = p.comunidad_id
+      ${ubicacion.join}
       LEFT JOIN fichas_riesgo_obstetrico r ON r.embarazo_id = e.id
       LEFT JOIN LATERAL (
         SELECT c.fecha, c.numero_control
@@ -259,7 +260,7 @@ function createReportesRepository(db = pool) {
         )::INTEGER AS sin_control_reciente
       FROM embarazos e
       JOIN pacientes p ON p.id = e.paciente_id
-      LEFT JOIN comunidades com ON com.id = p.comunidad_id
+      ${ubicacion.join}
       LEFT JOIN fichas_riesgo_obstetrico r ON r.embarazo_id = e.id
       LEFT JOIN LATERAL (
         SELECT c.fecha

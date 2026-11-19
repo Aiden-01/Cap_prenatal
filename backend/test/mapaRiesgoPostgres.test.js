@@ -79,7 +79,7 @@ function patientIds(row) {
   return row.pacientes_riesgo.map((item) => item.paciente_id);
 }
 
-postgresTest('mapa actual caracteriza asignaciones y conserva igualdad OLD/NEW en PostgreSQL real', {
+postgresTest('mapa conserva vínculos directos y excluye inferencias por texto en PostgreSQL real', {
   timeout: 120000,
 }, async () => {
   // No acepta DATABASE_URL: siempre crea un clúster vacío en un directorio temporal.
@@ -113,7 +113,7 @@ postgresTest('mapa actual caracteriza asignaciones y conserva igualdad OLD/NEW e
       ($1, 'Coincide'), ($1, 'Coincide '), ($1, 'Parcial'), ($2, 'Coincide')`,
     [ids.aliasA, ids.aliasB]);
 
-    const direct = await patient(db, 'DIRECTO', { communityId: ids.direct, communityText: 'Coincide' });
+    const direct = await patient(db, 'DIRECTO', { communityId: ids.direct });
     const direct2 = await patient(db, 'DIRECTO2', { communityId: ids.direct, communityText: null });
     await patient(db, 'DIRECTO-SIN-RIESGO', { communityId: ids.direct, risk: false });
     await patient(db, 'DIRECTO-SIN-FICHA', { communityId: ids.direct, risk: null });
@@ -130,8 +130,8 @@ postgresTest('mapa actual caracteriza asignaciones y conserva igualdad OLD/NEW e
 
     const oldRows = (await db.query(baselineSql())).rows;
     const newRows = (await db.query(currentSql())).rows;
-    assert.deepEqual(newRows, oldRows, 'Comparación completa de todos los campos y JSON por comunidad');
-    const directRow = byName(oldRows, 'CP43 Directa');
+    const directRow = byName(newRows, 'CP43 Directa');
+    assert.deepEqual(directRow, byName(oldRows, 'CP43 Directa'));
     assert.equal(directRow.total_riesgo, 2);
     assert.deepEqual(patientIds(directRow).sort((a,b)=>a-b), [direct.id, direct2.id].sort((a,b)=>a-b));
     assert.equal(directRow.pacientes_riesgo[0].expediente.startsWith('SYN-MAPA-'), true);
@@ -143,12 +143,15 @@ postgresTest('mapa actual caracteriza asignaciones y conserva igualdad OLD/NEW e
       [alias.id, ambiguous.id].sort((a,b)=>a-b));
     assert.equal(byName(oldRows, 'CP43 Alias Uno').total_riesgo, 3);
     assert.equal(byName(oldRows, 'CP43 Alias Dos').total_riesgo, 2);
-    assert.deepEqual(patientIds(byName(oldRows, 'CP43 Vacia')), []);
-    assert.equal(byName(oldRows, 'CP43 Vacia').total_riesgo, 0);
-    assert.deepEqual(patientIds(byName(oldRows, 'CP43 Inactiva Con Riesgo')), [inactive.id]);
-    assert.equal(oldRows.some((row) => row.nombre === 'CP43 Inactiva Vacia'), false);
+    assert.deepEqual(patientIds(byName(newRows, 'CP43 Vacia')), []);
+    assert.equal(byName(newRows, 'CP43 Vacia').total_riesgo, 0);
+    assert.deepEqual(patientIds(byName(newRows, 'CP43 Inactiva Con Riesgo')), [inactive.id]);
+    assert.equal(newRows.some((row) => row.nombre === 'CP43 Inactiva Vacia'), false);
     assert.deepEqual(patientIds(byName(oldRows, 'CP43 álamos')), [accented.id]);
-    assert.equal(oldRows.length, 48); // 41 del catálogo + 8 nuevas - 1 inactiva vacía
+    for (const nombre of ['CP43 Legacy', 'CP43 Alias Uno', 'CP43 Alias Dos', 'CP43 álamos']) {
+      assert.deepEqual(patientIds(byName(newRows, nombre)), []);
+    }
+    assert.equal(newRows.length, oldRows.length);
   } finally {
     if (db) await db.end().catch(() => {});
     if (started) run('pg_ctl', ['-D', data, '-m', 'immediate', '-w', 'stop']);

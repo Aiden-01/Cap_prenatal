@@ -91,7 +91,7 @@ postgresTest('censo primer control conserva contrato OLD/NEW en PostgreSQL tempo
     const community = await db.query(`INSERT INTO comunidades (nombre, territorio, sector, lat, lng)
       VALUES ('Catálogo sintético', 1, 'A', 16.8, -89.9) RETURNING id`);
     const communityId = community.rows[0].id;
-    const p1 = await addPatient(db, 'Dentro', { communityId, community: 'Texto alterno' });
+    const p1 = await addPatient(db, 'Dentro', { communityId });
     const p2 = await addPatient(db, 'Fuera', { community: 'Legado' });
     const p3 = await addPatient(db, 'Inicio');
     const p4 = await addPatient(db, 'Fin');
@@ -118,8 +118,14 @@ postgresTest('censo primer control conserva contrato OLD/NEW en PostgreSQL tempo
     await addControl(db, p6, secondPregnancy, 1, '2025-06-15');
     await addControl(db, p8, pregnancies[6], 1, '2025-06-15');
     await addControl(db, p9, fallbackPregnancy, 1, '2025-09-01');
-    await addControl(db, p7, null, 1, '2025-06-15');
-    await addControl(db, p7, null, 1, '2025-06-16');
+    // Simula controles históricos anteriores a la activación de notas.
+    await db.query('ALTER TABLE controles_prenatales DISABLE TRIGGER activar_seguimiento_nuevo_control');
+    try {
+      await addControl(db, p7, null, 1, '2025-06-15');
+      await addControl(db, p7, null, 1, '2025-06-16');
+    } finally {
+      await db.query('ALTER TABLE controles_prenatales ENABLE TRIGGER activar_seguimiento_nuevo_control');
+    }
     await db.query(`INSERT INTO fichas_riesgo_obstetrico
       (paciente_id, embarazo_id, fecha, muerte_fetal_neonatal_previa)
       VALUES ($1, $2, '2025-06-15', TRUE)`, [p1, pregnancies[0]]);

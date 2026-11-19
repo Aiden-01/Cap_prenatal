@@ -14,6 +14,7 @@ const MISSED_APPOINTMENTS_TYPE = 'inasistencias_semanales';
 const TDAP_FOLLOWUP_TYPE = 'seguimiento_tdap_el_chal';
 const DATA_QUALITY_WATCHDOG_TYPE = 'weekly_data_quality_watchdog';
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MAX_COMUNIDAD_N8N = 120;
 
 const DATA_QUALITY_CATEGORY_CATALOG = Object.freeze([
   Object.freeze({
@@ -77,6 +78,11 @@ function operationalText(value, maxLength) {
     throw new TypeError('Dato operativo de automatizacion demasiado largo');
   }
   return normalized;
+}
+
+function comunidadOperativa(value) {
+  // Los workflows desplegados validan la longitud del contrato nominal.
+  return operationalText(value, Infinity).slice(0, MAX_COMUNIDAD_N8N).replace(/[\uD800-\uDBFF]$/, '');
 }
 
 function zonedDateOnly(value, timezone = AUTOMATION_TIMEZONE) {
@@ -161,7 +167,7 @@ function normalizeMissedAppointments(rows) {
     first_name: operationalText(row.nombres_completos ?? row.primer_nombre, 150),
     last_name: operationalText(row.apellidos_completos ?? row.primer_apellido, 150),
     phone: operationalText(row.telefono, 32),
-    community: operationalText(row.comunidad, 120),
+    community: comunidadOperativa(row.comunidad),
     category: row.categoria === 'new' || row.categoria === 'previous_pending'
       ? row.categoria
       : (() => { throw new TypeError('Categoria semanal invalida'); })(),
@@ -246,7 +252,7 @@ function tdapOperationalRow(row) {
   return {
     first_name: operationalText(row.primer_nombre, 80),
     last_name: operationalText(row.primer_apellido, 80),
-    community: operationalText(row.comunidad, 120),
+    community: comunidadOperativa(row.comunidad),
   };
 }
 
@@ -393,7 +399,7 @@ function createAutomatizacionesService({
         first_name: operationalText(row.nombres_completos ?? row.primer_nombre, 150),
         last_name: operationalText(row.apellidos_completos ?? row.primer_apellido, 150),
         phone: operationalText(row.telefono, 32),
-        community: operationalText(row.comunidad, 120),
+        community: comunidadOperativa(row.comunidad),
       }))
       .sort((left, right) => left.date.localeCompare(right.date)
         || left.last_name.split(' ')[0].localeCompare(right.last_name.split(' ')[0], 'es')

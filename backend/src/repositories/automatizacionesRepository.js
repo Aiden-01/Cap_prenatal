@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const ubicacion = require('./ubicacionPacienteSql');
 const { seguimientoPendienteSql } = require('./citasPrenatalesRepository');
 
 function createAutomatizacionesRepository(db = pool) {
@@ -19,13 +20,13 @@ function createAutomatizacionesRepository(db = pool) {
           TRIM(p.nombres) AS nombres_completos,
           TRIM(p.apellidos) AS apellidos_completos,
           COALESCE(p.telefono, '') AS telefono,
-          COALESCE(com.nombre, p.comunidad, '') AS comunidad
+          ${ubicacion.comunidadOTextoVacio} AS comunidad
         FROM citas_prenatales cp
         JOIN embarazos e
           ON e.id = cp.embarazo_id
          AND e.estado = 'activo'
         JOIN pacientes p ON p.id = e.paciente_id
-        LEFT JOIN comunidades com ON com.id = p.comunidad_id
+        ${ubicacion.join}
         CROSS JOIN bounds b
         WHERE cp.estado = 'programada'
           AND cp.control_cumplimiento_id IS NULL
@@ -92,7 +93,7 @@ function createAutomatizacionesRepository(db = pool) {
          TRIM(p.nombres) AS nombres_completos,
          TRIM(p.apellidos) AS apellidos_completos,
          COALESCE(p.telefono, '') AS telefono,
-         COALESCE(com.nombre, p.comunidad, '') AS comunidad,
+         ${ubicacion.comunidadOTextoVacio} AS comunidad,
          CASE
            WHEN cp.fecha_programada BETWEEN $1::date AND $2::date THEN 'new'
            WHEN cp.fecha_programada < $1::date THEN 'previous_pending'
@@ -101,7 +102,7 @@ function createAutomatizacionesRepository(db = pool) {
        JOIN embarazos e
          ON e.id = cp.embarazo_id
        JOIN pacientes p ON p.id = e.paciente_id
-       LEFT JOIN comunidades com ON com.id = p.comunidad_id
+       ${ubicacion.join}
        WHERE cp.fecha_programada <= $2::date
          AND ${seguimientoPendienteSql()}
          AND cp.created_at >= $3::timestamptz
@@ -121,10 +122,10 @@ function createAutomatizacionesRepository(db = pool) {
          p.municipio,
          SPLIT_PART(TRIM(p.nombres), ' ', 1) AS primer_nombre,
          SPLIT_PART(TRIM(p.apellidos), ' ', 1) AS primer_apellido,
-         COALESCE(com.nombre, p.comunidad, '') AS comunidad
+         ${ubicacion.comunidadOTextoVacio} AS comunidad
        FROM embarazos e
        JOIN pacientes p ON p.id = e.paciente_id
-       LEFT JOIN comunidades com ON com.id = p.comunidad_id
+       ${ubicacion.join}
        WHERE e.estado = 'activo'
          AND LOWER(BTRIM(COALESCE(p.municipio, ''))) = 'el chal'
          AND NOT EXISTS (

@@ -1,41 +1,5 @@
 const pool = require('../db/pool');
 
-function normalizarTextoSql(expression) {
-  return `
-    regexp_replace(
-      translate(LOWER(BTRIM(${expression})), U&'\\00E1\\00E9\\00ED\\00F3\\00FA\\00FC\\00F1', 'aeiouun'),
-      '[^a-z0-9]+',
-      '',
-      'g'
-    )`;
-}
-
-function condicionPacienteMapaRiesgo(pacienteAlias = 'p', comunidadAlias = 'c') {
-  const comunidadPacienteNorm = normalizarTextoSql(`${pacienteAlias}.comunidad`);
-  const comunidadNombreNorm = normalizarTextoSql(`${comunidadAlias}.nombre`);
-  const aliasNorm = normalizarTextoSql('ca.alias');
-
-  return `
-    LOWER(BTRIM(COALESCE(${pacienteAlias}.municipio, ''))) = 'el chal'
-    AND (
-      ${pacienteAlias}.comunidad_id = ${comunidadAlias}.id
-      OR (
-        ${pacienteAlias}.comunidad_id IS NULL
-        AND COALESCE(BTRIM(${pacienteAlias}.comunidad), '') <> ''
-        -- El conteo de riesgo activo debe coincidir con el Mapa de Riesgo; el fallback textual solo aplica para historicos de El Chal.
-        AND (
-          ${comunidadPacienteNorm} = ${comunidadNombreNorm}
-          OR EXISTS (
-            SELECT 1
-            FROM comunidades_aliases ca
-            WHERE ca.comunidad_id = ${comunidadAlias}.id
-              AND ${comunidadPacienteNorm} LIKE '%' || ${aliasNorm} || '%'
-          )
-        )
-      )
-    )`;
-}
-
 function pacientesDirectosAgregadoLateral() {
   return `
     LEFT JOIN LATERAL (
@@ -53,7 +17,8 @@ function riesgoActivoAgregadoLateral() {
       FROM pacientes p
       JOIN embarazos e ON e.paciente_id = p.id AND e.estado = 'activo'
       JOIN fichas_riesgo_obstetrico r ON r.embarazo_id = e.id
-      WHERE ${condicionPacienteMapaRiesgo('p', 'c')}
+      WHERE p.comunidad_id = c.id
+        AND LOWER(BTRIM(COALESCE(p.municipio, ''))) = 'el chal'
         AND COALESCE(r.tiene_riesgo, FALSE) = TRUE
     ) riesgo_activo ON TRUE`;
 }

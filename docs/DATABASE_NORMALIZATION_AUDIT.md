@@ -5,6 +5,8 @@ Rama y versión evaluada: `main`, HEAD `3cddde1643e2313e9821ddd40819208570bdc9c3
 Gestión: [CPREN-42](https://tareajiraads.atlassian.net/browse/CPREN-42), Epic CPREN-4.
 Estado de entrega: auditoría técnica aprobada por el usuario; cierre documental autorizado, sin aprobación de cambios de esquema.
 
+El hallazgo histórico R5 se aborda en [CPREN-127](../operations/community-normalization/README.md). El [diccionario territorial](DATA_DICTIONARY.md) describe el esquema posterior a la migración 033.
+
 ## 1. Alcance y resultado principal
 
 Se auditaron **19 tablas: 18 funcionales/técnicas y el registro `schema_migrations`**. Se revisaron por completo `schema.sql`, las 16 migraciones versionadas (004–019), `migrate.js` y `seed.js`, y se contrastaron las rutas de escritura/lectura relevantes. Las tres vistas BI de 005 son proyecciones, no tablas adicionales. Los índices se consideran mecanismos de integridad/acceso, no entidades.

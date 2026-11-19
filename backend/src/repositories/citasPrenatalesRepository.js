@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const ubicacion = require('./ubicacionPacienteSql');
 
 function seguimientoPendienteSql(citaAlias = 'cp', embarazoAlias = 'e') {
   return `(
@@ -96,7 +97,7 @@ async function listarCalendarioPorRango({ desde, hasta }, db = pool) {
        p.id AS patient_id,
        cp.embarazo_id AS pregnancy_id,
        TRIM(CONCAT_WS(' ', p.nombres, p.apellidos)) AS patient_name,
-       NULLIF(BTRIM(COALESCE(com.nombre, p.comunidad, '')), '') AS community,
+       NULLIF(BTRIM(${ubicacion.comunidadOTextoVacio}), '') AS community,
        TO_CHAR(hija.fecha_programada, 'YYYY-MM-DD') AS rescheduled_to,
        CASE WHEN cp.estado = 'inasistente'
          THEN TO_CHAR(seguimiento.fecha_programada, 'YYYY-MM-DD')
@@ -113,8 +114,7 @@ async function listarCalendarioPorRango({ desde, hasta }, db = pool) {
        ON e.id = cp.embarazo_id
      JOIN pacientes p
        ON p.id = e.paciente_id
-     LEFT JOIN comunidades com
-       ON com.id = p.comunidad_id
+     ${ubicacion.join}
     LEFT JOIN citas_prenatales hija
        ON hija.reprogramada_desde_id = cp.id
       AND hija.embarazo_id = cp.embarazo_id
@@ -138,7 +138,7 @@ async function listarSinProximaCita(db = pool) {
        p.id AS paciente_id,
        e.id AS embarazo_id,
        TRIM(CONCAT_WS(' ', p.nombres, p.apellidos)) AS paciente_nombre,
-       NULLIF(BTRIM(COALESCE(com.nombre, p.comunidad, '')), '') AS comunidad,
+       NULLIF(BTRIM(${ubicacion.comunidadOTextoVacio}), '') AS comunidad,
        TO_CHAR(ultimo_control.fecha, 'YYYY-MM-DD') AS ultimo_control_fecha,
        ultimo_control.id AS ultimo_control_id,
        CASE
@@ -154,7 +154,7 @@ async function listarSinProximaCita(db = pool) {
        END AS motivo
      FROM embarazos e
      JOIN pacientes p ON p.id = e.paciente_id
-     LEFT JOIN comunidades com ON com.id = p.comunidad_id
+     ${ubicacion.join}
      JOIN LATERAL (
        SELECT c.id, c.fecha, c.numero_control, c.cita_siguiente
        FROM controles_prenatales c

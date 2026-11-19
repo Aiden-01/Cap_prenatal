@@ -5,7 +5,7 @@ const { structurallyEqual } = require('./audit/auditDiffBuilder');
 const { HttpError } = require('../utils/httpError');
 const { filtrarCamposVih } = require('../utils/datosSensibles');
 const { resolverEmbarazoParaLectura, requerirEmbarazoId, validarEmbarazoEditable } = require('../utils/embarazos');
-const { esMunicipioElChal } = require('../domain/municipioRules');
+const { esMunicipioElChal, normalizarMunicipio } = require('../domain/municipioRules');
 const { applyAgeRiskFactors } = require('../domain/riskAgeRules');
 const { validarEstablecimientoPaciente } = require('../domain/establecimientoCatalogs');
 
@@ -105,33 +105,39 @@ function normalizeComunidadId(value) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-async function normalizarComunidadPaciente(data, actual = null) {
-  const normalized = { ...data };
-  const touchedCommunity = ['municipio', 'comunidad', 'comunidad_id'].some((field) => hasOwn(data, field));
-  if (!touchedCommunity && actual) return normalized;
-
+async function normalizarComunidadPaciente(data, actual, db) {
+  const anteriorId = actual?.comunidad_id ?? null;
+  const idExplicito = hasOwn(data, 'comunidad_id') && data.comunidad_id !== undefined;
+  const comunidadId = idExplicito ? normalizeComunidadId(data.comunidad_id) : anteriorId;
+  if (idExplicito && data.comunidad_id !== null && !comunidadId) {
+    throw new HttpError(400, 'El identificador de comunidad no es válido', { code: 'COMUNIDAD_INVALIDA' });
+  }
   const municipio = hasOwn(data, 'municipio') ? data.municipio : actual?.municipio;
-  if (!esMunicipioElChal(municipio)) {
-    normalized.comunidad_id = null;
-    return normalized;
-  }
+  const cambioMunicipio = normalizarMunicipio(municipio) !== normalizarMunicipio(actual?.municipio);
 
-  const comunidadId = normalizeComunidadId(normalized.comunidad_id);
   if (!comunidadId) {
-    normalized.comunidad_id = null;
-    return normalized;
+    if (idExplicito && anteriorId && !hasOwn(data, 'comunidad')) {
+      const anterior = await comunidadesRepository.obtenerPorId(anteriorId, db);
+      return { ...data, comunidad_id: null, comunidad: anterior?.nombre ?? null };
+    }
+    return data;
   }
 
-  const comunidad = await comunidadesRepository.obtenerPorId(comunidadId);
-  if (!comunidad || comunidad.activo !== true) {
-    throw new HttpError(400, 'La comunidad seleccionada no existe o no esta activa', {
-      code: 'COMUNIDAD_INVALIDA',
+  if ((comunidadId !== anteriorId || cambioMunicipio) && !esMunicipioElChal(municipio)) {
+    throw new HttpError(400, 'Para registrar otro municipio, desvincule explícitamente la comunidad del catálogo de El Chal.', {
+      code: 'COMUNIDAD_MUNICIPIO_INCOMPATIBLE',
     });
   }
-
-  normalized.comunidad_id = comunidad.id;
-  normalized.comunidad = comunidad.nombre;
-  return normalized;
+  if (comunidadId !== anteriorId) {
+    const comunidad = await comunidadesRepository.obtenerPorId(comunidadId, db);
+    if (!comunidad || comunidad.activo !== true) {
+      throw new HttpError(400, 'La comunidad seleccionada no existe o no está activa', {
+        code: 'COMUNIDAD_INVALIDA',
+      });
+    }
+  }
+  // Conserva el vínculo previo, incluso si la comunidad se desactivó.
+  return { ...data, comunidad_id: comunidadId, comunidad: null, territorio: null, sector: null };
 }
 
 function errorEmbarazoActivoDuplicado() {
@@ -336,9 +342,9 @@ async function obtenerPaciente(id) {
 async function crearPaciente({ body, req }) {
   const bodyPermitido = validarEstablecimientoPaciente(filtrarCamposVih(body, req.usuario.permisos));
   const cui = normalizeCui(bodyPermitido.cui);
-  const bodyConComunidad = await normalizarComunidadPaciente(bodyPermitido);
-  const data = buildPacienteInsertData(bodyConComunidad, req.usuario.id);
   return pacientesRepository.enTransaccion(async (client) => {
+    const bodyConComunidad = await normalizarComunidadPaciente(bodyPermitido, null, client);
+    const data = buildPacienteInsertData(bodyConComunidad, req.usuario.id);
     if (await pacientesRepository.existeCui(cui, null, client)) {
       throw new HttpError(409, 'Ya existe una paciente registrada con ese CUI');
     }
@@ -408,7 +414,7 @@ async function actualizarPaciente({ id, body, req }) {
     }
 
     const bodyConCatalogos = validarEstablecimientoPaciente(bodyPermitido, before);
-    const bodyConComunidad = await normalizarComunidadPaciente(bodyConCatalogos, before);
+    const bodyConComunidad = await normalizarComunidadPaciente(bodyConCatalogos, before, client);
     const { data, campos } = buildPacienteUpdateData(bodyConComunidad);
     if (campos.length === 0) return { message: 'Paciente actualizado', version: before.version };
 

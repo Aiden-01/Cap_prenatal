@@ -7,6 +7,8 @@ const { execFileSync } = require('node:child_process');
 const test = require('node:test');
 const { Client, Pool } = require('pg');
 const { migrate } = require('../src/db/migrate');
+const pool = require('../src/db/pool');
+const pacientes = require('../src/repositories/pacientesRepository');
 
 const postgresTest = process.env.RUN_PACIENTES_TEMP_POSTGRES === '1' ? test : test.skip;
 const bin = process.env.PACIENTES_POSTGRES_BIN || (process.platform === 'win32'
@@ -22,17 +24,11 @@ async function freePort() {
   return port;
 }
 
-function sqlFromRepository(method) {
-  const source = fs.readFileSync(path.join(__dirname, '../src/repositories/pacientesRepository.js'), 'utf8');
-  const match = source.match(new RegExp(`async function ${method}\\([\\s\\S]*?pool\\.query\\(\\s*\x60([\\s\\S]*?)\x60`));
-  assert.ok(match, `No se encontró el SQL de ${method}`);
-  assert.equal(match[1].includes('${'), false, 'La consulta debe permanecer estática');
-  return match[1].replace(/\\\\/g, '\\');
-}
-
 function oldSql() {
   return fs.readFileSync(path.join(__dirname, 'fixtures/pacientesListadoBaseline.sql'), 'utf8')
-    .replace(/^\uFEFF/, '');
+    .replace(/^\uFEFF/, '')
+    // El orden histórico entre homónimas era indeterminado.
+    .replace('ORDER BY nombres ASC, apellidos ASC', 'ORDER BY nombres ASC, apellidos ASC, pacientes.id ASC');
 }
 
 // COUNT OLD del mismo checkpoint; el total también forma parte del contrato.
@@ -90,6 +86,7 @@ postgresTest('listado conserva respuesta completa OLD/NEW en PostgreSQL temporal
   const config = { host: '127.0.0.1', port, user: 'pacientes_test', database: 'postgres' };
   let started = false;
   let db;
+  const query = pool.query;
   try {
     run('initdb', ['-D', data, '-U', config.user, '-A', 'trust', '--no-locale', '-E', 'UTF8']);
     run('pg_ctl', ['-D', data, '-l', path.join(root, 'postgres.log'),
@@ -118,8 +115,7 @@ postgresTest('listado conserva respuesta completa OLD/NEW en PostgreSQL temporal
     await pregnancy(db, puerperiumPatient, 1, 'puerperio', true);
     await pregnancy(db, puerperiumPatient, 2, 'cerrado', false);
 
-    const current = sqlFromRepository('listar');
-    const currentCount = sqlFromRepository('contar');
+    pool.query = db.query.bind(db);
     const cases = [
       { name: 'primera página', limit: 10, offset: 0 },
       { name: 'OFFSET profundo', limit: 10, offset: 65 },
@@ -137,7 +133,12 @@ postgresTest('listado conserva respuesta completa OLD/NEW en PostgreSQL temporal
     ];
     for (const scenario of cases) {
       const oldResult = await response(db, oldSql(), OLD_COUNT_SQL, scenario);
-      const newResult = await response(db, current, currentCount, scenario);
+      const q = `%${scenario.search || ''}%`;
+      const [data, total] = await Promise.all([
+        pacientes.listar({ q, limite: scenario.limit, offset: scenario.offset }),
+        pacientes.contar({ q }),
+      ]);
+      const newResult = { data, total };
       assert.deepEqual(newResult, oldResult, scenario.name);
       if (scenario.name === 'página fuera de rango') {
         assert.deepEqual(oldResult.data, []);
@@ -164,6 +165,7 @@ postgresTest('listado conserva respuesta completa OLD/NEW en PostgreSQL temporal
       }
     }
   } finally {
+    pool.query = query;
     if (db) await db.end().catch(() => {});
     if (started) run('pg_ctl', ['-D', data, '-m', 'immediate', '-w', 'stop']);
     assert.ok(path.resolve(root).startsWith(`${path.resolve(os.tmpdir())}${path.sep}`));

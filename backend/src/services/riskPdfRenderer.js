@@ -158,7 +158,7 @@ async function renderRiskPdf({ paciente = {}, embarazo = {}, riesgo = {} }, opti
   [...history].forEach((digit, index) => drawField(page, bold, digit, { ...RISK_PDF_FIELDS.historiaClinica, x: RISK_PDF_FIELDS.historiaClinica.x[index] }));
   drawField(page, bold, nombre, RISK_PDF_FIELDS.nombre);
   drawField(page, bold, ageYears(paciente.fecha_nacimiento, options.now), RISK_PDF_FIELDS.edad);
-  drawField(page, bold, paciente.municipio || paciente.domicilio || paciente.comunidad, RISK_PDF_FIELDS.residencia);
+  drawField(page, bold, paciente.comunidad || paciente.municipio || paciente.domicilio, RISK_PDF_FIELDS.residencia);
   drawField(page, bold, riesgo.telefono || paciente.telefono, RISK_PDF_FIELDS.telefono);
   drawChoice(page, bold, riesgo.pueblo || paciente.pueblo, RISK_PDF_MARKS.pueblo);
   if (riesgo.migrante) drawMark(page, bold, RISK_PDF_MARKS.migrante);
