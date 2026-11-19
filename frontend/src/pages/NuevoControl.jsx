@@ -678,10 +678,12 @@ export default function NuevoControl({ consultationOnly = false }) {
         await api.put(`/pacientes/${id}/controles/${controlId}`, payload, { params: { embarazo_id: embarazoId } });
       } else {
         const response = await api.post(`/pacientes/${id}/controles`, payload, { params: { embarazo_id: embarazoId } });
-        setSavedControl({ id: response.data?.id });
+        setSavedControl({ id: response.data?.id, numero: response.data?.numero_control });
       }
-      toast(editando ? "Control actualizado exitosamente" : "Control registrado exitosamente", "success");
-      if (editando) setTimeout(() => navigate(expedientePath), 800);
+      if (editando) {
+        toast("Control actualizado exitosamente", "success");
+        setTimeout(() => navigate(expedientePath), 800);
+      }
     } catch (err) {
       const parsedFieldErrors = getFieldErrors(err);
       const nextFieldErrors = Object.keys(parsedFieldErrors).length
@@ -703,11 +705,18 @@ export default function NuevoControl({ consultationOnly = false }) {
   if (savedControl) {
     const path = seguimientoNotasPath({ pacienteId: id, embarazoId, controlId: savedControl.id });
     return <section className="card control-save-confirmation" aria-labelledby="control-guardado">
-      <h1 id="control-guardado" ref={savedHeading} tabIndex={-1}>Control registrado exitosamente</h1>
-      <p role="status">{path ? `Control ${savedControl.id} guardado.` : 'Control guardado. Recupera su identificación desde el expediente.'}</p>
-      <p>El control y la cita siguiente se conservan aunque no completes una nota ahora.</p>
-      {path && puedeLeerNotas(usuario) && <button type="button" className="btn-primary" onClick={() => navigate(path)}>Consultar seguimiento de notas</button>}
-      <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>Volver al expediente sin completar una nota</button>
+      <div className="seguimiento-confirmacion">
+        <span className="nota-section-icon" aria-hidden="true"><CheckCircle2 size={24} /></span>
+        <div>
+          <h1 id="control-guardado" ref={savedHeading} tabIndex={-1}>Control registrado exitosamente</h1>
+          {savedControl.numero != null && <p role="status">Control {savedControl.numero} guardado.</p>}
+          {!path && <p>Recupera su identificación desde el expediente.</p>}
+        </div>
+      </div>
+      <div className="nota-action-buttons">
+        {path && puedeLeerNotas(usuario) && <button type="button" className="btn-primary" onClick={() => navigate(path)}>Consultar seguimiento de notas</button>}
+        <button type="button" className="btn-secondary" onClick={() => navigate(expedientePath)}>Volver al expediente sin completar una nota</button>
+      </div>
     </section>;
   }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../hooks/useAuth';
@@ -14,11 +14,13 @@ export default function ForcedPasswordChange() {
   const themeKey = `theme:${usuario?.username || usuario?.id || 'default'}`;
   const [theme, setTheme] = useState(() => ({ key: themeKey, value: localStorage.getItem(themeKey) || localStorage.getItem('theme') || 'light' }));
   const currentTheme = theme.key === themeKey ? theme.value : localStorage.getItem(themeKey) || localStorage.getItem('theme') || 'light';
-  useEffect(() => {
+  const themeEnabled = Boolean(usuario?.requiere_cambio_password);
+  useLayoutEffect(() => {
+    if (!themeEnabled) return;
     document.documentElement.classList.toggle('dark', currentTheme === 'dark');
     localStorage.setItem(themeKey, currentTheme);
     localStorage.setItem('theme', currentTheme);
-  }, [currentTheme, themeKey]);
+  }, [currentTheme, themeKey, themeEnabled]);
   if (!usuario) return <Navigate to="/login" replace />;
   if (!usuario.requiere_cambio_password) return <Navigate to="/dashboard" replace />;
   const valid = validPassword(form.new_password) && form.new_password === form.confirm_password && form.new_password !== form.current_password && form.current_password;

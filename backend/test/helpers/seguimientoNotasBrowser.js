@@ -53,10 +53,14 @@ async function verificarSeguimientoBrowser({ apiPort, token, t }) {
       const control = await response.json(); assert.ok(Number.isInteger(control.id)); createdControls.push(control.id);
       await page.waitForSelector('#control-guardado');
       assert.equal(await page.$eval('#control-guardado', element => document.activeElement === element), true);
+      assert.ok(await page.$eval('.control-save-confirmation', (element, number) =>
+        element.textContent.includes(`Control ${number} guardado.`), control.numero_control));
       await page.screenshot({ path: path.join(artifacts, `confirmacion-${width}.png`), fullPage: true });
-      await page.locator('button::-p-text(Consultar seguimiento de notas)').click();
+      await page.click('.control-save-confirmation .btn-primary');
       await page.waitForSelector('.seguimiento-notas-form');
       assert.ok(page.url().includes(`/controles/${control.id}/seguimiento-notas?embarazo_id=11`));
+      assert.equal(await page.$eval('#seguimiento-control-guardado', element => element.textContent),
+        `Control ${control.numero_control} guardado`);
       const forms = await page.$$('.seguimiento-notas-form');
       const medical = forms[0];
       await (await medical.$('select')).select('externo');
@@ -64,11 +68,22 @@ async function verificarSeguimientoBrowser({ apiPort, token, t }) {
       const fields = await medical.$$('input');
       await fields[0].type('Médico navegador sintético');
       const confirmed = page.waitForResponse(result => result.url().includes(`/controles/${control.id}/seguimiento-notas`) && result.request().method() === 'POST');
+      await medical.$eval('button[type="submit"]', button => button.scrollIntoView({ block: 'center' }));
       await (await medical.$('button[type="submit"]')).click();
       assert.equal((await confirmed).status(), 200);
       await page.waitForFunction(() => document.querySelector('[aria-label="Seguimiento documental"]')?.textContent.includes('Nota pendiente'));
       await page.screenshot({ path: path.join(artifacts, `seguimiento-${width}.png`), fullPage: true });
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${width}: sin overflow horizontal`);
+      const cardsShareRow = await page.$$eval('.seguimiento-documento', cards =>
+        cards.length === 2 && cards[0].offsetTop === cards[1].offsetTop);
+      assert.equal(cardsShareRow, width === 1440, `${width}: distribución de tarjetas`);
+      const light = await page.$eval('.seguimiento-documento', element => getComputedStyle(element).backgroundColor);
+      await page.evaluate(() => document.documentElement.classList.add('dark'));
+      await page.waitForFunction(color => getComputedStyle(document.querySelector('.seguimiento-documento')).backgroundColor !== color, {}, light);
+      await page.$eval('.seguimiento-documento', element => Promise.all(element.getAnimations().map(animation => animation.finished)));
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${width}: tema oscuro sin overflow`);
+      await page.screenshot({ path: path.join(artifacts, `seguimiento-oscuro-${width}.png`), fullPage: true });
+      await page.evaluate(() => document.documentElement.classList.remove('dark'));
       // Abandono y recuperación desde expediente: ninguna nota se genera por navegar.
       await page.locator('button::-p-text(Volver al expediente sin completar una nota)').click();
       await page.waitForSelector('.prenatal-document-followup');

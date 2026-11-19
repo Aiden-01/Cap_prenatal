@@ -38,6 +38,7 @@ test('actualización versionada y finalización conservan responsable histórico
   vi.spyOn(api, 'post').mockResolvedValue({ data: { id: 7, version: 3, estado: 'captura_finalizada' } });
   mount({ notaId: 7 });
   await screen.findByRole('textbox', { name: 'Narrativa clínica' });
+  expect(screen.queryByRole('button', { name: /versión guardada|Descartar cambios/ })).toBeNull();
   fireEvent.change(screen.getByRole('textbox', { name: 'Narrativa clínica' }), { target: { value: 'Nuevo texto' } });
   expect(screen.getByRole('button', { name: 'Finalizar captura' }).disabled).toBe(true);
   fireEvent.submit(document.querySelector('form'));
@@ -48,11 +49,15 @@ test('actualización versionada y finalización conservan responsable histórico
   await screen.findByText('Captura finalizada', { selector: '.nota-status' });
   expect(api.post).toHaveBeenCalledWith('/pacientes/1/notas-clinicas/7/finalizar', { version: 2 });
   expect(screen.queryByRole('button', { name: 'Guardar borrador' })).toBeNull();
+  expect(screen.queryByRole('button', { name: /versión guardada|Descartar cambios/ })).toBeNull();
   expect(screen.getByRole('textbox', { name: 'Narrativa clínica' }).matches(':disabled')).toBe(true);
 });
 test('409 conserva texto y bloquea sobrescritura', async () => {
-  vi.spyOn(api, 'get').mockResolvedValue({ data: nota });
+  const get = vi.spyOn(api, 'get').mockResolvedValueOnce({ data: nota })
+    .mockRejectedValueOnce(new Error('fallo de red'))
+    .mockResolvedValueOnce({ data: { ...nota, contenido: 'Versión del servidor', version: 2 } });
   vi.spyOn(api, 'put').mockRejectedValue({ response: { status: 409 } });
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValue(true);
   mount({ notaId: 7 }); await screen.findByRole('textbox', { name: 'Narrativa clínica' });
   fireEvent.change(screen.getByRole('textbox', { name: 'Narrativa clínica' }), { target: { value: 'Texto local' } });
   fireEvent.submit(document.querySelector('form'));
@@ -60,6 +65,62 @@ test('409 conserva texto y bloquea sobrescritura', async () => {
   expect(screen.getByRole('textbox', { name: 'Narrativa clínica' }).value).toBe('Texto local');
   fireEvent.submit(document.querySelector('form'));
   expect(api.put).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole('button', { name: 'Descartar cambios' })).toBeNull();
+  const recargar = screen.getByRole('button', { name: 'Recargar versión guardada' });
+  fireEvent.click(recargar);
+  expect(confirm).toHaveBeenCalledWith(expect.stringContaining('se reemplazarán los cambios locales'));
+  expect(get).toHaveBeenCalledTimes(1);
+  fireEvent.click(recargar);
+  await screen.findByText(/Tus cambios siguen en el editor/);
+  const narrativa = screen.getByRole('textbox', { name: 'Narrativa clínica' });
+  expect(narrativa.value).toBe('Texto local');
+  expect(narrativa.matches(':disabled')).toBe(true);
+  expect(screen.queryByText('Versión guardada recargada.')).toBeNull();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Recargar versión guardada' }));
+  await screen.findByText('Versión guardada recargada.');
+  expect(narrativa.value).toBe('Versión del servidor');
+  expect(narrativa.matches(':disabled')).toBe(false);
+  expect(screen.queryByRole('button', { name: 'Recargar versión guardada' })).toBeNull();
+  fireEvent.change(narrativa, { target: { value: 'Siguiente edición' } });
+  fireEvent.submit(document.querySelector('form'));
+  await screen.findByText(/La nota cambió/);
+  expect(api.put).toHaveBeenLastCalledWith('/pacientes/1/notas-clinicas/7', expect.objectContaining({ version: 2 }));
+});
+
+test('descartar pide confirmación y restaura narrativa, fecha, hora y responsable solo tras una lectura exitosa', async () => {
+  const leerNota = vi.fn().mockResolvedValueOnce({ data: nota })
+    .mockResolvedValueOnce({ data: { id: nota.id } }).mockResolvedValueOnce({ data: nota });
+  vi.spyOn(api, 'get').mockImplementation(url => url === '/profesionales'
+    ? Promise.resolve({ data: { data: [], total: 0 } }) : leerNota());
+  vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValue(true);
+  mount({ notaId: 7 });
+  const narrativa = await screen.findByRole('textbox', { name: 'Narrativa clínica' });
+  const fecha = screen.getByLabelText('Fecha de atención');
+  const hora = screen.getByLabelText('Hora de atención');
+  const cambiarResponsable = screen.getByLabelText('Cambiar responsable');
+  fireEvent.change(narrativa, { target: { value: 'Narrativa local' } });
+  fireEvent.change(fecha, { target: { value: '2026-10-21' } });
+  fireEvent.change(hora, { target: { value: '08:45' } });
+  fireEvent.click(cambiarResponsable);
+  const descartar = screen.getByRole('button', { name: 'Descartar cambios' });
+  fireEvent.click(descartar);
+  expect(narrativa.value).toBe('Narrativa local');
+  expect(leerNota).toHaveBeenCalledTimes(1);
+  fireEvent.click(descartar);
+  await screen.findByText(/Tus cambios siguen en el editor/);
+  expect(narrativa.value).toBe('Narrativa local');
+  expect(fecha.value).toBe('2026-10-21');
+  expect(hora.value).toBe('08:45');
+  expect(cambiarResponsable.checked).toBe(true);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Descartar cambios' }));
+  await screen.findByText('Cambios descartados. Se restauró la versión guardada.');
+  expect(narrativa.value).toBe(nota.contenido);
+  expect(fecha.value).toBe(nota.fecha_atencion);
+  expect(hora.value).toBe('09:30');
+  expect(cambiarResponsable.checked).toBe(false);
+  expect(screen.queryByRole('button', { name: 'Descartar cambios' })).toBeNull();
 });
 test('reintento ambiguo conserva clave y payload y evita doble envío', async () => {
   vi.spyOn(api, 'post').mockRejectedValueOnce(new Error('network')).mockResolvedValue({ data: { id: 7 } });
@@ -119,8 +180,8 @@ test('nota recién creada permite recuperar versión guardada ante conflicto pos
   fireEvent.change(screen.getByRole('textbox', { name: 'Narrativa clínica' }), { target: { value: 'Edición local' } });
   fireEvent.submit(document.querySelector('form'));
   await screen.findByText(/La nota cambió/);
-  fireEvent.click(screen.getByRole('button', { name: 'Recuperar versión guardada' }));
-  await screen.findByRole('textbox', { name: 'Narrativa clínica' });
+  fireEvent.click(screen.getByRole('button', { name: 'Recargar versión guardada' }));
+  await screen.findByText('Versión guardada recargada.');
   expect(window.confirm).toHaveBeenCalledTimes(1);
   expect(screen.getByRole('textbox', { name: 'Narrativa clínica' }).value).toBe(nota.contenido);
   expect(screen.queryByText(/La nota cambió/)).toBeNull();
@@ -134,6 +195,20 @@ test('finalizador con permiso explícito puede cerrar sin permiso para editar', 
   fireEvent.click(screen.getByRole('button', { name: 'Finalizar captura' }));
   await screen.findByText('Captura finalizada', { selector: '.nota-status' });
   expect(api.post).toHaveBeenCalledWith('/pacientes/1/notas-clinicas/7/finalizar', { version: 1 });
+});
+test('conflicto al finalizar habilita recarga en un borrador sin cambios y muestra la captura finalizada de otro usuario', async () => {
+  vi.spyOn(api, 'get').mockResolvedValueOnce({ data: nota })
+    .mockResolvedValueOnce({ data: { ...nota, estado: 'captura_finalizada', version: 2 } });
+  vi.spyOn(api, 'post').mockRejectedValue({ response: { status: 409 } });
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  mount({ notaId: 7, usuario: { id: 2, permisos: ['notas_evolucion.ver', 'notas_evolucion.finalizar_captura'] } });
+  fireEvent.click(await screen.findByRole('button', { name: 'Finalizar captura' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Recargar versión guardada' }));
+  await screen.findByText('Versión guardada recargada.');
+  expect(confirm).toHaveBeenCalledTimes(1);
+  expect(screen.getByText('Captura finalizada', { selector: '.nota-status' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Recargar versión guardada' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Finalizar captura' })).toBeNull();
 });
 test('descarga PDF de nota guardada con permiso de lectura y sin metadatos clínicos en nombre', async () => {
   const createObjectURL = vi.fn(() => 'blob:synthetic-pdf');

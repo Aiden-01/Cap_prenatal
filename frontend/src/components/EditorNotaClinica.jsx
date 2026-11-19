@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../api/axios';
 import { descargarNotaPdf } from '../api/notasClinicas';
 import ResponsableNota from './ResponsableNota';
@@ -21,7 +21,7 @@ export default function EditorNotaClinica({ pacienteId, paciente, usuario, tipo,
   const [responsable, setResponsable] = useState({ tipo: '' });
   const [cambiarResponsable, setCambiarResponsable] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [recoveryId, setRecoveryId] = useState(null);
+  const [recovering, setRecovering] = useState(false);
   const [reintentoPendiente, setReintentoPendiente] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [confirmedId, setConfirmedId] = useState(null);
@@ -29,23 +29,60 @@ export default function EditorNotaClinica({ pacienteId, paciente, usuario, tipo,
   const pendingCreate = useRef(null);
   const confirmedCreateId = useRef(null);
   const base = `/pacientes/${pacienteId}/notas-clinicas`;
-  const targetId = notaId || recoveryId;
+  const aplicarVersionGuardada = useCallback(data => {
+    const horaGuardada = data.hora_atencion?.slice(0, 5) || '';
+    setNota(data);
+    setContenido(data.contenido);
+    setFecha(data.fecha_atencion || '');
+    setHora(horaGuardada);
+    setCambiarResponsable(false);
+    setResponsable({ tipo: '' });
+  }, []);
   useEffect(() => {
-    if (!targetId) return;
+    if (!notaId) return;
     let active = true;
-    api.get(`${base}/${targetId}`).then(({ data }) => {
+    api.get(`${base}/${notaId}`).then(({ data }) => {
       if (!active) return;
-      setNota(data); setContenido(data.contenido); setFecha(data.fecha_atencion || '');
-      setHora(data.hora_atencion?.slice(0, 5) || ''); setConflict(false); setError('');
-      setCambiarResponsable(false); setLoading(false);
+      aplicarVersionGuardada(data);
+      setConflict(false); setError(''); setLoading(false);
     }).catch(err => { if (active) { setError(errorNota(err, 'No se pudo recuperar la nota.')); setLoading(false); } });
     return () => { active = false; };
-  }, [base, targetId, revision]);
+  }, [base, notaId, revision, aplicarVersionGuardada]);
   const actualTipo = nota?.tipo || tipo;
   const prefijo = actualTipo === 'nota_evolucion' ? 'notas_evolucion' : 'notas_enfermeria';
   const can = action => usuario?.permisos?.includes(`${prefijo}.${action}`);
   const lectura = readOnly || nota?.estado === 'captura_finalizada';
   const frozen = lectura || !can('registrar');
+  const dirty = nota && (contenido !== nota.contenido || fecha !== (nota.fecha_atencion || '') || hora !== (nota.hora_atencion?.slice(0, 5) || '') || cambiarResponsable);
+  const busy = saving || downloading || recovering;
+  const recoveryId = nota?.id || confirmedId;
+  const showRecovery = recoveryId && (conflict || (dirty && !frozen));
+  const recuperar = async () => {
+    if (lock.current || !showRecovery) return;
+    const mensaje = conflict
+      ? 'Se cargará la versión del servidor y se reemplazarán los cambios locales. ¿Recargar versión guardada?'
+      : 'Se descartarán tus cambios locales y se cargará la versión guardada. ¿Continuar?';
+    if (!window.confirm(mensaje)) return;
+
+    lock.current = true;
+    setRecovering(true); setError(''); setNotice('');
+    try {
+      const { data } = await api.get(`${base}/${recoveryId}`);
+      if (data?.id !== recoveryId || !Number.isInteger(data.version) || typeof data.contenido !== 'string') {
+        throw new Error('Respuesta de nota inválida');
+      }
+      aplicarVersionGuardada(data);
+      setConflict(false);
+      pendingCreate.current = null;
+      setReintentoPendiente(false);
+      setNotice(conflict ? 'Versión guardada recargada.' : 'Cambios descartados. Se restauró la versión guardada.');
+    } catch (err) {
+      setError(`${errorNota(err, 'No se pudo recuperar la versión guardada.')} Tus cambios siguen en el editor.`);
+    } finally {
+      lock.current = false;
+      setRecovering(false);
+    }
+  };
   const save = async event => {
     event.preventDefault();
     if (lock.current || frozen || conflict) return;
@@ -72,11 +109,12 @@ export default function EditorNotaClinica({ pacienteId, paciente, usuario, tipo,
       const recovered = await api.get(`${base}/${result.data.id}`);
       const editsAfterRequest = reintentoPendiente && pendingCreate.current &&
         ['contenido', 'fecha_atencion', 'hora_atencion', 'responsable'].some(field => JSON.stringify(fields[field]) !== JSON.stringify(pendingCreate.current[field]));
-      setNota(recovered.data);
       if (!editsAfterRequest) {
-        setContenido(recovered.data.contenido); setFecha(recovered.data.fecha_atencion || '');
-        setHora(recovered.data.hora_atencion?.slice(0, 5) || ''); setCambiarResponsable(false);
-      } else setCambiarResponsable(JSON.stringify(fields.responsable) !== JSON.stringify(pendingCreate.current.responsable));
+        aplicarVersionGuardada(recovered.data);
+      } else {
+        setNota(recovered.data);
+        setCambiarResponsable(JSON.stringify(fields.responsable) !== JSON.stringify(pendingCreate.current.responsable));
+      }
       pendingCreate.current = null; setReintentoPendiente(false);
       setNotice(`Borrador guardado correctamente · Nota ${recovered.data.id}`);
       if (!editsAfterRequest) onSaved?.(recovered.data);
@@ -113,7 +151,6 @@ export default function EditorNotaClinica({ pacienteId, paciente, usuario, tipo,
   };
   if (loading) return <p role="status">Cargando nota…</p>;
   if (notaId && !nota) return <div role="alert">{error}<button onClick={() => setRevision(value => value + 1)}>Reintentar</button></div>;
-  const dirty = nota && (contenido !== nota.contenido || fecha !== (nota.fecha_atencion || '') || hora !== (nota.hora_atencion?.slice(0, 5) || '') || cambiarResponsable);
   return <section className="nota-clinica card" aria-label="Editor de nota clínica">
     <header className="nota-editor-header">
       <span className="nota-section-icon"><FileText size={22} aria-hidden="true" /></span>
@@ -122,7 +159,7 @@ export default function EditorNotaClinica({ pacienteId, paciente, usuario, tipo,
       <span className={`nota-status ${nota?.estado === 'captura_finalizada' ? 'is-final' : ''}`}>{ESTADOS_NOTA[nota?.estado] || 'Nuevo borrador'}</span>
     </header>
     <form className="seguimiento-notas-form nota-editor-form" onSubmit={save} noValidate>
-      <fieldset disabled={saving || downloading || frozen || conflict}>
+      <fieldset disabled={busy || frozen || conflict}>
         <legend className="sr-only">Datos de la nota</legend>
         <section className="nota-editor-section" aria-labelledby="nota-atencion-title">
           <h3 id="nota-atencion-title"><CalendarDays size={18} aria-hidden="true" />Información de la atención</h3>
@@ -158,14 +195,13 @@ export default function EditorNotaClinica({ pacienteId, paciente, usuario, tipo,
       <footer className="nota-editor-actions">
         <div><strong>{saving ? 'Guardando…' : dirty || !nota ? 'Cambios pendientes' : 'Documento guardado'}</strong><small>Finalizar captura no equivale a firma clínica. Una captura finalizada no admite cambios.</small></div>
         <div className="nota-action-buttons">
-          {!frozen && <button type="submit" className="btn-primary" disabled={saving || downloading || conflict}><Save size={16} aria-hidden="true" />{saving ? 'Guardando…' : 'Guardar borrador'}</button>}
-          {!lectura && nota && can('finalizar_captura') && <button type="button" className="btn-primary" disabled={saving || downloading || conflict || dirty || !fecha || !hora || !contenido.trim()} onClick={finalizar}><CheckCircle size={16} aria-hidden="true" />Finalizar captura</button>}
-          {nota && can('ver') && <button type="button" className="btn-secondary" disabled={saving || downloading || dirty || conflict} onClick={descargarPdf}><Download size={16} aria-hidden="true" />{downloading ? 'Generando PDF…' : 'Descargar PDF institucional'}</button>}
-          {(notaId || nota?.id) && !saving && <button type="button" className="btn-secondary" disabled={downloading} onClick={() => {
-            if (!dirty || window.confirm('Se reemplazará el texto local por la versión guardada. ¿Continuar?')) {
-              setRecoveryId(nota?.id); setRevision(value => value + 1); setLoading(true);
-            }
-          }}><RotateCcw size={16} aria-hidden="true" />Recuperar versión guardada</button>}
+          {!frozen && <button type="submit" className="btn-primary" disabled={busy || conflict}><Save size={16} aria-hidden="true" />{saving ? 'Guardando…' : 'Guardar borrador'}</button>}
+          {!lectura && nota && can('finalizar_captura') && <button type="button" className="btn-primary" disabled={busy || conflict || dirty || !fecha || !hora || !contenido.trim()} onClick={finalizar}><CheckCircle size={16} aria-hidden="true" />Finalizar captura</button>}
+          {nota && can('ver') && <button type="button" className="btn-secondary" disabled={busy || dirty || conflict} onClick={descargarPdf}><Download size={16} aria-hidden="true" />{downloading ? 'Generando PDF…' : 'Descargar PDF institucional'}</button>}
+          {showRecovery && <button type="button" className="btn-secondary" disabled={busy} onClick={recuperar}>
+            <RotateCcw size={16} aria-hidden="true" />
+            {recovering ? 'Recargando…' : conflict ? 'Recargar versión guardada' : 'Descartar cambios'}
+          </button>}
         </div>
       </footer>
     </form>

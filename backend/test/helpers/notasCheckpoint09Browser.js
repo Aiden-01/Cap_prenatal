@@ -137,6 +137,12 @@ async function verificarNotas09({ apiPort, tokens, setMedicalRegistration, setPr
     await page.waitForSelector('.nota-error'); assert.ok(await page.$eval('.nota-clinica textarea', el => el.value.includes('no debe perderse')));
     await setMedicalRegistration(true);
     const faultNote = await create('Borrador para conflicto de versión');
+    await page.waitForFunction(() => ![...document.querySelectorAll('.nota-editor-actions button')]
+      .some(button => ['Descartar cambios', 'Recargar versión guardada'].includes(button.textContent.trim())));
+    await setText('.nota-clinica textarea', 'Edición local para descartar');
+    await click('Descartar cambios');
+    await page.waitForFunction(() => document.querySelector('.nota-success')?.textContent.includes('Cambios descartados'));
+    assert.equal(await page.$eval('.nota-clinica textarea', el => el.value), 'Borrador para conflicto de versión');
     const alternate = await page.evaluate(async id => {
       const response = await fetch(`/api/pacientes/1/notas-clinicas/${id}`, { method: 'PUT', headers: { 'content-type': 'application/json', 'x-csrf-token': 'synthetic' }, body: JSON.stringify({ version: 1, contenido: 'Edición concurrente sintética' }) });
       return response.status;
@@ -146,7 +152,9 @@ async function verificarNotas09({ apiPort, tokens, setMedicalRegistration, setPr
     await click('Guardar borrador'); assert.equal((await conflict).status(), 409);
     await page.waitForFunction(() => document.querySelector('.nota-error')?.textContent.includes('cambió'));
     assert.equal(await page.$eval('.nota-clinica textarea', el => el.value), 'Texto local preservado ante 409');
-    await click('Recuperar versión guardada'); await page.waitForFunction(() => document.querySelector('.nota-clinica textarea')?.value === 'Edición concurrente sintética');
+    await click('Recargar versión guardada');
+    await page.waitForFunction(() => document.querySelector('.nota-success')?.textContent.includes('Versión guardada recargada'));
+    assert.equal(await page.$eval('.nota-clinica textarea', el => el.value), 'Edición concurrente sintética');
     const missing = await page.evaluate(async () => { const r = await fetch('/api/pacientes/999/notas-clinicas'); return { status: r.status, body: await r.json() }; });
     assert.equal(missing.status, 404); assert.equal(missing.body.code, 'PACIENTE_NO_ENCONTRADA');
     await page.goto(`${origin}/pacientes/1?tab=notas&embarazo_id=12`, { waitUntil: 'networkidle0' });

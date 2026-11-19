@@ -16,12 +16,12 @@ const medical = ['notas_evolucion.ver', 'notas_evolucion.registrar'];
 const nursing = ['notas_enfermeria.ver', 'notas_enfermeria.registrar'];
 const control = { id: 3, numero_control: 1, fecha: '2026-10-20', edad_gestacional_semanas: 20,
   peso_kg: 60, fcf: 140, presentacion_fetal: 'cefálica', nombre_cargo_atiende: 'Médico textual sin confirmar' };
-const row = (documentos = [], elegible = true) => ({ control_prenatal_id: 3, elegible, documentos });
+const row = (documentos = [], elegible = true) => ({ control_prenatal_id: 3, numero_control: 1, elegible, documentos });
 const doc = (estado, tipo = 'nota_evolucion') => ({ tipo, estado, nota_id: estado === 'pendiente' ? null : 7,
   responsable_previsto: { nombre_completo: 'Profesional sintético' } });
 function Location() { const location = useLocation(); return <output data-testid="location">{location.pathname}{location.search}</output>; }
 function mount({ entry = '/pacientes/1/controles/nuevo?embarazo_id=2', permisos = [...medical, ...nursing],
-  estado = 'activo', seguimiento = [row()], reject = false, controls = [control], postData = { id: 3 } } = {}) {
+  estado = 'activo', seguimiento = [row()], reject = false, controls = [control], postData = control } = {}) {
   auth.usuario = { id: 1, rol: 'personal_salud', permisos: ['pacientes.ver', 'controles.crear', 'controles.editar', ...permisos] };
   vi.spyOn(api, 'get').mockImplementation(async url => {
     if (url.endsWith('/seguimiento-notas')) {
@@ -31,6 +31,7 @@ function mount({ entry = '/pacientes/1/controles/nuevo?embarazo_id=2', permisos 
     return { data: url.endsWith('/expediente') ? {
       paciente: { id: 1, nombres: 'Paciente sintética', apellidos: 'Prueba' }, is_read_only: estado === 'cerrado',
       embarazo_seleccionado: { id: 2, estado, fur: '2026-01-01' },
+      controles_prenatales: controls,
     } : url.endsWith('/controles') ? [] : control };
   });
   vi.spyOn(api, 'post').mockResolvedValue({ data: postData });
@@ -97,7 +98,7 @@ for (const width of [390, 1366]) {
     fireEvent.submit(form); fireEvent.submit(form);
     const heading = await screen.findByRole('heading', { name: 'Control registrado exitosamente' });
     await waitFor(() => expect(document.activeElement).toBe(heading));
-    expect(screen.getByText('Control 3 guardado.')).toBeTruthy();
+    expect(screen.getByText('Control 1 guardado.')).toBeTruthy();
     expect(api.post).toHaveBeenCalledTimes(1);
     expect(api.post.mock.calls[0][0]).toBe('/pacientes/1/controles');
     expect(screen.queryByRole('button', { name: /Guardar control/ })).toBeNull();
@@ -114,11 +115,17 @@ test('ID real lleva a pantalla existente; fallo de seguimiento conserva resultad
   fireEvent.submit(document.querySelector('form'));
   fireEvent.click(await screen.findByRole('button', { name: 'Consultar seguimiento de notas' }));
   expect(await screen.findByText(/No se pudo consultar el seguimiento documental/)).toBeTruthy();
+  expect(await screen.findByRole('heading', { name: 'Control 1 guardado' })).toBeTruthy();
   expect(screen.getByTestId('location').textContent).toBe('/pacientes/1/controles/3/seguimiento-notas?embarazo_id=2');
   expect(api.post).toHaveBeenCalledTimes(1);
   api.get.mockResolvedValue({ data: { data: [row()] } });
   fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
-  expect(await screen.findByText('Tipo de nota por definir para los documentos que puedes consultar.')).toBeTruthy();
+  const evolucion = within(await screen.findByRole('article', { name: 'Evolución médica' }));
+  const enfermeria = within(screen.getByRole('article', { name: 'Enfermería' }));
+  for (const tarjeta of [evolucion, enfermeria]) {
+    expect(await tarjeta.findByText('Sin confirmar')).toBeTruthy();
+    expect(tarjeta.getByLabelText('Profesional que atendió')).toBeTruthy();
+  }
 });
 test('respuesta antigua sin ID no ofrece navegación inválida ni un segundo POST', async () => {
   mount({ postData: {} });
@@ -145,6 +152,13 @@ for (const estado of ['pendiente', 'borrador', 'captura_finalizada']) {
     expect(api.get.mock.calls[0][1].params.controles_ids).toBe('3');
     fireEvent.click(screen.getByRole('button', { name: 'Seguimiento de notas del control 1' }));
     expect(await screen.findByRole('heading', { name: 'Seguimiento documental del control' })).toBeTruthy();
+    const evolucion = within(screen.getByRole('article', { name: 'Evolución médica' }));
+    const enfermeria = within(screen.getByRole('article', { name: 'Enfermería' }));
+    expect(await evolucion.findByText(label)).toBeTruthy();
+    expect(enfermeria.getByText('Sin confirmar')).toBeTruthy();
+    expect(evolucion.queryByLabelText('Profesional que atendió')).toBeNull();
+    fireEvent.click(evolucion.getByRole('button', { name: 'Abrir nota de evolución' }));
+    expect(screen.getByTestId('location').textContent).toBe('/pacientes/1/notas?embarazo_id=2&control_id=3&tipo=nota_evolucion');
     expect(screen.queryByRole('button', { name: /Editar nota|Completar nota|PDF/ })).toBeNull();
   });
 }
@@ -171,7 +185,7 @@ test('solo lectura médica no permite confirmar ni revela enfermería', async ()
   mount({ entry: '/pacientes/1/controles/3/seguimiento-notas?embarazo_id=2', permisos: ['notas_evolucion.ver'], seguimiento: [row([doc('pendiente')])] });
   await screen.findByText(/Profesional sintético/);
   expect(screen.queryByRole('button', { name: 'Confirmar seguimiento' })).toBeNull();
-  expect(screen.queryByText(/evolución de enfermería/)).toBeNull();
+  expect(screen.queryByRole('article', { name: 'Enfermería' })).toBeNull();
 });
 test('confirmación externa explícita no infiere del campo libre ni del rol y no crea notas', async () => {
   mount({ entry: '/pacientes/1/controles/3/seguimiento-notas?embarazo_id=2', permisos: medical });
@@ -190,7 +204,7 @@ test('confirmación externa explícita no infiere del campo libre ni del rol y n
 });
 test('embarazo cerrado permite consultar sin formulario de confirmación', async () => {
   mount({ entry: '/pacientes/1/controles/3/seguimiento-notas?embarazo_id=2', estado: 'cerrado' });
-  await screen.findByText(/Tipo de nota por definir/);
+  await within(screen.getByRole('article', { name: 'Evolución médica' })).findByText('Sin confirmar');
   expect(screen.queryByRole('button', { name: 'Confirmar seguimiento' })).toBeNull();
   expect(screen.getByRole('button', { name: 'Volver al expediente sin completar una nota' })).toBeTruthy();
 });

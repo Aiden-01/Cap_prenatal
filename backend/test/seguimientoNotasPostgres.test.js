@@ -91,7 +91,7 @@ test('CPREN-119: seguimiento, controles y notas en PostgreSQL temporal propio', 
       assert.deepEqual((await db.query('SELECT * FROM usuario_permisos ORDER BY id')).rows, grants);
       assert.equal((await db.query('SELECT count(*)::int AS n FROM controles_seguimiento_notas')).rows[0].n, 0);
     });
-    for (const filename of fs.readdirSync(path.join(__dirname, '../src/db/migrations')).filter(name => /^(028|029|030)_/.test(name)).sort()) {
+    for (const filename of fs.readdirSync(path.join(__dirname, '../src/db/migrations')).filter(name => /^(028|029|030|031|032)_/.test(name)).sort()) {
       await db.query(fs.readFileSync(path.join(__dirname, '../src/db/migrations', filename), 'utf8'));
     }
     await db.query("UPDATE cargos_personal SET codigo=NULL WHERE codigo IN ('MED','AE','EP'); UPDATE cargos_personal SET codigo=CASE id WHEN 101 THEN 'MED' WHEN 102 THEN 'AE' WHEN 103 THEN 'EP' ELSE codigo END WHERE id IN (101,102,103)");
@@ -325,7 +325,7 @@ test('CPREN-119: seguimiento, controles y notas en PostgreSQL temporal propio', 
       const setPregnancyState = estado => db.query('UPDATE embarazos SET estado=$1 WHERE id=11', [estado]);
       const count = (await db.query('SELECT count(*)::int AS n FROM notas_clinicas')).rows[0].n;
       const ids = await require('./helpers/notasCheckpoint09Browser').verificarNotas09({ apiPort: server.address().port, tokens, setMedicalRegistration, setPregnancyState, t,
-        outputDirectory: process.env.CPREN_CHECKPOINT12 === '1' ? 'checkpoint12' : process.env.RUN_NOTAS_11_BROWSER === '1' ? 'checkpoint11' : process.env.RUN_NOTAS_10_BROWSER === '1' ? 'checkpoint10' : 'checkpoint09' });
+        outputDirectory: process.env.NOTAS_BROWSER_OUTPUT_DIR || (process.env.CPREN_CHECKPOINT12 === '1' ? 'checkpoint12' : process.env.RUN_NOTAS_11_BROWSER === '1' ? 'checkpoint11' : process.env.RUN_NOTAS_10_BROWSER === '1' ? 'checkpoint10' : 'checkpoint09') });
       assert.equal(ids.length, 7); assert.equal((await db.query('SELECT count(*)::int AS n FROM notas_clinicas')).rows[0].n, count + 7);
     });
     await t.test('instalación nueva y bootstrap oficial incluyen 027 y checksums', async () => {

@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useLayoutEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3,
@@ -30,6 +30,7 @@ export default function Login() {
   const [error, setError]     = useState("");
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+  const usernameInput = useRef(null);
   const fieldErrors = useFieldErrors(FIELD_LABELS);
   const { login }  = useAuth();
   const navigate   = useNavigate();
@@ -37,6 +38,11 @@ export default function Login() {
   const [sessionMessage] = useState(
     () => location.state?.sessionMessage || consumeAuthNotice()
   );
+
+  useLayoutEffect(() => {
+    document.documentElement.classList.remove("dark");
+    usernameInput.current?.focus();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -217,7 +223,7 @@ export default function Login() {
                 value={form.username}
                 onChange={(e) => fieldErrors.setFormValue(setForm, "username", e.target.value)}
                 required
-                autoFocus
+                ref={usernameInput}
               />
             </div>
             {fieldErrors.fieldError("username") && <div className="field-error-text">{fieldErrors.fieldError("username")}</div>}

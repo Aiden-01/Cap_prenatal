@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ArrowRight, Check, CheckCircle2, ClipboardList, Clock3, FilePenLine, HeartPulse, Stethoscope } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../hooks/useAuth';
 import { useSeguimientoNotas } from '../hooks/useSeguimientoNotas';
-import SeguimientoNotaEstado from '../components/SeguimientoNotaEstado';
-import { TIPOS_NOTA } from '../utils/seguimientoNotas';
+import { ESTADOS_NOTA, TIPOS_NOTA } from '../utils/seguimientoNotas';
 import { getErrorMessage } from '../utils/errorMessage';
-import { ClinicalWorkflowShell, ClinicalSection } from '../components/clinical/ClinicalWorkflow';
+import { ClinicalNotice, ClinicalWorkflowShell } from '../components/clinical/ClinicalWorkflow';
 import './seguimiento-notas.css';
 
 function ConfirmarProfesional({ tipo, pacienteId, embarazoId, controlId, onConfirmed }) {
@@ -48,14 +48,12 @@ function ConfirmarProfesional({ tipo, pacienteId, embarazoId, controlId, onConfi
     finally { lock.current = false; setSaving(false); }
   };
   return <form onSubmit={submit} className="seguimiento-notas-form">
-    <h3>{TIPOS_NOTA[tipo]}</h3>
-    <p>Confirma quién atendió. Esta decisión registra un pendiente y no crea una nota.</p>
     <fieldset disabled={saving}>
       <label>Profesional que atendió
         <select required value={modo} onChange={event => { setModo(event.target.value); setProfesionalId(''); }}>
-          <option value="">Sin confirmar</option>
-          <option value="autenticado">Yo atendí (el servidor validará mi cargo)</option>
-          <option value="usuario">Otro profesional del directorio</option>
+          <option value="">Selecciona quién atendió</option>
+          <option value="autenticado">Yo atendí</option>
+          <option value="usuario">Profesional del directorio</option>
           <option value="externo">Profesional externo</option>
         </select>
       </label>
@@ -75,11 +73,15 @@ function ConfirmarProfesional({ tipo, pacienteId, embarazoId, controlId, onConfi
         </select></label>}
       <p className="nota-muted">Identidad externa declarada; no verificada por el establecimiento.</p>
 </>}
-      <button className="btn-primary" type="submit" disabled={!modo || saving}>{saving ? 'Confirmando…' : 'Confirmar seguimiento'}</button>
+      <button className="btn-primary" type="submit" disabled={!modo || saving}>
+        <Check size={16} aria-hidden="true" /> {saving ? 'Confirmando…' : 'Confirmar seguimiento'}
+      </button>
     </fieldset>
-    {error && <p role="alert">{error}</p>}
+    {error && <p className="nota-error" role="alert">{error}</p>}
   </form>;
 }
+
+const ICONOS_ESTADO = { pendiente: Clock3, borrador: FilePenLine, captura_finalizada: CheckCircle2 };
 
 export default function SeguimientoNotasControl() {
   const { id, controlId } = useParams();
@@ -99,39 +101,81 @@ export default function SeguimientoNotasControl() {
   }, [id, embarazoId, contextKey]);
   const exp = contexto?.key === contextKey ? contexto.data : null;
   const row = seguimiento.data.find(item => item.control_prenatal_id === Number(controlId));
+  const control = exp?.controles_prenatales?.find(item => Number(item.id) === Number(controlId));
+  const numeroControl = row?.numero_control ?? control?.numero_control;
   const editable = exp && !exp.is_read_only && ['activo', 'puerperio'].includes(exp.embarazo_seleccionado?.estado);
+  const soloLectura = exp && !editable;
   const expediente = `/pacientes/${id}?embarazo_id=${encodeURIComponent(embarazoId || '')}&tab=controles`;
-  return <ClinicalWorkflowShell title="Seguimiento documental del control" mode={editable ? 'Seguimiento' : 'readonly'}
-    description={`Control ${row?.numero_control ?? 'asociado'} · Embarazo ${embarazoId || 'sin seleccionar'}`}
+  return <ClinicalWorkflowShell title="Seguimiento documental del control" mode={soloLectura ? 'readonly' : 'Seguimiento'}
+    icon={ClipboardList} className="seguimiento-control"
     patientName={exp?.paciente ? `${exp.paciente.nombres} ${exp.paciente.apellidos}` : undefined}
     onBack={() => navigate(expediente)}>
-    <ClinicalSection title="Estado de las notas">
-      <p>El control y su cita siguiente se conservan aunque dejes la nota para después.</p>
-      <p>Confirma solo los tipos correspondientes a los profesionales que atendieron. Si no conoces su identidad, puedes dejarla sin determinar.</p>
-      {!seguimiento.enabled && <p role="alert">Selecciona un contexto válido y verifica tus permisos de lectura de notas.</p>}
-      {seguimiento.loading && <p role="status">Cargando seguimiento…</p>}
-      {seguimiento.error && <div role="alert"><p>No se pudo consultar el seguimiento documental. El control permanece guardado.</p><button className="btn-secondary" onClick={seguimiento.retry}>Reintentar</button></div>}
-      {!seguimiento.loading && !seguimiento.error && <SeguimientoNotaEstado seguimiento={row} />}
-      {row?.documentos.map(documento => <div key={documento.tipo}>
-        <p>{TIPOS_NOTA[documento.tipo]} — Responsable {documento.responsable_nota ? 'de la nota' : 'previsto'}: {(documento.responsable_nota || documento.responsable_previsto)?.nombre_completo}</p>
-        {documento.responsable_nota && documento.responsable_previsto && <p>Profesional previsto al confirmar el seguimiento: {documento.responsable_previsto.nombre_completo}</p>}
-      </div>)}
-      <p>La captura finalizada es un cierre administrativo. No equivale a firma clínica.</p>
+    {(row || control) && <section className="card seguimiento-confirmacion" aria-labelledby="seguimiento-control-guardado">
+      <span className="nota-section-icon" aria-hidden="true"><CheckCircle2 size={24} /></span>
+      <div>
+        <h2 id="seguimiento-control-guardado">{numeroControl == null ? 'Control guardado' : `Control ${numeroControl} guardado`}</h2>
+        <p>Puedes completar las notas ahora o retomarlas desde el expediente.</p>
+      </div>
+    </section>}
+    {!seguimiento.enabled && <ClinicalNotice variant="restriction">Verifica el contexto del control y tus permisos de consulta.</ClinicalNotice>}
+    {seguimiento.loading && <p role="status">Cargando seguimiento…</p>}
+    {seguimiento.error && <ClinicalNotice variant="error" title="No se pudo consultar el seguimiento documental.">
+      <button type="button" className="btn-secondary" onClick={seguimiento.retry}>Reintentar</button>
+    </ClinicalNotice>}
+    {contexto?.key === contextKey && contexto.error && <ClinicalNotice variant="error">
+      No se pudo cargar el contexto clínico para confirmar el seguimiento.
+    </ClinicalNotice>}
+    <div className="seguimiento-documentos" role="group" aria-label="Seguimiento documental">
       {Object.entries(TIPOS_NOTA).map(([tipo, titulo]) => {
-        const prefijo = tipo === 'nota_evolucion' ? 'notas_evolucion' : 'notas_enfermeria';
-        return usuario?.permisos?.includes(`${prefijo}.ver`) ? <button key={tipo} type="button" className="btn-secondary"
-          onClick={() => navigate(`/pacientes/${id}/notas?embarazo_id=${embarazoId}&control_id=${controlId}&tipo=${tipo}`)}>Abrir {titulo.toLowerCase()}</button> : null;
+        const medicina = tipo === 'nota_evolucion';
+        const prefijo = medicina ? 'notas_evolucion' : 'notas_enfermeria';
+        if (!usuario?.permisos?.includes(`${prefijo}.ver`)) return null;
+        const documento = row?.documentos.find(item => item.tipo === tipo);
+        const confirmar = editable && row?.elegible && !documento && usuario.permisos.includes(`${prefijo}.registrar`);
+        const estado = documento?.estado;
+        const estadoTexto = documento ? ESTADOS_NOTA[estado] || 'Estado no disponible'
+          : row?.elegible ? 'Sin confirmar' : 'Sin seguimiento';
+        const IconoEstado = ICONOS_ESTADO[estado];
+        const IconoNota = medicina ? Stethoscope : HeartPulse;
+        const responsable = documento?.responsable_nota || documento?.responsable_previsto;
+        return <article className={`card seguimiento-documento ${medicina ? '' : 'is-enfermeria'}`} key={tipo} aria-labelledby={tipo}>
+          <header className="seguimiento-documento-header">
+            <span className="nota-section-icon" aria-hidden="true"><IconoNota size={22} /></span>
+            <h2 id={tipo}>{medicina ? 'Evolución médica' : 'Enfermería'}</h2>
+            {row && <span className="nota-status seguimiento-estado" data-estado={estado}>
+              {IconoEstado && <IconoEstado size={14} aria-hidden="true" />}
+              {estadoTexto}
+            </span>}
+          </header>
+          {responsable && <dl className="seguimiento-responsables">
+            <div>
+              <dt>{documento.responsable_nota ? 'Responsable de la nota' : 'Profesional previsto'}</dt>
+              <dd>{responsable.nombre_completo}</dd>
+            </div>
+            {documento.responsable_nota && documento.responsable_previsto && <div>
+              <dt>Profesional previsto al confirmar</dt>
+              <dd>{documento.responsable_previsto.nombre_completo}</dd>
+            </div>}
+          </dl>}
+          {estado === 'captura_finalizada' && <p className="nota-muted">Cierre administrativo sin firma clínica.</p>}
+          {confirmar && <>
+            <p className="nota-muted">Confirma quién atendió para dejar la nota pendiente.</p>
+            <ConfirmarProfesional key={controlId} tipo={tipo} pacienteId={id} embarazoId={embarazoId}
+              controlId={controlId} onConfirmed={seguimiento.retry} />
+          </>}
+          <div className="seguimiento-documento-acciones">
+            <button type="button" className="btn-secondary" aria-label={`Abrir ${titulo.toLowerCase()}`}
+              onClick={() => navigate(`/pacientes/${id}/notas?embarazo_id=${embarazoId}&control_id=${controlId}&tipo=${tipo}`)}>
+              Abrir nota <ArrowRight size={16} aria-hidden="true" />
+            </button>
+          </div>
+        </article>;
       })}
-      <button type="button" className="btn-secondary" onClick={() => navigate(expediente)}>Volver al expediente sin completar una nota</button>
-    </ClinicalSection>
-    {contexto?.error && <p role="alert">No se pudo cargar el contexto clínico. No se habilitarán confirmaciones.</p>}
-    {editable && row?.elegible && !seguimiento.loading && !seguimiento.error && Object.entries(TIPOS_NOTA).map(([tipo]) => {
-      const prefijo = tipo === 'nota_evolucion' ? 'notas_evolucion' : 'notas_enfermeria';
-      return usuario?.permisos?.includes(`${prefijo}.ver`) && usuario.permisos.includes(`${prefijo}.registrar`)
-        && !row.documentos.some(documento => documento.tipo === tipo)
-        ? <ClinicalSection key={tipo} title={`Definir ${TIPOS_NOTA[tipo].toLowerCase()}`}>
-          <ConfirmarProfesional tipo={tipo} pacienteId={id} embarazoId={embarazoId} controlId={controlId} onConfirmed={seguimiento.retry} />
-        </ClinicalSection> : null;
-    })}
+    </div>
+    <footer className="seguimiento-volver">
+      <button type="button" className="btn-secondary" onClick={() => navigate(expediente)}>
+        <Clock3 size={16} aria-hidden="true" /> Volver al expediente sin completar una nota
+      </button>
+    </footer>
   </ClinicalWorkflowShell>;
 }
