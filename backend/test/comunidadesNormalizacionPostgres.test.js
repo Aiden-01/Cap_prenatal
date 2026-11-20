@@ -57,7 +57,9 @@ test('033 conserva datos y rollback; las lecturas territoriales reflejan el cat√
   let db;
   try {
     run('initdb', ['-D', dataDir, '-U', database.user, '-A', 'trust', '--no-locale', '-E', 'UTF8']);
-    run('pg_ctl', ['-D', dataDir, '-l', path.join(root, 'postgres.log'), '-o', `-h 127.0.0.1 -p ${database.port}`, '-w', 'start']);
+    const serverOptions = `-h 127.0.0.1 -p ${database.port}`
+      + (process.platform === 'win32' ? '' : ` -k "${root}"`);
+    run('pg_ctl', ['-D', dataDir, '-l', path.join(root, 'postgres.log'), '-o', serverOptions, '-w', 'start']);
     started = true;
     db = new Pool(database);
     assert.equal(path.resolve((await db.query('SHOW data_directory')).rows[0].data_directory), path.resolve(dataDir));

@@ -109,7 +109,7 @@ test('CPREN-118: notas clínicas, seguridad y concurrencia en PostgreSQL tempora
       assert.equal((await db.query("SELECT to_regclass('ordenes_medicas') AS tabla")).rows[0].tabla, null);
     });
     // Upgrade correctivo sin reescribir 023–027; todo dentro del clúster propio.
-    for (const filename of fs.readdirSync(path.join(__dirname, '../src/db/migrations')).filter(name => /^(027|028|029|030)_/.test(name)).sort()) {
+    for (const filename of fs.readdirSync(path.join(__dirname, '../src/db/migrations')).filter(name => /^(027|028|029|030|031)_/.test(name)).sort()) {
       const sql = fs.readFileSync(path.join(__dirname, '../src/db/migrations', filename), 'utf8');
       await db.query(sql);
     }

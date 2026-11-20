@@ -7,7 +7,7 @@ const { spawnSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { failureDiagnostic, processDiagnostic } = require('../../.github/clinical/test-failure-diagnostics.cjs');
 const { collectLayoutDiagnostics } = require('./helpers/layoutDiagnostics');
-const { verifyReviewedLayout } = require('../../.github/clinical/candidate-integrity.cjs');
+const { verifyReviewedLayout, verifyResponsiveActions } = require('../../.github/clinical/candidate-integrity.cjs');
 const title = 'CI conserva assertion numérica sin publicar operandos sensibles';
 
 if (process.env.PREDEPLOY03_REPORTER_FIXTURE === '1') {
@@ -26,6 +26,15 @@ if (process.env.PREDEPLOY03_REPORTER_FIXTURE === '1') {
     assert.throws(() => verifyReviewedLayout(['frontend/src/index.css', 'frontend/src/pages/NotasClinicas.jsx'], css));
     assert.throws(() => verifyReviewedLayout(['frontend/src/index.css'], css + '\nbody { display:none }'));
     assert.throws(() => verifyReviewedLayout([], css));
+  });
+  test('integridad CI exige solo la modificación exacta del CSS responsive de acciones', () => {
+    const file = 'frontend/src/components/usuarios/profesionales.css';
+    const css = fs.readFileSync(path.join(__dirname, '../..', file), 'utf8');
+    const modified = [`M\t${file}`];
+    assert.equal(verifyResponsiveActions(modified, css).file, file);
+    assert.throws(() => verifyResponsiveActions([...modified, 'M\tbackend/src/db/schema.sql'], css), /Unexpected changes/);
+    assert.throws(() => verifyResponsiveActions([`A\t${file}`], css), /Unexpected changes/);
+    assert.throws(() => verifyResponsiveActions(modified, css + '\n/* cambio */'), /approved content/);
   });
   test('CI conserva assertion numérica sin publicar operandos sensibles', () => {
     const data = failureDiagnostic({ file: __filename, name: title, line: 12, column: 3,

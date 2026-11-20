@@ -9,7 +9,7 @@ test('perfiles: IDs estrictos, null explícito y omisión conservada en el contr
   }
   assert.deepEqual(usuarioUpdateSchema.parse({ cargo_id: '2' }), { cargo_id: 2 });
   assert.equal(Object.hasOwn(usuarioUpdateSchema.parse({ nombre_completo: 'Sintético' }), 'cargo_id'), false);
-  assert.equal(usuarioCreateSchema.safeParse({ nombre_completo: 'Sintético', username: 'fixture', email: 'fixture@example.test', password: 'test-only', rol: 'personal_salud' }).success, true);
+  assert.equal(usuarioCreateSchema.safeParse({ nombre_completo: 'Sintético', username: 'fixture', email: 'fixture@example.test', password: 'Synthetic-Profile-A9!', rol: 'personal_salud' }).success, true);
 });
 
 test('perfiles: transacción, bloqueo, conservación y ausencia de cambios en seguridad', async () => {

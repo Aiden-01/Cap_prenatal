@@ -2,7 +2,7 @@
 set -euo pipefail
 [[ "$GITHUB_ACTIONS" == true && "$RUNNER_ENVIRONMENT" == github-hosted ]]
 [[ "$GITHUB_REPOSITORY" == Aiden-01/Cap_prenatal ]]
-[[ "$GITHUB_REF" == refs/heads/feature/cpren-120-editor-pdf-notas-clinicas ]]
+[[ "$GITHUB_REF" == refs/heads/feature/cpren-127-normalizacion-comunidades ]]
 [[ "$(uname -s)" == Linux ]]
 [[ "$(node --version)" == v20.20.2 ]]
 [[ "$("$PREDEPLOY_NODE24_BIN/node" --version)" == v24.* ]]
@@ -14,6 +14,8 @@ for target in backend frontend; do
 done
 test -x /usr/lib/postgresql/16/bin/pg_dump
 test -x /usr/lib/postgresql/16/bin/pg_restore
+test -x /usr/lib/postgresql/16/bin/initdb
+test -x /usr/lib/postgresql/16/bin/pg_ctl
 test -n "$POSTGRES_SERVICE_ID"
 docker inspect "$POSTGRES_SERVICE_ID" --format '{{.Config.Image}}' | grep -Fx 'postgres:16.15-bookworm@sha256:cf5d353f55240ecc2f811827a15c7d1f2d562f08019b49dca12b5a59f4ab5962'
 docker exec "$POSTGRES_SERVICE_ID" psql -U predeploy02 -d cap_predeploy02_control \

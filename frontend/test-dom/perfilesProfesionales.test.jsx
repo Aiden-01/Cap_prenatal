@@ -36,13 +36,14 @@ test('crear cuenta exige cargo y correo; payload sin permisos nuevos', async () 
   fireEvent.change(screen.getByLabelText('Correo electrónico *'), { target: { value: '  SINTETICA@EXAMPLE.TEST  ' } });
   fireEvent.change(screen.getByPlaceholderText('Nombre completo'), { target: { value: 'Nueva sintética' } });
   fireEvent.change(screen.getByPlaceholderText('nombre_usuario'), { target: { value: 'nueva_fixture' } });
-  fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: 'test-only' } });
+  const password = 'Synthetic-Profile-A9!';
+  fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: password } });
   fireEvent.submit(cargo.closest('form'));
   expect(api.post).not.toHaveBeenCalled();
   fireEvent.change(cargo, { target: { value: '2' } });
   fireEvent.submit(cargo.closest('form'));
   await waitFor(() => expect(api.post).toHaveBeenCalledWith('/usuarios', {
-    nombre_completo: 'Nueva sintética', username: 'nueva_fixture', password: 'test-only', rol: 'personal_salud', cargo_id: 2, email: 'sintetica@example.test',
+    nombre_completo: 'Nueva sintética', username: 'nueva_fixture', password, rol: 'personal_salud', cargo_id: 2, email: 'sintetica@example.test',
   }));
 });
 

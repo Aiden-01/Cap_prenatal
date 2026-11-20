@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { Pool } = require('pg');
 
-const branch = 'refs/heads/feature/cpren-120-editor-pdf-notas-clinicas';
+const branch = 'refs/heads/feature/cpren-127-normalizacion-comunidades';
 const control = 'cap_predeploy02_control';
 const serviceConfig = Object.freeze({ host: '127.0.0.1', port: 55432,
   user: 'predeploy02', password: 'synthetic-predeploy02-only', database: control,

@@ -8,6 +8,8 @@ const puppeteer = require('puppeteer');
 // El navegador usa el frontend y la API reales del clúster temporal de la prueba.
 // Todas las peticiones externas se bloquean. Vite no carga archivos .env.
 async function verificarPerfilesBrowser({ apiPort, token, t }) {
+  const temporaryPassword = 'Synthetic-Browser-A9!';
+  const personalPassword = 'Synthetic-Browser-B8!';
   const frontendRoot = path.resolve(__dirname, '../../../frontend');
   const { createServer } = await import(pathToFileURL(require.resolve('vite', { paths: [frontendRoot] })).href);
   const { default: react } = await import(pathToFileURL(require.resolve('@vitejs/plugin-react', { paths: [frontendRoot] })).href);
@@ -43,8 +45,9 @@ async function verificarPerfilesBrowser({ apiPort, token, t }) {
       activo: true, permisos: ['catalogos_profesionales.gestionar'], lastActivityAt: new Date().toISOString(),
     })));
     await page.setViewport({ width: 1440, height: 1000 });
+    const widths = [1440, 1280, 768, 390, 375, 320];
     const captureSet = async name => {
-      for (const width of [1440, 1280, 768, 390, 320]) {
+      for (const width of widths) {
         await page.setViewport({ width, height: width === 1440 ? 1000 : 844 });
         for (const [theme, label] of [['light', 'claro'], ['dark', 'oscuro']]) {
           await page.evaluate(value => document.documentElement.classList.toggle('dark', value === 'dark'), theme);
@@ -68,7 +71,7 @@ async function verificarPerfilesBrowser({ apiPort, token, t }) {
     await page.type('input[name="nombre_completo"]', 'Perfil navegador');
     await page.type('input[name="username"]', 'browser_fixture');
     await page.type('input[name="email"]', '  BROWSER@EXAMPLE.TEST  ');
-    await page.type('input[name="password"]', 'test-only-browser');
+    await page.type('input[name="password"]', temporaryPassword);
     await page.select('select[name="rol"]', 'admin');
     await page.select('.perfil-fields select', '4');
     await captureSet('nuevo-usuario');
@@ -120,9 +123,20 @@ async function verificarPerfilesBrowser({ apiPort, token, t }) {
     await browser.deleteCookie(...await browser.cookies());
     await page.goto(`${base}/login`, { waitUntil: 'networkidle0' });
     await page.type('input[name="username"]', 'browser_renamed');
-    await page.type('input[name="password"]', 'test-only-browser');
+    await page.type('input[name="password"]', temporaryPassword);
     const loggedIn = page.waitForResponse(response => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
     await page.click('button[type="submit"]'); assert.equal((await loggedIn).status(), 200);
+    await page.waitForSelector('.forced-password');
+    await page.type('#current_password', temporaryPassword);
+    await page.type('#new_password', personalPassword);
+    await page.type('#confirm_password', personalPassword);
+    const changedPassword = page.waitForResponse(response => response.url().endsWith('/api/auth/cambiar-password') && response.request().method() === 'POST');
+    await page.click('.forced-password-submit'); assert.equal((await changedPassword).status(), 200);
+    await page.waitForSelector('input[name="username"]');
+    await page.type('input[name="username"]', 'browser_renamed');
+    await page.type('input[name="password"]', personalPassword);
+    const personalLogin = page.waitForResponse(response => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
+    await page.click('button[type="submit"]'); assert.equal((await personalLogin).status(), 200);
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('usuario') || 'null')?.username === 'browser_renamed');
     const identity = await page.evaluate(async () => ({ stored: JSON.parse(localStorage.getItem('usuario')), me: await (await fetch('/api/auth/me')).json() }));
     assert.equal(identity.stored.nombre_completo, 'Perfil navegador actualizado');
@@ -141,17 +155,17 @@ async function verificarPerfilesBrowser({ apiPort, token, t }) {
     await page.goto(`${base}/login`, { waitUntil: 'networkidle0' });
     await page.waitForSelector('input[name="username"]');
     await page.type('input[name="username"]', 'browser_self_renamed');
-    await page.type('input[name="password"]', 'test-only-browser');
+    await page.type('input[name="password"]', personalPassword);
     const relogged = page.waitForResponse(response => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
     await page.click('button[type="submit"]'); assert.equal((await relogged).status(), 200);
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('usuario') || 'null')?.username === 'browser_self_renamed');
     fs.writeFileSync(path.join(evidence, 'profiles-browser-evidence.json'), JSON.stringify({
-      machine: 'HUGUITO', equipo: 'Casa', synthetic_only: true, widths: [1440, 1280, 768, 390, 320],
-      themes: ['light', 'dark'], name_username_email_cargo_saved: true, relogin_updated_identity: true,
+      synthetic_only: true, widths,
+      themes: ['light', 'dark'], name_username_email_cargo_saved: true, required_password_change_completed: true, relogin_updated_identity: true,
       self_username_revokes_session: true, self_relogin_success: true, page_errors: errors,
     }, null, 2) + '\n');
     assert.deepEqual(errors, []);
-    t.diagnostic(`CHECKPOINT-12 Casa: UI→API→PostgreSQL, crear/email/cargo/nombre/username, reautenticación y renombrado propio; cinco anchos claro/oscuro; ${evidence}`);
+    t.diagnostic(`UI→API→PostgreSQL: creación, edición, reautenticación y renombrado propio; ${widths.length} anchos en claro y oscuro; ${evidence}`);
   } finally { if (browser) await browser.close(); if (vite) await vite.close(); process.chdir(previousCwd); }
 }
 module.exports = { verificarPerfilesBrowser };

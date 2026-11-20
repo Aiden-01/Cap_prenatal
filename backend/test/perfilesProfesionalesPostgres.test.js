@@ -97,7 +97,8 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
     const notasFilename = '026_notas_clinicas.sql';
     await applyMigration({ db, filename: notasFilename,
       sql: fs.readFileSync(path.join(__dirname, '../src/db/migrations', notasFilename), 'utf8') });
-    for (const filename of ['027_seguimiento_notas_controles.sql', '028_retirar_especialidades.sql', '029_usuarios_email.sql', '030_cargos_autoria_estable.sql']) {
+    for (const filename of ['027_seguimiento_notas_controles.sql', '028_retirar_especialidades.sql', '029_usuarios_email.sql',
+      '030_cargos_autoria_estable.sql', '031_password_temporal.sql']) {
       await applyMigration({ db, filename, sql: fs.readFileSync(path.join(__dirname, '../src/db/migrations', filename), 'utf8') });
     }
     await db.query('UPDATE usuarios SET password_hash=$1 WHERE id=3', [await require('bcryptjs').hash('synthetic-login-password', 4)]);
@@ -122,7 +123,7 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       return fetch(`http://127.0.0.1:${server.address().port}/api/${url}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     };
     let target;
-    const crearBody = { nombre_completo: 'Cuenta sintética', username: 'nueva_test', password: 'test-only-password', email: 'nueva@example.test', rol: 'personal_salud', cargo_id: 1 };
+    const crearBody = { nombre_completo: 'Cuenta sintética', username: 'nueva_test', password: 'Synthetic-Profile-A9!', email: 'nueva@example.test', rol: 'personal_salud', cargo_id: 1 };
     await t.test('autenticación, CSRF, admin/director y protección de director', async () => {
       assert.equal((await send('usuarios', 'GET', undefined, null)).status, 401);
       assert.equal((await send('usuarios', 'GET', undefined, 3)).status, 403);
@@ -192,7 +193,7 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       assert.deepEqual(await snapshot(), before);
       const events = (await db.query("SELECT * FROM auditoria_eventos WHERE registro_id=$1 AND descripcion='perfil_profesional_actualizado'", [String(target.id)])).rows;
       assert.ok(events.length >= 1); assert.equal(JSON.stringify(events).includes('Cuenta sintética'), false);
-      assert.equal(JSON.stringify(events).includes('test-only-password'), false);
+      assert.equal(JSON.stringify(events).includes(crearBody.password), false);
     });
     await t.test('asignaciones inactivas conservadas; nuevas rechazadas; FK preserva histórico', async () => {
       await db.query('UPDATE cargos_personal SET activo=FALSE WHERE id=2');
@@ -258,6 +259,9 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
     await t.test('CHECKPOINT-11: identidad administrativa, auditoría, unicidad y revocación transaccional', async () => {
       const created = await send('usuarios', 'POST', { ...crearBody, username: 'identity_admin', email: 'identity@example.test', rol: 'admin' });
       assert.equal(created.status, 201); const identity = await created.json();
+      // El escenario de identidad parte de una cuenta que ya completó el cambio obligatorio.
+      const activated = await db.query('UPDATE usuarios SET requiere_cambio_password=FALSE WHERE id=$1 AND requiere_cambio_password=TRUE', [identity.id]);
+      assert.equal(activated.rowCount, 1);
       const original = (await db.query('SELECT * FROM usuarios WHERE id=$1', [identity.id])).rows[0];
       const patient=(await db.query(`INSERT INTO pacientes(no_expediente,nombres,apellidos,registrado_por) VALUES('SYN-CP11-IDENTITY','Paciente sintética','Relación por ID',$1) RETURNING id`,[identity.id])).rows[0];
       const historicalSnapshot = { tipo: 'usuario', usuario_id: identity.id, nombre_completo: original.nombre_completo,

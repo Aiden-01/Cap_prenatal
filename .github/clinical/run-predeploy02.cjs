@@ -9,7 +9,7 @@ const { pathToFileURL } = require('node:url');
 const { spawn, execFileSync } = require('node:child_process');
 const { validateChromeSandboxStatus } = require('./chrome-sandbox-status.cjs');
 const { failureDiagnostic } = require('./test-failure-diagnostics.cjs');
-const { verifyReviewedLayout } = require('./candidate-integrity.cjs');
+const { verifyReviewedCandidate } = require('./candidate-integrity.cjs');
 const root = path.resolve(__dirname, '../..');
 const backend = path.join(root, 'backend');
 const { Pool } = require(path.join(backend, 'node_modules/pg'));
@@ -17,14 +17,7 @@ const { assertRunner, serviceFixture, serviceConfig } = require(path.join(backen
 assertRunner();
 assert.equal(process.versions.node, '20.20.2');
 assert.equal(execFileSync('id', ['-un'], { encoding: 'utf8' }).trim(), 'clinical-ci');
-const candidate = '74a458a6e9621c74982c1de13ee1ee2ef99fa7a7';
-const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
-assert.equal(git(['rev-parse', 'HEAD']), process.env.GITHUB_SHA);
-git(['merge-base', '--is-ancestor', candidate, 'HEAD']);
-git(['diff', '--exit-code', candidate, '--', 'backend/src',
-  'backend/package.json', 'backend/package-lock.json', 'frontend/package.json', 'frontend/package-lock.json']);
-const reviewedLayout = verifyReviewedLayout(git(['diff', '--name-only', candidate, '--', 'frontend/src']).split('\n').filter(Boolean),
-  fs.readFileSync(path.join(root, 'frontend/src/index.css'), 'utf8'));
+const { fourthLinux, reviewedCandidate, reviewedLayout, addedMigrations, responsiveActions } = verifyReviewedCandidate(root, process.env.GITHUB_SHA);
 
 const out = path.join(root, 'tmp_predeploy02/evidence');
 const logs = path.join(root, 'tmp_predeploy02/logs');
@@ -35,11 +28,12 @@ assert.match(node24Version, /^v24\./);
 assert.equal(fs.existsSync(out), false);
 fs.mkdirSync(out, { recursive: true });
 fs.mkdirSync(logs, { recursive: true });
-const report = { synthetic_only: true, production_access: false, candidate,
+const report = { synthetic_only: true, production_access: false, candidate: reviewedCandidate, fourth_linux: fourthLinux,
   sha: process.env.GITHUB_SHA, branch: process.env.GITHUB_REF,
   run_id: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT,
   started_utc: new Date().toISOString(), phases: [], versions: {}, status: 'running',
-  visual_review: 'pending human review of Linux renders', real_restore: 'out of scope', reviewed_layout: reviewedLayout };
+  visual_review: 'pending human review of Linux renders', real_restore: 'out of scope',
+  reviewed_layout: reviewedLayout, reviewed_migration_additions: addedMigrations, reviewed_responsive_actions: responsiveActions };
 const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const write = () => fs.writeFileSync(path.join(out, 'run-summary.json'), JSON.stringify(report, null, 2) + '\n');
 write();
@@ -199,6 +193,20 @@ async function main() {
       { RUN_POSTGRES_INTEGRATION: '1', DB_HOST: config.host, DB_PORT: String(config.port),
         DB_USER: config.user, DB_PASSWORD: config.password, DB_NAME: config.database, DB_SSL: 'false',
         JWT_SECRET: 'synthetic-predeploy02-auth-only-2026-ci' }, true);
+    const syntheticEnv = {
+      NODE_ENV: 'development', FRONTEND_URL: 'http://127.0.0.1:5173', COOKIE_SAMESITE: 'lax',
+      DB_HOST: config.host, DB_PORT: String(config.port), DB_USER: config.user,
+      DB_PASSWORD: config.password, DB_NAME: config.database, DB_SSL: 'false',
+      JWT_SECRET: crypto.randomBytes(32).toString('hex'), N8N_INTEGRATION_ENABLED: 'false',
+    };
+    const { seed } = require(path.join(backend, 'src/db/seed'));
+    await seed({ db: new Pool(config), env: { ...syntheticEnv, SEED_DIRECTOR_USERNAME: 'synthetic-ci-director',
+      SEED_DIRECTOR_NAME: 'Dirección sintética CI', SEED_DIRECTOR_PASSWORD: crypto.randomBytes(24).toString('hex') } });
+    await phase('candidate-integration', process.execPath, ['--test', '--test-concurrency=1',
+      'test/temporaryPasswordLocal.test.js', 'test/temporaryPasswordHttpLocal.test.js',
+      'test/controlCaptureLocal.test.js', 'test/comunidadesNormalizacionPostgres.test.js'], backend,
+    { ...syntheticEnv, RUN_TEMP_PASSWORD_LOCAL: '1', RUN_CONTROL_CAPTURE_LOCAL: '1',
+      RUN_CPREN127_TEMP_POSTGRES: '1', CPREN127_POSTGRES_BIN: '/usr/lib/postgresql/16/bin' }, true);
   } finally { await auth.close(); }
   const url = new URL('postgresql://127.0.0.1:55432/cap_predeploy02_control');
   url.username = serviceConfig.user; url.password = serviceConfig.password;

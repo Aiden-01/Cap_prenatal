@@ -107,7 +107,7 @@ test('CPREN-117: permisos, autoría y directorio en PostgreSQL temporal propio',
     // La evidencia histórica de 025 anterior permanece; las APIs se prueban
     // contra el contrato vigente de cargos y correo, con el historial intacto.
     for (const filename of ['026_notas_clinicas.sql', '027_seguimiento_notas_controles.sql',
-      '028_retirar_especialidades.sql', '029_usuarios_email.sql', '030_cargos_autoria_estable.sql']) {
+      '028_retirar_especialidades.sql', '029_usuarios_email.sql', '030_cargos_autoria_estable.sql', '031_password_temporal.sql']) {
       await applyMigration({ db, filename,
         sql: fs.readFileSync(path.join(__dirname, '../src/db/migrations', filename), 'utf8') });
     }
@@ -171,7 +171,7 @@ test('CPREN-117: permisos, autoría y directorio en PostgreSQL temporal propio',
     await t.test('altas de director y personal no reciben permisos clínicos; preservar administración de catálogos', async () => {
       for (const [username, rol] of [['alta_director_sintetica', 'director'], ['alta_personal_sintetica', 'personal_salud']]) {
         const response = await send('usuarios', 'POST', { nombre_completo: 'Alta sintética', username,
-          email: `${username}@example.test`, password: 'synthetic-test-only-password', rol, cargo_id: cargos.captura });
+          email: `${username}@example.test`, password: 'Synthetic-Author-A9!', rol, cargo_id: cargos.captura });
         assert.equal(response.status, 201);
         const row = await response.json();
         const granted = await codigos(row.id);

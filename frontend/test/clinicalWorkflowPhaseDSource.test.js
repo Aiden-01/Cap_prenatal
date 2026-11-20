@@ -20,7 +20,7 @@ function initFieldNames(pageSource) {
 
 test("UX-02D protege la cantidad de propiedades clínicas de los seis formularios", async () => {
   const expectations = [
-    ["src/pages/NuevoControl.jsx", 72],
+    ["src/pages/NuevoControl.jsx", 73],
     ["src/pages/FichaRiesgo.jsx", 51],
     ["src/pages/PlanPartoForm.jsx", 68],
     ["src/pages/PuerperioForm.jsx", 23],
@@ -32,6 +32,10 @@ test("UX-02D protege la cantidad de propiedades clínicas de los seis formulario
     const fields = initFieldNames(await source(path));
     assert.equal(fields.length, expectedCount, `${path} cambió su cantidad de propiedades`);
     assert.equal(new Set(fields).size, expectedCount, `${path} contiene propiedades duplicadas`);
+    if (path === "src/pages/NuevoControl.jsx") {
+      assert.ok(fields.includes("nombre_atiende") && fields.includes("cargo_atiende_id"));
+      assert.ok(!fields.includes("nombre_cargo_atiende"), "la captura nueva no usa el campo legado");
+    }
   }
 });
 

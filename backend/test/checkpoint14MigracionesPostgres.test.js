@@ -25,6 +25,7 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
  const hash=value=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
  const tables=['roles','pacientes','embarazos','controles_prenatales','citas_prenatales','auth_sessions'];
  const snapshot=async pool=>Object.fromEntries(await Promise.all(tables.map(async name=>[name,(await pool.query(`SELECT * FROM ${name} ORDER BY id`)).rows])));
+ const candidateMigrations=['031_password_temporal.sql','032_control_atencion_obstetrica.sql','033_normalizar_comunidad_paciente.sql'];
  const migrateDb=async(database,options={})=>{
   const result=await migrate({db:new Pool({...config,database}),logger:{log(){},error(){}},setExitCode(){},...options});
   assert.equal(result.ok,true,result.error?.message);
@@ -60,6 +61,10 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
    INSERT INTO citas_prenatales(embarazo_id,fecha_programada,control_origen_id,registrado_por) VALUES(11,'2026-11-20',111,3);
    INSERT INTO auth_sessions(usuario_id,refresh_token_hash,absolute_expires_at) VALUES(3,repeat('a',64),NOW()+INTERVAL '1 day')`);
   const before=await snapshot(db),users=(await db.query('SELECT * FROM usuarios ORDER BY id')).rows;
+  const expectedAfter={...before,controles_prenatales:before.controles_prenatales.map(row=>({
+   ...row,nombre_atiende:null,cargo_atiende_id:null,cargo_atiende_snapshot:null,
+  }))};
+  const expectedUsers=users.map(user=>({...user,cargo_id:null,email:null,requiere_cambio_password:false}));
   const grants=(await db.query('SELECT * FROM usuario_permisos WHERE usuario_id=3 ORDER BY id')).rows;
   const dump=path.join(root,'main-synthetic.dump');run('pg_dump',[...connection,'--dbname='+config.database,'--format=custom','--file='+dump]);
   await t.test('respaldo main sintético restaurable antes de actualizar',async()=>{
@@ -69,12 +74,13 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
    try{assert.deepEqual(await snapshot(restored),before);assert.deepEqual((await restored.query('SELECT * FROM usuarios ORDER BY id')).rows,users)}finally{await restored.end()}
    report.checks.push('backup_restore_before_upgrade');
   });
-  await t.test('023–030 en orden preservan expedientes, embarazos, controles, citas, sesiones y cuentas',async()=>{
+  await t.test('023–033 en orden preservan expedientes, embarazos, controles, citas, sesiones y cuentas',async()=>{
    await migrateDb(config.database);await assertSchemaCompatible(db);
-   assert.deepEqual(await snapshot(db),before);
+   assert.deepEqual(await snapshot(db),expectedAfter);
    for(const user of users){const now=(await db.query('SELECT * FROM usuarios WHERE id=$1',[user.id])).rows[0];
     for(const key of Object.keys(user))assert.deepEqual(now[key],user[key],key);
-    assert.equal(now.cargo_id,null);assert.equal(now.email,null);assert.equal(await bcrypt.compare('synthetic-checkpoint14-login',now.password_hash),true);
+    assert.equal(now.cargo_id,null);assert.equal(now.email,null);assert.equal(now.requiere_cambio_password,false);
+    assert.equal(await bcrypt.compare('synthetic-checkpoint14-login',now.password_hash),true);
    }
    assert.deepEqual((await db.query('SELECT * FROM usuario_permisos WHERE usuario_id=3 ORDER BY id')).rows,grants);
    assert.equal((await db.query(`SELECT count(*)::int n FROM usuario_permisos up JOIN permisos p ON p.id=up.permiso_id WHERE p.codigo LIKE 'notas_%' OR p.codigo LIKE 'ordenes_medicas.%'`)).rows[0].n,0);
@@ -83,7 +89,9 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
    assert.equal((await db.query('SELECT count(*)::int n FROM controles_seguimiento_notas')).rows[0].n,0,'No activa controles históricos');
    assert.equal((await db.query('SELECT count(*)::int n FROM notas_clinicas')).rows[0].n,0);
    report.applied_clinical_migrations=(await db.query("SELECT filename FROM schema_migrations WHERE filename>='023_' ORDER BY filename")).rows.map(r=>r.filename);
-   assert.equal(report.applied_clinical_migrations.length,8);report.checks.push('upgrade_022_to_030_no_core_data_loss_no_clinical_grants');
+   assert.equal(report.applied_clinical_migrations.length,11);
+   assert.deepEqual(report.applied_clinical_migrations.slice(8),candidateMigrations);
+   report.checks.push('upgrade_022_to_033_no_core_data_loss_no_clinical_grants');
    report.snapshots.push({stage:'core_before_after',sha256:hash(before),tables:tables.map(table=>({table,rows:before[table].length}))});
   });
   await t.test('esquema final sin especialidades/clasificación y repetición sin cambios',async()=>{
@@ -97,7 +105,7 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
     sql:fs.readFileSync(path.join(source,filename),'utf8')+'\n-- synthetic checksum mismatch\n'}),/fue modificada/);
    assert.deepEqual((await db.query('SELECT * FROM schema_migrations ORDER BY filename')).rows,registry);
    await migrateDb(config.database);assert.deepEqual((await db.query('SELECT * FROM schema_migrations ORDER BY filename')).rows,registry);
-   assert.deepEqual(await snapshot(db),before);report.checks.push('final_schema_checksums_tamper_rejection_and_idempotence');
+   assert.deepEqual(await snapshot(db),expectedAfter);report.checks.push('final_schema_checksums_tamper_rejection_and_idempotence');
   });
   await t.test('instalación nueva del esquema final y restauración posterior equivalentes',async()=>{
    await db.query('CREATE DATABASE fresh_final');await migrateDb('fresh_final');
@@ -106,7 +114,7 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
    const afterDump=path.join(root,'final-synthetic.dump');run('pg_dump',[...connection,'--dbname='+config.database,'--format=custom','--file='+afterDump]);
    await db.query('CREATE DATABASE restored_after');run('pg_restore',[...connection,'--dbname=restored_after','--exit-on-error',afterDump]);
    const restored=new Pool({...config,database:'restored_after'});
-   try{await assertSchemaCompatible(restored);assert.deepEqual(await snapshot(restored),before);assert.deepEqual((await restored.query('SELECT * FROM usuarios ORDER BY id')).rows,(await db.query('SELECT * FROM usuarios ORDER BY id')).rows)}finally{await restored.end()}
+   try{await assertSchemaCompatible(restored);assert.deepEqual(await snapshot(restored),expectedAfter);assert.deepEqual((await restored.query('SELECT * FROM usuarios ORDER BY id')).rows,expectedUsers)}finally{await restored.end()}
    report.checks.push('fresh_final_and_post_upgrade_restore');
    report.synthetic_dump_sha256=[dump,afterDump].map(file=>({name:path.basename(file),sha256:crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')}));
   });

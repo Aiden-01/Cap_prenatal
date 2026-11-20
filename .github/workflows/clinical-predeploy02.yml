@@ -1,8 +1,9 @@
-name: Clinical PREDEPLOY-02 (Linux, synthetic only)
+name: Clinical candidate validation (Linux, synthetic only)
 
 on:
   push:
-    branches: [feature/cpren-120-editor-pdf-notas-clinicas]
+    branches: [feature/cpren-127-normalizacion-comunidades]
+    paths: [.github/workflows/clinical-predeploy02.yml]
 
 permissions:
   contents: read
@@ -13,7 +14,7 @@ concurrency:
 
 jobs:
   clinical:
-    if: github.repository == 'Aiden-01/Cap_prenatal' && github.ref == 'refs/heads/feature/cpren-120-editor-pdf-notas-clinicas'
+    if: github.repository == 'Aiden-01/Cap_prenatal' && github.ref == 'refs/heads/feature/cpren-127-normalizacion-comunidades'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     services:

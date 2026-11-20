@@ -236,8 +236,8 @@ test('cambio y reinicio de password guardan unicamente el booleano y son obligat
   await authService.changePassword({
     usuarioId: 9,
     currentPassword: 'anterior',
-    newPassword: 'nueva-segura',
-    req: { usuario: { id: 9 }, body: { newPassword: 'nueva-segura' } },
+    newPassword: 'Nueva-Segura-A9!',
+    req: { usuario: { id: 9 }, body: { newPassword: 'Nueva-Segura-A9!' } },
     dependencies: {
       authRepository: {
         async obtenerCredencialesPorId() {
@@ -271,7 +271,7 @@ test('fallo de auditoria obligatoria revierte el cambio de password', async () =
   await assert.rejects(authService.changePassword({
     usuarioId: 9,
     currentPassword: 'anterior',
-    newPassword: 'nueva-segura',
+    newPassword: 'Nueva-Segura-A9!',
     req: { usuario: { id: 9 } },
     dependencies: {
       authRepository: {
