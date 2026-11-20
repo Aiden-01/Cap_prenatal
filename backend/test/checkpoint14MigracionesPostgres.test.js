@@ -25,7 +25,7 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
  const hash=value=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
  const tables=['roles','pacientes','embarazos','controles_prenatales','citas_prenatales','auth_sessions'];
  const snapshot=async pool=>Object.fromEntries(await Promise.all(tables.map(async name=>[name,(await pool.query(`SELECT * FROM ${name} ORDER BY id`)).rows])));
- const candidateMigrations=['031_password_temporal.sql','032_control_atencion_obstetrica.sql','033_normalizar_comunidad_paciente.sql'];
+ const candidateMigrations=['031_password_temporal.sql','032_control_atencion_obstetrica.sql','033_normalizar_comunidad_paciente.sql','034_recuperacion_password.sql'];
  const migrateDb=async(database,options={})=>{
   const result=await migrate({db:new Pool({...config,database}),logger:{log(){},error(){}},setExitCode(){},...options});
   assert.equal(result.ok,true,result.error?.message);
@@ -74,7 +74,7 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
    try{assert.deepEqual(await snapshot(restored),before);assert.deepEqual((await restored.query('SELECT * FROM usuarios ORDER BY id')).rows,users)}finally{await restored.end()}
    report.checks.push('backup_restore_before_upgrade');
   });
-  await t.test('023–033 en orden preservan expedientes, embarazos, controles, citas, sesiones y cuentas',async()=>{
+  await t.test('023–034 en orden preservan expedientes, embarazos, controles, citas, sesiones y cuentas',async()=>{
    await migrateDb(config.database);await assertSchemaCompatible(db);
    assert.deepEqual(await snapshot(db),expectedAfter);
    for(const user of users){const now=(await db.query('SELECT * FROM usuarios WHERE id=$1',[user.id])).rows[0];
@@ -89,9 +89,9 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
    assert.equal((await db.query('SELECT count(*)::int n FROM controles_seguimiento_notas')).rows[0].n,0,'No activa controles históricos');
    assert.equal((await db.query('SELECT count(*)::int n FROM notas_clinicas')).rows[0].n,0);
    report.applied_clinical_migrations=(await db.query("SELECT filename FROM schema_migrations WHERE filename>='023_' ORDER BY filename")).rows.map(r=>r.filename);
-   assert.equal(report.applied_clinical_migrations.length,11);
+   assert.equal(report.applied_clinical_migrations.length,12);
    assert.deepEqual(report.applied_clinical_migrations.slice(8),candidateMigrations);
-   report.checks.push('upgrade_022_to_033_no_core_data_loss_no_clinical_grants');
+   report.checks.push('upgrade_022_to_034_no_core_data_loss_no_clinical_grants');
    report.snapshots.push({stage:'core_before_after',sha256:hash(before),tables:tables.map(table=>({table,rows:before[table].length}))});
   });
   await t.test('esquema final sin especialidades/clasificación y repetición sin cambios',async()=>{

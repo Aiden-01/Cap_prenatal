@@ -14,24 +14,44 @@
 .catalogo-copy span { display: block; font-size: .8rem; color: var(--text-muted); }
 .catalogo-copy p { white-space: pre-wrap; }
 .catalogos-list .action-row { flex-shrink: 0; }
-.usuario-email-pendiente { color: var(--warning, var(--text-muted)); font-size: .8rem; overflow-wrap: anywhere; }
 .usuario-email-help, .catalogos-guidance { color: var(--text-muted); font-size: .82rem; line-height: 1.5; }
+.email-format { font-size: .8rem; margin-top: .3rem; }
+.email-format-valid { color: var(--accent); }
+.email-format-invalid { color: var(--danger); }
 .perfil-modal .form-group, .catalogos-controls label { min-width: 0; }
 .usuario-identity-copy { min-width: 0; }
+.usuarios-toolbar .usuarios-filters { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
+.usuarios-filters .usuarios-search { flex: 2 1 10rem; min-width: min(100%, 10rem); }
+.usuarios-filters .usuarios-search input { min-width: 0; }
+.usuarios-filters .usuarios-role-filter { flex: 1 1 7.5rem; width: auto; max-width: 100%; }
+.usuarios-table .usuario-actions-heading { width: 4.25rem; }
+.usuario-actions-heading span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.usuarios-table .usuario-actions-cell { text-align: right; white-space: nowrap; }
+.user-actions-trigger { display: inline-grid; place-items: center; width: 2.5rem; height: 2.5rem; border: 1px solid var(--border); border-radius: .65rem; background: var(--surface); color: var(--text); cursor: pointer; }
+.user-actions-trigger:hover, .user-actions-trigger[aria-expanded='true'] { background: var(--surface2); }
+.user-actions-menu { position: fixed; z-index: 9000; width: min(13rem, calc(100vw - 1rem)); padding: .3rem; overflow-y: auto; overscroll-behavior: contain; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: .8rem; box-shadow: var(--shadow-md); }
+.user-actions-menu button { width: 100%; min-height: 2.55rem; border: 0; border-radius: .45rem; padding: .5rem .6rem; background: transparent; color: inherit; font: inherit; font-size: .85rem; text-align: left; display: flex; align-items: center; gap: .55rem; cursor: pointer; }
+.user-actions-menu button svg { flex: none; }
+.user-actions-menu button:hover, .user-actions-menu button:focus-visible { background: var(--surface2); }
+.user-actions-menu button:focus-visible, .user-actions-trigger:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.user-actions-menu button[aria-disabled='true'] { color: var(--text-muted); cursor: default; }
+.user-actions-menu [role='separator'] { margin: .25rem .4rem; border-top: 1px solid var(--border); }
+.user-actions-danger { color: var(--danger); }
 @media (max-width: 760px) {
+  .usuarios-toolbar .usuarios-tabs { min-width: 0; flex-wrap: wrap; }
   .usuarios-table { display: block; width: 100%; }
-  .usuarios-table thead { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .usuarios-table thead { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; contain: layout; }
   .usuarios-table tbody { display: block; width: 100%; }
   .usuarios-table tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem 1rem; padding: 1rem; border-bottom: 1px solid var(--border); }
   .usuarios-table tbody td { display: block; min-width: 0; padding: 0; border: 0; text-align: left; overflow-wrap: anywhere; }
   .usuarios-table tbody td[data-label]::before { content: attr(data-label); display: block; margin-bottom: .3rem; color: var(--text-muted); font-size: .7rem; font-weight: 600; }
   .usuarios-table tbody .usuario-identity-cell::before { display: none; }
-  .usuarios-table .usuario-identity-cell, .usuarios-table .usuario-username-cell, .usuarios-table .usuario-history-cell, .usuarios-table .usuario-actions-cell, .usuarios-table td[colspan] { grid-column: 1 / -1; }
+  .usuarios-table .usuario-identity-cell, .usuarios-table .usuario-username-cell, .usuarios-table .usuario-history-cell, .usuarios-table td[colspan] { grid-column: 1 / -1; }
+  .usuarios-table tbody .usuario-identity-cell { grid-row: 1; padding-right: 3rem; }
+  .usuarios-table tbody .usuario-actions-cell { grid-column: 2; grid-row: 1; justify-self: end; align-self: start; }
   .usuarios-table .usuario-identity { align-items: flex-start !important; }
-  .usuarios-table .usuario-profesion, .usuarios-table .usuario-email-pendiente { overflow-wrap: normal; }
+  .usuarios-table .usuario-profesion { overflow-wrap: anywhere; }
   .usuarios-table .badge { max-width: 100%; white-space: normal; }
-  .usuarios-table .table-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: .5rem; }
-  .usuarios-table .table-actions button { min-width: 0; min-height: 40px; white-space: normal; overflow-wrap: anywhere; }
   .catalogos-controls { grid-template-columns: 1fr; }
   .catalogos-list li { align-items: stretch; flex-direction: column; }
   .catalogos-list .action-row { flex-wrap: wrap; }

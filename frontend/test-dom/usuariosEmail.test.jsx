@@ -45,6 +45,7 @@ test('nuevo usuario respeta orden, normaliza correo y no envía datos de especia
   const fields = [...email.closest('form').querySelectorAll('input,select')];
   expect(fields.map(input => input.name || input.id)).toEqual(['nombre_completo', 'username', 'email', 'password', 'rol', expect.stringMatching(/cargo$/)]);
   fireEvent.change(email, { target: { value: '  CORREO@EXAMPLE.TEST  ' } });
+  expect(screen.getByText('Correo electrónico válido')).toBeTruthy();
   fireEvent.submit(email.closest('form'));
   await waitFor(() => expect(api.post).toHaveBeenCalledWith('/usuarios', { nombre_completo: 'Persona nueva', username: 'new_synthetic', email: 'correo@example.test', password: 'Test-only-password9!', rol: 'personal_salud', cargo_id: 4 }));
   expect(api.get.mock.calls.every(([url]) => url === '/usuarios' || url === '/catalogos/cargos')).toBe(true);
@@ -62,51 +63,37 @@ test('duplicado de backend conserva correo y otros datos sin mostrar éxito', as
   expect(screen.queryByText('Usuario creado exitosamente')).toBeNull();
 });
 
-test('administrador completa correo legado y conserva cargo sin enviar rol, permisos ni contraseña', async () => {
-  render(<Usuarios />);
-  expect(await screen.findByText('Correo pendiente')).toBeTruthy();
-  fireEvent.click(screen.getByTitle('Editar perfil de Usuario sintético'));
-  const dialog = screen.getByRole('dialog', { name: 'Perfil del usuario' });
-  await within(dialog).findByRole('option', { name: 'Cargo sintético' });
-  const email = within(dialog).getByLabelText('Correo electrónico');
-  fireEvent.change(email, { target: { value: '  LEGADO@EXAMPLE.TEST ' } });
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar perfil' }));
-  await waitFor(() => expect(api.put).toHaveBeenCalledWith('/usuarios/2', { cargo_id: 4, email: 'legado@example.test' }));
-});
-
-test('correo existente se consulta en perfil autorizado y no se muestra en tabla ni puede vaciarse', async () => {
+test('tabla y perfil administrativo excluyen estados de correo y acciones sobre credenciales', async () => {
   target.email = 'private@example.test';
   render(<Usuarios />);
   await screen.findByText('Usuario sintético');
   expect(screen.queryByText(target.email)).toBeNull();
-  expect(screen.queryByText('Correo pendiente')).toBeNull();
-  fireEvent.click(screen.getByTitle('Editar perfil de Usuario sintético'));
-  await screen.findByRole('option', { name: 'Cargo sintético' });
-  const email = screen.getByLabelText('Correo electrónico');
-  expect(email.value).toBe(target.email);
-  fireEvent.change(email, { target: { value: '  ' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar perfil' }));
-  expect(api.put).not.toHaveBeenCalled();
-  expect(screen.getByRole('alert').textContent).toContain('Ingresa un correo electrónico');
+  expect(screen.queryByText(/correo pendiente|correo sin verificar|correo verificado/i)).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Restablecer contraseña' })).toBeNull();
+  fireEvent.click(await screen.findByRole('button', { name: 'Acciones de Usuario sintético' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Editar perfil' }));
+  const dialog = screen.getByRole('dialog');
+  expect(within(dialog).queryByLabelText('Correo electrónico')).toBeNull();
+  expect(within(dialog).queryByLabelText(/contraseña/i)).toBeNull();
 });
 
-test('perfil conserva edición y error específico ante duplicado de servidor', async () => {
-  api.put.mockRejectedValueOnce({ response: { status: 409, data: { code: 'EMAIL_DUPLICADO', message: 'El correo electrónico ya está registrado' } } });
-  render(<Usuarios />);
-  fireEvent.click(await screen.findByTitle('Editar perfil de Usuario sintético'));
-  await screen.findByRole('option', { name: 'Cargo sintético' });
-  const email = screen.getByLabelText('Correo electrónico');
-  fireEvent.change(email, { target: { value: 'duplicate@example.test' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar perfil' }));
-  await waitFor(() => expect(email.getAttribute('aria-invalid')).toBe('true'));
-  expect(screen.getByRole('dialog')).toBeTruthy();
-  expect(email.value).toBe('duplicate@example.test');
-  await waitFor(() => expect(document.activeElement).toBe(email));
-  expect(toast).not.toHaveBeenCalledWith(expect.any(String), 'success');
+test('el indicador de correo es neutro, rojo o verde mientras se escribe', async () => {
+  const email = await crearForm();
+  const hint = document.getElementById('usuario-create-email-format');
+  expect(hint.textContent).toBe('');
+  fireEvent.change(email, { target: { value: 'a..b@example.test' } });
+  expect(hint.classList.contains('email-format-invalid')).toBe(true);
+  expect(hint.textContent).toBe('Formato de correo inválido');
+  fireEvent.change(email, { target: { value: 'válido' } });
+  expect(hint.classList.contains('email-format-invalid')).toBe(true);
+  fireEvent.change(email, { target: { value: 'persona@example.test' } });
+  expect(hint.classList.contains('email-format-valid')).toBe(true);
+  expect(hint.textContent).toBe('Correo electrónico válido');
 });
 
 test('perfil administrativo edita nombre y username conservando correo y cargo',async()=>{
- render(<Usuarios/>);fireEvent.click(await screen.findByTitle('Editar perfil de Usuario sintético'));
+ render(<Usuarios/>);fireEvent.click(await screen.findByRole('button', { name: 'Acciones de Usuario sintético' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Editar perfil' }));
  await screen.findByRole('option',{name:'Cargo sintético'});
  fireEvent.change(screen.getByLabelText('Nombre completo'),{target:{value:'Nombre sintético editado'}});
  fireEvent.change(screen.getByLabelText('Nombre de usuario'),{target:{value:'renamed_synthetic'}});

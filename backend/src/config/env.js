@@ -374,6 +374,19 @@ function validateAutomationConfig(env = process.env, options = {}) {
   });
 }
 
+function validateAccountEmailConfig(env = process.env) {
+  if (!parseBoolean(env, 'ACCOUNT_EMAIL_ENABLED')) return { enabled: false };
+  const secret = validateSecret('ACCOUNT_EMAIL_HMAC_SECRET', readRequired(env, 'ACCOUNT_EMAIL_HMAC_SECRET'), {
+    nodeEnv: nodeEnvForValidation(env), minBytes: 32, rejectUnsafeOutsideProduction: true,
+  });
+  if (secret === readOptional(env, 'JWT_SECRET')) invalid('ACCOUNT_EMAIL_HMAC_SECRET');
+  const apiKey = readRequired(env, 'ACCOUNT_EMAIL_RESEND_KEY');
+  const sender = readRequired(env, 'ACCOUNT_EMAIL_FROM');
+  if (/\s/.test(apiKey)) invalid('ACCOUNT_EMAIL_RESEND_KEY');
+  if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(sender)) invalid('ACCOUNT_EMAIL_FROM');
+  return { enabled: true, secret, apiKey, sender };
+}
+
 function validateAppConfig(env = process.env) {
   const nodeEnv = nodeEnvForValidation(env, { required: true });
   const session = validateSessionConfig(env);
@@ -395,6 +408,7 @@ function validateAppConfig(env = process.env) {
     frontendOrigins,
     cookieSameSite,
     automation,
+    accountEmail: validateAccountEmailConfig(env),
     trustedProxyCidrs,
     port,
     jsonBodyLimit,
@@ -460,6 +474,7 @@ function getAutomationConfig() {
 }
 
 module.exports = {
+  validateAccountEmailConfig,
   BACKEND_ENV_PATH,
   ConfigError,
   MIN_JWT_SECRET_BYTES,

@@ -22,6 +22,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 
 const authRoutes = require('./routes/auth');
+const { createPasswordRecoveryRouter } = require('./routes/accountEmail');
 const usuariosRoutes = require('./routes/usuarios');
 const pacientesRoutes = require('./routes/pacientes');
 const citasCalendarioRoutes = require('./routes/citasCalendario');
@@ -90,6 +91,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: config.jsonBodyLimit }));
+app.use('/api/auth/recuperacion', createPasswordRecoveryRouter(config));
 app.use('/api', csrfMiddleware);
 
 app.use('/api/auth', authRoutes);

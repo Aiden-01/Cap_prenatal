@@ -36,6 +36,7 @@ const REQUIRED_MIGRATIONS = Object.freeze([
   '031_password_temporal.sql',
   '032_control_atencion_obstetrica.sql',
   '033_normalizar_comunidad_paciente.sql',
+  '034_recuperacion_password.sql',
 ]);
 const REQUIRED_MIGRATION = REQUIRED_MIGRATIONS[0];
 const MIGRATION_COMMAND = 'npm run db:migrate';

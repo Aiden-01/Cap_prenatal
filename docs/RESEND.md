@@ -311,3 +311,9 @@ termine en `.xlsx`.
 - Monitorear fallos, rebotes y cuotas sin registrar contenido clínico.
 - Probar restauración y rollback del paquete.
 - Publicar workflows solo con autorización documentada.
+
+## Correo transaccional de cuentas
+
+El backend envía códigos de recuperación y avisos de cambio de contraseña mediante la API de Resend al correo registrado de la cuenta. Configure ACCOUNT_EMAIL_ENABLED, ACCOUNT_EMAIL_HMAC_SECRET, ACCOUNT_EMAIL_RESEND_KEY y ACCOUNT_EMAIL_FROM en el backend. Use un secreto aleatorio de al menos 32 bytes independiente de JWT, una clave de envío dedicada y una dirección de un dominio verificado en Resend. Configure FRONTEND_URL con el origen HTTPS exacto de la interfaz que iniciará la recuperación. La cookie de restablecimiento es Secure, HttpOnly, SameSite=Strict y se limita al endpoint de consumo en producción.
+
+El envío se inicia después de confirmar la transacción de base de datos y tiene un plazo acotado. El código en claro permanece en memoria durante el envío. Ante un fallo o reinicio se puede pedir un código nuevo tras la espera prevista. La respuesta pública no depende del resultado del proveedor. Los tests inyectan un transporte en memoria.

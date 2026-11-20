@@ -9,7 +9,6 @@ test('PostgreSQL local: alta y reset temporales, cambio limpia indicador, sesion
  assert.equal((await sessions.obtenerConUsuarioPorId(sid,db)).requiere_cambio_password,true);
  await auth.actualizarPassword({id:u.id,passwordHash:hash},db);assert.equal(await flag(),false);
  assert.equal((await sessions.obtenerConUsuarioPorId(sid,db)).requiere_cambio_password,false);
- await users.actualizar({id:u.id,nombreCompleto:u.nombre_completo,activo:true,rol:'personal_salud',passwordHash:hash},db);assert.equal(await flag(),true);
- await users.actualizar({id:u.id,nombreCompleto:u.nombre_completo,activo:true,rol:'personal_salud',passwordHash:null,email:key+'@example.test'},db);assert.equal(await flag(),true);
+ await users.actualizar({id:u.id,nombreCompleto:u.nombre_completo,activo:true,rol:'personal_salud'},db);assert.equal(await flag(),false);
  }finally{await db.query('ROLLBACK');await db.end();}
 });

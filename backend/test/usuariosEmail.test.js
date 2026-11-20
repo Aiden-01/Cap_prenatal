@@ -5,8 +5,6 @@ const service = require('../src/services/usuariosService');
 const profesionales = require('../src/repositories/profesionalesRepository');
 const usuarios = require('../src/repositories/usuariosRepository');
 const { normalizeError } = require('../src/middleware/errorHandler');
-const { buildAuditPayload } = require('../src/services/audit/auditDiffBuilder');
-const { validateFinalPayload } = require('../src/services/audit/auditHistorySanitizer');
 
 const nuevo = { nombre_completo: 'Cuenta sintética', username: 'correo.fixture',
   email: '  CUENTA.SINTETICA@EXAMPLE.TEST  ', password: 'Test-only-password9!', rol: 'personal_salud' };
@@ -21,7 +19,7 @@ test('correo de alta obligatorio, normalizado y acotado; edición omitida conser
     assert.equal(usuarioUpdateSchema.safeParse({ email }).success, false, String(email));
   }
   assert.deepEqual(usuarioUpdateSchema.parse({ nombre_completo: 'Cuenta legada' }), { nombre_completo: 'Cuenta legada' });
-  assert.deepEqual(usuarioUpdateSchema.parse({ email: ' NUEVA@EXAMPLE.TEST ' }), { email: 'nueva@example.test' });
+  assert.equal(usuarioUpdateSchema.safeParse({ email: ' NUEVA@EXAMPLE.TEST ' }).success, false);
   assert.equal(email.trim().toLowerCase(), 'cuenta.sintetica@example.test');
 });
 
@@ -42,39 +40,15 @@ test('crear valida también en servicio, conserva rol/permisos y nunca audita la
   await assert.rejects(service.crearUsuario({ body: { ...nuevo, rol: 'director' }, req, dependencies }), { code: 'ROL_NO_AUTORIZADO' });
 });
 
-test('administración completa correo legado sin cambiar contraseña, sesión, cargo ni permisos', async () => {
-  const db = {}; const events = []; const writes = [];
-  let current = { id: 44, nombre_completo: 'Cuenta legada', email: null,
-    rol: 'personal_salud', activo: true, cargo_id: 9 };
-  const dependencies = {
-    usuariosRepository: {
-      obtenerVisibleParaActor: async () => ({ ...current }), obtenerPorId: async () => ({ ...current }),
-      actualizar: async (args, connection) => {
-        writes.push({ args, connection });
-        current = { ...current, nombre_completo: args.nombreCompleto,
-          ...(args.email !== undefined ? { email: args.email } : {}) };
-        return { ...current };
-      },
-    },
-    permisosRepository: { enTransaccion: fn => fn(db), bloquearUsuarioPermisos: async () => true },
-    permisosService: { reemplazarPermisosEnTransaccion: () => assert.fail('No reemplazar permisos por correo') },
-    sessionService: { revokeAllInTransaction: () => assert.fail('No revocar sesiones por correo') },
-    registrarEventoPrivado: async (_req, event, options) => events.push({ event, options }),
-  };
-  const req = { usuario: { id: 2, rol: 'director' } };
-  await service.actualizarUsuario({ id: 44, body: { nombre_completo: 'Cuenta legada editable' }, req, dependencies });
-  assert.equal(writes[0].args.email, undefined);
-  assert.equal(current.email, null);
-  await service.actualizarUsuario({ id: 44, body: { email: ' LEGADO@EXAMPLE.TEST ' }, req, dependencies });
-  assert.equal(current.email, 'legado@example.test');
-  assert.equal(current.cargo_id, 9); assert.equal(current.rol, 'personal_salud');
-  assert.equal(writes[1].args.passwordHash, null); assert.equal(writes[1].connection, db);
-  const audit = events.find(({ event }) => event.contexto.evento === 'email_actualizado');
-  assert.deepEqual(audit.options, { db, obligatorio: true });
-  assert.equal(JSON.stringify(audit).includes(current.email), false);
-  assert.deepEqual(buildAuditPayload({ metadata: audit.event.metadata }, { context: audit.event.contexto }),
-    { politica_version: 1, contacto_modificado: true, contacto_pendiente: false });
-  assert.equal(validateFinalPayload({ politica_version: 1, contacto_modificado: true, contacto_pendiente: false }, audit.event.contexto), true);
+test('el servicio rechaza entradas de credenciales antes de consultar o escribir un perfil', async () => {
+  const dependencies = { usuariosRepository: { obtenerVisibleParaActor: () => assert.fail('No debe consultar el perfil') } };
+  for (const rol of ['admin', 'director']) {
+    const req = { usuario: { id: 2, rol } };
+    for (const body of [{ email: 'otra@example.test' }, { password: nuevo.password }, { passwordHash: 'secreto' },
+      { requiere_cambio_password: true }, { cargo_id: 9, email_verificado_at: '2026-11-20' }]) {
+      await assert.rejects(service.actualizarUsuario({ id: 44, body, req, dependencies }), { name: 'ZodError' });
+    }
+  }
 });
 
 test('unicidad PostgreSQL de correo produce conflicto comprensible sin revelar direcciones', () => {
@@ -85,7 +59,7 @@ test('unicidad PostgreSQL de correo produce conflicto comprensible sin revelar d
   assert.equal(JSON.stringify(result).includes('privada@example.test'), false);
 });
 
-test('directorio usa lista explícita sin contacto; repositorio administrativo permite completar legado', async () => {
+test('directorio y actualización administrativa mantienen la separación de credenciales', async () => {
   let sql; let values;
   const db = { query: async (query, params) => {
     sql = query; values = params; return { rows: [{ data: [], total: 0 }] };
@@ -96,11 +70,7 @@ test('directorio usa lista explícita sin contacto; repositorio administrativo p
   assert.doesNotMatch(sql, /email|username|password|telefono|direccion/i);
   assert.match(sql, /u\.activo = TRUE AND c\.activo = TRUE/);
   assert.match(sql, /upper\(btrim\(c\.codigo\)\) IN \('MED', 'AE', 'EP'\)/);
-  await usuarios.actualizar({ id: 44, nombreCompleto: 'Legado', activo: true,
-    rol: 'personal_salud', passwordHash: null, email: 'legado@example.test' }, db);
-  assert.match(sql, /email=CASE WHEN \$9::boolean THEN \$10::varchar ELSE email END/);
-  assert.deepEqual(values.slice(8, 10), [true, 'legado@example.test']);
-  await usuarios.actualizar({ id: 44, nombreCompleto: 'Legado', activo: true,
-    rol: 'personal_salud', passwordHash: null }, db);
-  assert.deepEqual(values.slice(8, 10), [false, null]);
+  await usuarios.actualizar({ id: 44, nombreCompleto: 'Legado', activo: true, rol: 'personal_salud' }, db);
+  assert.doesNotMatch(sql.split('WHERE id=$5')[0], /email|password/i);
+  assert.equal(values[4], 44);
 });

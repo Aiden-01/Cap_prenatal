@@ -98,7 +98,7 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
     await applyMigration({ db, filename: notasFilename,
       sql: fs.readFileSync(path.join(__dirname, '../src/db/migrations', notasFilename), 'utf8') });
     for (const filename of ['027_seguimiento_notas_controles.sql', '028_retirar_especialidades.sql', '029_usuarios_email.sql',
-      '030_cargos_autoria_estable.sql', '031_password_temporal.sql']) {
+      '030_cargos_autoria_estable.sql', '031_password_temporal.sql', '034_recuperacion_password.sql']) {
       await applyMigration({ db, filename, sql: fs.readFileSync(path.join(__dirname, '../src/db/migrations', filename), 'utf8') });
     }
     await db.query('UPDATE usuarios SET password_hash=$1 WHERE id=3', [await require('bcryptjs').hash('synthetic-login-password', 4)]);
@@ -163,9 +163,9 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       assert.deepEqual(simultaneous.map(response => response.status).sort(), [201, 409]);
       assert.equal((await send('usuarios/3', 'PUT', { nombre_completo: 'Personal sintético' })).status, 200);
       assert.equal((await (await send('usuarios/3')).json()).email, null, 'editar otros campos no bloquea legados');
-      assert.equal((await send('usuarios/3', 'PUT', { email: '  LEGADO@EXAMPLE.TEST ' })).status, 200);
-      assert.equal((await (await send('usuarios/3')).json()).email, 'legado@example.test');
-      assert.equal((await send('usuarios/3', 'PUT', { email: 'NUEVA@EXAMPLE.TEST' })).status, 409);
+      assert.equal((await send('usuarios/3', 'PUT', { email: '  LEGADO@EXAMPLE.TEST ' })).status, 400);
+      assert.equal((await (await send('usuarios/3')).json()).email, null);
+      assert.equal((await send('usuarios/3', 'PUT', { email: 'NUEVA@EXAMPLE.TEST' })).status, 400);
       assert.equal((await send('usuarios/3', 'GET', undefined, 3)).status, 403, 'correo ajeno requiere acceso administrativo');
       const events = JSON.stringify((await db.query('SELECT * FROM auditoria_eventos')).rows);
       for (const email of ['nueva@example.test', 'legado@example.test', 'race@example.test']) assert.equal(events.includes(email), false);
@@ -182,10 +182,11 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       await db.query('UPDATE usuarios SET activo=FALSE WHERE id=$1', [target.id]);
       const before = await snapshot();
       assert.equal(before.sesiones.length, 1); assert.ok(before.permisos.length > 0);
-      assert.equal((await send(`usuarios/${target.id}`, 'PUT', { cargo_id: 2, email: '  MODIFICADO@EXAMPLE.TEST  ' })).status, 200);
+      assert.equal((await send(`usuarios/${target.id}`, 'PUT', { cargo_id: 2, email: '  MODIFICADO@EXAMPLE.TEST  ' })).status, 400);
+      assert.equal((await send(`usuarios/${target.id}`, 'PUT', { cargo_id: 2 })).status, 200);
       assert.deepEqual(await snapshot(), before);
       const user = await (await send(`usuarios/${target.id}`)).json();
-      assert.equal(user.cargo_id, 2); assert.equal(user.email, 'modificado@example.test');
+      assert.equal(user.cargo_id, 2); assert.equal(user.email, crearBody.email);
       assert.equal((await send(`usuarios/${target.id}`, 'PUT', { especialidad_id: null })).status, 400);
       assert.equal((await (await send(`usuarios/${target.id}`)).json()).cargo_id, 2);
       assert.equal((await send(`usuarios/${target.id}`, 'PUT', { nombre_completo: 'Cuenta sintética' })).status, 200);
@@ -336,7 +337,7 @@ test('CPREN-116: migración y API con sesiones reales en PostgreSQL temporal pro
       const row = (await db.query(`SELECT u.cargo_id, u.email, c.nombre AS cargo, c.codigo
         FROM usuarios u JOIN cargos_personal c ON c.id=u.cargo_id
         WHERE u.username='browser_self_renamed'`)).rows[0];
-      assert.equal(row.cargo, 'Cargo navegador'); assert.equal(row.email, 'updated@example.test'); assert.equal(row.codigo, 'CP11-TEST');
+      assert.equal(row.cargo, 'Cargo navegador'); assert.equal(row.email, 'browser@example.test'); assert.equal(row.codigo, 'CP11-TEST');
     });
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));

@@ -56,7 +56,7 @@ async function verificarPerfilesBrowser({ apiPort, token, t }) {
           });
           await page.screenshot({ path: path.join(evidence, `${name}-${width}-${label}.png`), fullPage: true });
           assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${name} ${width} ${theme}: sin desbordamiento de página`);
-          assert.ok(await page.evaluate(() => [...document.querySelectorAll('.usuarios-table .table-actions button')].every(button => button.scrollWidth <= button.clientWidth + 1)), `${width}: acciones completas sin recorte`);
+          assert.ok(await page.evaluate(() => [...document.querySelectorAll('.usuarios-table .user-actions-trigger')].every(button => button.scrollWidth <= button.clientWidth + 1)), `${width}: acciones completas sin recorte`);
         }
       }
       await page.setViewport({ width: 1440, height: 1000 });
@@ -80,7 +80,7 @@ async function verificarPerfilesBrowser({ apiPort, token, t }) {
     assert.equal((await created).status(), 201);
     await page.waitForSelector('.status-banner.success');
     await page.click('.user-create-drawer button[aria-label="Cerrar"]');
-    await page.waitForSelector('[title="Editar perfil de Perfil navegador"]');
+    await page.waitForSelector('[aria-label="Acciones de Perfil navegador"]');
     await page.locator('button::-p-text(Catálogo de cargos)').click();
     await page.waitForSelector('.catalogos-list li');
     assert.equal(await page.$('select[aria-label="Catálogo"]'), null);
@@ -95,13 +95,12 @@ async function verificarPerfilesBrowser({ apiPort, token, t }) {
     await page.waitForFunction(() => [...document.querySelectorAll('.catalogos-list strong')].some(el => el.textContent === 'Cargo navegador'));
     await captureSet('catalogo-cargos');
     await page.locator('button::-p-text(Volver a usuarios)').click();
-    await page.click('[title="Editar perfil de Perfil navegador"]');
+    await page.click('[aria-label="Acciones de Perfil navegador"]');
+    await page.locator('[role="menuitem"]::-p-text(Editar perfil)').click();
     await page.waitForFunction(() => [...document.querySelectorAll('.perfil-fields select option')].some(el => el.textContent === 'Cargo navegador'));
     const cargo = await page.evaluate(() => [...document.querySelectorAll('.perfil-fields option')].find(el => el.textContent === 'Cargo navegador')?.value);
     await page.select('.perfil-fields select', cargo);
-    assert.equal(await page.$eval('.perfil-modal input[type="email"]', element => element.value), 'browser@example.test');
-    await page.$eval('.perfil-modal input[type="email"]', element => { element.focus(); element.select(); });
-    await page.type('.perfil-modal input[type="email"]', 'UPDATED@EXAMPLE.TEST');
+    assert.equal(await page.$('.perfil-modal input[type="email"], .perfil-modal input[type="password"]'), null);
     const identityInputs = await page.$$('.perfil-modal input[required]');
     assert.equal(identityInputs.length, 2);
     for (const [index, value] of ['Perfil navegador actualizado', 'browser_renamed'].entries()) {
@@ -113,7 +112,7 @@ async function verificarPerfilesBrowser({ apiPort, token, t }) {
     assert.equal((await updated).status(), 200);
     await page.waitForSelector('.perfil-modal', { hidden: true });
     await page.waitForFunction(() => document.querySelector('.usuarios-grid')?.textContent.includes('Cargo navegador'));
-    await page.waitForSelector('[title="Editar perfil de Perfil navegador actualizado"]');
+    await page.waitForSelector('[aria-label="Acciones de Perfil navegador actualizado"]');
     assert.ok(await page.$eval('.usuarios-grid', el => el.textContent.includes('browser_renamed')));
     await page.evaluate(() => { document.querySelector('.tabla-wrapper').scrollLeft = 0; });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'usuarios sin overflow de página en móvil');
@@ -143,8 +142,9 @@ async function verificarPerfilesBrowser({ apiPort, token, t }) {
     assert.equal(identity.me.nombre_completo, 'Perfil navegador actualizado');
     assert.equal(identity.me.username, 'browser_renamed');
     await page.goto(`${base}/usuarios`, { waitUntil: 'networkidle0' });
-    await page.waitForSelector('[title="Editar perfil de Perfil navegador actualizado"]');
-    await page.click('[title="Editar perfil de Perfil navegador actualizado"]');
+    await page.waitForSelector('[aria-label="Acciones de Perfil navegador actualizado"]');
+    await page.click('[aria-label="Acciones de Perfil navegador actualizado"]');
+    await page.locator('[role="menuitem"]::-p-text(Editar perfil)').click();
     const ownSaved = page.waitForResponse(response => /\/api\/usuarios\/\d+$/.test(response.url()) && response.request().method() === 'PUT');
     const ownUsername = (await page.$$('.perfil-modal input[required]'))[1];
     await ownUsername.click({ clickCount: 3 }); await ownUsername.type('browser_self_renamed');
@@ -161,7 +161,7 @@ async function verificarPerfilesBrowser({ apiPort, token, t }) {
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('usuario') || 'null')?.username === 'browser_self_renamed');
     fs.writeFileSync(path.join(evidence, 'profiles-browser-evidence.json'), JSON.stringify({
       synthetic_only: true, widths,
-      themes: ['light', 'dark'], name_username_email_cargo_saved: true, required_password_change_completed: true, relogin_updated_identity: true,
+      themes: ['light', 'dark'], name_username_cargo_saved: true, recovery_email_preserved: true, required_password_change_completed: true, relogin_updated_identity: true,
       self_username_revokes_session: true, self_relogin_success: true, page_errors: errors,
     }, null, 2) + '\n');
     assert.deepEqual(errors, []);

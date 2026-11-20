@@ -21,7 +21,7 @@ test('perfiles: transacción, bloqueo, conservación y ausencia de cambios en se
     obtenerVisibleParaActor: async () => ({ ...current }), obtenerPorId: async () => ({ ...current }),
     obtenerElementoProfesional: async (campo, id, connection) => { assert.equal(connection, db); calls.push(campo); return id === 5 ? { id, activo: true } : null; },
     actualizar: async (args, connection) => {
-      assert.equal(connection, db); assert.equal(args.passwordHash, null);
+      assert.equal(connection, db); assert.equal(Object.hasOwn(args, 'passwordHash'), false);
       current = { ...current, nombre_completo: args.nombreCompleto, rol: args.rol, activo: args.activo,
         ...(args.cargoId !== undefined ? { cargo_id: args.cargoId } : {}) };
       return current;

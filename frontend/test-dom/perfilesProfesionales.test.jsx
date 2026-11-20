@@ -47,15 +47,15 @@ test('crear cuenta exige cargo y correo; payload sin permisos nuevos', async () 
   }));
 });
 
-test('listado y edición conservan cargo histórico y correo pendiente; edita cargo sin bloquear legado', async () => {
+test('listado y edición conservan cargo histórico sin exponer correo', async () => {
   render(<Usuarios />);
   expect(await screen.findByText(/Cargo histórico/)).toBeTruthy();
-  fireEvent.click(screen.getByTitle('Editar perfil de Persona sintética'));
+  fireEvent.click(await screen.findByRole('button', { name: 'Acciones de Persona sintética' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Editar perfil' }));
   const dialog = screen.getByRole('dialog', { name: 'Perfil del usuario' });
   await within(dialog).findByRole('option', { name: 'Cargo histórico (inactivo, asignado)' });
   expect(within(dialog).getByLabelText('Cargo laboral').value).toBe('1');
-  expect(within(dialog).getByRole('status').textContent).toContain('Correo pendiente');
-  expect(within(dialog).getByLabelText('Correo electrónico').value).toBe('');
+  expect(within(dialog).queryByLabelText('Correo electrónico')).toBeNull();
   fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar perfil' }));
   await waitFor(() => expect(api.put).toHaveBeenCalledWith('/usuarios/4', { cargo_id: 1 }));
   expect(api.put.mock.calls[0][1]).not.toHaveProperty('rol');
@@ -130,7 +130,8 @@ test('doble envío bloqueado; error de edición mantiene formulario y datos', as
   let reject;
   api.put.mockImplementation(() => new Promise((_resolve, fail) => { reject = fail; }));
   render(<Usuarios />);
-  fireEvent.click(await screen.findByTitle('Editar perfil de Persona sintética'));
+  fireEvent.click(await screen.findByRole('button', { name: 'Acciones de Persona sintética' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Editar perfil' }));
   await screen.findByRole('option', { name: 'Cargo CAP activo' });
   const save = screen.getByRole('button', { name: 'Guardar perfil' });
   fireEvent.click(save); fireEvent.click(save);

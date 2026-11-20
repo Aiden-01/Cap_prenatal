@@ -231,6 +231,7 @@ test('la lista requerida es explicita y cada checksum procede del archivo versio
   '031_password_temporal.sql',
   '032_control_atencion_obstetrica.sql',
   '033_normalizar_comunidad_paciente.sql',
+  '034_recuperacion_password.sql',
   ]);
   assert.equal(REQUIRED_STATE.every(({ checksum }) => /^[a-f0-9]{64}$/.test(checksum)), true);
 });

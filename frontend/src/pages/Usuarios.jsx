@@ -12,7 +12,9 @@ import { useFieldErrors } from "../hooks/useFieldErrors";
 import PerfilProfesionalFields from '../components/usuarios/PerfilProfesionalFields';
 import ModalPerfilProfesional from '../components/usuarios/ModalPerfilProfesional';
 import CatalogoCargos from '../components/usuarios/CatalogoCargos';
+import UserActionsMenu from '../components/usuarios/UserActionsMenu';
 import { normalizarEmail, validarEmail } from '../utils/usuarioEmail';
+import EmailFormatHint from '../components/EmailFormatHint';
 import '../components/usuarios/profesionales.css';
 
 import { requiresVihConfirmation } from "../utils/permissionConfirmation";
@@ -20,7 +22,6 @@ import { hasPermission } from "../utils/accessRules";
 
 import { validPassword } from '../utils/passwordPolicy';
 import PasswordRequirements from '../components/PasswordRequirements';
-import ResetTemporaryPassword from '../components/usuarios/ResetTemporaryPassword';
 const INIT = { nombre_completo: "", username: "", email: "", password: "", rol: "personal_salud", cargo_id: null };
 
 const PERMISSION_UI = {
@@ -543,7 +544,6 @@ export default function Usuarios() {
   const [aEliminar, setAEliminar]       = useState(null); // usuario seleccionado para eliminar
   const [formOpen, setFormOpen]         = useState(false);
   const [perfilUsuario, setPerfilUsuario] = useState(null);
-  const [resetUsuario, setResetUsuario] = useState(null);
   const [showTemporaryPassword, setShowTemporaryPassword] = useState(false);
   const [catalogosOpen, setCatalogosOpen] = useState(false);
   const [createReady, setCreateReady] = useState(false);
@@ -560,6 +560,7 @@ export default function Usuarios() {
   const [filtroRol, setFiltroRol] = useState("todos");
   const [busqueda, setBusqueda] = useState("");
   const fieldErrors = useFieldErrors(FIELD_LABELS, inferUsuarioFieldErrors);
+  const createEmailError = fieldErrors.fieldError('email') || (form.email ? validarEmail(form.email) : '');
   const toast        = useGlobalToast();
   const { usuario: yo, refreshUsuario } = useAuth();
   const esDirector = yo?.rol === "director";
@@ -723,7 +724,6 @@ export default function Usuarios() {
 
   return (
     <>
-      {resetUsuario && <ResetTemporaryPassword usuario={resetUsuario} onClose={() => setResetUsuario(null)} onSaved={cargar} />}
       {perfilUsuario && <ModalPerfilProfesional key={perfilUsuario.id} usuario={perfilUsuario} onClose={() => setPerfilUsuario(null)} onSaved={cargar} />}
       {/* Modal confirmacion eliminar */}
       <ModalEliminar
@@ -845,7 +845,7 @@ export default function Usuarios() {
                     <th scope="col">Rol</th>
                     <th scope="col">Estado</th>
                     <th scope="col">Historial</th>
-                    <th scope="col">Acciones</th>
+                    <th scope="col" className="usuario-actions-heading"><span>Acciones</span></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -856,7 +856,14 @@ export default function Usuarios() {
                       ? "No puedes eliminar tu propia cuenta"
                       : protegido
                         ? "No puede eliminarse porque tiene historial clinico o de auditoria. Desactivalo para conservar trazabilidad."
-                        : "Eliminar usuario";
+                        : undefined;
+                    const actions = [
+                      { label: 'Editar perfil', Icon: Pencil, run: () => setPerfilUsuario(u) },
+                      ...(esDirector ? [{ label: 'Gestionar permisos', Icon: ShieldCheck, run: () => abrirPermisos(u) }] : []),
+                      { label: u.activo ? 'Desactivar usuario' : 'Activar usuario', Icon: u.activo ? ShieldOff : ShieldAlert,
+                        run: () => toggleActivo(u), danger: u.activo, disabledReason: esSelf ? 'No puedes desactivar tu propia cuenta' : undefined },
+                      { label: 'Eliminar usuario', Icon: Trash2, run: () => setAEliminar(u), danger: true, disabledReason: eliminarTitle },
+                    ];
                     return (
                       <tr key={u.id} className={!u.activo ? "usuario-row-inactivo" : ""}>
                         <td className="usuario-identity-cell" data-label="Nombre">
@@ -871,7 +878,6 @@ export default function Usuarios() {
                               <div className="usuario-profesion">
                                 {u.cargo_nombre || 'Sin cargo asignado'}{u.cargo_activo === false ? ' (inactivo)' : ''}
                               </div>
-                              {!u.email && <div className="usuario-email-pendiente">Correo pendiente</div>}
                               {esSelf && (
                                 <div style={{ fontSize: "0.72rem", color: "var(--primary)" }}>
                                   (tu)
@@ -908,44 +914,8 @@ export default function Usuarios() {
                               </span>
                           }
                         </td>
-                        <td className="usuario-actions-cell" data-label="Acciones">
-                          <div className="table-actions">
-                            <button className="btn-secondary btn-compact" onClick={() => setResetUsuario(u)}>Restablecer contraseña</button>
-                            <button className="btn-secondary btn-compact" onClick={() => setPerfilUsuario(u)} title={`Editar perfil de ${u.nombre_completo}`}><Pencil size={13} /> Perfil</button>
-                            {/* Activar / Desactivar */}
-                            <button
-                              className={`btn-secondary btn-compact ${!u.activo ? "btn-reactivar" : ""}`}
-                              onClick={() => toggleActivo(u)}
-                              disabled={esSelf}
-                              title={esSelf ? "No puedes modificar tu propia cuenta" : ""}
-                            >
-                              {u.activo
-                                ? <><ShieldOff size={13} /> Desactivar</>
-                                : <><ShieldAlert size={13} /> Reactivar</>
-                              }
-                            </button>
-
-                            {/* Eliminar */}
-                            <button
-                              className="btn-soft-danger"
-                              onClick={() => !esSelf && !protegido && setAEliminar(u)}
-                              disabled={esSelf || protegido}
-                              title={eliminarTitle}
-                            >
-                              <Trash2 size={13} />
-                              Eliminar
-                            </button>
-                            {esDirector && (
-                              <button
-                                className="btn-secondary btn-compact"
-                                onClick={() => abrirPermisos(u)}
-                                title="Gestionar permisos"
-                              >
-                                <ShieldCheck size={13} />
-                                Permisos
-                              </button>
-                            )}
-                          </div>
+                        <td className="usuario-actions-cell">
+                          <UserActionsMenu name={u.nombre_completo} actions={actions} />
                         </td>
                       </tr>
                     );
@@ -1045,8 +1015,9 @@ export default function Usuarios() {
 
               <div className="form-group">
                 <label className="input-label" htmlFor="usuario-create-email">Correo electrónico *</label>
-                <input className={fieldErrors.inputClass('email')} name="email" id="usuario-create-email" type="email" inputMode="email" autoComplete="off" maxLength={254} value={form.email} onChange={event => fieldErrors.setFormValue(setForm, 'email', event.target.value)} required aria-invalid={Boolean(fieldErrors.fieldError('email'))} aria-describedby={fieldErrors.fieldError('email') ? 'usuario-create-email-error' : undefined} />
-                {fieldErrors.fieldError('email') && <div id="usuario-create-email-error" className="field-error-text">{fieldErrors.fieldError('email')}</div>}
+                <input className={createEmailError ? 'input-field input-error' : 'input-field'} name="email" id="usuario-create-email" type="email" inputMode="email" autoComplete="off" maxLength={254} value={form.email} onChange={event => fieldErrors.setFormValue(setForm, 'email', event.target.value)} required aria-invalid={Boolean(createEmailError)} aria-describedby="usuario-create-email-format usuario-create-email-error" />
+                <EmailFormatHint id="usuario-create-email-format" value={form.email} />
+                <div id="usuario-create-email-error" aria-live="polite" className="field-error-text">{(!normalizarEmail(form.email) || !validarEmail(form.email)) && fieldErrors.fieldError('email')}</div>
               </div>
 
               <div className="form-group">

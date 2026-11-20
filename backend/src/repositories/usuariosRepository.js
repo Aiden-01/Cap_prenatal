@@ -111,21 +111,18 @@ async function contarDirectoresActivos(db = pool) {
   return parseInt(rows[0].count, 10);
 }
 
-async function actualizar({ id, nombreCompleto, activo, rol, passwordHash, updatedBy = null, cargoId, email, username }, db = pool) {
+async function actualizar({ id, nombreCompleto, activo, rol, updatedBy = null, cargoId, username }, db = pool) {
   const { rows } = await db.query(
     `WITH actualizado AS (
       UPDATE usuarios SET nombre_completo=$1, activo=$2,
         rol_id=(SELECT id FROM roles WHERE nombre=$3),
-        password_hash=COALESCE($4, password_hash),
-        requiere_cambio_password=CASE WHEN $4::text IS NOT NULL THEN TRUE ELSE requiere_cambio_password END, updated_at=NOW(), updated_by=$5,
-        cargo_id=CASE WHEN $7::boolean THEN $8::integer ELSE cargo_id END,
-        email=CASE WHEN $9::boolean THEN $10::varchar ELSE email END,
-        username=COALESCE($11::varchar, username)
-      WHERE id=$6 RETURNING *
+        updated_at=NOW(), updated_by=$4,
+        cargo_id=CASE WHEN $6::boolean THEN $7::integer ELSE cargo_id END,
+        username=COALESCE($8::varchar, username)
+      WHERE id=$5 RETURNING *
     ) SELECT u.id, u.nombre_completo, u.username, u.activo, u.created_at, u.updated_at, u.created_by, u.updated_by,
       r.nombre AS rol, ${PERFIL_COLUMNS} FROM actualizado u JOIN roles r ON r.id=u.rol_id ${PERFIL_JOINS}`,
-    [nombreCompleto, activo, rol, passwordHash, updatedBy, id, cargoId !== undefined, cargoId ?? null,
-      email !== undefined, email ?? null, username ?? null]
+    [nombreCompleto, activo, rol, updatedBy, id, cargoId !== undefined, cargoId ?? null, username ?? null]
   );
   return rows[0] || null;
 }

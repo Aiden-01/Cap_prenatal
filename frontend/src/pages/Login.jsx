@@ -19,6 +19,7 @@ import { consumeAuthNotice, useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessage";
 import { useFieldErrors } from "../hooks/useFieldErrors";
 import { safeReturn } from "../utils/safeReturn";
+import AccountEmailDialog from "../components/AccountEmailDialog";
 
 const FIELD_LABELS = {
   username: "Usuario",
@@ -30,6 +31,7 @@ export default function Login() {
   const [error, setError]     = useState("");
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const usernameInput = useRef(null);
   const fieldErrors = useFieldErrors(FIELD_LABELS);
   const { login }  = useAuth();
@@ -252,6 +254,7 @@ export default function Login() {
             </div>
             {fieldErrors.fieldError("password") && <div className="field-error-text">{fieldErrors.fieldError("password")}</div>}
           </div>
+          <button className="login-recovery-link" type="button" onClick={() => setRecoveryOpen(true)}>¿Olvidaste tu contraseña?</button>
 
           {error && (
             <div className="login-error">
@@ -288,6 +291,7 @@ export default function Login() {
           <small>Dirección Departamental de Salud de Petén · Área Sur Oriente</small>
         </p>
       </div>
+      {recoveryOpen && <AccountEmailDialog onClose={() => setRecoveryOpen(false)} />}
     </div>
   );
 }

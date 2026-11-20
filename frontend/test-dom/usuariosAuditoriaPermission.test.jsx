@@ -24,7 +24,8 @@ function install(rol, actuales = []) {
 test.each(['admin', 'personal_salud', 'director'])('auditoria visible únicamente para admin: %s', async (rol) => {
   install(rol);
   render(<Usuarios />);
-  fireEvent.click(await screen.findByTitle('Gestionar permisos'));
+  fireEvent.click(await screen.findByRole('button', { name: /^Acciones de / }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Gestionar permisos' }));
   await screen.findByText('Ver pacientes');
   expect(Boolean(screen.queryByText('Ver historial de actividad'))).toBe(rol === 'admin');
 });
@@ -32,7 +33,8 @@ test.each(['admin', 'personal_salud', 'director'])('auditoria visible únicament
 test.each([false, true])('director concede o retira auditoria a admin (asignado: %s)', async (asignado) => {
   install('admin', asignado ? ['auditoria.ver'] : []);
   render(<Usuarios />);
-  fireEvent.click(await screen.findByTitle('Gestionar permisos'));
+  fireEvent.click(await screen.findByRole('button', { name: /^Acciones de / }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Gestionar permisos' }));
   const label = await screen.findByText('Ver historial de actividad');
   const checkbox = label.closest('label').querySelector('input');
   expect(checkbox.checked).toBe(asignado);
@@ -46,7 +48,8 @@ test('admin no gestiona permisos', async () => {
   install('admin');
   render(<Usuarios />);
   await screen.findByText('Objetivo');
-  expect(screen.queryByTitle('Gestionar permisos')).toBeNull();
+  fireEvent.click(await screen.findByRole('button', { name: /^Acciones de / }));
+  expect(screen.queryByRole('menuitem', { name: 'Gestionar permisos' })).toBeNull();
 });
 
 test('el catálogo conserva los diez códigos vigentes y guarda los códigos internos', async () => {
@@ -70,7 +73,8 @@ test('el catálogo conserva los diez códigos vigentes y guarda los códigos int
   api.put.mockResolvedValue({ data: [] });
 
   render(<Usuarios />);
-  fireEvent.click(await screen.findByTitle('Gestionar permisos'));
+  fireEvent.click(await screen.findByRole('button', { name: /^Acciones de / }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Gestionar permisos' }));
   await screen.findByText('Registrar pacientes');
   expect(screen.getAllByRole('checkbox')).toHaveLength(permisos.length);
   expect(screen.queryByText('Eliminar pacientes')).toBeNull();
@@ -105,7 +109,8 @@ test('el catálogo conserva los diez códigos vigentes y guarda los códigos int
 test('busca por nombre y descripción y oculta categorías sin coincidencias', async () => {
   install('admin');
   render(<Usuarios />);
-  fireEvent.click(await screen.findByTitle('Gestionar permisos'));
+  fireEvent.click(await screen.findByRole('button', { name: /^Acciones de / }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Gestionar permisos' }));
   await screen.findByText('Ver pacientes');
   const busqueda = screen.getByRole('searchbox', { name: 'Buscar permisos' });
 
@@ -125,7 +130,8 @@ test('busca por nombre y descripción y oculta categorías sin coincidencias', a
 test('contraer, buscar y expandir conserva selección, contadores y códigos al guardar', async () => {
   install('admin');
   render(<Usuarios />);
-  fireEvent.click(await screen.findByTitle('Gestionar permisos'));
+  fireEvent.click(await screen.findByRole('button', { name: /^Acciones de / }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Gestionar permisos' }));
   const paciente = await screen.findByText('Ver pacientes');
   const categoria = screen.getByRole('button', { name: /Pacientes/ });
   const checkbox = paciente.closest('label').querySelector('input');
@@ -176,7 +182,8 @@ test('grupos clínicos distinguen consulta, captura, cierre y emisión conservan
     : url === '/permisos' ? permisos.map(([codigo]) => ({ codigo, categoria: 'db' })) : [] }));
   api.put.mockResolvedValue({ data: [] });
   render(<Usuarios />);
-  fireEvent.click(await screen.findByTitle('Gestionar permisos'));
+  fireEvent.click(await screen.findByRole('button', { name: /^Acciones de / }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Gestionar permisos' }));
   await screen.findByText('Consultar notas de evolución médica');
   expect(screen.getAllByRole('checkbox')).toHaveLength(11);
   for (const titulo of ['Notas de evolución médica', 'Notas de evolución de enfermería', 'Órdenes médicas', 'Catálogo de cargos']) {

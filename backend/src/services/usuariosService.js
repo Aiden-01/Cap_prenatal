@@ -97,7 +97,6 @@ async function validarPerfil(body, before, repository, db) {
 async function auditarCambiosUsuario({
   before,
   after,
-  passwordReset,
   req,
   db,
   obligatorio,
@@ -117,14 +116,6 @@ async function auditarCambiosUsuario({
         cambios: { anteriores: { [campo]: before[campo] ?? null }, nuevos: { [campo]: after[campo] ?? null } },
       }, options);
     }
-  }
-
-  if ((before.email ?? null) !== (after.email ?? null)) {
-    await registrarEventoPrivado(req, {
-      ...common,
-      contexto: { categoria: 'usuarios', entidad: 'usuario', evento: 'email_actualizado' },
-      metadata: { contacto_modificado: true, contacto_pendiente: after.email == null },
-    }, options);
   }
 
   if (before.username !== after.username) {
@@ -174,17 +165,6 @@ async function auditarCambiosUsuario({
     }, options);
   }
 
-  if (passwordReset) {
-    await registrarEventoPrivado(req, {
-      ...common,
-      contexto: {
-        categoria: 'usuarios',
-        entidad: 'usuario',
-        evento: 'password_reiniciado',
-      },
-      metadata: { password_cambiado: true },
-    }, options);
-  }
 }
 
 async function assertPuedeCambiarSelf({
@@ -253,27 +233,23 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
     repository: usuariosRepo,
   });
 
-  const passwordHash = body.password ? await bcrypt.hash(body.password, 12) : null;
   const actualizar = (db = null, estadoAnterior = before) => usuariosRepo.actualizar({
     id,
     nombreCompleto: body.nombre_completo ?? estadoAnterior.nombre_completo,
     activo: body.activo ?? estadoAnterior.activo,
     rol: body.rol ?? estadoAnterior.rol,
-    passwordHash,
     updatedBy: req.usuario.id,
     cargoId: body.cargo_id,
-    email: body.email,
     username: body.username,
   }, db || undefined);
 
   const roleChanged = before.rol !== nextRol;
   const nextActivo = body.activo ?? before.activo;
   const stateChanged = before.activo !== nextActivo;
-  const passwordReset = Boolean(body.password);
-  const criticalChange = roleChanged || stateChanged || passwordReset;
+  const criticalChange = roleChanged || stateChanged;
 
   const perfilProporcionado = body.cargo_id !== undefined;
-  if (criticalChange || perfilProporcionado || body.email !== undefined || body.username !== undefined || body.nombre_completo !== undefined) {
+  if (criticalChange || perfilProporcionado || body.username !== undefined || body.nombre_completo !== undefined) {
     await permisosRepo.enTransaccion(async (db) => {
       const bloqueado = await permisosRepo.bloquearUsuarioPermisos(id, db);
       if (!bloqueado) throw new HttpError(404, 'Usuario no encontrado');
@@ -323,7 +299,6 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
 
       const reasons = [];
       if (body.username !== undefined && estadoAnterior.username !== body.username) reasons.push('username_changed');
-      if (passwordReset) reasons.push('password_reset');
       if (estadoAnterior.activo === true && body.activo === false) reasons.push('user_deactivated');
       if (estadoAnterior.rol !== rolBloqueado) reasons.push('role_changed');
       if (reasons.length) await sessions.revokeAllInTransaction({
@@ -340,7 +315,6 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
       await auditarCambiosUsuario({
         before: estadoAnterior,
         after: usuario,
-        passwordReset,
         req,
         db,
         obligatorio: true,
@@ -356,7 +330,6 @@ async function actualizarUsuario({ id, body, req, dependencies = {} }) {
   await auditarCambiosUsuario({
     before,
     after: usuario,
-    passwordReset: false,
     req,
     obligatorio: false,
     registrarEventoPrivado,

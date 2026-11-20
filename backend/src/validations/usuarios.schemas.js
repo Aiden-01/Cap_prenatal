@@ -13,8 +13,7 @@ const perfilIdSchema = z.union([
   z.number(), z.string().regex(/^[1-9]\d*$/).transform(Number),
 ]).pipe(z.number().int().min(1).max(2147483647)).nullable().optional();
 
-// El correo pertenece solo a la administración de cuentas. Su presencia no
-// acredita propiedad ni cambia el mecanismo de autenticación por username.
+// Un correo con formato válido todavía debe comprobarse desde la cuenta titular.
 const emailSchema = z.string({ error: 'El correo electrónico es obligatorio' })
   .trim().toLowerCase().min(1, 'El correo electrónico es obligatorio')
   .max(254, 'El correo electrónico debe tener como máximo 254 caracteres')
@@ -32,17 +31,13 @@ const usuarioCreateSchema = z.object({
 const usuarioUpdateSchema = z.object({
   username: requiredText(80).optional(),
   nombre_completo: requiredText(150).optional(),
-  email: emailSchema.optional(),
   activo: optionalBoolean,
-  password: z.preprocess(
-    (value) => (value === '' || value === null ? undefined : value),
-    passwordSchema.optional()
-  ),
   rol: rolSchema.optional(),
   cargo_id: perfilIdSchema,
 }).strict();
 
 module.exports = {
+  emailSchema,
   usuarioCreateSchema,
   usuarioUpdateSchema,
 };

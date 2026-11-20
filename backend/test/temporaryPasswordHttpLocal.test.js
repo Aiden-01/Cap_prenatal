@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),crypto=require('node:crypto'),bcrypt=require('bcryptjs');
-test('HTTP local: alta/reset temporal, CSRF, refresh bloqueado, cambio y revocación reales',{skip:process.env.RUN_TEMP_PASSWORD_LOCAL!=='1',timeout:60000},async()=>{
+test('HTTP local: alta temporal, CSRF, refresh bloqueado, cambio propio y bloqueo del reinicio administrativo',{skip:process.env.RUN_TEMP_PASSWORD_LOCAL!=='1',timeout:60000},async()=>{
  const ec=require('../src/config/env');ec.loadEnvironmentFile();const config=ec.validateAppConfig(process.env),dbConfig=ec.validateDatabaseConfig(process.env,{nodeEnv:config.nodeEnv});assert.equal(config.nodeEnv,'development');assert.ok(['localhost','127.0.0.1','::1'].includes(dbConfig.host));
  const pool=require('../src/db/pool');await require('../src/db/schemaCompatibility').assertSchemaCompatible(pool);
  const nonce=crypto.randomBytes(6).toString('hex'),actorName='tmp-admin-'+nonce,targetName='tmp-user-'+nonce;const ids=[];let server;
@@ -25,9 +25,9 @@ test('HTTP local: alta/reset temporal, CSRF, refresh bloqueado, cambio y revocac
   assert.equal((await send('/auth/login','POST',user,{username:targetName,password:temp})).status,401);
   const normal=await send('/auth/login','POST',user,{username:targetName,password:personal});assert.equal(normal.status,200);assert.equal(normal.data.usuario.requiere_cambio_password,false);
   assert.equal((await send('/pacientes','GET',user)).status,200);
-  assert.equal((await send('/usuarios/'+target.id,'PUT',admin,{password:reset})).status,200);
-  assert.equal((await send('/auth/me','GET',user)).status,401);
-  const resetLogin=await send('/auth/login','POST',user,{username:targetName,password:reset});assert.equal(resetLogin.status,200);assert.equal(resetLogin.data.usuario.requiere_cambio_password,true);assert.equal((await send('/pacientes','GET',user)).status,403);
+  assert.equal((await send('/usuarios/'+target.id,'PUT',admin,{password:reset})).status,400);
+  assert.equal((await send('/auth/me','GET',user)).status,200);
+  assert.equal((await send('/auth/login','POST',jar(),{username:targetName,password:reset})).status,401);
   assert.equal((await send('/auth/logout','POST',user,{})).status,200);
  }finally{
   // Preserve audit history; only accounts created by this test are disabled.

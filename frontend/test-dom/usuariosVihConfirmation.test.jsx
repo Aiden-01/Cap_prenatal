@@ -16,7 +16,8 @@ beforeEach(() => {
  api.put.mockImplementation(async (_url, payload) => { original = [...payload.permisos]; return { data: [] }; });
 });
 afterEach(cleanup);
-async function open() { fireEvent.click(await screen.findByTitle('Gestionar permisos')); await screen.findByText('Ver pacientes'); }
+async function open() { fireEvent.click(await screen.findByRole('button', { name: /^Acciones de / }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Gestionar permisos' })); await screen.findByText('Ver pacientes'); }
 const checkbox = name => screen.getByText(name).closest('label').querySelector('input');
 const save = () => fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
 async function grant() { await open(); fireEvent.click(checkbox('Ver resultados de VIH')); save(); }
