@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { Pool } = require('pg');
+const { PostgresTestPool, runPostgresCleanup, assertNoPostgresSessions } = require('./postgresCleanup');
 
 const approvedBranches = ['refs/heads/feature/cpren-127-normalizacion-comunidades',
   'refs/heads/feature/recuperacion-password'];
@@ -59,7 +60,9 @@ function serviceFixture(suite, config) {
   }
   return {
     async start() {
-      admin = new Pool(serviceConfig);
+      admin = suite === 'checkpoint14'
+        ? new PostgresTestPool({ ...serviceConfig, statement_timeout: 5000 })
+        : new Pool(serviceConfig);
       await verify(admin);
       const existing = (await admin.query('SELECT datname FROM pg_database WHERE datname = ANY($1::text[])', [allowed])).rows;
       assert.equal(existing.length, 0, 'No se reutilizan bases existentes');
@@ -67,7 +70,21 @@ function serviceFixture(suite, config) {
       owned = true;
     },
     verify,
-    async close() {
+    async close(t) {
+      if (suite === 'checkpoint14') {
+        if (!admin) return;
+        await runPostgresCleanup(t, [
+          ...(owned ? [['drop-fixture-databases', async () => {
+            await runPostgresCleanup(t, [['verify-client-sessions', async () => {
+              await verify(admin);
+              await assertNoPostgresSessions(admin, allowed);
+            }]]);
+            for (const name of allowed) await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
+          }]] : []),
+          ['close-control-pool', () => admin.end()],
+        ]);
+        return;
+      }
       try {
         if (owned) {
           await verify(admin);

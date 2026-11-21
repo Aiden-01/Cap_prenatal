@@ -5,7 +5,7 @@ const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { Client, Pool } = require('pg');
+const { PostgresTestPool, runPostgresCleanup, removeTemporaryPostgres } = require('./helpers/postgresCleanup');
 const appPool = require('../src/db/pool');
 const { migrate } = require('../src/db/migrate');
 const pacientes = require('../src/services/pacientesService');
@@ -55,17 +55,18 @@ test('033 conserva datos y rollback; las lecturas territoriales reflejan el catÃ
   const originalPool = { query: appPool.query, connect: appPool.connect };
   let started = false;
   let db;
+  let restored;
   try {
     run('initdb', ['-D', dataDir, '-U', database.user, '-A', 'trust', '--no-locale', '-E', 'UTF8']);
     const serverOptions = `-h 127.0.0.1 -p ${database.port}`
       + (process.platform === 'win32' ? '' : ` -k "${root}"`);
     run('pg_ctl', ['-D', dataDir, '-l', path.join(root, 'postgres.log'), '-o', serverOptions, '-w', 'start']);
     started = true;
-    db = new Pool(database);
+    db = new PostgresTestPool(database);
     assert.equal(path.resolve((await db.query('SHOW data_directory')).rows[0].data_directory), path.resolve(dataDir));
     const beforeMigration = await migrate({
       ...migrationOptions,
-      db: new Pool(database),
+      db: new PostgresTestPool(database),
       readDirectory: dir => fs.readdirSync(dir).filter(file => file !== migration),
       readSchema: (file, encoding) => fs.readFileSync(file, encoding).split('-- CPREN-127:')[0],
       verifyCompatibility: async () => {},
@@ -102,17 +103,21 @@ test('033 conserva datos y rollback; las lecturas territoriales reflejan el catÃ
     run('pg_dump', [...connectionArgs, '-d', database.database, '-Fc', '-f', backup]);
 
     const tx = await db.connect();
+    let txError;
     try {
       await tx.query('BEGIN');
-      await tx.query(sql033);
-      await tx.query('ROLLBACK');
+      try { await tx.query(sql033); }
+      finally { await tx.query('ROLLBACK'); }
+    } catch (error) {
+      txError = error;
+      throw error;
     } finally {
-      tx.release();
+      tx.release(txError);
     }
     assert.deepEqual(await snapshot(db), original);
     assert.equal((await db.query("SELECT to_regclass('pacientes_ubicacion_legado') AS tabla")).rows[0].tabla, null);
 
-    const migrated = await migrate({ ...migrationOptions, db: new Pool(database) });
+    const migrated = await migrate({ ...migrationOptions, db: new PostgresTestPool(database) });
     assert.equal(migrated.ok, true, migrated.error?.message);
     const after = await snapshot(db);
     assert.deepEqual(after, original.map(p => p.comunidad_id === null ? p
@@ -121,7 +126,7 @@ test('033 conserva datos y rollback; las lecturas territoriales reflejan el catÃ
       original.filter(p => p.comunidad_id !== null).map(p => ({
         paciente_id: p.id, comunidad_id_original: p.comunidad_id, comunidad: p.comunidad, territorio: p.territorio, sector: p.sector,
       })));
-    assert.equal((await migrate({ ...migrationOptions, db: new Pool(database) })).ok, true);
+    assert.equal((await migrate({ ...migrationOptions, db: new PostgresTestPool(database) })).ok, true);
     assert.deepEqual(await snapshot(db), after);
     await assert.rejects(db.query("UPDATE pacientes SET comunidad = 'Duplicada' WHERE id = $1", [catalogada.id]),
       { code: '23514', constraint: 'pacientes_ubicacion_catalogada_check' });
@@ -182,25 +187,29 @@ test('033 conserva datos y rollback; las lecturas territoriales reflejan el catÃ
 
     await db.query('CREATE DATABASE cpren127_rollback');
     run('pg_restore', [...connectionArgs, '-d', 'cpren127_rollback', '--exit-on-error', backup]);
-    const restored = new Client({ ...database, database: 'cpren127_rollback' });
-    await restored.connect();
-    try {
-      assert.deepEqual(await snapshot(restored), original);
-      const { rows: [schema] } = await restored.query(`SELECT character_maximum_length AS longitud,
-        to_regclass('pacientes_ubicacion_legado') AS archivo
-        FROM information_schema.columns
-        WHERE table_schema = 'public' AND table_name = 'pacientes' AND column_name = 'comunidad'`);
-      assert.deepEqual(schema, { longitud: 100, archivo: null });
-      assert.equal((await restored.query('SELECT 1 FROM schema_migrations WHERE filename = $1', [migration])).rowCount, 0);
-    } finally {
-      await restored.end();
-    }
+    restored = new PostgresTestPool({ ...database, database: 'cpren127_rollback', max: 1 });
+    assert.deepEqual(await snapshot(restored), original);
+    const { rows: [schema] } = await restored.query(`SELECT character_maximum_length AS longitud,
+      to_regclass('pacientes_ubicacion_legado') AS archivo
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'pacientes' AND column_name = 'comunidad'`);
+    assert.deepEqual(schema, { longitud: 100, archivo: null });
+    assert.equal((await restored.query('SELECT 1 FROM schema_migrations WHERE filename = $1', [migration])).rowCount, 0);
     t.diagnostic('4 pacientes sintÃ©ticas verificadas antes/despuÃ©s; 2 vÃ­nculos archivados; respaldo restaurado y comparado.');
   } finally {
-    Object.assign(appPool, originalPool);
-    if (db) await db.end();
-    if (started) run('pg_ctl', ['-D', dataDir, '-m', 'fast', '-w', 'stop']);
-    assert.ok(path.basename(root).startsWith('cap-cpren127-'));
-    fs.rmSync(root, { recursive: true, force: true });
+    t.after(async () => {
+      await runPostgresCleanup(t, [
+        ...(restored ? [['close-pool', () => restored.end()]] : []),
+        ...(db ? [['close-pool', async () => {
+          await db.end();
+          await runPostgresCleanup(t, [['restore-shared-pool', () => Object.assign(appPool, originalPool)]]);
+        }]] : []),
+        ['clean-temporary-directory', () => removeTemporaryPostgres(t, {
+          config: database, dataDirectory: dataDir, root, prefix: 'cap-cpren127-',
+          stop: started ? () => run('pg_ctl', ['-D', dataDir, '-m', 'fast', '-w', 'stop']) : null,
+        })],
+      ]);
+      t.diagnostic('postgres-cleanup:complete');
+    });
   }
 });

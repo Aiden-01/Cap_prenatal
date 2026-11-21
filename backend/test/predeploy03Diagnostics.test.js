@@ -8,10 +8,17 @@ const { pathToFileURL } = require('node:url');
 const { failureDiagnostic, processDiagnostic } = require('../../.github/clinical/test-failure-diagnostics.cjs');
 const { collectLayoutDiagnostics } = require('./helpers/layoutDiagnostics');
 const { verifyReviewedLayout, verifyResponsiveActions } = require('../../.github/clinical/candidate-integrity.cjs');
-const title = 'CI conserva assertion numérica sin publicar operandos sensibles';
+const title = 'CI conserva la ubicación de la aserción';
 
 if (process.env.PREDEPLOY03_REPORTER_FIXTURE === '1') {
-  test('CI conserva assertion numérica sin publicar operandos sensibles', () => assert.equal(808, 768));
+  test('CI conserva la ubicación de la aserción', async t => {
+    await t.test('subprueba con aserción fallida', () => assert.equal(81234567, 768));
+    t.diagnostic('postgres-cleanup:stop-temporary-server');
+  });
+} else if (process.env.PREDEPLOY03_REPORTER_FIXTURE === 'late') {
+  test('subprueba con error asíncrono después de terminar', () => {
+    setImmediate(() => Promise.reject(new Error('private password: synthetic value')));
+  });
 } else {
   test('diagnóstico de proceso rechaza claves y estados ajenos sin publicar texto arbitrario', () => {
     const valid = { stage: 'document-timeout', ready: true, parent: 'absent', child: 'Z', tempRemoved: true };
@@ -19,6 +26,16 @@ if (process.env.PREDEPLOY03_REPORTER_FIXTURE === '1') {
     assert.equal(processDiagnostic(JSON.stringify({ ...valid, cookie: 'synthetic' })), null);
     assert.equal(processDiagnostic(JSON.stringify({ ...valid, child: 'Paciente reservado' })), null);
     assert.equal(processDiagnostic('raw log'), null);
+    const late = 'Error: A resource generated asynchronous activity after the test ended. This activity created the error "Error: read ECONNRESET" which triggered an uncaughtException event, caught by the test runner.';
+    assert.equal(processDiagnostic(late).code, 'ECONNRESET');
+    assert.equal(processDiagnostic(late.replace('ECONNRESET', 'ECONNRESET sensitive suffix')).code, null);
+    const metadata = { file: __filename, nesting: 1 };
+    const cleanup = processDiagnostic('postgres-cleanup:verify-client-sessions:failed:POSTGRES_SESSIONS_REMAIN', metadata);
+    assert.equal(cleanup.code, 'POSTGRES_SESSIONS_REMAIN');
+    assert.equal(cleanup.status, 'failed');
+    assert.equal(cleanup.nesting, 1);
+    assert.equal(processDiagnostic('postgres-cleanup:close-pool:failed:81234567', metadata).code, null);
+    assert.equal(processDiagnostic('postgres-cleanup:close-pool:succeeded:details omitted', metadata), null);
   });
   test('integridad CI solo admite CSS revisado exacto y rechaza cambios de frontend adicionales', () => {
     const css = fs.readFileSync(path.join(__dirname, '../../frontend/src/index.css'), 'utf8');
@@ -37,14 +54,16 @@ if (process.env.PREDEPLOY03_REPORTER_FIXTURE === '1') {
     assert.throws(() => verifyResponsiveActions([`A\t${file}`], css), /Unexpected changes/);
     assert.throws(() => verifyResponsiveActions(modified, css + '\n/* cambio */'), /approved content/);
   });
-  test('CI conserva assertion numérica sin publicar operandos sensibles', () => {
+  test('CI conserva la ubicación de la aserción', () => {
     const data = failureDiagnostic({ file: __filename, name: title, line: 12, column: 3,
       error: { code: 'ERR_ASSERTION', operator: 'strictEqual', actual: 808, expected: 768,
         message: 'Authorization: secret synthetic value', stack: 'private stack' } }, { stage: 'backend', exitCode: 1 });
     assert.equal(data.test_name, title);
     assert.equal(data.test_file, 'backend/test/predeploy03Diagnostics.test.js');
-    assert.equal(data.actual, 808); assert.equal(data.expected, 768);
-    assert.match(data.message, /808 strictEqual 768/);
+    assert.equal(data.line, 12); assert.equal(data.column, 3);
+    assert.equal(data.operator, 'strictEqual');
+    assert.equal(Object.hasOwn(data, 'actual'), false);
+    assert.equal(Object.hasOwn(data, 'expected'), false);
     assert.equal(data.exit_code, 1); assert.equal(data.stage, 'backend');
     assert.doesNotMatch(JSON.stringify(data), /Authorization|private stack|secret synthetic/);
   });
@@ -66,25 +85,50 @@ if (process.env.PREDEPLOY03_REPORTER_FIXTURE === '1') {
     const data = failureDiagnostic({ error: { code: 'ERR_TEST_FAILURE', cause: { code: 'ENOENT', message: 'private path' } } }, { stage: 'backend' });
     assert.equal(data.code, 'ENOENT'); assert.doesNotMatch(data.message, /private path/);
     assert.equal(failureDiagnostic({ error: { code: 'PATIENT_RESERVED' } }).code, 'UNCLASSIFIED_TEST_FAILURE');
+    const shutdown = failureDiagnostic({ error: { code: 'ERR_TEST_FAILURE', failureType: 'uncaughtException',
+      cause: { code: '57P01', detail: 'sensitive database details', message: 'raw shutdown message' } } });
+    assert.equal(shutdown.code, '57P01');
+    assert.equal(shutdown.failure_kind, 'uncaughtException');
+    assert.doesNotMatch(JSON.stringify(shutdown), /sensitive database details|raw shutdown message/);
   });
 
-  test('reporter Node real conserva fallo y exit1 junto a TAP sin logs crudos en JSON', () => {
+  test('reporter Node real conserva subpruebas, cierre y actividad tardía sin logs crudos en JSON', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cap-ci-reporter-'));
     const output = path.join(directory, 'failures.jsonl');
     try {
-      const childEnv = { ...process.env, PREDEPLOY03_REPORTER_FIXTURE: '1' };
+      const childEnv = { ...process.env };
       delete childEnv.NODE_TEST_CONTEXT; // Otro runner real, no el contexto IPC del test padre.
-      const result = spawnSync(process.execPath, ['--test', '--test-reporter=tap',
+      const args = ['--test', '--test-reporter=tap',
         `--test-reporter=${pathToFileURL(path.resolve(__dirname, '../../.github/clinical/node-test-reporter.cjs')).href}`,
-        '--test-reporter-destination=stdout', `--test-reporter-destination=${output}`, __filename],
-      { encoding: 'utf8', timeout: 15000, env: childEnv });
-      assert.equal(result.status, 1, result.stderr);
-      assert.match(result.stdout, /# fail 1/);
-      const row = JSON.parse(fs.readFileSync(output, 'utf8').trim());
-      assert.equal(row.code, 'ERR_ASSERTION'); assert.equal(row.test_name, title);
-      assert.equal(row.actual, 808); assert.equal(row.expected, 768);
-      assert.equal(row.test_file, 'backend/test/predeploy03Diagnostics.test.js');
-      assert.ok(row.line > 0);
+        '--test-reporter-destination=stdout', `--test-reporter-destination=${output}`, __filename];
+      function runFixture(mode) {
+        const result = spawnSync(process.execPath, args, { encoding: 'utf8', timeout: 15000,
+          env: { ...childEnv, PREDEPLOY03_REPORTER_FIXTURE: mode } });
+        assert.equal(result.status, 1, result.stderr);
+        const raw = fs.readFileSync(output, 'utf8').trim();
+        assert.doesNotMatch(raw, /81234567|private password|synthetic value/);
+        return raw.split('\n').map(JSON.parse);
+      }
+      const file = 'backend/test/predeploy03Diagnostics.test.js';
+      const nested = runFixture('1');
+      const assertion = nested.find(row => row.code === 'ERR_ASSERTION');
+      assert.equal(assertion.test_name, 'subprueba con aserción fallida');
+      assert.equal(assertion.test_file, file);
+      assert.equal(assertion.nesting, 1);
+      assert.ok(assertion.line > 0);
+      assert.ok(nested.some(row => row.test_name === title && row.failure_kind === 'subtestsFailed'));
+      assert.ok(nested.some(row => row.stage === 'postgres-cleanup' && row.step === 'stop-temporary-server'));
+
+      const late = runFixture('late');
+      const activity = late.find(row => row.stage === 'node-test-late-activity');
+      assert.equal(activity.event, 'unhandledRejection');
+      assert.equal(activity.code, null);
+      assert.equal(activity.test_file, file);
+      assert.equal(activity.test_name, 'subprueba con error asíncrono después de terminar');
+      assert.ok(activity.line > 0);
+      const child = late.find(row => row.scope === 'file-process');
+      assert.equal(child.test_file, file);
+      assert.equal(child.child_exit_code, 1);
     } finally { fs.rmSync(directory, { recursive: true, force: true }); }
   });
 

@@ -8,7 +8,7 @@ module.exports = async function* reporter(source) {
       yield JSON.stringify({ record: 'failure', ...failureDiagnostic(event.data, { stage: 'node-test' }) }) + '\n';
     }
     if (event.type === 'test:diagnostic') {
-      const diagnostic = processDiagnostic(event.data.message);
+      const diagnostic = processDiagnostic(event.data.message, event.data);
       if (diagnostic) yield JSON.stringify({ record: 'process-diagnostic', ...diagnostic }) + '\n';
     }
   }
