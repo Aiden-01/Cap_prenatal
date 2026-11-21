@@ -2,7 +2,12 @@
 set -euo pipefail
 [[ "$GITHUB_ACTIONS" == true && "$RUNNER_ENVIRONMENT" == github-hosted ]]
 [[ "$GITHUB_REPOSITORY" == Aiden-01/Cap_prenatal ]]
-[[ "$GITHUB_REF" == refs/heads/feature/cpren-127-normalizacion-comunidades ]]
+case "$GITHUB_REF" in
+  refs/heads/feature/cpren-127-normalizacion-comunidades) ;;
+  refs/heads/feature/recuperacion-password)
+    [[ "${CPREN129_APPROVED_SHA:-}" =~ ^[a-f0-9]{40}$ ]];;
+  *) exit 1;;
+esac
 [[ "$(uname -s)" == Linux ]]
 [[ "$(node --version)" == v20.20.2 ]]
 [[ "$("$PREDEPLOY_NODE24_BIN/node" --version)" == v24.* ]]

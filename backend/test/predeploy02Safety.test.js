@@ -7,6 +7,7 @@ test('PREDEPLOY-02 rechaza destinos fuera del runner y de la rama clínica', () 
     GITHUB_REF: 'refs/heads/feature/cpren-127-normalizacion-comunidades',
     CAP_PREDEPLOY02_SERVICE: '1', NODE_ENV: 'test', RUNNER_ENVIRONMENT: 'github-hosted' };
   assert.doesNotThrow(() => assertRunner(env, 'linux'));
+  assert.doesNotThrow(() => assertRunner({ ...env, GITHUB_REF: 'refs/heads/feature/recuperacion-password' }, 'linux'));
   for (const key of Object.keys(env)) assert.throws(() => assertRunner({ ...env, [key]: 'invalid' }, 'linux'));
   assert.throws(() => assertRunner(env, 'win32'));
   assert.throws(() => assertRunner({ ...env, GITHUB_REF: 'refs/heads/main' }, 'linux'));

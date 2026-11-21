@@ -312,8 +312,40 @@ termine en `.xlsx`.
 - Probar restauración y rollback del paquete.
 - Publicar workflows solo con autorización documentada.
 
-## Correo transaccional de cuentas
+## Recuperación de contraseña (CPREN-129)
 
-El backend envía códigos de recuperación y avisos de cambio de contraseña mediante la API de Resend al correo registrado de la cuenta. Configure ACCOUNT_EMAIL_ENABLED, ACCOUNT_EMAIL_HMAC_SECRET, ACCOUNT_EMAIL_RESEND_KEY y ACCOUNT_EMAIL_FROM en el backend. Use un secreto aleatorio de al menos 32 bytes independiente de JWT, una clave de envío dedicada y una dirección de un dominio verificado en Resend. Configure FRONTEND_URL con el origen HTTPS exacto de la interfaz que iniciará la recuperación. La cookie de restablecimiento es Secure, HttpOnly, SameSite=Strict y se limita al endpoint de consumo en producción.
+Express genera, valida y consume los códigos. Usa `ACCOUNT_EMAIL_ENABLED`,
+`ACCOUNT_EMAIL_HMAC_SECRET`, `ACCOUNT_EMAIL_WEBHOOK_URL` y
+`ACCOUNT_EMAIL_WEBHOOK_SECRET`. Los dos secretos son independientes entre sí
+y de JWT. La URL es el webhook dedicado en un puerto de loopback. El backend
+no configura ni usa la API key de Resend.
 
-El envío se inicia después de confirmar la transacción de base de datos y tiene un plazo acotado. El código en claro permanece en memoria durante el envío. Ante un fallo o reinicio se puede pedir un código nuevo tras la espera prevista. La respuesta pública no depende del resultado del proveedor. Los tests inyectan un transporte en memoria.
+El workflow de seguridad vive en `n8n/security/recuperacion-password.json`
+y se importa por separado. Asignar una credencial Header Auth dedicada con el
+nombre de cabecera `X-CAP-Account-Email-Key` al Webhook y a la recogida privada.
+Asignar la credencial existente `Resend API` al HTTP Request de envío. El
+remitente es la identidad `TECHNICAL` del manifiesto.
+
+Iniciar n8n mediante `scripts/start-n8n-local.ps1` para que se aplique la
+protección del webhook antes de que n8n escriba su copia inicial. El disparador
+solo admite el identificador del mensaje. Tras validar Header Auth, el
+lanzador elimina los encabezados y los metadatos del disparador antes de esa
+escritura. n8n recoge el correo una sola vez por una ruta autenticada de
+Express fuera de `/api`, en loopback. El puerto local del backend en el
+workflow es `3015`. El mensaje vive en memoria hasta la recogida o el cierre
+de la solicitud al webhook. No configurar un proxy público para esos puertos.
+
+El workflow queda sin publicar y sin datos fijados, con el guardado de
+ejecuciones manuales, resultados y progreso deshabilitado. Resend recibe un `Idempotency-Key`
+derivado del identificador del mensaje. Los nodos y el backend no
+reintentan una entrega dudosa. Los diagnósticos de Express son categorías
+fijas y la respuesta pública de recuperación sigue siendo uniforme.
+`ENTREGA_INCIERTA` requiere comprobar el evento en Resend antes de repetir un
+envío. La verificación simulada no llama a Resend.
+
+La validación integrada usa el workflow clínico existente. Cuando se autorice
+su ejecución, un commit que solo modifique ese workflow debe fijar
+`CPREN129_APPROVED_SHA` al SHA del checkpoint publicado. El runner exige que
+ese checkpoint sea el padre directo del commit de activación y ejecuta la fase
+`account-recovery` con PostgreSQL temporal y correo simulado, junto a las
+comprobaciones clínicas ya configuradas.

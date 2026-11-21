@@ -376,15 +376,28 @@ function validateAutomationConfig(env = process.env, options = {}) {
 
 function validateAccountEmailConfig(env = process.env) {
   if (!parseBoolean(env, 'ACCOUNT_EMAIL_ENABLED')) return { enabled: false };
+  const { accountEmailWebhook } = require('../services/accountEmailTransport');
+  const nodeEnv = nodeEnvForValidation(env);
+  const jwtSecret = readOptional(env, 'JWT_SECRET');
   const secret = validateSecret('ACCOUNT_EMAIL_HMAC_SECRET', readRequired(env, 'ACCOUNT_EMAIL_HMAC_SECRET'), {
-    nodeEnv: nodeEnvForValidation(env), minBytes: 32, rejectUnsafeOutsideProduction: true,
+    nodeEnv, minBytes: 32, rejectUnsafeOutsideProduction: true,
   });
-  if (secret === readOptional(env, 'JWT_SECRET')) invalid('ACCOUNT_EMAIL_HMAC_SECRET');
-  const apiKey = readRequired(env, 'ACCOUNT_EMAIL_RESEND_KEY');
-  const sender = readRequired(env, 'ACCOUNT_EMAIL_FROM');
-  if (/\s/.test(apiKey)) invalid('ACCOUNT_EMAIL_RESEND_KEY');
-  if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(sender)) invalid('ACCOUNT_EMAIL_FROM');
-  return { enabled: true, secret, apiKey, sender };
+  if (secret === jwtSecret) invalid('ACCOUNT_EMAIL_HMAC_SECRET');
+  const webhookSecret = validateSecret('ACCOUNT_EMAIL_WEBHOOK_SECRET', readRequired(env, 'ACCOUNT_EMAIL_WEBHOOK_SECRET'), {
+    nodeEnv, minBytes: 32, rejectUnsafeOutsideProduction: true,
+  });
+  if (webhookSecret === secret || webhookSecret === jwtSecret || !/^[A-Za-z0-9_-]{32,128}$/.test(webhookSecret)) {
+    invalid('ACCOUNT_EMAIL_WEBHOOK_SECRET');
+  }
+  const webhookVariable = 'ACCOUNT_EMAIL_WEBHOOK_URL';
+  let url;
+  try { url = new URL(readRequired(env, webhookVariable)); }
+  catch { invalid(webhookVariable); }
+  if (url.protocol !== 'http:' || !['127.0.0.1', '[::1]'].includes(url.hostname)
+    || !url.port || url.username || url.password || url.search || url.hash || url.pathname !== accountEmailWebhook) {
+    invalid(webhookVariable);
+  }
+  return { enabled: true, secret, webhookUrl: url.href, webhookSecret };
 }
 
 function validateAppConfig(env = process.env) {

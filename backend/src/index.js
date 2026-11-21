@@ -23,6 +23,8 @@ const helmet = require('helmet');
 
 const authRoutes = require('./routes/auth');
 const { createPasswordRecoveryRouter } = require('./routes/accountEmail');
+const { createAccountEmailService } = require('./services/accountEmailService');
+const { accountEmailDeliveryPath, createAccountEmailTransport } = require('./services/accountEmailTransport');
 const usuariosRoutes = require('./routes/usuarios');
 const pacientesRoutes = require('./routes/pacientes');
 const citasCalendarioRoutes = require('./routes/citasCalendario');
@@ -91,7 +93,14 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: config.jsonBodyLimit }));
-app.use('/api/auth/recuperacion', createPasswordRecoveryRouter(config));
+const accountEmailTransport = config.accountEmail.enabled && config.nodeEnv !== 'test'
+  ? createAccountEmailTransport(config.accountEmail)
+  : null;
+const accountEmailService = accountEmailTransport
+  ? createAccountEmailService({ secret: config.accountEmail.secret, send: accountEmailTransport.send })
+  : null;
+if (accountEmailTransport) app.post(accountEmailDeliveryPath + '/:messageId', accountEmailTransport.claim);
+app.use('/api/auth/recuperacion', createPasswordRecoveryRouter(config, accountEmailService));
 app.use('/api', csrfMiddleware);
 
 app.use('/api/auth', authRoutes);

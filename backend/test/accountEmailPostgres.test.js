@@ -61,6 +61,8 @@ test('034 incrementa el esquema y protege el restablecimiento real HTTP en Postg
       verifyCompatibility() {},
     });
     assert.equal(before.ok, true, before.error?.message);
+    const readMigration = () => db.query('SELECT checksum, applied_at FROM schema_migrations WHERE filename=$1', [migration]);
+    assert.equal((await readMigration()).rowCount, 0);
     const initialHash = await bcrypt.hash(initialPassword, 4);
     await db.query("INSERT INTO roles(nombre) VALUES ('director'),('admin'),('personal_salud') ON CONFLICT (nombre) DO NOTHING");
     const { rows: accounts } = await db.query("INSERT INTO usuarios (nombre_completo,username,email,password_hash,rol_id,activo) "
@@ -71,6 +73,11 @@ test('034 incrementa el esquema y protege el restablecimiento real HTTP en Postg
     const ids = Object.fromEntries(accounts.map(row => [row.username, row.id]));
     const result = await migrate({ ...options, db: new Pool(config) });
     assert.equal(result.ok, true, result.error?.message);
+    const registered = (await readMigration()).rows;
+    assert.equal(registered.length, 1);
+    const repeated = await migrate({ ...options, db: new Pool(config) });
+    assert.equal(repeated.ok, true, repeated.error?.message);
+    assert.deepEqual((await readMigration()).rows, registered);
     await db.query("UPDATE usuarios SET rol_id=(SELECT id FROM roles WHERE nombre='admin') WHERE username='admin'");
     await db.query("UPDATE usuarios SET rol_id=(SELECT id FROM roles WHERE nombre='personal_salud') WHERE username='activa'");
     appPool.query = db.query.bind(db);

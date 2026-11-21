@@ -2,8 +2,12 @@ name: Clinical candidate validation (Linux, synthetic only)
 
 on:
   push:
-    branches: [feature/cpren-127-normalizacion-comunidades]
+    branches: [feature/cpren-127-normalizacion-comunidades, feature/recuperacion-password]
     paths: [.github/workflows/clinical-predeploy02.yml]
+
+env:
+  # Completar con el SHA aprobado en el único push que autorice la validación.
+  CPREN129_APPROVED_SHA: ''
 
 permissions:
   contents: read
@@ -14,7 +18,10 @@ concurrency:
 
 jobs:
   clinical:
-    if: github.repository == 'Aiden-01/Cap_prenatal' && github.ref == 'refs/heads/feature/cpren-127-normalizacion-comunidades'
+    if: >-
+      github.repository == 'Aiden-01/Cap_prenatal' &&
+      (github.ref == 'refs/heads/feature/cpren-127-normalizacion-comunidades' ||
+      github.ref == 'refs/heads/feature/recuperacion-password')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     services:
@@ -71,7 +78,7 @@ jobs:
             PUPPETEER_CACHE_DIR="$RUNNER_TEMP/predeploy02-chrome" \
             PREDEPLOY_PYTHON="$RUNNER_TEMP/predeploy02-python/bin/python" \
             PREDEPLOY_POSTGRES_IMAGE="$PREDEPLOY_POSTGRES_IMAGE" \
-            PREDEPLOY_NODE24_BIN="$PREDEPLOY_NODE24_BIN" \
+            PREDEPLOY_NODE24_BIN="$PREDEPLOY_NODE24_BIN" CPREN129_APPROVED_SHA="$CPREN129_APPROVED_SHA" \
             node .github/clinical/run-predeploy02.cjs
       - name: Upload synthetic evidence only
         if: ${{ always() }}

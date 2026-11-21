@@ -1,45 +1,81 @@
-const subjects = {
-  recuperar: 'Código para recuperar tu contraseña de CAP Prenatal',
-  aviso: 'Tu contraseña de CAP Prenatal se actualizó',
+const { timingSafeEqual } = require('node:crypto');
+const { accountEmailMessage } = require('./accountEmailTemplates');
+
+const accountEmailWebhook = '/webhook/cap-prenatal-seguridad-recuperacion';
+const accountEmailDeliveryPath = '/internal/account-email/delivery';
+const authHeader = 'X-CAP-Account-Email-Key';
+const identifier = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const knownFailures = Object.freeze({
+  rejected: 'RESEND_RECHAZADO',
+  rate_limited: 'RESEND_LIMITE',
+  uncertain: 'ENTREGA_INCIERTA',
+  payload_unavailable: 'MENSAJE_NO_DISPONIBLE',
+});
+
+class AccountEmailDeliveryError extends Error {
+  constructor(diagnostic) {
+    super('No se pudo confirmar la entrega del correo de cuenta');
+    this.diagnostic = diagnostic;
+  }
+}
+
+function describeAccountEmailFailure(error) {
+  return error instanceof AccountEmailDeliveryError ? error.diagnostic : 'ERROR_INTERNO';
+}
+
+function createAccountEmailTransport({ webhookUrl, webhookSecret, fetchImpl = fetch }) {
+  const pending = new Map();
+  const expectedAuth = Buffer.from(webhookSecret);
+
+  async function send({ to, kind, code, id }) {
+    if (!identifier.test(id) || pending.has(id)) throw new AccountEmailDeliveryError('MENSAJE_INVALIDO');
+    pending.set(id, { messageId: id, to, ...accountEmailMessage(kind, code) });
+    try {
+      let response;
+      let reply;
+      try {
+        response = await fetchImpl(webhookUrl, {
+          method: 'POST',
+          redirect: 'error',
+          signal: AbortSignal.timeout(15000),
+          headers: { [authHeader]: webhookSecret, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messageId: id }),
+        });
+        if ([401, 403, 404].includes(response.status)) {
+          await response.body?.cancel();
+          throw new AccountEmailDeliveryError('WEBHOOK_NO_AUTORIZADO_O_INACTIVO');
+        }
+        reply = await response.json();
+      } catch (error) {
+        if (error instanceof AccountEmailDeliveryError) throw error;
+        throw new AccountEmailDeliveryError('ENTREGA_INCIERTA');
+      }
+      if (!response.ok || reply?.status !== 'accepted') {
+        const diagnostic = Object.hasOwn(knownFailures, reply?.status) ? knownFailures[reply.status] : 'ENTREGA_INCIERTA';
+        throw new AccountEmailDeliveryError(diagnostic);
+      }
+    } finally {
+      pending.delete(id);
+    }
+  }
+
+  function claim(req, res) {
+    res.set('Cache-Control', 'no-store');
+    const incoming = Buffer.from(req.get(authHeader) || '');
+    const fromLoopback = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+    if (!fromLoopback || incoming.length !== expectedAuth.length || !timingSafeEqual(incoming, expectedAuth)) {
+      return res.status(403).json({ status: 'forbidden' });
+    }
+    const message = pending.get(req.params.messageId);
+    if (!message) return res.status(404).json({ status: 'payload_unavailable' });
+    pending.set(req.params.messageId, null);
+    return res.json(message);
+  }
+
+  return { send, claim };
+}
+
+module.exports = {
+  accountEmailWebhook, accountEmailDeliveryPath, accountEmailMessage,
+  createAccountEmailTransport, describeAccountEmailFailure,
 };
-
-function accountEmailMessage(kind, code) {
-  const subject = subjects[kind];
-  const withCode = kind === 'recuperar';
-  if (!subject || (withCode && !/^\d{8}$/.test(code))) throw new Error('Plantilla de cuenta inválida');
-  const title = { recuperar: 'Recupera tu contraseña', aviso: 'Contraseña actualizada' }[kind];
-  const intro = {
-    recuperar: 'Ingresa este código en CAP Prenatal para establecer una contraseña nueva.',
-    aviso: 'La contraseña de tu cuenta cambió y las sesiones anteriores se cerraron.',
-  }[kind];
-  const note = !withCode
-    ? 'Si no reconoces este cambio, comunícate con la administración de CAP Prenatal.'
-    : 'El código vence en 15 minutos. No lo compartas con nadie. Si no solicitaste esta acción, ignora este correo.';
-  const text = ['CAP Prenatal', title, intro, ...(withCode ? [code] : []), note, 'CAP El Chal · Seguridad de cuentas'].join('\n\n');
-  const codeBlock = withCode ? `<p style="margin:24px 0;background:#e7f4f1;color:#12443e;border-radius:12px;padding:16px 8px;text-align:center;font:700 30px ui-monospace,monospace;letter-spacing:.12em">${code}</p>` : '';
-  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head>
-  <body style="margin:0;background:#eef5f4;color:#172e31;font:16px/1.5 Arial,sans-serif">
-  <table role="presentation" style="width:100%;border-spacing:0"><tr><td align="center" style="padding:28px 12px">
-  <table role="presentation" style="width:100%;max-width:520px;background:#fff;border:1px solid #dceae6;border-spacing:0;border-radius:16px">
-  <tr><td style="padding:18px 24px;background:#13534b;color:#fff;font-weight:bold;border-radius:16px 16px 0 0">CAP Prenatal</td></tr>
-  <tr><td style="padding:24px"><span aria-hidden="true" style="background:#e7f4f1;border-radius:50%;padding:10px">&#128274;</span>
-  <h1 style="font-size:24px;line-height:1.25;margin:16px 0 8px">${title}</h1><p>${intro}</p>${codeBlock}
-  <p style="color:#395a5a;font-size:14px">${note}</p></td></tr>
-  <tr><td style="padding:16px 24px;border-top:1px solid #dceae6;color:#395a5a;font-size:13px">CAP El Chal · Seguridad de cuentas</td></tr>
-  </table></td></tr></table></body></html>`;
-  return { subject, text, html };
-}
-
-function createAccountEmailTransport({ apiKey, sender, fetchImpl = fetch }) {
-  return async ({ to, kind, code, id }) => {
-    const response = await fetchImpl('https://api.resend.com/emails', {
-      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(5000),
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'Idempotency-Key': `cap-account-${id}` },
-      body: JSON.stringify({ from: `CAP Prenatal <${sender}>`, to: [to], ...accountEmailMessage(kind, code) }),
-    });
-    await response.body?.cancel();
-    if (!response.ok) throw new Error('ACCOUNT_EMAIL_DELIVERY_FAILED');
-  };
-}
-
-module.exports = { accountEmailMessage, createAccountEmailTransport };

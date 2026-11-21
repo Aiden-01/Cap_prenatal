@@ -8,8 +8,7 @@ const { validateBody } = require('../middleware/validate');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { readCookie } = require('../middleware/auth');
 const { AppError } = require('../utils/appError');
-const { createAccountEmailService, grantLifetime } = require('../services/accountEmailService');
-const { createAccountEmailTransport } = require('../services/accountEmailTransport');
+const { grantLifetime } = require('../services/accountEmailService');
 
 const recoveryPath = '/api/auth/recuperacion';
 const challengeCookie = 'cap_email_desafio';
@@ -19,9 +18,7 @@ const resetSchema = z.object({ new_password: passwordSchema, confirm_password: z
   .refine(body => body.new_password === body.confirm_password, { path: ['confirm_password'], message: 'Las contraseñas no coinciden.' });
 const badCode = () => new AppError(400, 'El código no es válido o ya venció.', { code: 'ACCOUNT_CODE_INVALID' });
 
-function createPasswordRecoveryRouter(config, service = config.nodeEnv !== 'test' && config.accountEmail.enabled
-  ? createAccountEmailService({ secret: config.accountEmail.secret, send: createAccountEmailTransport(config.accountEmail) })
-  : null) {
+function createPasswordRecoveryRouter(config, service = null) {
   const recovery = express.Router();
   const cookie = path => ({ path, httpOnly: true, secure: config.nodeEnv === 'production', sameSite: 'strict' });
   const resetCookie = cookie(`${recoveryPath}/restablecer`);

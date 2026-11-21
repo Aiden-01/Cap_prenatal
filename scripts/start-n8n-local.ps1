@@ -1,6 +1,9 @@
+param([string]$ProfileRoot)
+
 $ErrorActionPreference = "Stop"
 
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$sourceRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$repositoryRoot = if ($ProfileRoot) { (Resolve-Path -LiteralPath $ProfileRoot).Path } else { $sourceRoot }
 $envPath = Join-Path $repositoryRoot "n8n\.env"
 $requiredN8nVersion = "2.34.4"
 $requiredResendVersion = "2.8.0"
@@ -170,5 +173,6 @@ $env:NODE_FUNCTION_ALLOW_EXTERNAL = "exceljs"
 $env:NODE_FUNCTION_ALLOW_BUILTIN = ""
 $env:N8N_RUNNERS_INSECURE_MODE = "false"
 
-node $localN8nBin
+$privateWebhookPreload = Join-Path $sourceRoot "n8n\security\private-webhook-preload.cjs"
+node --require $privateWebhookPreload $localN8nBin
 exit $LASTEXITCODE

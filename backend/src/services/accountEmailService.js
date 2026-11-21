@@ -7,6 +7,7 @@ const { enTransaccion } = require('../repositories/authSessionsRepository');
 const { revokeAllInTransaction } = require('./sessionService');
 const { registrarEventoPrivado } = require('./auditService');
 const { AppError } = require('../utils/appError');
+const { describeAccountEmailFailure } = require('./accountEmailTransport');
 
 const grantLifetime = 5 * 60 * 1000;
 
@@ -57,7 +58,9 @@ function createAccountEmailService({ secret, send, transact = enTransaccion, que
     // en memoria hasta el envío y nunca se persiste en una cola ni se registra.
     setImmediate(async () => {
       try { await send(message); }
-      catch { console.warn('[cuenta] No se pudo entregar un correo transaccional'); }
+      catch (error) {
+        console.warn('[cuenta] No se pudo confirmar el correo transaccional:', describeAccountEmailFailure(error));
+      }
     });
   }
 
@@ -84,7 +87,7 @@ function createAccountEmailService({ secret, send, transact = enTransaccion, que
           codigo_mac=EXCLUDED.codigo_mac, vence_at=EXCLUDED.vence_at, intentos=0`,
       [id, user.id, mac('codigo', id, code)]);
       await audit(db, req, user, 'recuperacion_solicitada');
-      return { to: user.email, kind: 'recuperar', code, id };
+      return { to: user.email, kind: 'recuperar', code, id: randomUUID() };
     });
     deliver(message);
     cleanupLimits();

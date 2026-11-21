@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { Pool } = require('pg');
 
-const branch = 'refs/heads/feature/cpren-127-normalizacion-comunidades';
+const approvedBranches = ['refs/heads/feature/cpren-127-normalizacion-comunidades',
+  'refs/heads/feature/recuperacion-password'];
 const control = 'cap_predeploy02_control';
 const serviceConfig = Object.freeze({ host: '127.0.0.1', port: 55432,
   user: 'predeploy02', password: 'synthetic-predeploy02-only', database: control,
@@ -13,7 +14,7 @@ function assertRunner(env = process.env, platform = process.platform) {
   assert.equal(platform, 'linux', 'PREDEPLOY-02 solo corre en Linux hospedado');
   assert.equal(env.GITHUB_ACTIONS, 'true');
   assert.equal(env.GITHUB_REPOSITORY, 'Aiden-01/Cap_prenatal');
-  assert.equal(env.GITHUB_REF, branch);
+  assert.ok(approvedBranches.includes(env.GITHUB_REF), 'Rama ajena a la validación clínica');
   assert.equal(env.CAP_PREDEPLOY02_SERVICE, '1');
   assert.equal(env.NODE_ENV, 'test');
   assert.equal(env.RUNNER_ENVIRONMENT, 'github-hosted');

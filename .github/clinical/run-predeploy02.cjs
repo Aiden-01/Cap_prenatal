@@ -9,7 +9,7 @@ const { pathToFileURL } = require('node:url');
 const { spawn, execFileSync } = require('node:child_process');
 const { validateChromeSandboxStatus } = require('./chrome-sandbox-status.cjs');
 const { failureDiagnostic } = require('./test-failure-diagnostics.cjs');
-const { verifyReviewedCandidate } = require('./candidate-integrity.cjs');
+const { recoveryRef, verifyReviewedCandidate } = require('./candidate-integrity.cjs');
 const root = path.resolve(__dirname, '../..');
 const backend = path.join(root, 'backend');
 const { Pool } = require(path.join(backend, 'node_modules/pg'));
@@ -17,7 +17,10 @@ const { assertRunner, serviceFixture, serviceConfig } = require(path.join(backen
 assertRunner();
 assert.equal(process.versions.node, '20.20.2');
 assert.equal(execFileSync('id', ['-un'], { encoding: 'utf8' }).trim(), 'clinical-ci');
-const { fourthLinux, reviewedCandidate, reviewedLayout, addedMigrations, responsiveActions } = verifyReviewedCandidate(root, process.env.GITHUB_SHA);
+const recoveryCandidate = process.env.GITHUB_REF === recoveryRef;
+const { fourthLinux, reviewedCandidate, reviewedLayout, addedMigrations, responsiveActions } = verifyReviewedCandidate(root, process.env.GITHUB_SHA, {
+  ref: process.env.GITHUB_REF, approvedCheckpoint: process.env.CPREN129_APPROVED_SHA,
+});
 
 const out = path.join(root, 'tmp_predeploy02/evidence');
 const logs = path.join(root, 'tmp_predeploy02/logs');
@@ -207,6 +210,12 @@ async function main() {
       'test/controlCaptureLocal.test.js', 'test/comunidadesNormalizacionPostgres.test.js'], backend,
     { ...syntheticEnv, RUN_TEMP_PASSWORD_LOCAL: '1', RUN_CONTROL_CAPTURE_LOCAL: '1',
       RUN_CPREN127_TEMP_POSTGRES: '1', CPREN127_POSTGRES_BIN: '/usr/lib/postgresql/16/bin' }, true);
+    if (recoveryCandidate) {
+      await phase('account-recovery', process.execPath, ['--test', '--test-concurrency=1',
+        'test/accountEmailTransport.test.js', 'test/accountEmailPostgres.test.js'], backend,
+      { RUN_CPREN129_TEMP_POSTGRES: '1', CPREN129_POSTGRES_BIN: '/usr/lib/postgresql/16/bin',
+        ACCOUNT_EMAIL_ENABLED: 'false', N8N_INTEGRATION_ENABLED: 'false' }, true);
+    }
   } finally { await auth.close(); }
   const url = new URL('postgresql://127.0.0.1:55432/cap_predeploy02_control');
   url.username = serviceConfig.user; url.password = serviceConfig.password;

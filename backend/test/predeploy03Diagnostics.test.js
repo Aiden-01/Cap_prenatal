@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { failureDiagnostic, processDiagnostic } = require('../../.github/clinical/test-failure-diagnostics.cjs');
 const { collectLayoutDiagnostics } = require('./helpers/layoutDiagnostics');
@@ -29,7 +29,8 @@ if (process.env.PREDEPLOY03_REPORTER_FIXTURE === '1') {
   });
   test('integridad CI exige solo la modificación exacta del CSS responsive de acciones', () => {
     const file = 'frontend/src/components/usuarios/profesionales.css';
-    const css = fs.readFileSync(path.join(__dirname, '../..', file), 'utf8');
+    const css = execFileSync('git', ['show', '1bd79237eac045c4f57b5a31e170bec02046f151:' + file],
+      { cwd: path.resolve(__dirname, '../..'), encoding: 'utf8' });
     const modified = [`M\t${file}`];
     assert.equal(verifyResponsiveActions(modified, css).file, file);
     assert.throws(() => verifyResponsiveActions([...modified, 'M\tbackend/src/db/schema.sql'], css), /Unexpected changes/);
