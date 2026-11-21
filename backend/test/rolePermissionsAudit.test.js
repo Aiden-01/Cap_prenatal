@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const usuariosService = require('../src/services/usuariosService');
 const permisosService = require('../src/services/permisosService');
 const { registrarEventoPrivado } = require('../src/services/auditService');
+const { normalizeError } = require('../src/middleware/errorHandler');
 
 const ADMIN = [
   'controles.crear',
@@ -34,6 +35,7 @@ function crearEscenario({
     activo: activoInicial,
     rol: rolInicial,
   } : null;
+  let passwordHash = 'hash-sintetico-inicial';
   let permisos = [...permisosIniciales].sort();
   const auditorias = [];
   const llamadas = [];
@@ -50,6 +52,7 @@ function crearEscenario({
     async actualizar(args, conexion) {
       if (conexion !== undefined) assert.equal(conexion, db);
       llamadas.push('UPDATE_USER');
+      passwordHash = args.passwordHash ?? passwordHash;
       usuario = {
         ...usuario,
         nombre_completo: args.nombreCompleto,
@@ -78,6 +81,7 @@ function crearEscenario({
     },
     async enTransaccion(callback) {
       const usuarioSnapshot = usuario ? { ...usuario } : null;
+      const passwordHashSnapshot = passwordHash;
       const permisosSnapshot = [...permisos];
       const auditoriasSnapshot = auditorias.length;
       llamadas.push('BEGIN');
@@ -87,6 +91,7 @@ function crearEscenario({
         return resultado;
       } catch (error) {
         usuario = usuarioSnapshot;
+        passwordHash = passwordHashSnapshot;
         permisos = permisosSnapshot;
         auditorias.length = auditoriasSnapshot;
         llamadas.push('ROLLBACK');
@@ -181,6 +186,7 @@ function crearEscenario({
     auditorias,
     ejecutar,
     llamadas,
+    passwordHash: () => passwordHash,
     permisos: () => [...permisos],
     usuario: () => (usuario ? { ...usuario } : null),
     usuarioId,
@@ -214,22 +220,33 @@ test('cambio de rol agrega los permisos predeterminados faltantes', async () => 
   assert.equal(escenario.llamadas.includes('REVOKE_SESSIONS'), true);
 });
 
-test('reinicio administrativo de password revoca sesiones', async () => {
-  const escenario = crearEscenario();
-  await escenario.ejecutar({
-    nombre_completo: 'Usuario objetivo',
-    activo: true,
-    rol: 'admin',
-    password: 'NuevaClaveSegura123!',
-  });
-  assert.equal(escenario.llamadas.includes('REVOKE_SESSIONS'), true);
-  const event = escenario.auditorias.find(
-    ({ evento }) => evento.descripcion === 'password_reiniciado'
-  ).evento;
-  assert.deepEqual(event.datosNuevos, {
-    password_cambiado: true,
-    politica_version: 1,
-  });
+test('admin y director no pueden cambiar administrativamente la contraseña de otro usuario', async (t) => {
+  for (const actorRol of ['admin', 'director']) {
+    await t.test(actorRol, async () => {
+      const escenario = crearEscenario({ actorRol });
+      assert.notEqual(escenario.actorId, escenario.usuarioId);
+      const usuarioInicial = escenario.usuario();
+      const hashInicial = escenario.passwordHash();
+
+      await assert.rejects(escenario.ejecutar({
+        nombre_completo: 'Nombre que no debe guardarse',
+        activo: true,
+        rol: 'admin',
+        password: 'NuevaClaveSegura123!',
+      }), (error) => {
+        const normalized = normalizeError(error);
+        assert.equal(normalized.statusCode, 400);
+        assert.equal(normalized.code, 'VALIDATION_ERROR');
+        assert.ok(error.issues.some(({ code, keys }) => code === 'unrecognized_keys' && keys.includes('password')));
+        return true;
+      });
+
+      assert.deepEqual(escenario.usuario(), usuarioInicial);
+      assert.equal(escenario.passwordHash(), hashInicial);
+      assert.deepEqual(escenario.llamadas, [], 'No debe iniciar una transacción, escribir ni revocar sesiones');
+      assert.deepEqual(escenario.auditorias, [], 'No debe registrar password_reiniciado ni otros eventos');
+    });
+  }
 });
 
 test('desactivar usuario revoca sesiones', async () => {
