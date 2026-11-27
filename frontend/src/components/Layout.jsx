@@ -5,6 +5,7 @@ import { useLocation } from 'react-router-dom';
 import { safeReturn } from '../utils/safeReturn';
 import { Eye, EyeOff, KeyRound, Menu, X } from "lucide-react";
 import Sidebar from "./Sidebar";
+import OwnEmailDialog from "./OwnEmailDialog";
 import Toast from "./Toast";
 import ChatbotWidget from "./ChatbotWidget";
 import api from "../api/axios";
@@ -30,6 +31,7 @@ export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen]   = useState(false);
   const [isMobile, setIsMobile]   = useState(window.innerWidth < 768);
+  const [emailOpen, setEmailOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [showPasswords, setShowPasswords] = useState(false);
@@ -157,6 +159,10 @@ export default function Layout() {
           isMobile={isMobile}
           collapsed={collapsed}
           setCollapsed={setCollapsed}
+          onChangeEmail={() => {
+            setEmailOpen(true);
+            if (isMobile) setMenuOpen(false);
+          }}
           onChangePassword={() => {
             setPasswordOpen(true);
             if (isMobile) setMenuOpen(false);
@@ -177,6 +183,18 @@ export default function Layout() {
 
         <Toast toasts={toasts} />
         <ChatbotWidget key={String(usuario?.id || usuario?.username || "anonymous")} />
+
+        {emailOpen && (
+          <OwnEmailDialog
+            onClose={() => setEmailOpen(false)}
+            onChanged={() => endLocalSession(
+              "El correo se actualizó. Inicia sesión nuevamente.",
+              "session-expired",
+              {},
+              { localOnly: true }
+            )}
+          />
+        )}
 
         {sessionManager.visible && (
           <SessionTimeoutModal

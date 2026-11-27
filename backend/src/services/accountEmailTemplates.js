@@ -1,22 +1,41 @@
 const institution = 'Centro de Atención Permanente El Chal';
 
+const messages = {
+  recuperar: {
+    title: 'Restablecer contraseña',
+    instruction: 'Ingresa este código en CAP Prenatal para elegir una contraseña nueva.',
+    warning: 'No compartas este código. Si no solicitaste recuperar tu contraseña, ignora este correo y no respondas.',
+    hasCode: true,
+  },
+  aviso: {
+    title: 'Contraseña actualizada',
+    instruction: 'Tu contraseña de CAP Prenatal se actualizó. Las sesiones anteriores se cerraron.',
+    warning: 'Si no reconoces el cambio, comunícate con el equipo del centro. No respondas a este correo.',
+  },
+  'confirmar-correo': {
+    title: 'Confirma tu correo electrónico',
+    instruction: 'Ingresa este código en CAP Prenatal para confirmar esta dirección en tu cuenta.',
+    warning: 'No compartas este código. Si no solicitaste registrar este correo, ignora el mensaje y no respondas.',
+    hasCode: true,
+  },
+  'aviso-correo': {
+    title: 'Correo electrónico actualizado',
+    instruction: 'Se actualizó el correo de tu cuenta de CAP Prenatal y se cerraron todas sus sesiones.',
+    warning: 'Si no reconoces el cambio, comunícate con el equipo del centro. No respondas a este correo.',
+  },
+};
+
 function accountEmailMessage(kind, code) {
-  const recovering = kind === 'recuperar';
-  if ((!recovering && kind !== 'aviso') || (recovering && !/^\d{8}$/.test(code))) {
+  const message = Object.hasOwn(messages, kind) ? messages[kind] : null;
+  if (!message || (message.hasCode && !/^\d{8}$/.test(code))) {
     throw new Error('Plantilla de cuenta inválida');
   }
 
-  const title = recovering ? 'Restablecer contraseña' : 'Contraseña actualizada';
+  const { title, instruction, warning, hasCode } = message;
   const subject = title + ' | CAP Prenatal';
-  const instruction = recovering
-    ? 'Ingresa este código en CAP Prenatal para elegir una contraseña nueva.'
-    : 'Tu contraseña de CAP Prenatal se actualizó. Las sesiones anteriores se cerraron.';
   const validity = 'Válido durante 15 minutos · Un solo uso';
-  const warning = recovering
-    ? 'No compartas este código. Si no solicitaste recuperar tu contraseña, ignora este correo y no respondas.'
-    : 'Si no reconoces el cambio, comunícate con el equipo del centro. No respondas a este correo.';
 
-  const codeBlock = recovering ? [
+  const codeBlock = hasCode ? [
     '<tr><td align="center" class="code-bg" bgcolor="#EDF4F3" style="background-color:#EDF4F3;padding:20px 8px 16px;">',
     '<p class="accent" style="margin:0;color:#173E42;font-family:Consolas,Menlo,Courier New,monospace;font-size:36px;font-weight:bold;line-height:1.2;letter-spacing:0.11em;white-space:nowrap;">' + code + '</p>',
     '<p class="muted" style="margin:10px 0 0;color:#40595C;font-size:13px;line-height:1.5;">' + validity + '</p>',
@@ -60,7 +79,7 @@ function accountEmailMessage(kind, code) {
     '</td></tr>',
     '<tr><td style="padding:27px 24px 24px;">',
     '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;">',
-    '<tr><td style="padding:0 0 ' + (recovering ? '20px' : '0') + ';">',
+    '<tr><td style="padding:0 0 ' + (hasCode ? '20px' : '0') + ';">',
     '<h1 class="ink" style="margin:0;color:#182C30;font-size:26px;font-weight:bold;line-height:1.2;">' + title + '</h1>',
     '<p class="ink" style="margin:10px 0 0;color:#34494C;font-size:15px;line-height:1.55;">' + instruction + '</p>',
     '</td></tr>',
@@ -77,7 +96,7 @@ function accountEmailMessage(kind, code) {
   ].join('\n');
   const text = [
     'CAP Prenatal', institution, '', title, '', instruction,
-    ...(recovering ? ['', code, validity] : []),
+    ...(hasCode ? ['', code, validity] : []),
     '', warning, '', institution + ' · Seguridad de cuentas',
   ].join('\n');
   return { subject, text, html };

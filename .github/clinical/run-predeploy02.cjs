@@ -18,7 +18,7 @@ assertRunner();
 assert.equal(process.versions.node, '20.20.2');
 assert.equal(execFileSync('id', ['-un'], { encoding: 'utf8' }).trim(), 'clinical-ci');
 const recoveryCandidate = process.env.GITHUB_REF === recoveryRef;
-const { fourthLinux, reviewedCandidate, reviewedLayout, addedMigrations, responsiveActions } = verifyReviewedCandidate(root, process.env.GITHUB_SHA, {
+const { fourthLinux, reviewedCandidate, reviewedLayout, addedMigrations, responsiveActions, approvedRecoveryRun, product } = verifyReviewedCandidate(root, process.env.GITHUB_SHA, {
   ref: process.env.GITHUB_REF, approvedCheckpoint: process.env.CPREN129_APPROVED_SHA,
 });
 
@@ -36,7 +36,8 @@ const report = { synthetic_only: true, production_access: false, candidate: revi
   run_id: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT,
   started_utc: new Date().toISOString(), phases: [], versions: {}, status: 'running',
   visual_review: 'pending human review of Linux renders', real_restore: 'out of scope',
-  reviewed_layout: reviewedLayout, reviewed_migration_additions: addedMigrations, reviewed_responsive_actions: responsiveActions };
+  reviewed_layout: reviewedLayout, reviewed_migration_additions: addedMigrations, reviewed_responsive_actions: responsiveActions,
+  approved_recovery_run: approvedRecoveryRun, reviewed_owner_email_product: product };
 const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const write = () => fs.writeFileSync(path.join(out, 'run-summary.json'), JSON.stringify(report, null, 2) + '\n');
 write();

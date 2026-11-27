@@ -171,7 +171,11 @@ const BASE_CONTEXTUAL_RULES = Object.freeze([
   }),
   Object.freeze({
     categories: ['usuarios'], entities: ['usuario'],
-    events: ['recuperacion_solicitada', 'recuperacion_codigo_validado', 'recuperacion_codigo_rechazado'],
+    events: [
+      'recuperacion_solicitada', 'recuperacion_codigo_validado', 'recuperacion_codigo_rechazado',
+      'cambio_correo_solicitado', 'cambio_correo_codigo_rechazado',
+      'cambio_correo_reautenticacion_rechazada', 'cambio_correo_confirmado',
+    ],
     fields: ['operacion_registrada'], valueType: AUDIT_VALUE_TYPES.BOOLEAN,
   }),
   Object.freeze({ categories: ['clinica'], entities: ['control_prenatal'],

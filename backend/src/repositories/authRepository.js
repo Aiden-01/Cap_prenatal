@@ -45,7 +45,13 @@ async function actualizarPassword({ id, passwordHash, updatedBy = null }, db = p
   return rows[0] || null;
 }
 
+async function obtenerCorreoPropio(id, db = pool) {
+  const { rows: [user] } = await db.query('SELECT email FROM usuarios WHERE id=$1 AND activo=TRUE', [id]);
+  return user?.email ?? null;
+}
+
 module.exports = {
+  obtenerCorreoPropio,
   obtenerUsuarioPorUsername,
   obtenerUsuarioPorId,
   obtenerCredencialesPorId,

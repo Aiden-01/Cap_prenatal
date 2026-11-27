@@ -135,3 +135,13 @@ test('el workflow local conserva la credencial de tipo Resend, la política y la
   const other = makeContext('clinico', { field: 'unchanged' });
   assert.deepEqual(await instance.webhook(other), other.result);
 });
+
+test('confirmación y aviso de correo reutilizan la identidad institucional sin divulgar la dirección nueva', () => {
+  const confirm = accountEmailMessage('confirmar-correo', '00001234');
+  const notice = accountEmailMessage('aviso-correo', '00001234');
+  assert.match(confirm.html, /Centro de Atención Permanente El Chal/);
+  assert.match(confirm.text, /00001234/);
+  assert.match(notice.text, /se cerraron todas sus sesiones/);
+  assert.doesNotMatch(notice.html + notice.text, /00001234|@example\.invalid/);
+  assert.throws(() => accountEmailMessage('confirmar-correo', '<script>'), /Plantilla/);
+});

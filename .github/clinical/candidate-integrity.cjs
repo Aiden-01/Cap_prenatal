@@ -8,6 +8,8 @@ const reviewedCandidate = 'eafadf527c54e6184f6f3806cb53079cf644b569';
 const recoveryBaseline = 'bb7bc7a612758cf7889f510b847968ab24a2dd0c';
 const recoveryRef = 'refs/heads/feature/recuperacion-password';
 const recoveryMigration = '034_recuperacion_password.sql';
+const approvedRecoveryRun = '0c0f7d94d1c6c99d4364bb2e8e28f5be911f0112';
+const ownerEmailMigration = '035_cambio_correo_titular.sql';
 const workflow = '.github/workflows/clinical-predeploy02.yml';
 const dependencyFiles = ['backend/package.json', 'backend/package-lock.json',
   'frontend/package.json', 'frontend/package-lock.json'];
@@ -19,6 +21,34 @@ const approvedCss = 'frontend/src/index.css';
 const approvedHash = '9b6d24a932331046de714e25fdcdac26d82368c813bcd2a7033f0e2a6dbd7509';
 const responsiveActionsCss = 'frontend/src/components/usuarios/profesionales.css';
 const responsiveActionsHash = '41d2b3deed5737d97187d684dcea4b7a560a3fb716ab9eb969c43e74d74dcb84';
+
+// Archivos productivos cotejados en el diff de CPREN-126. El SHA del checkpoint fija también las pruebas y el control.
+const reviewedOwnerEmailProduct = Object.freeze({
+  "A\tbackend/src/db/migrations/035_cambio_correo_titular.sql": "46b57cbda6de0414f037ddaf3559a77508c058679149cccbe5d2872d6d758609",
+  "M\tbackend/src/db/schema.sql": "71d6b0d2b58cf6133fab4f31a1518c150cf15cc111d3a69896f8430d3d132e80",
+  "M\tbackend/src/db/schemaCompatibility.js": "dabc1e27e451dbb9c80881d8c4147ee921a21668f5c4fed185157018441faa5b",
+  "M\tbackend/src/index.js": "a5ba7ff3455d2dcd4e5c2d4b8bf24e72e51f0009224635218a840301216d2004",
+  "M\tbackend/src/repositories/authRepository.js": "f40770f25b10f3e34b01a00e2ab6d34d594c4d8f14a3f4c96a3ba0e4d69abbc3",
+  "A\tbackend/src/routes/ownEmail.js": "fbabdb4ddb1715f776880b7f7d207867ace31878e06a8819ad698c7d1caa662d",
+  "M\tbackend/src/services/accountEmailService.js": "4cfa865cf38d232366ce93a86f727ed302547d5f8ebaa8a517a24b27f622a1c0",
+  "M\tbackend/src/services/accountEmailTemplates.js": "978947fbf56479823097ab582ba3d0b4eaa9cd060af6e505d14f73e39414481c",
+  "M\tbackend/src/services/audit/auditFieldPolicy.js": "d1066de4291acbfbd29b3e856a3d8132ba490ccde773157be5b02100660872cf",
+  "M\tbackend/src/validations/auth.schemas.js": "6ccfaf42f47f46ebdfdc8e1278384787eaaca42c7487ed75af981e28a2ecaa5a",
+  "M\tfrontend/src/components/Layout.jsx": "13bee10c3d91ef0c562fdcd70c2616dc90c571a567fa2ba990153344a1b79859",
+  "A\tfrontend/src/components/OwnEmailDialog.jsx": "54ff17d01873b086925649854d5da77612abd72b791eff8e2d77ae98cdc22cdb",
+  "M\tfrontend/src/components/Sidebar.jsx": "a780d3a0d8af4b31a7ab182314ba2a92dc4845309462a353ff915fb141286f58",
+  "M\tfrontend/src/components/account-email.css": "a0339159b420f4c70dee8f4f466fd70981b466bf063ebb49a772f1cb4e7cdb88",
+});
+const reviewedOwnerEmailChanges = Object.freeze([
+  ...Object.keys(reviewedOwnerEmailProduct),
+  "M\t.github/clinical/candidate-integrity.cjs",
+  "M\t.github/clinical/run-predeploy02.cjs",
+  "M\tbackend/test/accountEmailPostgres.test.js",
+  "M\tbackend/test/accountEmailTransport.test.js",
+  "M\tbackend/test/checkpoint14MigracionesPostgres.test.js",
+  "M\tbackend/test/predeploy03Diagnostics.test.js",
+  "M\tbackend/test/schemaCompatibility.test.js",
+].sort());
 
 const stylesheetHash = content => crypto.createHash('sha256').update(content.replace(/\r\n/g, '\n')).digest('hex');
 
@@ -34,6 +64,23 @@ function verifyResponsiveActions(changes, content) {
   const sha256 = stylesheetHash(content);
   assert.equal(sha256, responsiveActionsHash, 'Responsive actions stylesheet differs from the approved content');
   return { file: responsiveActionsCss, sha256 };
+}
+
+function verifyOwnerEmailDiff(changes, readBlob) {
+  const listed = changes.trim().split('\n').sort();
+  assert.deepEqual(listed, reviewedOwnerEmailChanges, 'El checkpoint CPREN-126 contiene rutas no revisadas o incompletas');
+  const product = [];
+  for (const entry of listed) {
+    const file = entry.slice(2);
+    const expectedHash = reviewedOwnerEmailProduct[entry];
+    const blob = readBlob(file, Boolean(expectedHash));
+    assert.equal(blob.mode, '100644 blob', 'Modo no revisado en ' + file);
+    if (expectedHash) {
+      assert.equal(stylesheetHash(blob.content), expectedHash, 'Contenido productivo no revisado en ' + file);
+      product.push({ file, sha256: expectedHash });
+    }
+  }
+  return product;
 }
 
 function verifyReviewedCandidate(root, expectedHead, { ref, approvedCheckpoint } = {}) {
@@ -54,24 +101,32 @@ function verifyReviewedCandidate(root, expectedHead, { ref, approvedCheckpoint }
 
   const protectedPaths = ['backend/src', 'frontend/src', ...dependencyFiles];
   if (ref === recoveryRef) {
-    assert.match(approvedCheckpoint ?? '', /^[a-f0-9]{40}$/, 'Falta el SHA aprobado para validar CPREN-129');
+    assert.match(approvedCheckpoint ?? '', /^[a-f0-9]{40}$/, 'Falta el SHA aprobado para validar CPREN-126');
     assert.deepEqual(git(['rev-list', '--parents', '-n', '1', head]).trim().split(' '), [head, approvedCheckpoint],
       'El commit de activación debe tener como único padre el checkpoint aprobado');
     assert.equal(git(['diff', '--name-status', '--no-renames', approvedCheckpoint, head]).trim(), 'M\t' + workflow,
       'La activación solo puede modificar el workflow existente');
     git(['merge-base', '--is-ancestor', reviewedCandidate, recoveryBaseline]);
-    git(['merge-base', '--is-ancestor', recoveryBaseline, approvedCheckpoint]);
-    const migrationChanges = git(['diff', '--name-status', '--no-renames', reviewedCandidate, head, '--', migrationDir]).trim();
-    assert.equal(migrationChanges, 'A\t' + migrationDir + '/' + recoveryMigration,
-      'La única migración posterior al candidato anterior debe ser 034');
-    const recoveryProtected = [...protectedPaths, 'n8n/security', 'n8n/workflows', 'n8n/email-senders.json'];
-    git(['diff', '--exit-code', recoveryBaseline, head, '--', migrationDir, 'frontend/src', ...dependencyFiles,
+    git(['merge-base', '--is-ancestor', recoveryBaseline, approvedRecoveryRun]);
+    assert.equal(git(['diff', '--name-status', '--no-renames', reviewedCandidate, approvedRecoveryRun, '--', migrationDir]).trim(),
+      'A\t' + migrationDir + '/' + recoveryMigration, 'El candidato histórico de CPREN-129 incorpora únicamente la 034');
+    git(['diff', '--exit-code', recoveryBaseline, approvedRecoveryRun, '--', migrationDir, 'frontend/src', ...dependencyFiles,
       'n8n/workflows', 'n8n/email-senders.json']);
+    assert.deepEqual(git(['rev-list', '--parents', '-n', '1', approvedCheckpoint]).trim().split(' '),
+      [approvedCheckpoint, approvedRecoveryRun], 'El checkpoint CPREN-126 debe partir directamente del SHA validado de CPREN-129');
+    assert.equal(git(['diff', '--name-status', '--no-renames', approvedRecoveryRun, head, '--', migrationDir]).trim(),
+      'A\t' + migrationDir + '/' + ownerEmailMigration, 'La 035 debe ser la única migración nueva; las anteriores se conservan');
+    const product = verifyOwnerEmailDiff(git(['diff', '--name-status', '--no-renames', approvedRecoveryRun, approvedCheckpoint]),
+      (file, hashRequired) => ({
+        mode: git(['ls-tree', approvedCheckpoint, '--', file]).split(' ').slice(0, 2).join(' '),
+        content: hashRequired ? git(['show', approvedCheckpoint + ':' + file]) : undefined,
+      }));
+    const recoveryProtected = [...protectedPaths, 'backend/test', '.github', 'n8n/security', 'n8n/workflows', 'n8n/email-senders.json'];
     git(['diff', '--exit-code', head, '--', ...recoveryProtected]);
     assert.equal(git(['ls-files', '--others', '-z', '--', ...recoveryProtected]), '',
       'Archivos sin seguimiento en las rutas del candidato');
-    return { fourthLinux, reviewedCandidate: approvedCheckpoint, reviewedLayout,
-      addedMigrations: [...addedMigrations, recoveryMigration],
+    return { fourthLinux, reviewedCandidate: approvedCheckpoint, reviewedLayout, approvedRecoveryRun, product,
+      addedMigrations: [...addedMigrations, recoveryMigration, ownerEmailMigration],
       responsiveActions: { file: responsiveActionsCss, sha256: stylesheetHash(git(['show', head + ':' + responsiveActionsCss])) } };
   }
   const candidateChanges = git(['diff', '--name-status', '--no-renames', reviewedCandidate, head, '--', ...protectedPaths]);
@@ -85,4 +140,4 @@ function verifyReviewedCandidate(root, expectedHead, { ref, approvedCheckpoint }
   return { fourthLinux, reviewedCandidate, reviewedLayout, addedMigrations, responsiveActions };
 }
 
-module.exports = { recoveryRef, verifyReviewedLayout, verifyReviewedCandidate, verifyResponsiveActions };
+module.exports = { recoveryRef, reviewedOwnerEmailChanges, verifyOwnerEmailDiff, verifyReviewedLayout, verifyReviewedCandidate, verifyResponsiveActions };

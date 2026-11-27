@@ -3,13 +3,28 @@ const { ipKeyGenerator } = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const pool = require('../db/pool');
 const authRepository = require('../repositories/authRepository');
-const { enTransaccion } = require('../repositories/authSessionsRepository');
-const { revokeAllInTransaction } = require('./sessionService');
+const { enTransaccion, obtenerConUsuarioPorId } = require('../repositories/authSessionsRepository');
+const { revokeAllInTransaction, stateOfSession } = require('./sessionService');
 const { registrarEventoPrivado } = require('./auditService');
 const { AppError } = require('../utils/appError');
 const { describeAccountEmailFailure } = require('./accountEmailTransport');
 
 const grantLifetime = 5 * 60 * 1000;
+
+const emailChangeErrors = {
+  ACCOUNT_EMAIL_CHANGE_LIMIT: [429, 'Demasiados intentos. Espera antes de volver a solicitar o confirmar un código.'],
+  SESSION_REVOKED: [401, 'La sesión ya no está activa.'],
+  ACCOUNT_EMAIL_PASSWORD_INVALID: [403, 'La contraseña actual no es correcta.'],
+  ACCOUNT_EMAIL_UNCHANGED: [400, 'Ingresa una dirección distinta a la actual.'],
+  EMAIL_DUPLICADO: [409, 'El correo electrónico ya está registrado.'],
+  ACCOUNT_CODE_INVALID: [400, 'El código no es válido o ya venció.'],
+};
+
+function emailChangeError(code) {
+  const [status, message] = emailChangeErrors[code];
+  return new AppError(status, message, { code });
+}
+
 
 function sameMac(left, right) {
   return typeof left === 'string' && typeof right === 'string' && left.length === right.length
@@ -142,7 +157,85 @@ function createAccountEmailService({ secret, send, transact = enTransaccion, que
     return Boolean(message);
   }
 
-  return { issue, verify, reset };
+  function emailChangeMac(user, sessionId, email, challengeId, code) {
+    return mac('cambio-correo:v1', user.id, sessionId, email, user.email, user.password_hash, challengeId, code);
+  }
+
+  async function lockEmailChangeAccount(db, req) {
+    const user = await lockAccount(db, undefined, req.usuario.id);
+    if (!user?.activo) return null;
+    const session = await obtenerConUsuarioPorId(req.authSession.id, db, { bloquear: true });
+    return session?.usuario_id === user.id && !session.requiere_cambio_password && !stateOfSession(session)
+      ? user : null;
+  }
+
+  async function emailChangeLimit(db, req, action, userLimit, ipLimit) {
+    const ip = ipKeyGenerator(req.ip || req.socket?.remoteAddress || 'unknown');
+    return await take(db, mac('cambio-correo', action, 'ip', ip), ipLimit, 3600)
+      && await take(db, mac('cambio-correo', action, 'usuario', req.usuario.id), userLimit, 3600);
+  }
+
+  async function requestEmailChange({ req, email, password }) {
+    cleanupLimits();
+    const result = await transact(async db => {
+      if (!await emailChangeLimit(db, req, 'solicitud', 10, 50)) return 'ACCOUNT_EMAIL_CHANGE_LIMIT';
+      const user = await lockEmailChangeAccount(db, req);
+      if (!user) return 'SESSION_REVOKED';
+      if (!await bcrypt.compare(password, user.password_hash)) {
+        await audit(db, req, user, 'cambio_correo_reautenticacion_rechazada');
+        return 'ACCOUNT_EMAIL_PASSWORD_INVALID';
+      }
+      if (user.email === email) return 'ACCOUNT_EMAIL_UNCHANGED';
+      const existing = await db.query('SELECT 1 FROM usuarios WHERE lower(email)=$1 AND id<>$2', [email, user.id]);
+      if (existing.rowCount) return 'EMAIL_DUPLICADO';
+      if (!await take(db, mac('cambio-correo', 'reenvio', user.id), 1, 60)
+        || !await take(db, mac('cambio-correo', 'envio', user.id), 5, 3600)) return 'ACCOUNT_EMAIL_CHANGE_LIMIT';
+
+      const id = randomUUID();
+      const code = String(randomInt(100_000_000)).padStart(8, '0');
+      const sessionId = req.authSession.id;
+      await db.query(
+        'INSERT INTO cuenta_cambios_correo (usuario_id, sesion_id, id, codigo_mac, vence_at)'
+        + " VALUES ($1,$2,$3,$4,clock_timestamp()+INTERVAL '15 minutes')"
+        + ' ON CONFLICT (usuario_id) DO UPDATE SET sesion_id=EXCLUDED.sesion_id, id=EXCLUDED.id,'
+        + ' codigo_mac=EXCLUDED.codigo_mac, vence_at=EXCLUDED.vence_at, intentos=0',
+        [user.id, sessionId, id, emailChangeMac(user, sessionId, email, id, code)]
+      );
+      await audit(db, req, user, 'cambio_correo_solicitado');
+      return { id, message: { to: email, kind: 'confirmar-correo', code, id: randomUUID() } };
+    });
+    if (typeof result === 'string') throw emailChangeError(result);
+    deliver(result.message);
+    return result.id;
+  }
+
+  async function confirmEmailChange({ req, email, code, challengeId }) {
+    const result = await transact(async db => {
+      if (!await emailChangeLimit(db, req, 'confirmacion', 15, 80)) return 'ACCOUNT_EMAIL_CHANGE_LIMIT';
+      const user = await lockEmailChangeAccount(db, req);
+      if (!user) return 'SESSION_REVOKED';
+      const sessionId = req.authSession.id;
+      const { rows: [challenge] } = await db.query(
+        'UPDATE cuenta_cambios_correo SET intentos=intentos+1'
+        + ' WHERE usuario_id=$1 AND sesion_id=$2 AND id=$3 AND intentos<5 AND vence_at>clock_timestamp()'
+        + ' RETURNING codigo_mac', [user.id, sessionId, challengeId]
+      );
+      if (!challenge || !sameMac(challenge.codigo_mac, emailChangeMac(user, sessionId, email, challengeId, code))) {
+        if (challenge) await audit(db, req, user, 'cambio_correo_codigo_rechazado');
+        return 'ACCOUNT_CODE_INVALID';
+      }
+      await db.query('DELETE FROM cuenta_cambios_correo WHERE usuario_id=$1', [user.id]);
+      // El trigger de 034 invalida los desafíos y autorizaciones de recuperación aquí.
+      await db.query('UPDATE usuarios SET email=$1, updated_at=clock_timestamp(), updated_by=id WHERE id=$2', [email, user.id]);
+      await revokeAllInTransaction({ usuarioId: user.id, reason: 'email_changed', req, db });
+      await audit(db, req, user, 'cambio_correo_confirmado');
+      return { message: user.email ? { to: user.email, kind: 'aviso-correo', id: randomUUID() } : null };
+    });
+    if (typeof result === 'string') throw emailChangeError(result);
+    deliver(result.message);
+  }
+
+  return { issue, verify, reset, requestEmailChange, confirmEmailChange };
 }
 
 module.exports = { createAccountEmailService, grantLifetime };

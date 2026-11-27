@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { availableModules } from '../utils/accessRules';
 import {
   LayoutDashboard, Users, UserPlus, BarChart3,
-  Settings, LogOut, Menu, Moon, Sun, KeyRound, MapPin, MapPinned, History
+  Settings, LogOut, Menu, Moon, Sun, KeyRound, Mail, MapPin, MapPinned, History
 } from "lucide-react";
 
 const NAV_ICONS = {
@@ -26,7 +26,7 @@ function getInitialTheme(usuario) {
 
 export default function Sidebar({
   usuario, menuOpen, setMenuOpen, isMobile,
-  onLogout, onChangePassword, collapsed, setCollapsed
+  onLogout, onChangePassword, onChangeEmail, collapsed, setCollapsed
 }) {
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -259,6 +259,18 @@ export default function Sidebar({
           >
             <KeyRound size={18} />
             {!collapsed && "Cambiar contraseña"}
+          </button>
+
+          <button
+            type="button"
+            onClick={onChangeEmail}
+            className="sidebar-footer-action sidebar-password-action sidebar-email-action"
+            aria-label="Correo electrónico"
+            title={collapsed ? "Correo electrónico" : undefined}
+            style={{ justifyContent: collapsed ? "center" : "flex-start" }}
+          >
+            <Mail size={18} />
+            {!collapsed && "Correo electrónico"}
           </button>
 
           {/* LOGOUT */}

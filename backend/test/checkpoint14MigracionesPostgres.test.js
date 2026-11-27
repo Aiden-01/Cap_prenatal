@@ -43,7 +43,7 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
    return result.value;
   }));
  };
- const candidateMigrations=['031_password_temporal.sql','032_control_atencion_obstetrica.sql','033_normalizar_comunidad_paciente.sql','034_recuperacion_password.sql'];
+ const candidateMigrations=['031_password_temporal.sql','032_control_atencion_obstetrica.sql','033_normalizar_comunidad_paciente.sql','034_recuperacion_password.sql','035_cambio_correo_titular.sql'];
  const migrateDb=async(database,options={})=>{
   const result=await migrate({db:new PostgresTestPool({...config,database}),logger:{log(){},error(){}},setExitCode(){},...options});
   assert.equal(result.ok,true,result.error?.message);
@@ -92,7 +92,7 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
    assert.deepEqual(await snapshot(restored),before);assert.deepEqual((await restored.query('SELECT * FROM usuarios ORDER BY id')).rows,users);
    report.checks.push('backup_restore_before_upgrade');
   });
-  await t.test('023–034 en orden preservan expedientes, embarazos, controles, citas, sesiones y cuentas',async()=>{
+  await t.test('023–035 en orden preservan expedientes, embarazos, controles, citas, sesiones y cuentas',async()=>{
    await migrateDb(config.database);await assertSchemaCompatible(db);
    assert.deepEqual(await snapshot(db),expectedAfter);
    for(const user of users){const now=(await db.query('SELECT * FROM usuarios WHERE id=$1',[user.id])).rows[0];
@@ -107,9 +107,9 @@ test('CHECKPOINT-14: upgrade desde main 022, instalación y restauración exclus
    assert.equal((await db.query('SELECT count(*)::int n FROM controles_seguimiento_notas')).rows[0].n,0,'No activa controles históricos');
    assert.equal((await db.query('SELECT count(*)::int n FROM notas_clinicas')).rows[0].n,0);
    report.applied_clinical_migrations=(await db.query("SELECT filename FROM schema_migrations WHERE filename>='023_' ORDER BY filename")).rows.map(r=>r.filename);
-   assert.equal(report.applied_clinical_migrations.length,12);
+   assert.equal(report.applied_clinical_migrations.length,13);
    assert.deepEqual(report.applied_clinical_migrations.slice(8),candidateMigrations);
-   report.checks.push('upgrade_022_to_034_no_core_data_loss_no_clinical_grants');
+   report.checks.push('upgrade_022_to_035_no_core_data_loss_no_clinical_grants');
    report.snapshots.push({stage:'core_before_after',sha256:hash(before),tables:tables.map(table=>({table,rows:before[table].length}))});
   });
   await t.test('esquema final sin especialidades/clasificación y repetición sin cambios',async()=>{

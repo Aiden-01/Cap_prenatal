@@ -7,7 +7,7 @@ const { execFileSync, spawnSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { failureDiagnostic, processDiagnostic } = require('../../.github/clinical/test-failure-diagnostics.cjs');
 const { collectLayoutDiagnostics } = require('./helpers/layoutDiagnostics');
-const { verifyReviewedLayout, verifyResponsiveActions } = require('../../.github/clinical/candidate-integrity.cjs');
+const { reviewedOwnerEmailChanges, verifyOwnerEmailDiff, verifyReviewedLayout, verifyResponsiveActions } = require('../../.github/clinical/candidate-integrity.cjs');
 const title = 'CI conserva la ubicación de la aserción';
 
 if (process.env.PREDEPLOY03_REPORTER_FIXTURE === '1') {
@@ -20,6 +20,20 @@ if (process.env.PREDEPLOY03_REPORTER_FIXTURE === '1') {
     setImmediate(() => Promise.reject(new Error('private password: synthetic value')));
   });
 } else {
+  test('CPREN-126 verifica el conjunto exacto, modo y contenido productivo aprobado', () => {
+    const root = path.resolve(__dirname, '../..');
+    const changes = reviewedOwnerEmailChanges.join('\n');
+    const readBlob = (file, verifyContent) => ({ mode: '100644 blob',
+      content: verifyContent ? fs.readFileSync(path.join(root, file), 'utf8') : undefined });
+    const product = verifyOwnerEmailDiff(changes, readBlob);
+    assert.equal(product.length, 14);
+    assert.ok(product.some(item => item.file.endsWith('/035_cambio_correo_titular.sql')));
+    assert.throws(() => verifyOwnerEmailDiff(changes + '\nM\tfrontend/src/App.jsx', readBlob), /rutas no revisadas/);
+    assert.throws(() => verifyOwnerEmailDiff(changes.replace('035_cambio_correo_titular.sql', '034_recuperacion_password.sql'), readBlob), /rutas no revisadas/);
+    assert.throws(() => verifyOwnerEmailDiff(changes, (file, check) => ({ ...readBlob(file, check), mode: '100755 blob' })), /Modo no revisado/);
+    assert.throws(() => verifyOwnerEmailDiff(changes, (file, check) => ({ ...readBlob(file, check), content: 'otro contenido' })), /Contenido productivo no revisado/);
+  });
+
   test('diagnóstico de proceso rechaza claves y estados ajenos sin publicar texto arbitrario', () => {
     const valid = { stage: 'document-timeout', ready: true, parent: 'absent', child: 'Z', tempRemoved: true };
     assert.deepEqual(processDiagnostic(JSON.stringify(valid)), valid);

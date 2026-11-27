@@ -7,3 +7,17 @@
 .account-email-dialog .account-email-code { font: 600 1.3rem ui-monospace, monospace; letter-spacing: .24em; text-align: center; border-radius: .75rem; min-height: 3rem; }
 .account-email-dialog .forced-password-logout { margin: .65rem auto 0; display: flex; }
 .login-recovery-link { align-self: flex-end; border: 0; padding: .25rem 0; color: var(--primary); background: transparent; font: inherit; font-size: .85rem; text-decoration: underline; cursor: pointer; }
+
+.sidebar-email-action {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  width: 100%;
+  padding: .6rem .75rem;
+  margin-bottom: .4rem;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, .72);
+  font-size: .9rem;
+  cursor: pointer;
+}

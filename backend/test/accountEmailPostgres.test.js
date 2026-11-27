@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
-const { randomBytes } = require('node:crypto');
+const { createHmac, randomBytes } = require('node:crypto');
 const fs = require('node:fs');
 const net = require('node:net');
 const os = require('node:os');
@@ -13,6 +13,7 @@ const { Pool } = require('pg');
 const { migrate } = require('../src/db/migrate');
 const appPool = require('../src/db/pool');
 const { createAccountEmailService } = require('../src/services/accountEmailService');
+const { createOwnEmailRouter } = require('../src/routes/ownEmail');
 const { createPasswordRecoveryRouter } = require('../src/routes/accountEmail');
 const { authMiddleware, csrfMiddleware } = require('../src/middleware/auth');
 const { errorHandler } = require('../src/middleware/errorHandler');
@@ -21,6 +22,7 @@ const origin = 'http://127.0.0.1:5175';
 const validPassword = 'Exercise-Secure-B7!';
 const initialPassword = 'Exercise-Secure-A8!';
 const migration = '034_recuperacion_password.sql';
+const emailChangeMigration = '035_cambio_correo_titular.sql';
 
 test('034 incrementa el esquema y protege el restablecimiento real HTTP en PostgreSQL aislado', {
   skip: process.env.RUN_CPREN129_TEMP_POSTGRES !== '1', timeout: 240_000,
@@ -57,7 +59,7 @@ test('034 incrementa el esquema y protege el restablecimiento real HTTP en Postg
     const options = { logger: { log() {}, error() {} }, setExitCode() {} };
     const before = await migrate({ ...options, db: new Pool(config),
       readSchema: (file, enc) => fs.readFileSync(file, enc).split('-- CPREN-129:')[0],
-      readDirectory: folder => fs.readdirSync(folder).filter(file => file !== migration),
+      readDirectory: folder => fs.readdirSync(folder).filter(file => ![migration, emailChangeMigration].includes(file)),
       verifyCompatibility() {},
     });
     assert.equal(before.ok, true, before.error?.message);
@@ -69,7 +71,8 @@ test('034 incrementa el esquema y protege el restablecimiento real HTTP en Postg
       + "SELECT login, login, correo, $1, (SELECT id FROM roles WHERE nombre='director'), activa FROM "
       + "(VALUES ('activa','activa@example.invalid',true),"
       + "('inactiva','inactiva@example.invalid',false),('legada',NULL,true),('cambio','cambio@example.invalid',true),"
-      + "('limites','limites@example.invalid',true),('admin','admin@example.invalid',true)) AS x(login,correo,activa) RETURNING id,username", [initialHash]);
+      + "('limites','limites@example.invalid',true),('admin','admin@example.invalid',true),"
+      + "('propia','propia@example.invalid',true),('carrera1',NULL,true),('carrera2',NULL,true)) AS x(login,correo,activa) RETURNING id,username", [initialHash]);
     const ids = Object.fromEntries(accounts.map(row => [row.username, row.id]));
     const result = await migrate({ ...options, db: new Pool(config) });
     assert.equal(result.ok, true, result.error?.message);
@@ -86,10 +89,12 @@ test('034 incrementa el esquema y protege el restablecimiento real HTTP en Postg
     const expressApp = express();
     expressApp.set('trust proxy', 'loopback');
     expressApp.use(express.json());
-    const recoveryRouter = createPasswordRecoveryRouter({ nodeEnv: 'production', frontendOrigins: [origin], accountEmail: { enabled: true } },
-      createAccountEmailService({ secret: randomBytes(32).toString('hex'), send: async message => { messages.push(message); }, query: appPool.query }));
+    const secret = randomBytes(32).toString('hex');
+    const accountEmail = createAccountEmailService({ secret, send: async message => { messages.push(message); }, query: appPool.query });
+    const recoveryRouter = createPasswordRecoveryRouter({ nodeEnv: 'production', frontendOrigins: [origin], accountEmail: { enabled: true } }, accountEmail);
     expressApp.use('/api/auth/recuperacion', recoveryRouter);
     expressApp.use('/api', csrfMiddleware);
+    expressApp.use('/api/auth/correo', createOwnEmailRouter(accountEmail));
     expressApp.use('/api/auth', require('../src/routes/auth'));
     expressApp.use('/api/usuarios', require('../src/routes/usuarios'));
     expressApp.get('/api/pacientes', authMiddleware, (_req, res) => res.json({ ok: true }));
@@ -257,6 +262,129 @@ test('034 incrementa el esquema y protege el restablecimiento real HTTP en Postg
         assert.equal((await sendFrom(targetEmail, `192.0.2.${i}`)).status, 202);
       }
       assert.equal(messages.length, before + 5);
+    });
+
+    const own = '/auth/correo';
+    let fixtureIp = 80;
+    const loginAs = async username => {
+      const jar = new Map();
+      const login = await call('/auth/login', jar, { username, password: initialPassword }, { 'X-Forwarded-For': '192.0.2.' + fixtureIp++ });
+      assert.equal(login.status, 200);
+      return jar;
+    };
+    const requestOwn = (jar, email, password = initialPassword, headers = {}) =>
+      call(own + '/solicitar', jar, { email, current_password: password }, headers);
+    const confirmOwn = (jar, email, id, code) =>
+      call(own + '/confirmar', jar, { email, challenge_id: id, code });
+    async function mailedCode(to, kind = 'confirmar-correo') {
+      for (let step = 0; step < 30; step += 1) {
+        const message = messages.findLast(item => item.kind === kind && item.to === to);
+        if (message) return message.code;
+        await delay(20);
+      }
+      assert.fail('El transporte simulado no recibió el correo esperado');
+    }
+
+    await t.test('035 agrega correo al legado, reautentica y comprueba sesión, destino, código y CSRF', async () => {
+      const owner = await loginAs('legada');
+      const second = await loginAs('legada');
+      const destination = 'legada.nueva@example.invalid';
+      assert.equal((await call(own, new Map())).status, 401);
+      assert.deepEqual((await call(own, owner)).body, { email: null, available: true });
+      assert.equal((await requestOwn(owner, destination, initialPassword, { 'X-CSRF-Token': 'incorrecto' })).status, 403);
+      assert.equal((await requestOwn(owner, destination, 'incorrecta')).body.code, 'ACCOUNT_EMAIL_PASSWORD_INVALID');
+      assert.equal((await requestOwn(owner, ' ADMIN@EXAMPLE.INVALID ')).body.code, 'EMAIL_DUPLICADO');
+      assert.equal((await call(own + '/solicitar', owner, { email: destination, current_password: initialPassword, usuario_id: ids.activa })).status, 400);
+
+      const requested = await requestOwn(owner, ' LEGADA.NUEVA@EXAMPLE.INVALID ');
+      assert.equal(requested.status, 202);
+      const id = requested.body.challenge_id;
+      const code = await mailedCode(destination);
+      const { rows: [pending] } = await db.query('SELECT * FROM cuenta_cambios_correo WHERE usuario_id=$1', [ids.legada]);
+      assert.match(pending.codigo_mac, /^[a-f0-9]{64}$/);
+      assert.ok(!JSON.stringify(pending).includes(destination));
+      assert.equal((await call(own, owner)).body.email, null);
+      assert.equal((await requestOwn(owner, destination)).status, 429);
+      assert.equal((await confirmOwn(second, destination, id, code)).status, 400);
+      assert.equal((await confirmOwn(owner, 'otro@example.invalid', id, code)).status, 400);
+      assert.equal((await confirmOwn(owner, destination, id, fakeCode(code))).status, 400);
+      assert.equal((await confirmOwn(owner, destination, id, code)).status, 200);
+      assert.equal((await call('/auth/me', second)).status, 401);
+      const resumed = await loginAs('legada');
+      assert.equal((await call(own, resumed)).body.email, destination);
+      assert.equal((await confirmOwn(resumed, destination, id, code)).status, 400);
+      assert.ok(!messages.some(message => message.kind === 'aviso-correo'));
+    });
+
+    await t.test('035 vence el desafío y el cambio revoca las autorizaciones previas; la recuperación usa el nuevo correo', async () => {
+      const owner = await loginAs('propia');
+      const old = 'propia@example.invalid';
+      const next = 'propia.nueva@example.invalid';
+      const expired = 'propia.vencida@example.invalid';
+      const jar = new Map();
+      assert.equal((await issue(jar, old)).status, 202);
+      const oldCode = await mailedCode(old, 'recuperar');
+      const grant = await verify(jar, oldCode, old);
+      assert.equal(grant.status, 200);
+      await expireCooldown();
+      const pendingRecovery = new Map();
+      assert.equal((await issue(pendingRecovery, old)).status, 202);
+
+      const stale = await requestOwn(owner, expired);
+      assert.equal(stale.status, 202);
+      const staleCode = await mailedCode(expired);
+      await db.query('UPDATE cuenta_cambios_correo SET vence_at=clock_timestamp() WHERE usuario_id=$1', [ids.propia]);
+      assert.equal((await confirmOwn(owner, expired, stale.body.challenge_id, staleCode)).status, 400);
+      assert.equal((await call(own, owner)).body.email, old);
+
+      await expireCooldown();
+      const requested = await requestOwn(owner, next);
+      assert.equal(requested.status, 202);
+      const code = await mailedCode(next);
+      assert.equal((await confirmOwn(owner, next, requested.body.challenge_id, code)).status, 200);
+      assert.deepEqual((await db.query('SELECT (SELECT count(*)::int FROM cuenta_codigos_email WHERE usuario_id=$1) AS challenges,'
+        + ' (SELECT count(*)::int FROM cuenta_autorizaciones_recuperacion WHERE usuario_id=$1) AS grants', [ids.propia])).rows[0],
+      { challenges: 0, grants: 0 });
+      assert.equal((await reset(jar, grant.body.csrf)).status, 403);
+      await mailedCode(old, 'aviso-correo');
+      const notice = messages.find(message => message.kind === 'aviso-correo');
+      assert.deepEqual(Object.keys(notice).sort(), ['id', 'kind', 'to']);
+      assert.equal(notice.to, old);
+
+      await expireCooldown();
+      const recovered = new Map();
+      assert.equal((await issue(recovered, next)).status, 202);
+      const recovery = await verify(recovered, await mailedCode(next, 'recuperar'), next);
+      assert.equal(recovery.status, 200);
+      assert.equal((await reset(recovered, recovery.body.csrf)).status, 200);
+      const { rows } = await db.query("SELECT descripcion, datos_nuevos FROM auditoria_eventos WHERE descripcion LIKE 'cambio_correo_%'");
+      assert.ok(rows.some(row => row.descripcion === 'cambio_correo_confirmado'));
+      for (const value of [old, next, code, initialPassword]) assert.ok(!JSON.stringify(rows).includes(value));
+    });
+
+    await t.test('PostgreSQL deja un único ganador cuando dos titulares confirman el mismo correo', async () => {
+      const first = await loginAs('carrera1');
+      const second = await loginAs('carrera2');
+      const shared = 'compartido@example.invalid';
+      const responses = await Promise.all([requestOwn(first, shared), requestOwn(second, shared)]);
+      assert.ok(responses.every(result => result.status === 202));
+      await mailedCode(shared);
+      for (let step = 0; step < 30 && messages.filter(item => item.to === shared).length < 2; step += 1) await delay(20);
+      const sent = messages.filter(item => item.to === shared);
+      assert.equal(sent.length, 2);
+      // El transporte es asíncrono. Asociamos cada código con el MAC de su desafío.
+      for (const [index, name] of ['carrera1', 'carrera2'].entries()) {
+        const { rows: [row] } = await db.query('SELECT c.*, u.password_hash, u.email FROM cuenta_cambios_correo c JOIN usuarios u ON u.id=c.usuario_id WHERE u.id=$1', [ids[name]]);
+        const message = sent.find(item => createHmac('sha256', secret).update(JSON.stringify([
+          'cambio-correo:v1', row.usuario_id, row.sesion_id, shared, row.email, row.password_hash, row.id, item.code,
+        ])).digest('hex') === row.codigo_mac);
+        assert.ok(message);
+        responses[index].code = message.code;
+      }
+      const confirmation = await Promise.all(responses.map((result, index) =>
+        confirmOwn([first, second][index], shared, result.body.challenge_id, result.code)));
+      assert.deepEqual(confirmation.map(result => result.status).sort(), [200, 409]);
+      assert.equal((await db.query('SELECT 1 FROM usuarios WHERE email=$1', [shared])).rowCount, 1);
     });
   } finally {
     Object.assign(appPool, originalPool);

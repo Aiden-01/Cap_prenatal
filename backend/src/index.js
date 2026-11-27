@@ -23,6 +23,7 @@ const helmet = require('helmet');
 
 const authRoutes = require('./routes/auth');
 const { createPasswordRecoveryRouter } = require('./routes/accountEmail');
+const { createOwnEmailRouter } = require('./routes/ownEmail');
 const { createAccountEmailService } = require('./services/accountEmailService');
 const { accountEmailDeliveryPath, createAccountEmailTransport } = require('./services/accountEmailTransport');
 const usuariosRoutes = require('./routes/usuarios');
@@ -102,6 +103,7 @@ const accountEmailService = accountEmailTransport
 if (accountEmailTransport) app.post(accountEmailDeliveryPath + '/:messageId', accountEmailTransport.claim);
 app.use('/api/auth/recuperacion', createPasswordRecoveryRouter(config, accountEmailService));
 app.use('/api', csrfMiddleware);
+app.use('/api/auth/correo', createOwnEmailRouter(accountEmailService));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/usuarios', usuariosRoutes);
