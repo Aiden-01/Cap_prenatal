@@ -7,7 +7,7 @@ on:
 
 env:
   # Completar con el SHA aprobado en el único push que autorice la validación.
-  CPREN129_APPROVED_SHA: 'df6c2e9fffd86d514357ac30c9f7b24ac7ae3e99'
+  CPREN129_APPROVED_SHA: 'b9bdfe9557fdf73ee449748dad4a1111f8df8342'
 
 permissions:
   contents: read
