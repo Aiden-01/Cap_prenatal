@@ -9,7 +9,8 @@ const { setTimeout: delay } = require('node:timers/promises');
 const test = require('node:test');
 const bcrypt = require('bcryptjs');
 const express = require('express');
-const { Pool } = require('pg');
+const { PostgresTestPool: Pool, runPostgresCleanup, removeTemporaryPostgres } = require('./helpers/postgresCleanup');
+const { setImmediate: nextCheckPhase } = require('node:timers/promises');
 const { migrate } = require('../src/db/migrate');
 const appPool = require('../src/db/pool');
 const { createAccountEmailService } = require('../src/services/accountEmailService');
@@ -49,7 +50,31 @@ test('034 incrementa el esquema y protege el restablecimiento real HTTP en Postg
   let server;
   let db;
   const messages = [];
-  try {
+  t.after(async () => {
+    await runPostgresCleanup(t, [
+      ...(server ? [['close-http-server', async () => {
+        await new Promise((resolve, reject) => {
+          server.close(error => error ? reject(error) : resolve());
+          server.closeIdleConnections();
+        });
+      }]] : []),
+      // deliver() queues its simulated send in the check phase. All HTTP handlers
+      // have completed above, so this barrier runs after their queued callbacks.
+      ['drain-simulated-delivery', () => nextCheckPhase()],
+      ['close-pool', async () => {
+        if (db) await db.end();
+        await runPostgresCleanup(t, [['restore-shared-pool', () => {
+          Object.assign(appPool, originalPool);
+          dotenv.config = originalDotenv;
+        }]]);
+      }],
+      ['clean-temporary-directory', () => removeTemporaryPostgres(t, {
+        config, dataDirectory: dataDir, root: dir, prefix: 'cap-cpren129-',
+        stop: started ? () => run('pg_ctl', ['-D', dataDir, '-m', 'fast', '-w', 'stop']) : null,
+      })],
+    ]);
+    t.diagnostic('postgres-cleanup:complete');
+  });
     run('initdb', ['-D', dataDir, '-U', config.user, '-A', 'trust', '--no-locale', '-E', 'UTF8']);
     const socket = process.platform === 'win32' ? '' : ' -k "' + dir + '"';
     run('pg_ctl', ['-D', dataDir, '-l', path.join(dir, 'postgres.log'), '-o', '-h 127.0.0.1 -p ' + port + socket, '-w', 'start']);
@@ -386,14 +411,4 @@ test('034 incrementa el esquema y protege el restablecimiento real HTTP en Postg
       assert.deepEqual(confirmation.map(result => result.status).sort(), [200, 409]);
       assert.equal((await db.query('SELECT 1 FROM usuarios WHERE email=$1', [shared])).rowCount, 1);
     });
-  } finally {
-    Object.assign(appPool, originalPool);
-    dotenv.config = originalDotenv;
-    if (server) await new Promise(resolve => server.close(resolve));
-    if (db) await db.end();
-    if (started) run('pg_ctl', ['-D', dataDir, '-m', 'fast', '-w', 'stop']);
-    assert.equal(path.dirname(dir), os.tmpdir());
-    assert.ok(path.basename(dir).startsWith('cap-cpren129-'));
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-  }
 });

@@ -9,6 +9,15 @@ const recoveryBaseline = 'bb7bc7a612758cf7889f510b847968ab24a2dd0c';
 const recoveryRef = 'refs/heads/feature/recuperacion-password';
 const recoveryMigration = '034_recuperacion_password.sql';
 const approvedRecoveryRun = '0c0f7d94d1c6c99d4364bb2e8e28f5be911f0112';
+const approvedOwnerCheckpoint = 'b9bdfe9557fdf73ee449748dad4a1111f8df8342';
+const approvedOwnerRun = '35a70a4ba0ca9563b5acce3f5b28ccd4f1fe3473';
+const correctiveChanges = Object.freeze([
+  'M\t.github/clinical/candidate-integrity.cjs',
+  'M\t.github/clinical/test-failure-diagnostics.cjs',
+  'M\tbackend/test/accountEmailPostgres.test.js',
+  'M\tbackend/test/predeploy03Diagnostics.test.js',
+  'M\tbackend/test/retiroReferencias.test.js',
+].sort());
 const ownerEmailMigration = '035_cambio_correo_titular.sql';
 const workflow = '.github/workflows/clinical-predeploy02.yml';
 const dependencyFiles = ['backend/package.json', 'backend/package-lock.json',
@@ -83,6 +92,18 @@ function verifyOwnerEmailDiff(changes, readBlob) {
   return product;
 }
 
+function verifyCorrectiveDiff(changes, readMode) {
+  assert.deepEqual(changes.trim().split('\n').sort(), correctiveChanges, 'Diff correctivo no autorizado');
+  for (const entry of correctiveChanges) assert.equal(readMode(entry.slice(2)), '100644 blob', 'Modo correctivo no autorizado');
+}
+
+function verifyCorrectiveLineage(head, checkpoint, parents) {
+  assert.deepEqual(parents(approvedOwnerCheckpoint), [approvedOwnerCheckpoint, approvedRecoveryRun], 'Linaje productivo incorrecto');
+  assert.deepEqual(parents(approvedOwnerRun), [approvedOwnerRun, approvedOwnerCheckpoint], 'Activación histórica incorrecta');
+  assert.deepEqual(parents(checkpoint), [checkpoint, approvedOwnerRun], 'Checkpoint correctivo fuera de linaje');
+  assert.deepEqual(parents(head), [head, checkpoint], 'Activación correctiva fuera de linaje');
+}
+
 function verifyReviewedCandidate(root, expectedHead, { ref, approvedCheckpoint } = {}) {
   const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
   const head = git(['rev-parse', 'HEAD']).trim();
@@ -112,14 +133,18 @@ function verifyReviewedCandidate(root, expectedHead, { ref, approvedCheckpoint }
       'A\t' + migrationDir + '/' + recoveryMigration, 'El candidato histórico de CPREN-129 incorpora únicamente la 034');
     git(['diff', '--exit-code', recoveryBaseline, approvedRecoveryRun, '--', migrationDir, 'frontend/src', ...dependencyFiles,
       'n8n/workflows', 'n8n/email-senders.json']);
-    assert.deepEqual(git(['rev-list', '--parents', '-n', '1', approvedCheckpoint]).trim().split(' '),
-      [approvedCheckpoint, approvedRecoveryRun], 'El checkpoint CPREN-126 debe partir directamente del SHA validado de CPREN-129');
+    verifyCorrectiveLineage(head, approvedCheckpoint,
+      sha => git(['rev-list', '--parents', '-n', '1', sha]).trim().split(' '));
+    assert.equal(git(['diff', '--name-status', approvedOwnerCheckpoint, approvedOwnerRun]).trim(), 'M\t' + workflow,
+      'Activación histórica modificó rutas adicionales');
+    verifyCorrectiveDiff(git(['diff', '--name-status', '--no-renames', approvedOwnerRun, approvedCheckpoint]),
+      file => git(['ls-tree', approvedCheckpoint, '--', file]).split(' ').slice(0, 2).join(' '));
     assert.equal(git(['diff', '--name-status', '--no-renames', approvedRecoveryRun, head, '--', migrationDir]).trim(),
       'A\t' + migrationDir + '/' + ownerEmailMigration, 'La 035 debe ser la única migración nueva; las anteriores se conservan');
-    const product = verifyOwnerEmailDiff(git(['diff', '--name-status', '--no-renames', approvedRecoveryRun, approvedCheckpoint]),
+    const product = verifyOwnerEmailDiff(git(['diff', '--name-status', '--no-renames', approvedRecoveryRun, approvedOwnerCheckpoint]),
       (file, hashRequired) => ({
-        mode: git(['ls-tree', approvedCheckpoint, '--', file]).split(' ').slice(0, 2).join(' '),
-        content: hashRequired ? git(['show', approvedCheckpoint + ':' + file]) : undefined,
+        mode: git(['ls-tree', approvedOwnerCheckpoint, '--', file]).split(' ').slice(0, 2).join(' '),
+        content: hashRequired ? git(['show', approvedOwnerCheckpoint + ':' + file]) : undefined,
       }));
     const recoveryProtected = [...protectedPaths, 'backend/test', '.github', 'n8n/security', 'n8n/workflows', 'n8n/email-senders.json'];
     git(['diff', '--exit-code', head, '--', ...recoveryProtected]);
@@ -140,4 +165,5 @@ function verifyReviewedCandidate(root, expectedHead, { ref, approvedCheckpoint }
   return { fourthLinux, reviewedCandidate, reviewedLayout, addedMigrations, responsiveActions };
 }
 
-module.exports = { recoveryRef, reviewedOwnerEmailChanges, verifyOwnerEmailDiff, verifyReviewedLayout, verifyReviewedCandidate, verifyResponsiveActions };
+module.exports = { recoveryRef, correctiveChanges, verifyCorrectiveDiff, verifyCorrectiveLineage,
+  reviewedOwnerEmailChanges, verifyOwnerEmailDiff, verifyReviewedLayout, verifyReviewedCandidate, verifyResponsiveActions };

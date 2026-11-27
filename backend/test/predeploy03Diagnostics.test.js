@@ -9,6 +9,7 @@ const { failureDiagnostic, processDiagnostic } = require('../../.github/clinical
 const { collectLayoutDiagnostics } = require('./helpers/layoutDiagnostics');
 const { reviewedOwnerEmailChanges, verifyOwnerEmailDiff, verifyReviewedLayout, verifyResponsiveActions } = require('../../.github/clinical/candidate-integrity.cjs');
 const title = 'CI conserva la ubicación de la aserción';
+const { correctiveChanges, verifyCorrectiveDiff, verifyCorrectiveLineage } = require('../../.github/clinical/candidate-integrity.cjs');
 
 if (process.env.PREDEPLOY03_REPORTER_FIXTURE === '1') {
   test('CI conserva la ubicación de la aserción', async t => {
@@ -20,6 +21,30 @@ if (process.env.PREDEPLOY03_REPORTER_FIXTURE === '1') {
     setImmediate(() => Promise.reject(new Error('private password: synthetic value')));
   });
 } else {
+  test('CPREN-126 correctivo rechaza rutas productivas, migraciones, modos y linajes ajenos', () => {
+    const changes = correctiveChanges.join('\n');
+    verifyCorrectiveDiff(changes, () => '100644 blob');
+    for (const file of ['backend/src/services/accountEmailService.js', 'backend/src/db/migrations/035_cambio_correo_titular.sql',
+      'frontend/src/App.jsx', 'backend/package-lock.json', 'n8n/security/recuperacion-password.json']) {
+      assert.throws(() => verifyCorrectiveDiff(changes + '\nM\t' + file, () => '100644 blob'));
+    }
+    assert.throws(() => verifyCorrectiveDiff(changes, () => '100755 blob'));
+    assert.throws(() => verifyCorrectiveDiff(correctiveChanges.slice(1).join('\n'), () => '100644 blob'));
+    const product = 'b9bdfe9557fdf73ee449748dad4a1111f8df8342';
+    const run = '35a70a4ba0ca9563b5acce3f5b28ccd4f1fe3473';
+    const parents = new Map([
+      [product, [product, '0c0f7d94d1c6c99d4364bb2e8e28f5be911f0112']],
+      [run, [run, product]], ['checkpoint', ['checkpoint', run]], ['activation', ['activation', 'checkpoint']],
+    ]);
+    verifyCorrectiveLineage('activation', 'checkpoint', sha => parents.get(sha));
+    for (const sha of parents.keys()) {
+      const changed = new Map(parents);
+      changed.set(sha, [sha, 'other']);
+      assert.throws(() => verifyCorrectiveLineage('activation', 'checkpoint', key => changed.get(key)));
+      changed.set(sha, [...parents.get(sha), 'second-parent']);
+      assert.throws(() => verifyCorrectiveLineage('activation', 'checkpoint', key => changed.get(key)));
+    }
+  });
   test('CPREN-126 verifica el conjunto exacto, modo y contenido productivo aprobado', () => {
     const root = path.resolve(__dirname, '../..');
     const changes = reviewedOwnerEmailChanges.join('\n');

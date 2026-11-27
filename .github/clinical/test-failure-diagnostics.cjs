@@ -11,6 +11,7 @@ const failureKinds = new Set(['testCodeFailure', 'subtestsFailed', 'hookFailed',
   'testAborted', 'cancelledByParent', 'parentAlreadyFinished', 'uncaughtException', 'unhandledRejection']);
 const syscalls = new Set(['connect', 'listen', 'read', 'write', 'open', 'unlink', 'rmdir', 'scandir', 'spawnSync']);
 const cleanupSteps = new Set(['close-pool', 'close-control-pool', 'close-fixture', 'restore-shared-pool',
+  'close-http-server', 'drain-simulated-delivery',
   'verify-client-sessions', 'drop-fixture-databases', 'stop-temporary-server', 'stop-after-drain-failure',
   'clean-temporary-directory', 'remove-temporary-files', 'complete']);
 const signals = new Set(['SIGTERM', 'SIGKILL', 'SIGABRT', 'SIGSEGV', 'SIGINT']);
